@@ -17,6 +17,7 @@ import UserPortalApp from "./components/user/UserApp"
 import ApprovalManagement from "@/app/components/leave/ApprovalManagement"
 import OrgStructure from "./components/org/OrgStructure"
 import UserProfile from "./components/user/UserProfile"
+import IPManagement from "./components/IPManagement"
 
 // ─── CONSTANTS 
 const avatarImg = `https://ui-avatars.com/api/?name=T&background=C62828&color=fff&bold=true`
@@ -2522,10 +2523,7 @@ export default function App() {
       case "thong-ke": return <Statistics />
       case "duyet-don": return <ApprovalManagement />
       case "tai-khoan": return <AccountManagement />
-      case "ip": return (
-        <PlaceholderPage title="Quản lý IP" desc="Cấu hình danh sách địa chỉ IP được phép thực hiện chấm công." icon={Wifi}
-          items={["Thêm IP mới", "Danh sách IP", "Khoá IP", "Lịch sử truy cập"]} />
-      )
+      case "ip": return <IPManagement />
       case "tien-ich": return (
         <PlaceholderPage title="Tiện ích" desc="Các công cụ hỗ trợ vận hành hệ thống và quản lý dữ liệu chấm công." icon={Wrench}
           items={["Quản lý admin", "Điều chỉnh chấm công", "BXH gắn bó", "Sinh mã nhân viên"]} />
