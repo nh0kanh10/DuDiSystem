@@ -1,0 +1,783 @@
+[
+  {
+    "id": "branch-hcm",
+    "name": "Chi nhánh TP.HCM",
+    "code": "HCM-BR",
+    "type": "branch",
+    "managerId": "NV009",
+    "managerTitle": "Giám đốc Chi nhánh",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "dept-tech",
+    "name": "Phòng Công nghệ",
+    "code": "TECH-DEPT",
+    "type": "department",
+    "managerId": "NV009",
+    "managerTitle": "Trưởng phòng",
+    "parentId": "branch-hcm",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-dev",
+    "name": "Bộ phận Phát triển phần mềm",
+    "code": "DEV-SUB",
+    "type": "sub-department",
+    "managerId": "NV009",
+    "managerTitle": "Trưởng Phòng",
+    "parentId": "dept-tech",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-dev-lead",
+    "name": "Team Leader",
+    "code": "DEV-TL",
+    "type": "position",
+    "managerId": "NV009",
+    "managerTitle": "Team Leader",
+    "parentId": "sub-dev",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-dev-be",
+    "name": "Backend Developer",
+    "code": "DEV-BE",
+    "type": "position",
+    "parentId": "sub-dev",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-dev-fe",
+    "name": "Frontend Developer",
+    "code": "DEV-FE",
+    "type": "position",
+    "parentId": "sub-dev",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-dev-full",
+    "name": "Fullstack Developer",
+    "code": "DEV-FULL",
+    "type": "position",
+    "parentId": "sub-dev",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-dev-mobi",
+    "name": "Mobile Developer",
+    "code": "DEV-MOB",
+    "type": "position",
+    "parentId": "sub-dev",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-dev-intern",
+    "name": "Thực tập sinh Developer",
+    "code": "DEV-INT",
+    "type": "position",
+    "parentId": "sub-dev",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "team-be-core",
+    "name": "Nhóm Backend Core",
+    "code": "BE-CORE",
+    "type": "team",
+    "managerId": "NV002",
+    "managerTitle": "Team Lead",
+    "parentId": "pos-dev-be",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "team-fe-erp",
+    "name": "Nhóm Frontend ERP",
+    "code": "FE-ERP",
+    "type": "team",
+    "managerId": "NV001",
+    "managerTitle": "Team Lead",
+    "parentId": "pos-dev-fe",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-qa",
+    "name": "Bộ phận QA/QC",
+    "code": "QA-SUB",
+    "type": "sub-department",
+    "parentId": "dept-tech",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-qa-lead",
+    "name": "Trưởng nhóm QA",
+    "code": "QA-TL",
+    "type": "position",
+    "parentId": "sub-qa",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-qa-man",
+    "name": "Manual Tester",
+    "code": "QA-MAN",
+    "type": "position",
+    "parentId": "sub-qa",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-qa-auto",
+    "name": "Automation Tester",
+    "code": "QA-AUTO",
+    "type": "position",
+    "parentId": "sub-qa",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-qa-perf",
+    "name": "Performance Tester",
+    "code": "QA-PERF",
+    "type": "position",
+    "parentId": "sub-qa",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-qa-intern",
+    "name": "Thực tập sinh Tester",
+    "code": "QA-INT",
+    "type": "position",
+    "parentId": "sub-qa",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-design",
+    "name": "Bộ phận BA & UI/UX",
+    "code": "BAUX-SUB",
+    "type": "sub-department",
+    "parentId": "dept-tech",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-ba-lead",
+    "name": "Trưởng nhóm BA",
+    "code": "BA-TL",
+    "type": "position",
+    "parentId": "sub-design",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-ba-special",
+    "name": "Business Analyst",
+    "code": "BA-SPEC",
+    "type": "position",
+    "parentId": "sub-design",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-ui",
+    "name": "UI Designer",
+    "code": "UI-DES",
+    "type": "position",
+    "parentId": "sub-design",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-ux",
+    "name": "UX Designer",
+    "code": "UX-DES",
+    "type": "position",
+    "parentId": "sub-design",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-prod",
+    "name": "Product Designer",
+    "code": "PROD-DES",
+    "type": "position",
+    "parentId": "sub-design",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-design-intern",
+    "name": "Thực tập sinh BA/UIUX",
+    "code": "BAUX-INT",
+    "type": "position",
+    "parentId": "sub-design",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-devops",
+    "name": "Bộ phận DevOps & Hạ tầng",
+    "code": "OPS-SUB",
+    "type": "sub-department",
+    "parentId": "dept-tech",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-ops-devops",
+    "name": "DevOps Engineer",
+    "code": "OPS-DEVOPS",
+    "type": "position",
+    "parentId": "sub-devops",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-ops-sys",
+    "name": "System Administrator",
+    "code": "OPS-SYS",
+    "type": "position",
+    "parentId": "sub-devops",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-ops-cloud",
+    "name": "Cloud Engineer",
+    "code": "OPS-CLD",
+    "type": "position",
+    "parentId": "sub-devops",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-ops-sec",
+    "name": "Security Engineer",
+    "code": "OPS-SEC",
+    "type": "position",
+    "parentId": "sub-devops",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-ops-support",
+    "name": "IT Support dự án",
+    "code": "OPS-SUP",
+    "type": "position",
+    "parentId": "sub-devops",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "dept-finance",
+    "name": "Phòng Tài chính - Kế toán",
+    "code": "FIN-DEPT",
+    "type": "department",
+    "managerId": "NV009",
+    "managerTitle": "Trưởng phòng",
+    "parentId": "branch-hcm",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-accounting",
+    "name": "Bộ phận Kế toán",
+    "code": "ACC-SUB",
+    "type": "sub-department",
+    "managerId": "NV009",
+    "managerTitle": "Kế toán trưởng",
+    "parentId": "dept-finance",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-acc-gen",
+    "name": "Kế toán tổng hợp",
+    "code": "ACC-GEN",
+    "type": "position",
+    "parentId": "sub-accounting",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-acc-int",
+    "name": "Kế toán nội bộ",
+    "code": "ACC-INT",
+    "type": "position",
+    "parentId": "sub-accounting",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-acc-debt",
+    "name": "Kế toán công nợ",
+    "code": "ACC-DEBT",
+    "type": "position",
+    "parentId": "sub-accounting",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-acc-tax",
+    "name": "Kế toán thuế",
+    "code": "ACC-TAX",
+    "type": "position",
+    "parentId": "sub-accounting",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-acc-cash",
+    "name": "Thủ quỹ",
+    "code": "ACC-CASH",
+    "type": "position",
+    "parentId": "sub-accounting",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-audit",
+    "name": "Bộ phận Kiểm soát nội bộ",
+    "code": "AUDIT-SUB",
+    "type": "sub-department",
+    "parentId": "dept-finance",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-audit-ins",
+    "name": "Kiểm soát viên nội bộ",
+    "code": "AUD-INS",
+    "type": "position",
+    "parentId": "sub-audit",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-audit-fa",
+    "name": "Chuyên viên phân tích tài chính",
+    "code": "AUD-FA",
+    "type": "position",
+    "parentId": "sub-audit",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-audit-risk",
+    "name": "Chuyên viên quản lý rủi ro",
+    "code": "AUD-RISK",
+    "type": "position",
+    "parentId": "sub-audit",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "dept-sales",
+    "name": "Phòng Kinh doanh",
+    "code": "SAL-DEPT",
+    "type": "department",
+    "managerId": "NV009",
+    "managerTitle": "Trưởng phòng",
+    "parentId": "branch-hcm",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-sales",
+    "name": "Bộ phận Sales",
+    "code": "SAL-SUB",
+    "type": "sub-department",
+    "managerId": "NV009",
+    "managerTitle": "Trưởng phòng",
+    "parentId": "dept-sales",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-sales-b2b",
+    "name": "Nhân viên Kinh doanh B2B",
+    "code": "SAL-B2B",
+    "type": "position",
+    "parentId": "sub-sales",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-sales-b2c",
+    "name": "Nhân viên Kinh doanh B2C",
+    "code": "SAL-B2C",
+    "type": "position",
+    "parentId": "sub-sales",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-sales-tele",
+    "name": "Telesales",
+    "code": "SAL-TELE",
+    "type": "position",
+    "parentId": "sub-sales",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-sales-mkt",
+    "name": "Phát triển thị trường",
+    "code": "SAL-MKT",
+    "type": "position",
+    "parentId": "sub-sales",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-sales-intern",
+    "name": "Thực tập sinh Sales",
+    "code": "SAL-INT",
+    "type": "position",
+    "parentId": "sub-sales",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-cskh",
+    "name": "Bộ phận CSKH",
+    "code": "CSKH-SUB",
+    "type": "sub-department",
+    "parentId": "dept-sales",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-cskh-staff",
+    "name": "Nhân viên CSKH",
+    "code": "CS-STAFF",
+    "type": "position",
+    "parentId": "sub-cskh",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-cskh-am",
+    "name": "Account Manager",
+    "code": "CS-AM",
+    "type": "position",
+    "parentId": "sub-cskh",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-cskh-del",
+    "name": "Nhân viên Triển khai",
+    "code": "CS-DEL",
+    "type": "position",
+    "parentId": "sub-cskh",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-cskh-tech",
+    "name": "Hỗ trợ kỹ thuật sau bán",
+    "code": "CS-TECH",
+    "type": "position",
+    "parentId": "sub-cskh",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "dept-mkt",
+    "name": "Phòng Marketing",
+    "code": "MKT-DEPT",
+    "type": "department",
+    "parentId": "branch-hcm",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-mkt-digital",
+    "name": "Bộ phận Digital & Nội dung",
+    "code": "DIG-SUB",
+    "type": "sub-department",
+    "parentId": "dept-mkt",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-mkt-digi",
+    "name": "Digital Marketing Executive",
+    "code": "MKT-DIGI",
+    "type": "position",
+    "parentId": "sub-mkt-digital",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-mkt-cont",
+    "name": "Content Marketing",
+    "code": "MKT-CONT",
+    "type": "position",
+    "parentId": "sub-mkt-digital",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-mkt-copy",
+    "name": "Copywriter",
+    "code": "MKT-COPY",
+    "type": "position",
+    "parentId": "sub-mkt-digital",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-mkt-seo",
+    "name": "SEO Specialist",
+    "code": "MKT-SEO",
+    "type": "position",
+    "parentId": "sub-mkt-digital",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-mkt-ads",
+    "name": "Ads Specialist",
+    "code": "MKT-ADS",
+    "type": "position",
+    "parentId": "sub-mkt-digital",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-mkt-soc",
+    "name": "Social Media Executive",
+    "code": "MKT-SOC",
+    "type": "position",
+    "parentId": "sub-mkt-digital",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-mkt-des",
+    "name": "Designer Marketing",
+    "code": "MKT-DES",
+    "type": "position",
+    "parentId": "sub-mkt-digital",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-mkt-vid",
+    "name": "Video Editor",
+    "code": "MKT-VID",
+    "type": "position",
+    "parentId": "sub-mkt-digital",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-mkt-intern",
+    "name": "Thực tập sinh Marketing",
+    "code": "MKT-INT",
+    "type": "position",
+    "parentId": "sub-mkt-digital",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "dept-hr",
+    "name": "Phòng Nhân sự - Hành chính",
+    "code": "HR-DEPT",
+    "type": "department",
+    "managerId": "NV009",
+    "managerTitle": "Trưởng phòng",
+    "parentId": "branch-hcm",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-recruitment",
+    "name": "Bộ phận Tuyển dụng",
+    "code": "REC-SUB",
+    "type": "sub-department",
+    "managerId": "NV009",
+    "managerTitle": "Trưởng phòng",
+    "parentId": "dept-hr",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-rec-lead",
+    "name": "Trưởng nhóm Tuyển dụng",
+    "code": "REC-TL",
+    "type": "position",
+    "parentId": "sub-recruitment",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-rec-spec",
+    "name": "Chuyên viên Tuyển dụng",
+    "code": "REC-SPEC",
+    "type": "position",
+    "parentId": "sub-recruitment",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-rec-staff",
+    "name": "Nhân viên Tuyển dụng",
+    "code": "REC-STAFF",
+    "type": "position",
+    "parentId": "sub-recruitment",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-rec-intern",
+    "name": "Thực tập sinh Tuyển dụng",
+    "code": "REC-INT",
+    "type": "position",
+    "parentId": "sub-recruitment",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-cb",
+    "name": "Bộ phận C&B",
+    "code": "CB-SUB",
+    "type": "sub-department",
+    "managerId": "NV009",
+    "managerTitle": "Phó phòng",
+    "parentId": "dept-hr",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-cb-spec",
+    "name": "Chuyên viên C&B",
+    "code": "CB-SPEC",
+    "type": "position",
+    "parentId": "sub-cb",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-cb-pay",
+    "name": "Nhân viên tiền lương",
+    "code": "CB-PAY",
+    "type": "position",
+    "parentId": "sub-cb",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-cb-ins",
+    "name": "Nhân viên BHXH - HĐLĐ",
+    "code": "CB-INS",
+    "type": "position",
+    "parentId": "sub-cb",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-admin",
+    "name": "Bộ phận Hành chính & Hậu cần",
+    "code": "ADM-SUB",
+    "type": "sub-department",
+    "parentId": "dept-hr",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-adm-staff",
+    "name": "Nhân viên Hành chính",
+    "code": "ADM-STAFF",
+    "type": "position",
+    "parentId": "sub-admin",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-adm-clerk",
+    "name": "Văn thư",
+    "code": "ADM-CLERK",
+    "type": "position",
+    "parentId": "sub-admin",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-adm-asset",
+    "name": "Quản lý tài sản",
+    "code": "ADM-ASSET",
+    "type": "position",
+    "parentId": "sub-admin",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-adm-recep",
+    "name": "Lễ tân",
+    "code": "ADM-RECEP",
+    "type": "position",
+    "parentId": "sub-admin",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-adm-maid",
+    "name": "Tạp vụ",
+    "code": "ADM-MAID",
+    "type": "position",
+    "parentId": "sub-admin",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "sub-it-internal",
+    "name": "Bộ phận IT nội bộ",
+    "code": "ITINT-SUB",
+    "type": "sub-department",
+    "parentId": "dept-hr",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-it-sup",
+    "name": "IT Support nội bộ",
+    "code": "IT-SUP",
+    "type": "position",
+    "parentId": "sub-it-internal",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-it-tech",
+    "name": "Kỹ thuật viên máy tính",
+    "code": "IT-TECH",
+    "type": "position",
+    "parentId": "sub-it-internal",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "pos-it-sysadmin",
+    "name": "Quản trị hệ thống nội bộ",
+    "code": "IT-SYS",
+    "type": "position",
+    "parentId": "sub-it-internal",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  }
+]

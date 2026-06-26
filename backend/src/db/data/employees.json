@@ -1,0 +1,156 @@
+[
+  {
+    "id": "NV001", "name": "Trần Thị Bích Liên", "email": "lien.tran@dudi.vn", "phone": "0901 234 567",
+    "department": "Frontend", "position": "Senior Developer", "joinDate": "28/05/2026",
+    "status": "active", "contractType": "Chính thức", "orgNodeId": "team-fe-erp",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "28/05/2026", "toDate": "", "orgNodeId": "team-fe-erp", "snapshot": "Nhóm Frontend ERP · Frontend Developer · Bộ phận Phát triển phần mềm · Phòng Công nghệ" }
+    ],
+    "internEndDate": "", "university": "", "notes": "", "resignDate": ""
+  },
+  {
+    "id": "NV002", "name": "Nguyễn Văn Minh", "email": "minh.nguyen@dudi.vn", "phone": "0912 345 678",
+    "department": "Backend", "position": "Lead Developer", "joinDate": "12/03/2024",
+    "status": "active", "contractType": "Chính thức", "orgNodeId": "team-be-core",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "12/03/2024", "toDate": "", "orgNodeId": "team-be-core", "snapshot": "Nhóm Backend Core · Backend Developer · Bộ phận Phát triển phần mềm · Phòng Công nghệ" }
+    ],
+    "internEndDate": "", "university": "", "notes": "", "resignDate": ""
+  },
+  {
+    "id": "NV003", "name": "Lê Thu Hương", "email": "huong.le@dudi.vn", "phone": "0923 456 789",
+    "department": "Design", "position": "UI/UX Designer", "joinDate": "15/08/2023",
+    "status": "active", "contractType": "Chính thức", "orgNodeId": "pos-ui",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "15/08/2023", "toDate": "", "orgNodeId": "pos-ui", "snapshot": "UI Designer · Bộ phận BA & UI/UX · Phòng Công nghệ" }
+    ],
+    "internEndDate": "", "university": "", "notes": "", "resignDate": ""
+  },
+  {
+    "id": "NV004", "name": "Phạm Đức Thành", "email": "thanh.pham@dudi.vn", "phone": "0934 567 890",
+    "department": "PM", "position": "Project Manager", "joinDate": "28/01/2025",
+    "status": "active", "contractType": "Chính thức", "orgNodeId": "pos-dev-lead",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "28/01/2025", "toDate": "", "orgNodeId": "pos-dev-lead", "snapshot": "Team Leader · Bộ phận Phát triển phần mềm · Phòng Công nghệ" }
+    ],
+    "internEndDate": "", "university": "", "notes": "", "resignDate": ""
+  },
+  {
+    "id": "NV005", "name": "Hoàng Thị Mai", "email": "mai.hoang@dudi.vn", "phone": "0945 678 901",
+    "department": "HR", "position": "HR Manager", "joinDate": "12/09/2024",
+    "status": "active", "contractType": "Chính thức", "orgNodeId": "pos-rec-lead",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "12/09/2024", "toDate": "", "orgNodeId": "pos-rec-lead", "snapshot": "Trưởng nhóm Tuyển dụng · Bộ phận Tuyển dụng · Phòng Nhân sự - Hành chính" }
+    ],
+    "internEndDate": "", "university": "", "notes": "", "resignDate": ""
+  },
+  {
+    "id": "NV006", "name": "Võ Minh Tuấn", "email": "tuan.vo@dudi.vn", "phone": "0956 789 012",
+    "department": "Backend", "position": "Developer", "joinDate": "01/06/2025",
+    "status": "intern", "contractType": "Thực tập", "orgNodeId": "pos-dev-intern",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "01/06/2025", "toDate": "", "orgNodeId": "pos-dev-intern", "snapshot": "Thực tập sinh Developer · Bộ phận Phát triển phần mềm · Phòng Công nghệ" }
+    ],
+    "internEndDate": "30/07/2026", "university": "", "notes": "", "resignDate": ""
+  },
+  {
+    "id": "NV007", "name": "Đinh Thị Lan Anh", "email": "lanh.dinh@dudi.vn", "phone": "0967 890 123",
+    "department": "Frontend", "position": "Developer", "joinDate": "15/07/2025",
+    "status": "intern", "contractType": "Thực tập", "orgNodeId": "pos-dev-fe",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "15/07/2025", "toDate": "", "orgNodeId": "pos-dev-fe", "snapshot": "Frontend Developer · Bộ phận Phát triển phần mềm · Phòng Công nghệ" }
+    ],
+    "internEndDate": "", "university": "", "notes": "", "resignDate": ""
+  },
+  {
+    "id": "NV008", "name": "Bùi Văn Hùng", "email": "hung.bui@dudi.vn", "phone": "0978 901 234",
+    "department": "DevOps", "position": "DevOps Engineer", "joinDate": "20/11/2024",
+    "status": "inactive", "contractType": "Chính thức", "orgNodeId": "pos-ops-devops",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "20/11/2024", "toDate": "", "orgNodeId": "pos-ops-devops", "snapshot": "DevOps Engineer · Bộ phận DevOps & Hạ tầng · Phòng Công nghệ" }
+    ],
+    "internEndDate": "", "university": "", "notes": "", "resignDate": ""
+  },
+  {
+    "id": "NV009", "name": "Võ Bá Thành Nhân", "email": "nhan.vo@dudi.vn", "phone": "0999 888 777",
+    "department": "IT", "position": "Director", "joinDate": "01/01/2020",
+    "status": "active", "contractType": "Chính thức", "orgNodeId": "branch-hcm",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "01/01/2020", "toDate": "", "orgNodeId": "branch-hcm", "snapshot": "Giám đốc Chi nhánh · Chi nhánh TP.HCM" }
+    ],
+    "internEndDate": "", "university": "", "notes": "", "resignDate": ""
+  },
+  {
+    "id": "NV010", "name": "Quản Trị Viên", "email": "admin@dudi.vn", "phone": "0988 888 888",
+    "department": "IT", "position": "System Administrator", "joinDate": "01/01/2026",
+    "status": "active", "contractType": "Chính thức", "orgNodeId": "branch-hcm",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "01/01/2026", "toDate": "", "orgNodeId": "branch-hcm", "snapshot": "Quản trị hệ thống · Chi nhánh TP.HCM" }
+    ],
+    "internEndDate": "", "university": "", "notes": "", "resignDate": ""
+  },
+  {
+    "id": "NV011", "name": "Trần Thị Bích Liên", "email": "lien@dudi.vn", "phone": "0911 100 011",
+    "department": "Frontend", "position": "Developer", "joinDate": "28/05/2026",
+    "status": "active", "contractType": "Chính thức", "orgNodeId": "team-fe-erp",
+    "cccd": "", "cccdDate": "", "cccdPlace": "",
+    "bankAccount": "", "bank": "",
+    "dob": "", "gender": "",
+    "curProvince": "", "curDistrict": "", "curWard": "", "curStreet": "",
+    "homeProvince": "", "homeDistrict": "", "homeWard": "", "homeStreet": "",
+    "workHistory": [
+      { "id": 1, "fromDate": "28/05/2026", "toDate": "", "orgNodeId": "team-fe-erp", "snapshot": "Nhóm Frontend ERP · Frontend Developer · Bộ phận Phát triển phần mềm · Phòng Công nghệ" }
+    ],
+    "internEndDate": "", "university": "", "notes": "", "resignDate": ""
+  }
+]

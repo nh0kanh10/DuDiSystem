@@ -1,0 +1,12 @@
+[
+  { "id": "T1",  "title": "Redesign dashboard UI",              "assigneeId": "NV003", "dueDate": "30/06/2026", "priority": "high",   "status": "in-progress" },
+  { "id": "T2",  "title": "Fix attendance API bug",             "assigneeId": "NV002", "dueDate": "26/06/2026", "priority": "high",   "status": "todo" },
+  { "id": "T3",  "title": "Tài liệu onboarding nhân viên mới", "assigneeId": "NV005", "dueDate": "01/07/2026", "priority": "medium", "status": "todo" },
+  { "id": "T4",  "title": "Review code module Nhân sự",         "assigneeId": "NV004", "dueDate": "28/06/2026", "priority": "medium", "status": "in-progress" },
+  { "id": "T5",  "title": "Setup CI/CD pipeline",               "assigneeId": "NV008", "dueDate": "27/06/2026", "priority": "high",   "status": "done" },
+  { "id": "T6",  "title": "Báo cáo tháng 6",                   "assigneeId": "NV005", "dueDate": "05/07/2026", "priority": "low",    "status": "todo" },
+  { "id": "T7",  "title": "Tích hợp API backend vào FE",       "assigneeId": "NV001", "dueDate": "29/06/2026", "priority": "high",   "status": "in-progress" },
+  { "id": "T8",  "title": "Viết unit test module chấm công",    "assigneeId": "NV002", "dueDate": "03/07/2026", "priority": "medium", "status": "todo" },
+  { "id": "T9",  "title": "Deploy lên staging server",          "assigneeId": "NV008", "dueDate": "30/06/2026", "priority": "high",   "status": "done" },
+  { "id": "T10", "title": "Thiết kế màn hình báo cáo v2",      "assigneeId": "NV003", "dueDate": "07/07/2026", "priority": "medium", "status": "todo" }
+]

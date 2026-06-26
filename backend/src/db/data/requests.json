@@ -1,0 +1,10 @@
+[
+  { "id": "XN001", "employeeId": "NV002", "leaveType": "Nghỉ phép năm",   "category": "leave",   "startDate": "28/06/2026", "endDate": "30/06/2026", "reason": "Du lịch gia đình",          "status": "pending",  "submittedAt": "24/06/2026" },
+  { "id": "XN002", "employeeId": "NV003", "leaveType": "Nghỉ ốm",          "category": "leave",   "startDate": "26/06/2026", "endDate": "26/06/2026", "reason": "Sức khỏe không tốt",        "status": "pending",  "submittedAt": "25/06/2026" },
+  { "id": "XN003", "employeeId": "NV006", "leaveType": "Nghỉ phép năm",   "category": "leave",   "startDate": "04/07/2026", "endDate": "05/07/2026", "reason": "Việc cá nhân",              "status": "pending",  "submittedAt": "23/06/2026" },
+  { "id": "XN004", "employeeId": "NV005", "leaveType": "Nghỉ cưới",        "category": "leave",   "startDate": "10/07/2026", "endDate": "12/07/2026", "reason": "Kết hôn",                   "status": "approved", "submittedAt": "20/06/2026" },
+  { "id": "XN005", "employeeId": "NV007", "leaveType": "Nghỉ phép năm",   "category": "leave",   "startDate": "27/06/2026", "endDate": "27/06/2026", "reason": "Việc cá nhân",              "status": "rejected", "submittedAt": "22/06/2026" },
+  { "id": "TO001", "employeeId": "NV001", "leaveType": "Time off bù tăng ca",  "category": "timeoff", "startDate": "02/07/2026", "endDate": "02/07/2026", "reason": "Bù 8h tăng ca tháng 5",    "status": "pending",  "submittedAt": "25/06/2026" },
+  { "id": "TO002", "employeeId": "NV004", "leaveType": "Time off theo chế độ", "category": "timeoff", "startDate": "07/07/2026", "endDate": "08/07/2026", "reason": "Ngày nghỉ bổ sung quý 2",  "status": "pending",  "submittedAt": "23/06/2026" },
+  { "id": "TO003", "employeeId": "NV008", "leaveType": "Time off bù tăng ca",  "category": "timeoff", "startDate": "30/06/2026", "endDate": "30/06/2026", "reason": "Bù 4h cuối tuần trực hệ thống", "status": "approved", "submittedAt": "21/06/2026" }
+]

@@ -61,7 +61,6 @@ const STATUS_COLOR: Record<string, string> = {
   low: "bg-blue-100 text-blue-600",
 }
 
-// ─── LOCAL UTILS & HELPERS ──────────────────────────────────────────────────
 function initials(name: string): string {
   return name.split(" ").pop()?.charAt(0) ?? "?"
 }
@@ -151,7 +150,6 @@ function getRequestForSlot(
   }) || null
 }
 
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function ApprovalManagement() {
   const [requests, setRequests] = useState<RequestRecord[]>([])
   const [slots, setSlots] = useState<TimeOffSlot[]>([])
@@ -163,11 +161,9 @@ export default function ApprovalManagement() {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [toastType, setToastType] = useState<"success" | "error">("success")
 
-  // Lazy-user premium features states
   const [bulkMode, setBulkMode] = useState(false)
   const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>([])
-  
-  // Date and employee filters
+
   const [selectedYear, setSelectedYear] = useState(2026)
   const [selectedMonth, setSelectedMonth] = useState(6)
   const [weekFilter, setWeekFilter] = useState("W26")
@@ -176,7 +172,6 @@ export default function ApprovalManagement() {
   const [employees, setEmployees] = useState<{ id: string; name: string; department: string; position?: string; joinDate?: string }[]>([])
   const [showToday, setShowToday] = useState(false)
 
-  // Leave types configuration state (Mocked UI)
   const [leaveTypes, setLeaveTypes] = useState([
     { id: "LT1", name: "Nghỉ phép năm", code: "AL", color: "bg-green-100 border border-green-300 text-green-700", maxDays: 12, description: "Nghỉ hưởng lương định kỳ hàng năm", active: true },
     { id: "LT2", name: "Nghỉ ốm", code: "SL", color: "bg-red-100 border border-red-300 text-red-600", maxDays: 5, description: "Nghỉ do ốm đau, cần giấy khám sức khỏe", active: true },
@@ -187,7 +182,6 @@ export default function ApprovalManagement() {
   const [showAddTypeModal, setShowAddTypeModal] = useState(false)
   const [newType, setNewType] = useState({ name: "", code: "", maxDays: 12, description: "" })
 
-  // Leave balance state (Mocked UI)
   const [leaveBalances, setLeaveBalances] = useState([
     { id: "LB1", empId: "NV001", name: "Trần Thị Bích Liên", department: "Frontend", total: 12, used: 2, remaining: 10 },
     { id: "LB2", empId: "NV002", name: "Nguyễn Văn Minh", department: "Backend", total: 12, used: 4, remaining: 8 },
@@ -200,7 +194,6 @@ export default function ApprovalManagement() {
   const [editingBalanceId, setEditingBalanceId] = useState<string | null>(null)
   const [editingValue, setEditingValue] = useState<number>(12)
 
-  // Quick register slot state
   const [quickAddSlot, setQuickAddSlot] = useState<{ empId: string; empName: string; day: number; session: "sang" | "chieu" } | null>(null)
   const [quickAddReason, setQuickAddReason] = useState("")
   const [quickAddType, setQuickAddType] = useState("Nghỉ phép năm")
@@ -272,7 +265,6 @@ export default function ApprovalManagement() {
     }
   }
 
-  // Quick operations directly on Grid cells using real APIs
   const handleQuickApprove = async (id: string) => {
     addProcessing(id)
     try {
@@ -299,7 +291,6 @@ export default function ApprovalManagement() {
     }
   }
 
-  // Bulk actions using APIs
   const handleApproveAllPending = async () => {
     const pendingSlots = slots.filter(s => s.status === "pending" && s.week === weekFilter)
     if (pendingSlots.length === 0) { showToast("Không có đơn nào chờ duyệt!", "error"); return }
@@ -355,7 +346,6 @@ export default function ApprovalManagement() {
     )
   }
 
-  // Save new Leave Type (Mock UI)
   const handleSaveLeaveType = () => {
     if (!newType.name.trim() || !newType.code.trim()) {
       showToast("Vui lòng nhập đầy đủ thông tin loại phép!", "error")
@@ -382,7 +372,6 @@ export default function ApprovalManagement() {
     showToast("Đã thêm loại nghỉ phép mới thành công!")
   }
 
-  // Inline edit Leave Balance (Mock UI)
   const startEditingBalance = (id: string, currentTotal: number) => {
     setEditingBalanceId(id)
     setEditingValue(currentTotal)
@@ -401,7 +390,6 @@ export default function ApprovalManagement() {
     showToast("Cập nhật hạn mức ngày phép thành công!")
   }
 
-  // Quick register slot action using real API
   const handleCreateQuickSlot = async () => {
     if (!quickAddReason.trim()) {
       showToast("Vui lòng nhập lý do nghỉ phép!", "error")
@@ -435,7 +423,6 @@ export default function ApprovalManagement() {
     }
   }
 
-  // --- Filtering requests and slots ---
   const filteredReqs = useMemo(
     () => requests.filter(r => statusFilter === "all" || r.status === statusFilter),
     [requests, statusFilter]
@@ -488,7 +475,6 @@ export default function ApprovalManagement() {
     rejected: "bg-red-50 border border-red-200 text-red-500 line-through",
   }
 
-  // Charts configuration
   const chartWeeklyData = [
     { day: "Thứ 2", "Đơn nghỉ": slots.filter(s => s.day === 1 && s.status === "approved").length },
     { day: "Thứ 3", "Đơn nghỉ": slots.filter(s => s.day === 2 && s.status === "approved").length },
@@ -507,7 +493,7 @@ export default function ApprovalManagement() {
 
   return (
     <div className="space-y-5">
-      {/* Premium custom Toast system */}
+      
       {toastMessage && (
         <div className="fixed bottom-8 right-8 bg-gradient-to-r from-gray-900 to-gray-800 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-50 border border-white/10 animate-bounce">
           <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-ping" />
@@ -515,7 +501,6 @@ export default function ApprovalManagement() {
         </div>
       )}
 
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-bold text-gray-800">Duyệt đơn & Quản lý nghỉ phép</h2>
@@ -533,7 +518,6 @@ export default function ApprovalManagement() {
         </div>
       </div>
 
-      {/* 5-Tab switcher */}
       <div className="flex bg-white rounded-xl p-1 shadow-sm border border-black/[0.06] overflow-x-auto gap-1">
         {[
           ["timeoff", "⏱ Lịch nghỉ tuần (Grid)"],
@@ -550,13 +534,12 @@ export default function ApprovalManagement() {
         ))}
       </div>
 
-      {/* ── TAB: Lịch Time off tuần (Grid View) ── */}
       {tab === "timeoff" && (
         <div className="space-y-4">
-          {/* Controls row */}
+          
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/[0.06] flex items-center justify-between flex-wrap gap-4">
             <div className="flex gap-3 flex-wrap flex-1 items-center">
-              {/* Dropdown tuần */}
+              
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-gray-400 uppercase">Tuần:</span>
                 <select value={weekFilter} onChange={e => setWeekFilter(e.target.value)}
@@ -566,7 +549,6 @@ export default function ApprovalManagement() {
                 </select>
               </div>
 
-              {/* Tìm nhân viên */}
               <div className="relative w-64">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input value={searchEmp} onChange={e => setSearchEmp(e.target.value)}
@@ -575,9 +557,8 @@ export default function ApprovalManagement() {
               </div>
             </div>
 
-            {/* Quick action buttons for lazy users */}
             <div className="flex items-center gap-2">
-              {/* Mode chọn nhiều */}
+              
               <button onClick={() => { setBulkMode(!bulkMode); setSelectedSlotIds([]) }}
                 className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all border
                   ${bulkMode
@@ -586,7 +567,6 @@ export default function ApprovalManagement() {
                 {bulkMode ? "✓ Đang chọn nhiều" : "🖱️ Chọn nhiều ô"}
               </button>
 
-              {/* Phê duyệt nhanh tất cả */}
               <button onClick={handleApproveAllPending}
                 className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-sm font-bold hover:from-amber-600 hover:to-orange-600 transition-all shadow-sm shadow-orange-500/10">
                 ⚡ Duyệt nhanh tất cả đơn chờ
@@ -594,7 +574,6 @@ export default function ApprovalManagement() {
             </div>
           </div>
 
-          {/* Legend */}
           <div className="flex gap-4 px-1">
             {[["bg-green-100 border border-green-300", "Đã duyệt"], ["bg-amber-100 border border-amber-300", "Chờ duyệt"], ["bg-red-100 border border-red-300", "Từ chối"]].map(([cls, label]) => (
               <div key={label} className="flex items-center gap-1.5">
@@ -604,7 +583,6 @@ export default function ApprovalManagement() {
             ))}
           </div>
 
-          {/* Table Grid */}
           <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-xs">
@@ -631,7 +609,7 @@ export default function ApprovalManagement() {
                 <tbody className="divide-y divide-gray-50">
                   {empRows.map(emp => (
                     <tr key={emp.empId} className="hover:bg-gray-50/30 transition-colors">
-                      {/* Employee Column */}
+                      
                       <td className="px-4 py-3.5 sticky left-0 bg-white z-10 border-r border-gray-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                         <div className="flex items-center gap-2.5">
                           <AvatarCircle name={emp.empName} size="sm" />
@@ -643,17 +621,16 @@ export default function ApprovalManagement() {
                         </div>
                       </td>
 
-                      {/* Day Sessions Columns */}
                       {DAYS.map(d => {
                         const sang = getSlot(emp.empId, d.day, "sang")
                         const chieu = getSlot(emp.empId, d.day, "chieu")
                         return (
                           <React.Fragment key={`${emp.empId}-${d.day}`}>
-                            {/* Session Sáng */}
+                            
                             <td className="px-1.5 py-2 border-l border-gray-100 text-center align-middle relative group/slot min-h-[48px]">
                               {sang ? (
                                 <div className="relative">
-                                  {/* Checkbox for bulk mode */}
+                                  
                                   {bulkMode && (
                                     <input type="checkbox" checked={selectedSlotIds.includes(sang.id)}
                                       onChange={() => toggleSelectSlot(sang.id)}
@@ -668,7 +645,6 @@ export default function ApprovalManagement() {
                                     <div className="opacity-75 truncate max-w-[64px] mx-auto mt-0.5 font-normal">{sang.reason}</div>
                                   </button>
 
-                                  {/* Quick Action Overlay (only visible on hover and when not in bulk mode) */}
                                   {!bulkMode && sang.status === "pending" && (
                                     <div className="absolute inset-0 bg-white/85 backdrop-blur-[1px] rounded-xl flex items-center justify-center gap-1.5 opacity-0 group-hover/slot:opacity-100 transition-all z-10 duration-200">
                                       {processingIds.includes(sang.id) ? (
@@ -689,7 +665,7 @@ export default function ApprovalManagement() {
                                   )}
                                 </div>
                               ) : (
-                                /* Quick Add Time Off on empty slot */
+                                
                                 <button onClick={() => setQuickAddSlot({ empId: emp.empId, empName: emp.empName, day: d.day, session: "sang" })}
                                   disabled={processingIds.includes("quick-create")}
                                   className="w-full h-8 rounded-lg border border-dashed border-gray-100 text-gray-300 hover:border-[#C62828]/30 hover:bg-red-50/30 hover:text-[#C62828] flex items-center justify-center transition-all opacity-0 group-hover/slot:opacity-100">
@@ -698,11 +674,10 @@ export default function ApprovalManagement() {
                               )}
                             </td>
 
-                            {/* Session Chiều */}
                             <td className="px-1.5 py-2 text-center align-middle relative group/slot min-h-[48px]">
                               {chieu ? (
                                 <div className="relative">
-                                  {/* Checkbox for bulk mode */}
+                                  
                                   {bulkMode && (
                                     <input type="checkbox" checked={selectedSlotIds.includes(chieu.id)}
                                       onChange={() => toggleSelectSlot(chieu.id)}
@@ -717,7 +692,6 @@ export default function ApprovalManagement() {
                                     <div className="opacity-75 truncate max-w-[64px] mx-auto mt-0.5 font-normal">{chieu.reason}</div>
                                   </button>
 
-                                  {/* Quick Action Overlay (only visible on hover and when not in bulk mode) */}
                                   {!bulkMode && chieu.status === "pending" && (
                                     <div className="absolute inset-0 bg-white/85 backdrop-blur-[1px] rounded-xl flex items-center justify-center gap-1.5 opacity-0 group-hover/slot:opacity-100 transition-all z-10 duration-200">
                                       {processingIds.includes(chieu.id) ? (
@@ -738,7 +712,7 @@ export default function ApprovalManagement() {
                                   )}
                                 </div>
                               ) : (
-                                /* Quick Add Time Off on empty slot */
+                                
                                 <button onClick={() => setQuickAddSlot({ empId: emp.empId, empName: emp.empName, day: d.day, session: "chieu" })}
                                   className="w-full h-8 rounded-lg border border-dashed border-gray-100 text-gray-300 hover:border-[#C62828]/30 hover:bg-red-50/30 hover:text-[#C62828] flex items-center justify-center transition-all opacity-0 group-hover/slot:opacity-100">
                                   <Plus size={12} />
@@ -761,7 +735,6 @@ export default function ApprovalManagement() {
             )}
           </div>
 
-          {/* Floating Bulk Action Bar at the bottom */}
           {bulkMode && selectedSlotIds.length > 0 && (
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 z-40 border border-white/10 animate-slide-up">
               <span className="text-sm font-semibold">Đã chọn <strong className="text-amber-400 text-base">{selectedSlotIds.length}</strong> buổi nghỉ phép</span>
@@ -784,7 +757,6 @@ export default function ApprovalManagement() {
         </div>
       )}
 
-      {/* ── TAB: Đơn xin nghỉ (List View) ── */}
       {tab === "leave" && (
         <div className="bg-white rounded-2xl shadow-sm border border-black/[0.06] overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100 flex gap-2 flex-wrap">
@@ -841,7 +813,6 @@ export default function ApprovalManagement() {
         </div>
       )}
 
-      {/* ── TAB: Hạn mức ngày phép (Inline Edit) ── */}
       {tab === "balance" && (
         <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
@@ -867,7 +838,6 @@ export default function ApprovalManagement() {
                     <td className="px-6 py-4 font-semibold text-gray-700">{balance.name}</td>
                     <td className="px-6 py-4 text-gray-500 text-xs">{balance.department}</td>
 
-                    {/* Inline edit total leave days */}
                     <td className="px-6 py-4 text-center align-middle font-bold text-gray-700">
                       {editingBalanceId === balance.id ? (
                         <div className="flex items-center justify-center gap-1.5 max-w-[120px] mx-auto">
@@ -903,7 +873,6 @@ export default function ApprovalManagement() {
         </div>
       )}
 
-      {/* ── TAB: Cấu hình loại phép ── */}
       {tab === "types" && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
@@ -945,10 +914,9 @@ export default function ApprovalManagement() {
         </div>
       )}
 
-      {/* ── TAB: Thống kê nghỉ phép (Recharts) ── */}
       {tab === "stats" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Biểu đồ số lượng người nghỉ theo thứ */}
+          
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
             <h3 className="font-bold text-gray-700 text-sm mb-4">Lịch sử nghỉ trong tuần (Đơn đã duyệt)</h3>
             <ResponsiveContainer width="100%" height={240}>
@@ -962,7 +930,6 @@ export default function ApprovalManagement() {
             </ResponsiveContainer>
           </div>
 
-          {/* Biểu đồ tỉ lệ các loại nghỉ */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
             <h3 className="font-bold text-gray-700 text-sm mb-4">Tỷ lệ theo loại nghỉ phép (%)</h3>
             <ResponsiveContainer width="100%" height={240}>
@@ -978,7 +945,6 @@ export default function ApprovalManagement() {
         </div>
       )}
 
-      {/* ── Modal: Xử lý yêu cầu chi tiết ── */}
       {selectedSlot && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-zoom-in">
@@ -1038,7 +1004,6 @@ export default function ApprovalManagement() {
         </div>
       )}
 
-      {/* ── Modal: Thêm loại nghỉ phép mới ── */}
       {showAddTypeModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-zoom-in">
@@ -1086,7 +1051,6 @@ export default function ApprovalManagement() {
         </div>
       )}
 
-      {/* ── Modal: Đăng ký Time Off nhanh (Quick Register & Approve) ── */}
       {quickAddSlot && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-zoom-in">

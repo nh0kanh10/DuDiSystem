@@ -1,0 +1,6 @@
+[
+  { "id": "U001", "employeeId": "NV001", "email": "lien.tran@dudi.vn", "password": "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", "role": "admin", "status": "active" },
+  { "id": "U002", "employeeId": "NV009", "email": "nhan.vo@dudi.vn", "password": "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", "role": "director", "status": "active" },
+  { "id": "U003", "employeeId": "NV010", "email": "admin@dudi.vn", "password": "$2a$10$gLujZnoS.gEjOE6JisXzZ.7MbmA5CBZo1KRorOLttnOkSZzrDVSr2", "role": "admin", "status": "active" },
+  { "id": "U004", "employeeId": "NV011", "email": "lien@dudi.vn", "password": "$2a$10$gLujZnoS.gEjOE6JisXzZ.7MbmA5CBZo1KRorOLttnOkSZzrDVSr2", "role": "employee", "status": "active" }
+]
