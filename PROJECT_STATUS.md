@@ -1,6 +1,6 @@
 # Project Status: DuDiSystem
 
-## 1. Current Milestone: Integrate Employee Portal (src2) & Merge Premium Components (Completed)
+## 1. Current Milestone: Complete Frontend/Backend Code Merge & Fix Compilation Errors (Completed)
 - **Status:** Completed
 - **Last Updated:** 2026-06-26
 
@@ -30,7 +30,7 @@
   - Replaced browser alert confirmations with the premium delete modal across both `OrgTreeView` and `OrgDetailView`.
   - Wrote a post-order descendant extraction logic to recursively purge all subtree items.
 
-- **Employee Portal (src2) Integration:**
+- **Employee Portal Integration & Build Fixes:**
   - Copied all portal components from `src2/app/components/user` to `frontend/app/components/user` (Dashboard, Attendance, Profile, Settings, Tasks, TimeOff, types).
   - Transferred image assets from `src2/imports` to `frontend/imports` to resolve image dependency errors.
   - Swapped default `App.tsx` with the new version containing user routing, login logic, and sidebar adjustments.
@@ -40,9 +40,15 @@
   - Handled missing `"user-chat"` route definition in `UserPortalLayout.tsx` by setting a functional placeholder.
   - Adjusted `tsconfig.json` parameters (`noUnusedLocals`, `noUnusedParameters`) to compile without warnings.
   - Cleaned up the local codebase by deleting `src2` folder upon successful integration.
+  - Added `allowedIPs` and `timeOffSlots` Mock handler APIs using `localStorage` persistence in `frontend/lib/api.ts` to allow testing IP settings and leave requests.
+  - Corrected entry point paths in `index.html` from `/src/main.tsx` to `/frontend/main.tsx`.
+  - Cleaned up duplicate and redundant configuration files at root (`default_shadcn_theme.css`, `pnpm-workspace.yaml`, `script.cjs`).
+  - Added a root `.gitignore` to prevent committing unnecessary directories like `node_modules` or AI agent folders.
+  - Resolved Recharts Tooltip conflicting alias issues in `ApprovalManagement.tsx`.
+  - Fixed missing props `emp={ME}` on the `UserProfile` call within `UserPortalLayout.tsx`.
   - Verified 100% production build success (`npm run build` exits with code 0).
+  - Successfully committed and pushed all clean unified codebase to GitHub main branch.
 
 ## 3. Next Steps
-- Push the local codebase to Github repository: `https://github.com/nh0kanh10/DuDiSystem`.
 - Verify viewport responsiveness on mobile/tablet view.
-- Transition state changes to backend endpoint integration if database storage is needed.
+- Test active backend database state sync for newly introduced settings.
