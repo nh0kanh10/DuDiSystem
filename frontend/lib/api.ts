@@ -97,47 +97,6 @@ export const api = {
     delete: (id: string) => req<unknown>("DELETE", `/notifications/${id}`),
   },
 
-  timeOffSlots: {
-    list: (params?: { week?: string; empId?: string; status?: string }) =>
-      req<unknown[]>("GET", `/time-off-slots${qs(params)}`),
-    create: (data: unknown) => req<unknown>("POST", "/time-off-slots", data),
-    approve: (id: string, adminNote?: string) =>
-      req<unknown>("PATCH", `/time-off-slots/${id}/approve`, { adminNote }),
-    reject: (id: string, adminNote?: string) =>
-      req<unknown>("PATCH", `/time-off-slots/${id}/reject`, { adminNote }),
-    approveAll: (week: string) =>
-      req<{ count: number }>("PATCH", "/time-off-slots/approve-all", { week }),
-    delete: (id: string) => req<unknown>("DELETE", `/time-off-slots/${id}`),
-  },
-
-  leaveTypes: {
-    list: () => req<unknown[]>("GET", "/leave-types"),
-    create: (data: unknown) => req<unknown>("POST", "/leave-types", data),
-    update: (id: string, data: unknown) => req<unknown>("PUT", `/leave-types/${id}`, data),
-    toggle: (id: string) => req<unknown>("PATCH", `/leave-types/${id}/toggle`),
-    delete: (id: string) => req<unknown>("DELETE", `/leave-types/${id}`),
-  },
-
-  leaveBalances: {
-    list: (params?: { empId?: string }) =>
-      req<unknown[]>("GET", `/leave-balances${qs(params)}`),
-    update: (id: string, total: number) =>
-      req<unknown>("PUT", `/leave-balances/${id}`, { total }),
-  },
-
-  allowedIPs: {
-    list: (params?: { status?: string; q?: string; orgNodeId?: string }) =>
-      req<unknown[]>("GET", `/allowed-ips${qs(params)}`),
-    getById: (id: string) => req<unknown>("GET", `/allowed-ips/${id}`),
-    create: (data: { ip: string; description?: string; orgNodeId?: string }) =>
-      req<unknown>("POST", "/allowed-ips", data),
-    update: (id: string, data: unknown) =>
-      req<unknown>("PUT", `/allowed-ips/${id}`, data),
-    toggle: (id: string) =>
-      req<unknown>("PATCH", `/allowed-ips/${id}/toggle`),
-    delete: (id: string) => req<unknown>("DELETE", `/allowed-ips/${id}`),
-  },
-
   dashboard: {
     stats: () =>
       req<{
@@ -148,6 +107,165 @@ export const api = {
         pendingRequests: number
         unreadNotifications: number
       }>("GET", "/dashboard/stats"),
+  },
+  allowedIPs: {
+    list: async (params?: { orgNodeId?: string }) => {
+      const mockAllowedIPsKey = "dudi_mock_allowed_ips";
+      const getMockAllowedIPs = () => {
+        const data = localStorage.getItem(mockAllowedIPsKey);
+        if (!data) {
+          const init = [
+            { id: "ip-1", ip: "192.168.1.1", description: "Văn phòng chính - Wifi", status: "active", orgNodeId: "branch-hcm", createdAt: new Date().toISOString() },
+            { id: "ip-2", ip: "10.0.0.1", description: "Văn phòng Tech - Wired", status: "active", orgNodeId: "branch-hcm", createdAt: new Date().toISOString() },
+          ];
+          localStorage.setItem(mockAllowedIPsKey, JSON.stringify(init));
+          return init;
+        }
+        return JSON.parse(data);
+      };
+      let list = getMockAllowedIPs();
+      if (params?.orgNodeId && params.orgNodeId !== "all") {
+        list = list.filter((ip: any) => ip.orgNodeId === params.orgNodeId);
+      }
+      return list;
+    },
+    create: async (data: { ip: string; description: string; orgNodeId?: string }) => {
+      const mockAllowedIPsKey = "dudi_mock_allowed_ips";
+      const getMockAllowedIPs = () => {
+        const saved = localStorage.getItem(mockAllowedIPsKey);
+        return saved ? JSON.parse(saved) : [];
+      };
+      const list = getMockAllowedIPs();
+      const newItem = {
+        id: `ip-${Date.now()}`,
+        ip: data.ip,
+        description: data.description,
+        status: "active" as const,
+        orgNodeId: data.orgNodeId,
+        createdAt: new Date().toISOString(),
+      };
+      list.push(newItem);
+      localStorage.setItem(mockAllowedIPsKey, JSON.stringify(list));
+      return newItem;
+    },
+    update: async (id: string, data: { ip: string; description: string; orgNodeId?: string }) => {
+      const mockAllowedIPsKey = "dudi_mock_allowed_ips";
+      const saved = localStorage.getItem(mockAllowedIPsKey);
+      const list = saved ? JSON.parse(saved) : [];
+      const index = list.findIndex((ip: any) => ip.id === id);
+      if (index !== -1) {
+        list[index] = { ...list[index], ...data };
+        localStorage.setItem(mockAllowedIPsKey, JSON.stringify(list));
+        return list[index];
+      }
+      throw new Error("Không tìm thấy IP");
+    },
+    toggle: async (id: string) => {
+      const mockAllowedIPsKey = "dudi_mock_allowed_ips";
+      const saved = localStorage.getItem(mockAllowedIPsKey);
+      const list = saved ? JSON.parse(saved) : [];
+      const index = list.findIndex((ip: any) => ip.id === id);
+      if (index !== -1) {
+        list[index].status = list[index].status === "active" ? "inactive" : "active";
+        localStorage.setItem(mockAllowedIPsKey, JSON.stringify(list));
+        return list[index];
+      }
+      throw new Error("Không tìm thấy IP");
+    },
+    delete: async (id: string) => {
+      const mockAllowedIPsKey = "dudi_mock_allowed_ips";
+      const saved = localStorage.getItem(mockAllowedIPsKey);
+      let list = saved ? JSON.parse(saved) : [];
+      list = list.filter((ip: any) => ip.id !== id);
+      localStorage.setItem(mockAllowedIPsKey, JSON.stringify(list));
+      return { success: true };
+    },
+  },
+
+  timeOffSlots: {
+    list: async (params?: { week?: string }) => {
+      const mockTimeOffSlotsKey = "dudi_mock_timeoff_slots";
+      const getMockTimeOffSlots = () => {
+        const data = localStorage.getItem(mockTimeOffSlotsKey);
+        if (!data) {
+          const init = [
+            { id: "S1", empId: "NV003", empName: "Lê Thu Hương", empCode: "2023081567", department: "Design", day: 1, session: "sang", reason: "Dạ đi học", status: "approved", week: "2026-W26", registeredAt: "21/6/2026", adminNote: "Đã được duyệt tự động (đồng bộ)", processedAt: "21/6/2026" },
+            { id: "S2", empId: "NV003", empName: "Lê Thu Hương", empCode: "2023081567", department: "Design", day: 1, session: "chieu", reason: "Dạ đi học", status: "approved", week: "2026-W26", registeredAt: "21/6/2026", adminNote: "Đã được duyệt tự động (đồng bộ)", processedAt: "21/6/2026" },
+            { id: "S3", empId: "NV004", empName: "Phạm Đức Thành", empCode: "2025012893", department: "PM", day: 2, session: "sang", reason: "Họp khách hàng", status: "pending", week: "2026-W26", registeredAt: "22/6/2026", adminNote: "", processedAt: "" },
+            { id: "S4", empId: "NV002", empName: "Nguyễn Văn Minh", empCode: "2024031245", department: "Backend", day: 2, session: "chieu", reason: "Việc cá nhân", status: "pending", week: "2026-W26", registeredAt: "22/6/2026", adminNote: "", processedAt: "" },
+            { id: "S5", empId: "NV005", empName: "Hoàng Thị Mai", empCode: "2024091234", department: "HR", day: 3, session: "sang", reason: "Đi khám bệnh", status: "approved", week: "2026-W26", registeredAt: "20/6/2026", adminNote: "Duyệt", processedAt: "21/6/2026" },
+            { id: "S6", empId: "NV006", empName: "Võ Minh Tuấn", empCode: "2025060001", department: "Backend", day: 3, session: "chieu", reason: "Bù tăng ca", status: "approved", week: "2026-W26", registeredAt: "21/6/2026", adminNote: "Duyệt bù giờ", processedAt: "21/6/2026" },
+            { id: "S7", empId: "NV007", empName: "Đinh Thị Lan Anh", empCode: "2025071501", department: "Frontend", day: 4, session: "sang", reason: "Gia đình có việc", status: "rejected", week: "2026-W26", registeredAt: "22/6/2026", adminNote: "Không đủ điều kiện", processedAt: "22/6/2026" },
+            { id: "S8", empId: "NV001", empName: "Trần Thị Bích Liên", empCode: "2026052831", department: "Frontend", day: 4, session: "chieu", reason: "Bù tăng ca T5", status: "pending", week: "2026-W26", registeredAt: "22/6/2026", adminNote: "", processedAt: "" },
+            { id: "S9", empId: "NV004", empName: "Phạm Đức Thành", empCode: "2025012893", department: "PM", day: 5, session: "sang", reason: "Học thêm", status: "approved", week: "2026-W26", registeredAt: "20/6/2026", adminNote: "OK", processedAt: "20/6/2026" },
+            { id: "S10", empId: "NV008", empName: "Bùi Văn Hùng", empCode: "2024112001", department: "DevOps", day: 5, session: "chieu", reason: "Trực ca đêm bù", status: "approved", week: "2026-W26", registeredAt: "21/6/2026", adminNote: "Duyệt bù trực", processedAt: "21/6/2026" },
+            { id: "S11", empId: "NV002", empName: "Nguyễn Văn Minh", empCode: "2024031245", department: "Backend", day: 6, session: "sang", reason: "Nghỉ phép năm", status: "pending", week: "2026-W26", registeredAt: "23/6/2026", adminNote: "", processedAt: "" },
+          ];
+          localStorage.setItem(mockTimeOffSlotsKey, JSON.stringify(init));
+          return init;
+        }
+        return JSON.parse(data);
+      };
+      let list = getMockTimeOffSlots();
+      if (params?.week) {
+        list = list.filter((s: any) => s.week === params.week);
+      }
+      return list;
+    },
+    create: async (data: any) => {
+      const mockTimeOffSlotsKey = "dudi_mock_timeoff_slots";
+      const saved = localStorage.getItem(mockTimeOffSlotsKey);
+      const list = saved ? JSON.parse(saved) : [];
+      const newItem = {
+        id: `S-${Date.now()}`,
+        ...data,
+      };
+      list.push(newItem);
+      localStorage.setItem(mockTimeOffSlotsKey, JSON.stringify(list));
+      return newItem;
+    },
+    approve: async (id: string, note?: string) => {
+      const mockTimeOffSlotsKey = "dudi_mock_timeoff_slots";
+      const saved = localStorage.getItem(mockTimeOffSlotsKey);
+      const list = saved ? JSON.parse(saved) : [];
+      const index = list.findIndex((s: any) => s.id === id);
+      if (index !== -1) {
+        list[index].status = "approved";
+        list[index].adminNote = note || "Đã duyệt";
+        list[index].processedAt = new Date().toLocaleString("vi");
+        localStorage.setItem(mockTimeOffSlotsKey, JSON.stringify(list));
+        return list[index];
+      }
+      throw new Error("Không tìm thấy ca nghỉ");
+    },
+    reject: async (id: string, note?: string) => {
+      const mockTimeOffSlotsKey = "dudi_mock_timeoff_slots";
+      const saved = localStorage.getItem(mockTimeOffSlotsKey);
+      const list = saved ? JSON.parse(saved) : [];
+      const index = list.findIndex((s: any) => s.id === id);
+      if (index !== -1) {
+        list[index].status = "rejected";
+        list[index].adminNote = note || "Từ chối";
+        list[index].processedAt = new Date().toLocaleString("vi");
+        localStorage.setItem(mockTimeOffSlotsKey, JSON.stringify(list));
+        return list[index];
+      }
+      throw new Error("Không tìm thấy ca nghỉ");
+    },
+    approveAll: async (week: string) => {
+      const mockTimeOffSlotsKey = "dudi_mock_timeoff_slots";
+      const saved = localStorage.getItem(mockTimeOffSlotsKey);
+      const list = saved ? JSON.parse(saved) : [];
+      list.forEach((s: any) => {
+        if (s.week === week && s.status === "pending") {
+          s.status = "approved";
+          s.adminNote = "Duyệt hàng loạt";
+          s.processedAt = new Date().toLocaleString("vi");
+        }
+      });
+      localStorage.setItem(mockTimeOffSlotsKey, JSON.stringify(list));
+      return { success: true };
+    },
   },
 }
 

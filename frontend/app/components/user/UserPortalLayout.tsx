@@ -35,7 +35,7 @@ export default function UserPortalLayout({ activePage, onNavigate, onLogout }: P
 
     const renderPage = () => {
         switch (activePage) {
-            case "user-profile": return <UserProfile />
+            case "user-profile": return <UserProfile emp={ME} />
             case "user-attendance": return <UserAttendance />
             case "user-timeoff": return <UserTimeOff />
             case "user-tasks": return <UserTasks />

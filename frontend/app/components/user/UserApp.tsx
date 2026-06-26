@@ -12,16 +12,16 @@ import dudiLogo from "../../../imports/avatar.jpg";
 const BRAND = "#E8231A";          // exact DUDI red
 const CRIMSON = "#C01525";          // deeper variant for depth
 const GOLD = "#FF8800";          // ember gold complement
-const BG = "#0C0102";          // near-black warm
+const BG = "#2a0a0f";          // even brighter warm ruby
 const GR = "rgba(232,35,26,0.28)";   // red glow
 const GG = "rgba(255,136,0,0.14)";   // gold glow
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 const PANEL_BG: React.CSSProperties = {
-  background: "rgba(12,2,4,0.88)",
+  background: "rgba(32,8,12,0.94)",
   backdropFilter: "blur(36px)",
   WebkitBackdropFilter: "blur(36px)",
-  border: `1px solid rgba(232,35,26,0.16)`,
+  border: `1px solid rgba(255,255,255,0.08)`,
   borderRadius: 24,
 };
 
@@ -57,13 +57,24 @@ type LeaveStatus = "pending" | "approved" | "cancelled";
 const EMP = {
   name: "Trần Thị Bích Liên",
   id: "2026052831",
+  dob: "31/05/2003",
+  gender: "Nữ",
+  cccd: "089303002304",
+  cccdPlace: "CCS",
+  bank: "Vietcombank",
+  bankAccount: "1025840990",
+  university: "Cao đẳng công thương",
+
   dept: "Kỹ thuật",
-  role: "Kỹ sư phần mềm",
-  email: "bich.lien@dudisoftware.com",
-  phone: "0901 234 567",
-  joinDate: "01/05/2026",
-  dob: "15/03/1998",
-  address: "123 Nguyễn Huệ, Q.1, TP.HCM",
+  role: "Intern Tester",
+  contractType: "Thử việc",
+  joinDate: "28/05/2026",
+  status: "Đang làm việc",
+
+  email: "tranbichlien935@gmail.com",
+  phone: "0352440603",
+  hometown: "Kiến Thuận 1, Xã Kiến Thành, Huyện Chợ Mới, Tỉnh An Giang",
+  address: "12a đường số 3 linh trung thủ đức, Phường Linh Trung, Thành phố Thủ Đức, Thành phố Hồ Chí Minh",
 };
 
 const WEEK = [
@@ -95,21 +106,80 @@ const LEAVES: { id: number; date: string; type: string; reason: string; status: 
 
 // ─── Bubble definitions ────────────────────────────────────────────────────────
 // ─── Bubble definitions ────────────────────────────────────────────────────────
-type BubbleId = "checkin" | "employee" | "leave" | "tasks" | "settings" | "directory" | "chat" | "workflow" | "notifications";
+type BubbleId = "checkin" | "employee" | "leave" | "tasks" | "settings" | "chat" | "workflow" | "notifications";
 
 const BUBBLES: {
-  id: BubbleId; label: string; sub: string; emoji: string;
+  id: BubbleId; label: string; sub: string; emoji: string | React.ReactNode;
   lx: string; ty: string; size: number; dur: number; delay: number; isCenter?: boolean;
 }[] = [
-    { id: "checkin", label: "Check-in", sub: "Chấm công", emoji: "⚡", lx: "50%", ty: "48%", size: 184, dur: 8.8, delay: 0, isCenter: true },
-    { id: "employee", label: "Hồ sơ", sub: "Cá nhân", emoji: "👤", lx: "22%", ty: "24%", size: 128, dur: 9.3, delay: 0.6 },
-    { id: "leave", label: "Ngày nghỉ", sub: "Phép & Time off", emoji: "🏖️", lx: "78%", ty: "24%", size: 128, dur: 8.9, delay: 1.1 },
-    { id: "directory", label: "Danh bạ", sub: "Nhân viên", emoji: "📖", lx: "12%", ty: "50%", size: 110, dur: 10.1, delay: 0.9 },
-    { id: "workflow", label: "Quy trình", sub: "Trình duyệt", emoji: "🔄", lx: "88%", ty: "50%", size: 116, dur: 9.8, delay: 1.5 },
-    { id: "tasks", label: "Công việc", sub: "Quản lý task", emoji: "📋", lx: "24%", ty: "74%", size: 120, dur: 9.6, delay: 0.4 },
-    { id: "chat", label: "Tin nhắn", sub: "Chat nội bộ", emoji: "💬", lx: "76%", ty: "74%", size: 120, dur: 9.2, delay: 1.2 },
-    { id: "settings", label: "Cài đặt", sub: "Tài khoản", emoji: "⚙️", lx: "38%", ty: "86%", size: 104, dur: 8.4, delay: 1.8 },
-    { id: "notifications", label: "Thông báo", sub: "Hệ thống", emoji: "🔔", lx: "62%", ty: "86%", size: 104, dur: 8.7, delay: 0.5 },
+    { id: "checkin", label: "Check-in", sub: "Chấm công", emoji: "⚡", lx: "50%", ty: "48%", size: 200, dur: 8.8, delay: 0, isCenter: true },
+    {
+      id: "employee", label: "Hồ sơ", sub: "Cá nhân",
+      emoji: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
+          <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
+        </svg>
+      ),
+      lx: "22%", ty: "28%", size: 140, dur: 9.3, delay: 0.6
+    },
+    {
+      id: "leave", label: "Ngày nghỉ", sub: "Phép & Time off",
+      emoji: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
+          <path fillRule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z" clipRule="evenodd" />
+        </svg>
+      ),
+      lx: "78%", ty: "28%", size: 140, dur: 8.9, delay: 1.1
+    },
+    {
+      id: "workflow", label: "Quy trình", sub: "Trình duyệt",
+      emoji: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
+          <path d="M21.731 2.269a2.625 2.625 0 0 0-3.712 0l-1.157 1.157 3.712 3.712 1.157-1.157a2.625 2.625 0 0 0 0-3.712ZM19.513 8.199l-3.712-3.712-8.4 8.4a5.25 5.25 0 0 0-1.32 2.214l-.8 2.685a.75.75 0 0 0 .933.933l2.685-.8a5.25 5.25 0 0 0 2.214-1.32l8.4-8.4Z" />
+          <path d="M5.25 5.25a3 3 0 0 0-3 3v10.5a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3V13.5a.75.75 0 0 0-1.5 0v5.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5V8.25a1.5 1.5 0 0 1 1.5-1.5h5.25a.75.75 0 0 0 0-1.5H5.25Z" />
+        </svg>
+      ),
+      lx: "88%", ty: "55%", size: 136, dur: 9.8, delay: 1.5
+    },
+    {
+      id: "tasks", label: "Công việc", sub: "Quản lý task",
+      emoji: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
+          <path fillRule="evenodd" d="M6 3.75A2.75 2.75 0 0 1 8.75 1h2.5A2.75 2.75 0 0 1 14 3.75v.443c.572.055 1.14.122 1.706.2C17.053 4.582 18 5.75 18 7.07v3.469c0 1.126-.694 2.191-1.83 2.54-1.952.599-4.024.921-6.17.921s-4.219-.322-6.17-.921C2.694 12.73 2 11.665 2 10.539V7.07c0-1.321.947-2.489 2.294-2.676A41.047 41.047 0 0 1 6 4.193V3.75Zm6.5 0v.325a41.622 41.622 0 0 0-5 0V3.75c0-.69.56-1.25 1.25-1.25h2.5c.69 0 1.25.56 1.25 1.25ZM10 10a1 1 0 0 0-1 1v.01a1 1 0 0 0 1 1h.01a1 1 0 0 0 1-1V11a1 1 0 0 0-1-1H10Z" clipRule="evenodd" />
+          <path d="M3 15.055v-.684c.126.053.255.1.39.142 2.092.642 4.313.987 6.61.987 2.297 0 4.518-.345 6.61-.987.135-.041.264-.089.39-.142v.684c0 1.347-.985 2.53-2.363 2.686a41.454 41.454 0 0 1-9.274 0C3.985 17.585 3 16.402 3 15.055Z" />
+        </svg>
+      ),
+      lx: "12%", ty: "55%", size: 136, dur: 9.6, delay: 0.4
+    },
+    {
+      id: "chat", label: "Tin nhắn", sub: "Chat nội bộ",
+      emoji: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
+          <path fillRule="evenodd" d="M12 2.25c-2.429 0-4.817.178-7.152.521C2.87 3.061 1.5 4.795 1.5 6.741v6.018c0 1.946 1.37 3.68 3.348 3.97.877.129 1.761.234 2.652.316V21a.75.75 0 0 0 1.28.53l4.184-4.183a.39.39 0 0 1 .266-.112c2.006-.05 3.982-.22 5.922-.506 1.978-.29 3.348-2.023 3.348-3.97V6.741c0-1.947-1.37-3.68-3.348-3.97A49.145 49.145 0 0 0 12 2.25ZM8.25 8.625a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25Zm2.625 1.125a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Zm4.875-1.125a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25Z" clipRule="evenodd" />
+        </svg>
+      ),
+      lx: "70%", ty: "80%", size: 128, dur: 9.2, delay: 1.2
+    },
+    {
+      id: "settings", label: "Cài đặt", sub: "Tài khoản",
+      emoji: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
+          <path d="M13.024 9.25c.47 0 .827-.433.637-.863a4 4 0 0 0-4.094-2.364c-.468.05-.665.576-.43.984l1.08 1.868a.75.75 0 0 0 .649.375h2.158ZM7.84 7.758c-.236-.408-.79-.5-1.068-.12A3.982 3.982 0 0 0 6 10c0 .884.287 1.7.772 2.363.278.38.832.287 1.068-.12l1.078-1.868a.75.75 0 0 0 0-.75L7.839 7.758ZM9.138 12.993c-.235.408-.039.934.43.984a4 4 0 0 0 4.094-2.364c.19-.43-.168-.863-.638-.863h-2.158a.75.75 0 0 0-.65.375l-1.078 1.868Z" />
+          <path fillRule="evenodd" d="m14.13 4.347.644-1.117a.75.75 0 0 0-1.299-.75l-.644 1.116a6.954 6.954 0 0 0-2.081-.556V1.75a.75.75 0 0 0-1.5 0v1.29a6.954 6.954 0 0 0-2.081.556L6.525 2.48a.75.75 0 1 0-1.3.75l.645 1.117A7.04 7.04 0 0 0 4.347 5.87L3.23 5.225a.75.75 0 1 0-.75 1.3l1.116.644A6.954 6.954 0 0 0 3.04 9.25H1.75a.75.75 0 0 0 0 1.5h1.29c.078.733.27 1.433.556 2.081l-1.116.645a.75.75 0 1 0 .75 1.298l1.117-.644a7.04 7.04 0 0 0 1.523 1.523l-.645 1.117a.75.75 0 1 0 1.3.75l.644-1.116a6.954 6.954 0 0 0 2.081.556v1.29a.75.75 0 0 0 1.5 0v-1.29a6.954 6.954 0 0 0 2.081-.556l.645 1.116a.75.75 0 0 0 1.299-.75l-.645-1.117a7.042 7.042 0 0 0 1.523-1.523l1.117.644a.75.75 0 0 0 .75-1.298l-1.116-.645a6.954 6.954 0 0 0 .556-2.081h1.29a.75.75 0 0 0 0-1.5h-1.29a6.954 6.954 0 0 0-.556-2.081l1.116-.644a.75.75 0 0 0-.75-1.3l-1.117.645a7.04 7.04 0 0 0-1.524-1.523ZM10 4.5a5.475 5.475 0 0 0-2.781.754A5.527 5.527 0 0 0 5.22 7.277 5.475 5.475 0 0 0 4.5 10a5.475 5.475 0 0 0 .752 2.777 5.527 5.527 0 0 0 2.028 2.004c.802.458 1.73.719 2.72.719a5.474 5.474 0 0 0 2.78-.753 5.527 5.527 0 0 0 2.001-2.027c.458-.802.719-1.73.719-2.72a5.475 5.475 0 0 0-.753-2.78 5.528 5.528 0 0 0-2.028-2.002A5.475 5.475 0 0 0 10 4.5Z" clipRule="evenodd" />
+        </svg>
+      ),
+      lx: "30%", ty: "80%", size: 128, dur: 8.4, delay: 1.8
+    },
+    {
+      id: "notifications", label: "Thông báo", sub: "Hệ thống",
+      emoji: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
+          <path d="M4.214 3.227a.75.75 0 0 0-1.156-.955 8.97 8.97 0 0 0-1.856 3.825.75.75 0 0 0 1.466.316 7.47 7.47 0 0 1 1.546-3.186ZM16.942 2.272a.75.75 0 0 0-1.157.955 7.47 7.47 0 0 1 1.547 3.186.75.75 0 0 0 1.466-.316 8.971 8.971 0 0 0-1.856-3.825Z" />
+          <path fillRule="evenodd" d="M10 2a6 6 0 0 0-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 0 0 .515 1.076 32.91 32.91 0 0 0 3.256.508 3.5 3.5 0 0 0 6.972 0 32.903 32.903 0 0 0 3.256-.508.75.75 0 0 0 .515-1.076A11.448 11.448 0 0 1 16 8a6 6 0 0 0-6-6Zm0 14.5a2 2 0 0 1-1.95-1.557 33.54 33.54 0 0 0 3.9 0A2 2 0 0 1 10 16.5Z" clipRule="evenodd" />
+        </svg>
+      ),
+      lx: "50%", ty: "88%", size: 128, dur: 8.7, delay: 0.5
+    },
   ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,16 +193,16 @@ function LeaveBadge({ status }: { status: LeaveStatus }) {
 }
 
 function SectionLabel({ children }: { children: string }) {
-  return <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(255,232,236,0.28)", marginBottom: 14 }}>{children}</p>;
+  return <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(255,232,236,0.65)", marginBottom: 14 }}>{children}</p>;
 }
 
 function FieldLabel({ children }: { children: string }) {
-  return <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,232,236,0.28)", marginBottom: 6 }}>{children}</p>;
+  return <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,232,236,0.65)", marginBottom: 6 }}>{children}</p>;
 }
 
 function FieldBox({ children, mono }: { children: React.ReactNode; mono?: boolean }) {
   return (
-    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "10px 12px", color: "#FFE8EC", fontSize: 13, fontFamily: mono ? "'JetBrains Mono', monospace" : "inherit" }}>
+    <div style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, padding: "10px 12px", color: "#FFFFFF", fontSize: 13, fontFamily: mono ? "'JetBrains Mono', monospace" : "inherit" }}>
       {children}
     </div>
   );
@@ -143,11 +213,13 @@ function AmbientBg() {
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
       {/* Large red glow bottom-left */}
-      <div style={{ position: "absolute", bottom: "-10%", left: "-5%", width: "55vw", height: "55vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(200,20,30,0.18) 0%, transparent 65%)` }} />
+      <div style={{ position: "absolute", bottom: "-10%", left: "-15%", width: "80vw", height: "80vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(220,30,40,0.45) 0%, transparent 75%)` }} />
       {/* Gold glow top-right */}
-      <div style={{ position: "absolute", top: "-8%", right: "-8%", width: "40vw", height: "40vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(200,80,0,0.1) 0%, transparent 60%)` }} />
+      <div style={{ position: "absolute", top: "-15%", right: "-10%", width: "60vw", height: "60vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(255,120,0,0.3) 0%, transparent 70%)` }} />
+      {/* Massive Gold glow bottom-right to eliminate black spots */}
+      <div style={{ position: "absolute", bottom: "-20%", right: "-15%", width: "75vw", height: "75vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(255,140,0,0.25) 0%, transparent 75%)` }} />
       {/* Subtle center glow */}
-      <div style={{ position: "absolute", top: "40%", left: "50%", transform: "translate(-50%,-50%)", width: "30vw", height: "30vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(180,10,25,0.08) 0%, transparent 70%)` }} />
+      <div style={{ position: "absolute", top: "40%", left: "50%", transform: "translate(-50%,-50%)", width: "55vw", height: "55vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(255,60,50,0.25) 0%, transparent 75%)` }} />
     </div>
   );
 }
@@ -234,18 +306,18 @@ function Bubble({ b, hovId, setHovId, onClick }: {
           transition: "box-shadow 0.35s ease, border-color 0.35s ease, background 0.35s ease",
           background: isHov
             ? b.isCenter
-              ? `radial-gradient(circle at 35% 30%, rgba(232,35,26,0.38), rgba(120,10,18,0.22))`
-              : `radial-gradient(circle at 35% 30%, rgba(232,35,26,0.25), rgba(80,6,12,0.15))`
+              ? `radial-gradient(circle at 35% 30%, rgba(232,35,26,0.48), rgba(120,10,18,0.35))`
+              : `radial-gradient(circle at 35% 30%, rgba(232,35,26,0.35), rgba(120,10,18,0.25))`
             : b.isCenter
-              ? `radial-gradient(circle at 35% 30%, rgba(232,35,26,0.22), rgba(90,8,14,0.12))`
-              : `radial-gradient(circle at 35% 30%, rgba(232,35,26,0.13), rgba(50,4,8,0.06))`,
+              ? `radial-gradient(circle at 35% 30%, rgba(232,35,26,0.32), rgba(90,8,14,0.22))`
+              : `radial-gradient(circle at 35% 30%, rgba(232,35,26,0.22), rgba(70,6,12,0.12))`,
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           border: isHov
-            ? `1px solid rgba(240,100,90,0.45)`
+            ? `1px solid rgba(240,100,90,0.55)`
             : b.isCenter
-              ? `1px solid rgba(232,80,80,0.32)`
-              : `1px solid rgba(200,60,55,0.2)`,
+              ? `1px solid rgba(232,80,80,0.42)`
+              : `1px solid rgba(220,60,55,0.3)`,
           boxShadow: isHov ? hovGlow : baseGlow,
         }}
       >
@@ -289,7 +361,6 @@ function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
     leave: "Quản lý ngày nghỉ",
     tasks: "Quản lý công việc",
     settings: "Cài đặt tài khoản",
-    directory: "Danh bạ công ty",
     chat: "Chat nội bộ",
     workflow: "Quy trình nội bộ",
     notifications: "Thông báo hệ thống",
@@ -358,7 +429,6 @@ function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
           {activePage === "employee" && <EmployeeContent />}
           {activePage === "leave" && <LeaveContent />}
           {activePage === "tasks" && <TasksContent />}
-          {activePage === "directory" && <DirectoryContent />}
           {activePage === "chat" && <ChatContent />}
           {activePage === "workflow" && <WorkflowContent />}
           {activePage === "notifications" && <NotificationsContent />}
@@ -476,19 +546,21 @@ function CheckinContent({ checkedIn, setCheckedIn }: { checkedIn: boolean; setCh
 
 // ─── Employee content ─────────────────────────────────────────────────────────
 function EmployeeContent() {
-  const info = [
-    { l: "Email", v: EMP.email },
-    { l: "Số điện thoại", v: EMP.phone },
-    { l: "Ngày sinh", v: EMP.dob },
-    { l: "Ngày vào làm", v: EMP.joinDate },
-    { l: "Địa chỉ", v: EMP.address },
-  ];
-  const locked = ["Mức lương (VNĐ)", "Loại hợp đồng", "Đánh giá hiệu suất"];
+  const [activeTab, setActiveTab] = useState(0);
+
+  const FieldGroup = ({ l, v, span }: { l: string, v: React.ReactNode, span?: number }) => (
+    <div style={span ? { gridColumn: `span ${span}` } : {}}>
+      <FieldLabel>{l}</FieldLabel>
+      <FieldBox>{v}</FieldBox>
+    </div>
+  );
+
+
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Profile card */}
-      <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "18px 20px", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "18px 20px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18 }}>
         <div style={{ position: "relative", flexShrink: 0 }}>
           <div style={{ width: 68, height: 68, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#fff", boxShadow: `0 0 24px ${GR}` }}>
             TL
@@ -509,18 +581,67 @@ function EmployeeContent() {
         </div>
       </div>
 
-      {/* Info fields */}
-      <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16 }}>
-        <SectionLabel>Thông tin hợp đồng & Liên hệ</SectionLabel>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {info.map(({ l, v }) => (
-            <div key={l}>
-              <FieldLabel>{l}</FieldLabel>
-              <FieldBox>{v}</FieldBox>
-            </div>
-          ))}
-        </div>
+      <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.08)", marginTop: 4 }}>
+        {["Thông tin chung", "Công việc", "Liên hệ"].map((t, i) => (
+          <button
+            key={t}
+            onClick={() => setActiveTab(i)}
+            style={{
+              flex: 1,
+              padding: "12px 0",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 700,
+              color: activeTab === i ? "#fff" : "rgba(255,232,236,0.4)",
+              borderBottom: activeTab === i ? `2px solid ${BRAND}` : "2px solid transparent",
+              transition: "all 0.2s"
+            }}
+          >
+            {t}
+          </button>
+        ))}
       </div>
+
+      {activeTab === 0 && (
+        <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <FieldGroup l="Mã NV" v={EMP.id} />
+            <FieldGroup l="Họ tên" v={EMP.name} />
+            <FieldGroup l="Ngày sinh" v={EMP.dob} />
+            <FieldGroup l="Giới tính" v={EMP.gender} />
+            <FieldGroup l="Số CCCD" v={EMP.cccd} />
+            <FieldGroup l="Nơi cấp" v={EMP.cccdPlace} />
+            <FieldGroup l="Ngân hàng" v={EMP.bank} />
+            <FieldGroup l="Số tài khoản" v={EMP.bankAccount} />
+            <FieldGroup l="Trường học" v={EMP.university} span={2} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 1 && (
+        <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <FieldGroup l="Phòng ban" v={EMP.dept} />
+            <FieldGroup l="Vị trí" v={EMP.role} />
+            <FieldGroup l="Loại hợp đồng" v={EMP.contractType} />
+            <FieldGroup l="Ngày bắt đầu" v={EMP.joinDate} />
+            <FieldGroup l="Trạng thái" v={EMP.status} span={2} />
+          </div>
+        </div>
+      )}
+
+      {activeTab === 2 && (
+        <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <FieldGroup l="Email" v={EMP.email} span={2} />
+            <FieldGroup l="Số điện thoại" v={EMP.phone} span={2} />
+            <FieldGroup l="Quê quán" v={EMP.hometown} span={2} />
+            <FieldGroup l="Địa chỉ hiện tại" v={EMP.address} span={2} />
+          </div>
+        </div>
+      )}
 
       {/* Quá trình công tác */}
       <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16 }}>
@@ -543,25 +664,6 @@ function EmployeeContent() {
         </div>
       </div>
 
-      {/* Locked fields */}
-      <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-          <Lock size={12} style={{ color: "#f59e0b" }} />
-          <SectionLabel>Thông tin quản lý</SectionLabel>
-          <span style={{ marginBottom: 14, padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, color: "#f59e0b", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.18)" }}>Chỉ sếp</span>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
-          {locked.map(l => (
-            <div key={l}>
-              <FieldLabel>{l}</FieldLabel>
-              <div style={{ ...{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 12, padding: "10px 12px", color: "#FFE8EC", fontSize: 13 }, opacity: 0.35, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: "0.24em" }}>••••••</span>
-                <Lock size={10} style={{ color: "#f59e0b" }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
@@ -977,12 +1079,7 @@ export default function UserPortalApp({ onLogout }: { onLogout: () => void }) {
           ))}
         </div>
 
-        {/* Hint text */}
-        {!hovId && !activePage && (
-          <div style={{ position: "absolute", bottom: 28, left: "50%", transform: "translateX(-50%)", fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.18)", letterSpacing: "0.16em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-            Nhấp vào bong bóng để mở
-          </div>
-        )}
+
       </div>
 
       {/* Panel overlay */}

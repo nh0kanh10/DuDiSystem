@@ -6,7 +6,7 @@ import {
   UserCheck, UserX, Menu, FileText, Shield, Wifi,
   CheckSquare, ChevronLeft, TrendingUp, Download,
   Award, Calendar, Lock, User, ArrowRight, Mail, Building2, Eye,
-  Upload, Camera, Briefcase, Fingerprint, Settings, MessageCircle, Layers, FileImage
+  Upload, Camera, Briefcase, Fingerprint, Settings, MessageCircle, Layers, FileImage, MoreHorizontal
 } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -16,7 +16,7 @@ import { ImageWithFallback } from "./components/figma/ImageWithFallback"
 import UserPortalApp from "./components/user/UserApp"
 import ApprovalManagement from "@/app/components/leave/ApprovalManagement"
 import OrgStructure from "./components/org/OrgStructure"
-import IPManagement from "./components/IPManagement"
+import UserProfile from "./components/user/UserProfile"
 
 // ─── CONSTANTS 
 const avatarImg = `https://ui-avatars.com/api/?name=T&background=C62828&color=fff&bold=true`
@@ -35,6 +35,12 @@ export interface Employee {
   department: string; position: string; joinDate: string
   status: "active" | "inactive" | "intern"; contractType: string
   orgNodeId?: string;
+  cccd?: string; cccdDate?: string; cccdPlace?: string;
+  bankAccount?: string; bank?: string;
+  dob?: string; gender?: string;
+  curProvince?: string; curDistrict?: string; curWard?: string; curStreet?: string;
+  homeProvince?: string; homeDistrict?: string; homeWard?: string; homeStreet?: string;
+  internEndDate?: string; university?: string; notes?: string; resignDate?: string;
 }
 export type OrgNodeType = "branch" | "department" | "sub-department" | "position" | "team";
 export interface OrgNode {
@@ -85,44 +91,44 @@ interface TaskItem {
 
 // ─── MOCK DATA ────────────────────────────────────────────────────────────────
 const INIT_EMPLOYEES: Employee[] = [
-  { id: "NV001", name: "Trần Thị Bích Liên", email: "lien.tran@dudi.vn", phone: "0901 234 567", department: "Frontend", position: "Senior Developer", joinDate: "28/05/2026", status: "active", contractType: "Chính thức" },
-  { id: "NV002", name: "Nguyễn Văn Minh", email: "minh.nguyen@dudi.vn", phone: "0912 345 678", department: "Backend", position: "Lead Developer", joinDate: "12/03/2024", status: "active", contractType: "Chính thức" },
-  { id: "NV003", name: "Lê Thu Hương", email: "huong.le@dudi.vn", phone: "0923 456 789", department: "Design", position: "UI/UX Designer", joinDate: "15/08/2023", status: "active", contractType: "Chính thức" },
-  { id: "NV004", name: "Phạm Đức Thành", email: "thanh.pham@dudi.vn", phone: "0934 567 890", department: "PM", position: "Project Manager", joinDate: "28/01/2025", status: "active", contractType: "Chính thức" },
-  { id: "NV005", name: "Hoàng Thị Mai", email: "mai.hoang@dudi.vn", phone: "0945 678 901", department: "HR", position: "HR Manager", joinDate: "12/09/2024", status: "active", contractType: "Chính thức" },
-  { id: "NV006", name: "Võ Minh Tuấn", email: "tuan.vo@dudi.vn", phone: "0956 789 012", department: "Backend", position: "Developer", joinDate: "01/06/2025", status: "intern", contractType: "Thực tập" },
-  { id: "NV007", name: "Đinh Thị Lan Anh", email: "lanh.dinh@dudi.vn", phone: "0967 890 123", department: "Frontend", position: "Developer", joinDate: "15/07/2025", status: "intern", contractType: "Thực tập" },
-  { id: "NV008", name: "Bùi Văn Hùng", email: "hung.bui@dudi.vn", phone: "0978 901 234", department: "DevOps", position: "DevOps Engineer", joinDate: "20/11/2024", status: "inactive", contractType: "Chính thức" },
+  { id: "0000000001", name: "Trần Thị Bích Liên", email: "lien.tran@dudi.vn", phone: "0901 234 567", department: "Frontend", position: "Senior Developer", joinDate: "28/05/2026", status: "active", contractType: "Chính thức" },
+  { id: "0000000002", name: "Nguyễn Văn Minh", email: "minh.nguyen@dudi.vn", phone: "0912 345 678", department: "Backend", position: "Lead Developer", joinDate: "12/03/2024", status: "active", contractType: "Chính thức" },
+  { id: "0000000003", name: "Lê Thu Hương", email: "huong.le@dudi.vn", phone: "0923 456 789", department: "Design", position: "UI/UX Designer", joinDate: "15/08/2023", status: "active", contractType: "Chính thức" },
+  { id: "0000000004", name: "Phạm Đức Thành", email: "thanh.pham@dudi.vn", phone: "0934 567 890", department: "PM", position: "Project Manager", joinDate: "28/01/2025", status: "active", contractType: "Chính thức" },
+  { id: "0000000005", name: "Hoàng Thị Mai", email: "admin@dudi.vn", phone: "0945 678 901", department: "HR", position: "HR Manager", joinDate: "12/09/2024", status: "active", contractType: "Chính thức" },
+  { id: "0000000006", name: "Võ Minh Tuấn", email: "tuan.vo@dudi.vn", phone: "0956 789 012", department: "Backend", position: "Developer", joinDate: "01/06/2025", status: "intern", contractType: "Thực tập" },
+  { id: "0000000007", name: "Đinh Thị Lan Anh", email: "lanh.dinh@dudi.vn", phone: "0967 890 123", department: "Frontend", position: "Developer", joinDate: "15/07/2025", status: "intern", contractType: "Thực tập" },
+  { id: "0000000008", name: "Bùi Văn Hùng", email: "hung.bui@dudi.vn", phone: "0978 901 234", department: "DevOps", position: "DevOps Engineer", joinDate: "20/11/2024", status: "inactive", contractType: "Chính thức" },
 ]
 
 const INIT_ORG_NODES: OrgNode[] = [
-  { id: "branch-hcm", name: "Chi nhánh Hồ Chí Minh", code: "HCM01", type: "branch", memberCount: 150, status: "active", managerId: "NV005", managerTitle: "Giám đốc chi nhánh" },
-  { id: "dept-tech", name: "Phòng Công nghệ", code: "TECH01", type: "department", parentId: "branch-hcm", memberCount: 80, status: "active", managerId: "NV002", managerTitle: "Trưởng phòng Công nghệ" },
-  { id: "sub-dev", name: "Bộ phận Phát triển phần mềm", code: "DEV01", type: "sub-department", parentId: "dept-tech", memberCount: 50, status: "active", managerId: "NV004", managerTitle: "Trưởng bộ phận Dev" },
-  { id: "pos-lead", name: "Lead Developer", code: "LDEV01", type: "position", parentId: "sub-dev", memberCount: 10, status: "active", managerId: "NV002", managerTitle: "Lead Developer" },
-  { id: "team-fe", name: "Nhóm Frontend", code: "FE01", type: "team", parentId: "pos-lead", memberCount: 15, status: "active", managerId: "NV001", managerTitle: "Trưởng nhóm Frontend" },
-  { id: "dept-finance", name: "Phòng Tài chính", code: "FIN01", type: "department", parentId: "branch-hcm", memberCount: 20, status: "active", managerId: "NV005", managerTitle: "Trưởng phòng Tài chính" },
-  { id: "dept-sales", name: "Phòng Kinh doanh", code: "SALE01", type: "department", parentId: "branch-hcm", memberCount: 35, status: "active", managerId: "NV003", managerTitle: "Trưởng phòng Kinh doanh" },
-  { id: "dept-hr", name: "Phòng Nhân sự", code: "HR01", type: "department", parentId: "branch-hcm", memberCount: 15, status: "active", managerId: "NV005", managerTitle: "Trưởng phòng Nhân sự" }
+  { id: "branch-hcm", name: "Chi nhánh Hồ Chí Minh", code: "HCM01", type: "branch", memberCount: 150, status: "active", managerId: "0000000005", managerTitle: "Giám đốc chi nhánh" },
+  { id: "dept-tech", name: "Phòng Công nghệ", code: "TECH01", type: "department", parentId: "branch-hcm", memberCount: 80, status: "active", managerId: "0000000002", managerTitle: "Trưởng phòng Công nghệ" },
+  { id: "sub-dev", name: "Bộ phận Phát triển phần mềm", code: "DEV01", type: "sub-department", parentId: "dept-tech", memberCount: 50, status: "active", managerId: "0000000004", managerTitle: "Trưởng bộ phận Dev" },
+  { id: "pos-lead", name: "Lead Developer", code: "LDEV01", type: "position", parentId: "sub-dev", memberCount: 10, status: "active", managerId: "0000000002", managerTitle: "Lead Developer" },
+  { id: "team-fe", name: "Nhóm Frontend", code: "FE01", type: "team", parentId: "pos-lead", memberCount: 15, status: "active", managerId: "0000000001", managerTitle: "Trưởng nhóm Frontend" },
+  { id: "dept-finance", name: "Phòng Tài chính", code: "FIN01", type: "department", parentId: "branch-hcm", memberCount: 20, status: "active", managerId: "0000000005", managerTitle: "Trưởng phòng Tài chính" },
+  { id: "dept-sales", name: "Phòng Kinh doanh", code: "SALE01", type: "department", parentId: "branch-hcm", memberCount: 35, status: "active", managerId: "0000000003", managerTitle: "Trưởng phòng Kinh doanh" },
+  { id: "dept-hr", name: "Phòng Nhân sự", code: "HR01", type: "department", parentId: "branch-hcm", memberCount: 15, status: "active", managerId: "0000000005", managerTitle: "Trưởng phòng Nhân sự" }
 ]
 
 const INIT_ASSIGNMENTS: Assignment[] = [
-  { id: "as-1", employeeId: "NV001", nodeId: "team-fe", type: "permanent", startDate: "2026-05-28", status: "active" },
-  { id: "as-2", employeeId: "NV002", nodeId: "dept-tech", type: "permanent", startDate: "2024-03-12", status: "active" },
-  { id: "as-3", employeeId: "NV003", nodeId: "dept-sales", type: "permanent", startDate: "2023-08-15", status: "active" },
-  { id: "as-4", employeeId: "NV004", nodeId: "sub-dev", type: "permanent", startDate: "2025-01-28", status: "active" },
-  { id: "as-5", employeeId: "NV005", nodeId: "dept-hr", type: "permanent", startDate: "2024-09-12", status: "active" }
+  { id: "as-1", employeeId: "0000000001", nodeId: "team-fe", type: "permanent", startDate: "2026-05-28", status: "active" },
+  { id: "as-2", employeeId: "0000000002", nodeId: "dept-tech", type: "permanent", startDate: "2024-03-12", status: "active" },
+  { id: "as-3", employeeId: "0000000003", nodeId: "dept-sales", type: "permanent", startDate: "2023-08-15", status: "active" },
+  { id: "as-4", employeeId: "0000000004", nodeId: "sub-dev", type: "permanent", startDate: "2025-01-28", status: "active" },
+  { id: "as-5", employeeId: "0000000005", nodeId: "dept-hr", type: "permanent", startDate: "2024-09-12", status: "active" }
 ]
 
 const ATTENDANCE: AttendanceRecord[] = [
-  { id: "1", employeeId: "NV001", employeeName: "Trần Thị Bích Liên", department: "Frontend", checkIn: "08:02", checkOut: "17:35", date: "2026-06-25", status: "on-time", note: "" },
-  { id: "2", employeeId: "NV002", employeeName: "Nguyễn Văn Minh", department: "Backend", checkIn: "08:45", checkOut: "18:10", date: "2026-06-25", status: "late", note: "Kẹt xe" },
-  { id: "3", employeeId: "NV003", employeeName: "Lê Thu Hương", department: "Design", checkIn: "07:55", checkOut: "17:00", date: "2026-06-25", status: "on-time", note: "" },
-  { id: "4", employeeId: "NV004", employeeName: "Phạm Đức Thành", department: "PM", checkIn: "--", checkOut: "--", date: "2026-06-25", status: "leave", note: "Nghỉ phép" },
-  { id: "5", employeeId: "NV005", employeeName: "Hoàng Thị Mai", department: "HR", checkIn: "09:15", checkOut: "18:30", date: "2026-06-25", status: "late", note: "Họp ngoài" },
-  { id: "6", employeeId: "NV006", employeeName: "Võ Minh Tuấn", department: "Backend", checkIn: "08:00", checkOut: "17:00", date: "2026-06-25", status: "on-time", note: "" },
-  { id: "7", employeeId: "NV007", employeeName: "Đinh Thị Lan Anh", department: "Frontend", checkIn: "--", checkOut: "--", date: "2026-06-25", status: "absent", note: "" },
-  { id: "8", employeeId: "NV008", employeeName: "Bùi Văn Hùng", department: "DevOps", checkIn: "08:10", checkOut: "17:20", date: "2026-06-25", status: "on-time", note: "" },
+  { id: "1", employeeId: "0000000001", employeeName: "Trần Thị Bích Liên", department: "Frontend", checkIn: "08:02", checkOut: "17:35", date: "2026-06-25", status: "on-time", note: "" },
+  { id: "2", employeeId: "0000000002", employeeName: "Nguyễn Văn Minh", department: "Backend", checkIn: "08:45", checkOut: "18:10", date: "2026-06-25", status: "late", note: "Kẹt xe" },
+  { id: "3", employeeId: "0000000003", employeeName: "Lê Thu Hương", department: "Design", checkIn: "07:55", checkOut: "17:00", date: "2026-06-25", status: "on-time", note: "" },
+  { id: "4", employeeId: "0000000004", employeeName: "Phạm Đức Thành", department: "PM", checkIn: "--", checkOut: "--", date: "2026-06-25", status: "leave", note: "Nghỉ phép" },
+  { id: "5", employeeId: "0000000005", employeeName: "Hoàng Thị Mai", department: "HR", checkIn: "09:15", checkOut: "18:30", date: "2026-06-25", status: "late", note: "Họp ngoài" },
+  { id: "6", employeeId: "0000000006", employeeName: "Võ Minh Tuấn", department: "Backend", checkIn: "08:00", checkOut: "17:00", date: "2026-06-25", status: "on-time", note: "" },
+  { id: "7", employeeId: "0000000007", employeeName: "Đinh Thị Lan Anh", department: "Frontend", checkIn: "--", checkOut: "--", date: "2026-06-25", status: "absent", note: "" },
+  { id: "8", employeeId: "0000000008", employeeName: "Bùi Văn Hùng", department: "DevOps", checkIn: "08:10", checkOut: "17:20", date: "2026-06-25", status: "on-time", note: "" },
 ]
 
 const INIT_REQUESTS = [
@@ -504,7 +510,7 @@ function Header({ onToggle, unread, currentUser, onLogout, onNavigate }: {
                   <Settings size={15} className="text-gray-400" />
                   Cài đặt tài khoản
                 </button>
-                <button onClick={() => { onNavigate(currentUser.role === "admin" ? "tai-khoan" : "user-profile"); setShowDrop(false) }}
+                <button onClick={() => { onNavigate("user-profile"); setShowDrop(false) }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
                   <User size={15} className="text-gray-400" />
                   Thông tin cá nhân
@@ -606,11 +612,25 @@ function LoginPage({ onLogin }: { onLogin: (email: string) => void }) {
               Đăng nhập <ArrowRight size={18} />
             </button>
           </div>
-          <div className="mt-5 p-3.5 bg-gray-50 border border-gray-100 rounded-xl text-xs text-gray-500 space-y-1.5">
-            <p className="font-semibold text-gray-600">Tài khoản demo:</p>
-            <p>📧 <code className="bg-white px-1.5 py-0.5 rounded border border-gray-200 font-mono text-[11px]">admin@dudi.vn</code> → Quyền quản lý</p>
-            <p>📧 <code className="bg-white px-1.5 py-0.5 rounded border border-gray-200 font-mono text-[11px]">lien@dudi.vn</code> → Quyền nhân viên</p>
-            <p className="text-gray-400 text-[10px]">Hệ thống tự phân quyền dựa vào tài khoản đăng nhập.</p>
+          <div className="mt-5 p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs text-gray-500 space-y-3">
+            <p className="font-semibold text-gray-700 text-sm">Đăng nhập nhanh:</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => { setEmail("admin@dudi.vn"); setPass("123456"); onLogin("admin@dudi.vn") }}
+                className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 transition-colors cursor-pointer text-violet-700"
+              >
+                <div className="font-bold mb-1">Quản lý</div>
+                <div className="font-mono text-[10px] opacity-75">admin@dudi.vn</div>
+              </button>
+              <button
+                onClick={() => { setEmail("lien.tran@dudi.vn"); setPass("123456"); onLogin("lien.tran@dudi.vn") }}
+                className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors cursor-pointer text-amber-700"
+              >
+                <div className="font-bold mb-1">Nhân viên</div>
+                <div className="font-mono text-[10px] opacity-75">lien.tran@dudi.vn</div>
+              </button>
+            </div>
+            <p className="text-gray-400 text-[10px] text-center pt-1">Hệ thống tự phân quyền dựa vào tài khoản đăng nhập.</p>
           </div>
 
         </div>
@@ -781,6 +801,7 @@ function EmployeeManagement({ employees, setEmployees }: { employees: Employee[]
   const [showModal, setShowModal] = useState(false)
   const [viewEmp, setViewEmp] = useState<Employee | null>(null)
   const [editEmp, setEditEmp] = useState<Employee | null>(null)
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [form, setForm] = useState<EmpExtForm>({
     name: "", email: "", phone: "", department: "", position: "",
     joinDate: "", status: "active", contractType: "Chính thức",
@@ -919,17 +940,27 @@ function EmployeeManagement({ employees, setEmployees }: { employees: Employee[]
                   <td className="px-4 py-4 text-gray-400 text-xs font-mono whitespace-nowrap">{emp.joinDate}</td>
                   <td className="px-4 py-4 text-gray-400 text-xs whitespace-nowrap">{emp.contractType}</td>
                   <td className="px-4 py-4"><Badge status={emp.status} /></td>
-                  <td className="px-4 py-4 sticky right-0 bg-white">
-                    <div className="flex gap-2">
-                      <button onClick={() => setViewEmp(emp)} className="w-8 h-8 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center text-blue-500 transition-colors" title="Xem chi tiết">
-                        <Eye size={14} />
+                  <td className={`px-4 py-4 sticky right-0 bg-white ${openMenu === emp.id ? "z-50" : "z-0"}`}>
+                    <div className="relative" onMouseLeave={() => setOpenMenu(null)}>
+                      <button onClick={() => setOpenMenu(openMenu === emp.id ? null : emp.id)} className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-xl text-gray-500 transition-colors transition-transform active:scale-95" title="Thao tác">
+                        <MoreHorizontal size={16} />
                       </button>
-                      <button onClick={() => openEdit(emp)} className="w-8 h-8 rounded-full bg-amber-100 hover:bg-amber-200 flex items-center justify-center text-amber-500 transition-colors" title="Sửa">
-                        <Edit2 size={14} />
-                      </button>
-                      <button onClick={() => handleDelete(emp.id)} className="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 flex items-center justify-center text-red-500 transition-colors" title="Xóa">
-                        <Trash2 size={14} />
-                      </button>
+                      {openMenu === emp.id && (
+                        <div className="absolute right-0 top-full pt-1 z-50">
+                          <div className="w-44 bg-white rounded-xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-black/5 overflow-hidden" style={{ animation: "popup 0.2s cubic-bezier(0.16, 1, 0.3, 1)" }}>
+                            <button onClick={() => { setViewEmp(emp); setOpenMenu(null) }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-700 transition-colors">
+                              <Eye size={15} className="text-gray-400" /> Xem chi tiết
+                            </button>
+                            <button onClick={() => { openEdit(emp); setOpenMenu(null) }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-700 transition-colors">
+                              <Edit2 size={15} className="text-gray-400" /> Sửa hồ sơ
+                            </button>
+                            <div className="h-px bg-gray-100 my-1"></div>
+                            <button onClick={() => { handleDelete(emp.id); setOpenMenu(null) }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 text-sm text-red-600 font-medium transition-colors">
+                              <Trash2 size={15} className="text-red-400" /> Xóa
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1171,52 +1202,11 @@ function EmployeeManagement({ employees, setEmployees }: { employees: Employee[]
 
       {/* View Detail Modal */}
       {viewEmp && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            {/* Header gradient */}
-            <div className="bg-gradient-to-br from-[#C62828] to-[#E64A19] px-6 py-6 relative">
-              <button onClick={() => setViewEmp(null)} className="absolute top-4 right-4 p-1.5 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-white">
-                <X size={16} />
-              </button>
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-white text-xl font-black">
-                  {initials(viewEmp.name)}
-                </div>
-                <div>
-                  <p className="text-white font-bold text-lg leading-tight">{viewEmp.name}</p>
-                  <p className="text-white/70 text-sm">{viewEmp.position}</p>
-                  <div className="mt-1.5"><Badge status={viewEmp.status} /></div>
-                </div>
-              </div>
-            </div>
-
-            {/* Info grid */}
-            <div className="p-6 space-y-3">
-              {[
-                ["Mã nhân viên", viewEmp.id],
-                ["Phòng ban", viewEmp.department],
-                ["Chức vụ", viewEmp.position],
-                ["Email", viewEmp.email],
-                ["Số điện thoại", viewEmp.phone],
-                ["Ngày vào làm", viewEmp.joinDate],
-                ["Loại hợp đồng", viewEmp.contractType],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                  <span className="text-xs text-gray-400 font-medium">{label}</span>
-                  <span className="text-sm font-semibold text-gray-700">{value}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="px-6 pb-6 flex gap-2">
-              <button onClick={() => { setViewEmp(null); openEdit(viewEmp) }}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-blue-200 text-blue-600 hover:bg-blue-50 rounded-xl text-sm font-semibold transition-colors">
-                <Edit2 size={14} /> Chỉnh sửa
-              </button>
-              <button onClick={() => setViewEmp(null)}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-sm font-semibold transition-colors">
-                Đóng
-              </button>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) setViewEmp(null) }}>
+          <div className="relative w-full max-w-5xl animate-in zoom-in duration-200">
+            {/* Unified User profile component rendered here */}
+            <div className="mb-2">
+              <UserProfile emp={viewEmp} onEdit={() => { setViewEmp(null); openEdit(viewEmp) }} onClose={() => setViewEmp(null)} />
             </div>
           </div>
         </div>
@@ -2013,49 +2003,7 @@ function UserHome({ onNavigate }: { onNavigate: (p: Page) => void }) {
   )
 }
 
-function UserProfile() {
-  return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-800">Thông tin cá nhân</h2>
-      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
-        <div className="bg-gradient-to-r from-gray-100 to-gray-50 p-8 flex items-center gap-6">
-          <img src={`https://ui-avatars.com/api/?name=${ME.name.charAt(0)}`} alt="avatar" className="w-24 h-24 rounded-2xl shadow-md object-cover" />
-          <div>
-            <h3 className="text-2xl font-bold text-gray-800">{ME.name}</h3>
-            <p className="text-gray-500 font-medium">{ME.position} · {ME.department}</p>
-            <div className="mt-2 flex items-center gap-2">
-              <Badge status={ME.status} /> <span className="text-sm text-gray-400 font-mono">{ME.id}</span>
-            </div>
-          </div>
-        </div>
-        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div>
-            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Thông tin chung</p>
-            <div className="space-y-4">
-              {[["Ngày sinh", "15/08/2000"], ["Giới tính", "Nữ"], ["Số CCCD", "012345678901"], ["Số điện thoại", ME.phone], ["Email cá nhân", ME.email]].map(([k, v]) => (
-                <div key={k} className="flex flex-col">
-                  <span className="text-xs text-gray-400 mb-1">{k}</span>
-                  <span className="text-sm font-semibold text-gray-700">{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Hồ sơ nhân sự</p>
-            <div className="space-y-4">
-              {[["Ngày vào làm", ME.joinDate], ["Loại hợp đồng", ME.contractType], ["Tài khoản NH", "0123456789 - VCB"]].map(([k, v]) => (
-                <div key={k} className="flex flex-col">
-                  <span className="text-xs text-gray-400 mb-1">{k}</span>
-                  <span className="text-sm font-semibold text-gray-700">{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+
 
 function UserAttendance() {
   return (
@@ -2126,9 +2074,10 @@ function UserTimeOff() {
 
 function UserDirectory() {
   const [search, setSearch] = useState("")
+  const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null)
   const list = INIT_EMPLOYEES.filter(e => e.name.toLowerCase().includes(search.toLowerCase()))
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold text-gray-800">Danh bạ nội bộ</h2>
         <div className="relative w-72">
@@ -2138,16 +2087,28 @@ function UserDirectory() {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {list.map(emp => (
-          <div key={emp.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-start gap-4">
-            <AvatarCircle name={emp.name} />
+          <div key={emp.id} onClick={() => setSelectedEmp(emp)} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-start gap-4 cursor-pointer hover:shadow-md transition-all active:scale-95 group">
+            <div className="group-hover:scale-105 transition-transform"><AvatarCircle name={emp.name} /></div>
             <div className="min-w-0">
               <p className="font-bold text-gray-800 text-sm truncate">{emp.name}</p>
               <p className="text-xs text-gray-500 my-0.5">{emp.position} · {emp.department}</p>
-              <a href={`mailto:${emp.email}`} className="text-[#C62828] text-xs font-semibold hover:underline block truncate">{emp.email}</a>
+              <span className="text-[#C62828] text-xs font-semibold block truncate opacity-70">{emp.email}</span>
             </div>
           </div>
         ))}
       </div>
+
+      {/* View Detail Modal for Directory */}
+      {selectedEmp && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-[100] p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) setSelectedEmp(null) }}>
+          <div className="relative w-full max-w-5xl animate-in zoom-in duration-200">
+            {/* Unified User profile component rendered here */}
+            <div className="rounded-2xl pb-2">
+              <UserProfile emp={selectedEmp} onClose={() => setSelectedEmp(null)} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2535,13 +2496,18 @@ export default function App() {
 
   // Current user data based on role
   const currentEmp = (role as string) === "user" ? ME : INIT_EMPLOYEES[4] // Hoàng Thị Mai as admin
-  const adminUser = { name: "Hoàng Thị Mai", id: "NV005", role: "admin" as Role, position: "HR Manager", department: "HR" }
+  const adminUser = { name: "Hoàng Thị Mai", id: "0000000005", role: "admin" as Role, position: "HR Manager", department: "HR" }
   const currentUserInfo = role === "admin" ? adminUser : { name: ME.name, id: ME.id, role: "user" as Role, position: ME.position, department: ME.department }
 
   const renderPage = () => {
     switch (activePage) {
       case "dashboard": return (role as string) === "user" ? <UserHome onNavigate={setActivePage} /> : <Dashboard onNavigate={setActivePage} />
-      case "user-profile": return <UserProfile />
+      case "user-profile": return (
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold text-gray-800">Thông tin cá nhân</h2>
+          <UserProfile emp={currentEmp} />
+        </div>
+      )
       case "user-attendance": return <UserAttendance />
       case "user-timeoff": return <UserTimeOff />
       case "user-directory": return <UserDirectory />
@@ -2556,7 +2522,10 @@ export default function App() {
       case "thong-ke": return <Statistics />
       case "duyet-don": return <ApprovalManagement />
       case "tai-khoan": return <AccountManagement />
-      case "ip": return <IPManagement />
+      case "ip": return (
+        <PlaceholderPage title="Quản lý IP" desc="Cấu hình danh sách địa chỉ IP được phép thực hiện chấm công." icon={Wifi}
+          items={["Thêm IP mới", "Danh sách IP", "Khoá IP", "Lịch sử truy cập"]} />
+      )
       case "tien-ich": return (
         <PlaceholderPage title="Tiện ích" desc="Các công cụ hỗ trợ vận hành hệ thống và quản lý dữ liệu chấm công." icon={Wrench}
           items={["Quản lý admin", "Điều chỉnh chấm công", "BXH gắn bó", "Sinh mã nhân viên"]} />
@@ -2651,18 +2620,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, onLogout }:
         )}
       </div>
 
-      {/* User card */}
-      {!collapsed && (
-        <div className="px-3 py-3">
-          <div className="flex items-center gap-2.5 bg-white/5 rounded-xl p-2.5 border border-white/5">
-            <img src={`https://ui-avatars.com/api/?name=T`} alt="Avatar" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
-            <div className="min-w-0">
-              <div className="text-white text-xs font-semibold truncate">Trần Thị Bích Liên</div>
-              <div className="text-white/35 text-[10px] font-mono">NV001 · {role === "admin" ? "Admin" : "Nhân viên"}</div>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 space-y-0.5 py-2" style={{ scrollbarWidth: "none" }}>
