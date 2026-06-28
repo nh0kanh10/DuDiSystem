@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { X, Building2, Clipboard, Users2, Settings, Briefcase } from "lucide-react"
-import { OrgNode, OrgNodeType, Employee } from "../../App"
+import { OrgNode, OrgNodeType, Employee } from "../../types"
 
 interface AddUnitModalProps {
   isOpen: boolean

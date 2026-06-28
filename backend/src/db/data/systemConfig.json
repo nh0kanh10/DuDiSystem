@@ -1,0 +1,13 @@
+[
+  {
+    "id": "working_hours",
+    "companyName": "DuDi System",
+    "morningStart": "09:00",
+    "morningEnd": "12:00",
+    "afternoonStart": "13:30",
+    "afternoonEnd": "17:00",
+    "lateGraceMinutes": 15,
+    "earlyGraceMinutes": 15,
+    "requireIP": false
+  }
+]

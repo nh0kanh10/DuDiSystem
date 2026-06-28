@@ -9,7 +9,7 @@ router.use(authenticate)
 
 router.get("/", ctrl.list)
 router.get("/:id", ctrl.getOne)
-router.post("/", requireFields("employeeId", "leaveType", "startDate"), ctrl.create)
+router.post("/", requireFields("employeeId", "startDate"), ctrl.create)
 router.patch("/:id/approve", ctrl.approve)
 router.patch("/:id/reject", ctrl.reject)
 router.delete("/:id", ctrl.remove)

@@ -10,6 +10,26 @@
     "createdDate": "01/01/2020"
   },
   {
+    "id": "branch-hn",
+    "name": "Chi nhánh Hà Nội",
+    "code": "HN-BR",
+    "type": "branch",
+    "managerId": "NV002",
+    "managerTitle": "Giám đốc Chi nhánh",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
+    "id": "branch-dn",
+    "name": "Chi nhánh Đà Nẵng",
+    "code": "DN-BR",
+    "type": "branch",
+    "managerId": "NV003",
+    "managerTitle": "Giám đốc Chi nhánh",
+    "status": "active",
+    "createdDate": "01/01/2020"
+  },
+  {
     "id": "dept-tech",
     "name": "Phòng Công nghệ",
     "code": "TECH-DEPT",
@@ -287,7 +307,7 @@
     "type": "department",
     "managerId": "NV009",
     "managerTitle": "Trưởng phòng",
-    "parentId": "branch-hcm",
+    "parentId": "branch-hn",
     "status": "active",
     "createdDate": "01/01/2020"
   },
@@ -390,7 +410,7 @@
     "type": "department",
     "managerId": "NV009",
     "managerTitle": "Trưởng phòng",
-    "parentId": "branch-hcm",
+    "parentId": "branch-dn",
     "status": "active",
     "createdDate": "01/01/2020"
   },

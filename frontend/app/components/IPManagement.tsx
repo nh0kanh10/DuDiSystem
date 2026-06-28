@@ -16,6 +16,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { CustomSelect } from "./ui/CustomSelect";
 
 type AllowedIP = {
   id: string;
@@ -95,7 +96,7 @@ function DeleteConfirmModal({
   );
 }
 
-export default function IPManagement() {
+export default function IPManagement({ selectedBranch = "all" }: { selectedBranch?: string }) {
   const [ips, setIps] = useState<AllowedIP[]>([]);
   const [orgNodes, setOrgNodes] = useState<OrgNode[]>([]);
   const [search, setSearch] = useState("");
@@ -173,6 +174,15 @@ export default function IPManagement() {
     fetchServerIPs();
   }, [selectedOrgNodeId]);
 
+  useEffect(() => {
+    setSelectedOrgNodeId(selectedBranch);
+    if (selectedBranch !== "all") {
+      setNewOrgNodeId(selectedBranch);
+    } else {
+      setNewOrgNodeId("");
+    }
+  }, [selectedBranch]);
+
   const isValidIP = (ip: string) => {
     const ipv4Regex =
       /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
@@ -208,7 +218,7 @@ export default function IPManagement() {
       });
       setNewIp("");
       setNewDescription("");
-      setNewOrgNodeId("");
+      setNewOrgNodeId(selectedBranch !== "all" ? selectedBranch : "");
       await fetchIPs();
       showToast("Thêm IP thành công!", "success");
     } catch (err) {
@@ -402,18 +412,16 @@ export default function IPManagement() {
             <div className="flex items-center gap-2 mb-2">
               <label className="text-sm font-semibold text-gray-700">Chi nhánh</label>
             </div>
-            <select
+            <CustomSelect
               value={newOrgNodeId}
-              onChange={(e) => setNewOrgNodeId(e.target.value)}
-              className="w-full px-4 py-3 pr-14 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] focus:ring-2 focus:ring-[#C62828]/10 transition-all"
-            >
-              <option value="">Chọn chi nhánh</option>
-              {orgNodes.map((node) => (
-                <option key={node.id} value={node.id}>
-                  {node.name}
-                </option>
-              ))}
-            </select>
+              onChange={setNewOrgNodeId}
+              disabled={selectedBranch !== "all"}
+              heightClass="h-[46px]"
+              options={[
+                ...(selectedBranch === "all" ? [{ value: "", label: "Chọn chi nhánh" }] : []),
+                ...orgNodes.map((node: any) => ({ value: node.id, label: node.name }))
+              ]}
+            />
           </div>
 
           <div className="md:col-span-3">
@@ -463,21 +471,21 @@ export default function IPManagement() {
                 {filteredIps.length} IP
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <Building2 size={18} className="text-indigo-500" />
-              <select
-                value={selectedOrgNodeId}
-                onChange={(e) => setSelectedOrgNodeId(e.target.value)}
-                className="px-3 py-2 pr-14 border border-gray-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-[#C62828] focus:ring-2 focus:ring-[#C62828]/10 transition-all"
-              >
-                <option value="all">Tất cả chi nhánh</option>
-                {orgNodes.map((node) => (
-                  <option key={node.id} value={node.id}>
-                    {node.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {selectedBranch === "all" && (
+              <div className="flex items-center gap-2">
+                <Building2 size={18} className="text-indigo-500" />
+                <CustomSelect
+                  value={selectedOrgNodeId}
+                  onChange={setSelectedOrgNodeId}
+                  heightClass="h-[38px]"
+                  className="min-w-[200px]"
+                  options={[
+                    { value: "all", label: "Tất cả chi nhánh" },
+                    ...orgNodes.map((node: any) => ({ value: node.id, label: node.name }))
+                  ]}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -560,9 +568,10 @@ export default function IPManagement() {
                       <select
                         value={editOrgNodeId}
                         onChange={(e) => setEditOrgNodeId(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#C62828] focus:ring-2 focus:ring-[#C62828]/10 transition-all"
+                        disabled={selectedBranch !== "all"}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#C62828] focus:ring-2 focus:ring-[#C62828]/10 transition-all disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
                       >
-                        <option value="">Chọn chi nhánh</option>
+                        {selectedBranch === "all" && <option value="">Chọn chi nhánh</option>}
                         {orgNodes.map((node) => (
                           <option key={node.id} value={node.id}>
                             {node.name}

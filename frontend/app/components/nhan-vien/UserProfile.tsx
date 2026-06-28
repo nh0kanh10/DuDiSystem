@@ -14,7 +14,7 @@ import {
     Pencil,
     X,
 } from "lucide-react"
-import { Employee } from "../../App"
+import { Employee } from "../../types"
 
 function InfoField({
     label,

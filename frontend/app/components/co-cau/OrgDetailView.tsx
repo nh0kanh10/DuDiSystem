@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { ArrowLeft, Edit2, Plus, MoreVertical, Building2, Clipboard, Users2, Settings, Briefcase, UserPlus, Calendar, Clock } from "lucide-react"
-import { OrgNode, OrgNodeType, Employee, Assignment } from "../../App"
+import { OrgNode, OrgNodeType, Employee, Assignment } from "../../types"
 import AssignMemberModal from "./AssignMemberModal"
 
 const getDescendantNodeIds = (nodeId: string, nodes: OrgNode[]): string[] => {

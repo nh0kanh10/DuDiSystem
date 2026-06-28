@@ -12,6 +12,8 @@ import requestRoutes from "./routes/request.routes.js"
 import taskRoutes from "./routes/task.routes.js"
 import notificationRoutes from "./routes/notification.routes.js"
 import dashboardRoutes from "./routes/dashboard.routes.js"
+import userRoutes from "./routes/user.routes.js"
+import systemConfigRoutes from "./routes/systemConfig.routes.js"
 
 const app = express()
 
@@ -29,6 +31,8 @@ app.use("/api/requests", requestRoutes)
 app.use("/api/tasks", taskRoutes)
 app.use("/api/notifications", notificationRoutes)
 app.use("/api/dashboard", dashboardRoutes)
+app.use("/api/users", userRoutes)
+app.use("/api/system-config", systemConfigRoutes)
 
 app.use(notFoundHandler)
 app.use(errorHandler)

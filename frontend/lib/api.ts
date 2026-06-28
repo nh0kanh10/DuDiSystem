@@ -32,6 +32,15 @@ export const api = {
     login: (email: string, password: string) =>
       req<{ token: string; user: Record<string, unknown> }>("POST", "/auth/login", { email, password }),
   },
+  users: {
+    list: () => req<any[]>("GET", "/users"),
+    create: (data: any) => req<any>("POST", "/users", data),
+    update: (id: string, data: any) => req<any>("PATCH", `/users/${id}`, data),
+    toggleStatus: (id: string) => req<any>("POST", `/users/${id}/toggle-status`),
+    resetPassword: (id: string) => req<any>("POST", `/users/${id}/reset-password`),
+    delete: (id: string) => req<any>("DELETE", `/users/${id}`),
+  },
+
 
   employees: {
     list: (params?: { status?: string; department?: string; q?: string }) =>
@@ -266,6 +275,10 @@ export const api = {
       localStorage.setItem(mockTimeOffSlotsKey, JSON.stringify(list));
       return { success: true };
     },
+  },
+  systemConfig: {
+    get: () => req<any>("GET", "/system-config"),
+    update: (data: any) => req<any>("PUT", "/system-config", data),
   },
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { X, Search, Calendar, RefreshCw, Clock, ArrowRight, UserPlus } from "lucide-react"
-import { Employee, OrgNode } from "../../App"
+import { Employee, OrgNode } from "../../types"
 
 interface AssignMemberModalProps {
   isOpen: boolean
