@@ -1,0 +1,71 @@
+[
+  {
+    "id": "role-admin",
+    "name": "Quản trị hệ thống",
+    "isSystem": true,
+    "scopeType": "company",
+    "modules": [
+      "dashboard",
+      "nhan-su",
+      "co-cau",
+      "cham-cong",
+      "duyet-don",
+      "tai-khoan",
+      "phan-quyen",
+      "ip",
+      "thong-ke",
+      "thong-bao",
+      "du-an",
+      "cong-viec",
+      "tien-ich"
+    ]
+  },
+  {
+    "id": "role-manager",
+    "name": "Quản lý cấp trung",
+    "isSystem": true,
+    "scopeType": "branch",
+    "modules": [
+      "dashboard",
+      "nhan-su",
+      "co-cau",
+      "cham-cong",
+      "duyet-don",
+      "thong-bao",
+      "user-profile",
+      "user-attendance",
+      "user-timeoff",
+      "user-directory",
+      "user-chat",
+      "user-workflow",
+      "user-settings"
+    ]
+  },
+  {
+    "id": "role-user",
+    "name": "Nhân viên",
+    "isSystem": true,
+    "scopeType": "self",
+    "modules": [
+      "dashboard",
+      "user-profile",
+      "user-attendance",
+      "user-timeoff",
+      "user-directory",
+      "user-chat",
+      "user-workflow",
+      "cong-viec",
+      "thong-bao",
+      "user-settings"
+    ]
+  },
+  {
+    "id": "role-wsf2m7f",
+    "name": "123",
+    "scopeType": "branch",
+    "modules": [
+      "dashboard"
+    ],
+    "isSystem": false
+  }
+]

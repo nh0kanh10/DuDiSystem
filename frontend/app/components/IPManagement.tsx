@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus,
   Search,
@@ -48,7 +49,7 @@ function DeleteConfirmModal({
 }) {
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden border border-gray-100 p-6 relative">
         <button
@@ -92,7 +93,8 @@ function DeleteConfirmModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -303,19 +305,19 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-to-br from-[#C62828] to-[#E64A19] rounded-2xl flex items-center justify-center shadow-md shadow-[#C62828]/20">
-            <Server size={24} className="text-white" />
+      <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
+        <div className="flex items-center">
+          <div className="flex gap-1.5 items-center mr-4 shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-white/30 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white/60 animate-pulse delay-75"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150"></span>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Quản lý IP cho phép</h1>
-            <p className="text-sm text-gray-600 mt-1">
-              Cấu hình các địa chỉ IP được phép chấm công theo chi nhánh
-            </p>
+            <h2 className="text-xl font-black tracking-tight text-white">Quản lý IP cho phép</h2>
+            <p className="text-xs text-white/80 mt-1">Cấu hình các địa chỉ IP được phép chấm công theo chi nhánh</p>
           </div>
         </div>
-        <div className="text-sm text-gray-700 font-medium bg-white px-5 py-3 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="text-xs text-white/80 font-bold bg-white/10 px-4 py-2 rounded-xl backdrop-blur-xs border border-white/10 hidden sm:block">
           {new Date().toLocaleDateString("vi-VN", {
             weekday: "long",
             year: "numeric",
@@ -692,7 +694,7 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
         message="Bạn có chắc chắn muốn xóa IP này khỏi danh sách?"
       />
 
-      {toast && (
+      {toast && createPortal(
         <div
           className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-3 rounded-xl shadow-lg border transition-all duration-300 ${
             toast.type === "success"
@@ -706,7 +708,8 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
             <AlertCircle size={20} className="text-red-600" />
           )}
           <span className="font-semibold">{toast.message}</span>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

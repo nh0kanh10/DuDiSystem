@@ -1,12 +1,15 @@
 import { useState, useMemo, useEffect } from "react"
-import { Download, Plus, Search, Edit2, Trash2, ChevronRight, ChevronDown, Circle, User, Ban, CheckCircle } from "lucide-react"
+import { createPortal } from "react-dom"
+import { Download, Plus, Search, Edit2, Trash2, ChevronRight, ChevronDown, Circle, User, Ban, CheckCircle, ClipboardList, UserPlus, Briefcase } from "lucide-react"
 import { OrgNode, OrgNodeType, Employee, Assignment } from "../../types"
 import OrgTreeView from "./OrgTreeView"
 import OrgDetailView from "./OrgDetailView"
 import AddUnitModal from "./AddUnitModal"
 import DeleteConfirmModal from "./DeleteConfirmModal"
 import ViewMembersModal from "./ViewMembersModal"
+import PositionManagement from "../vi-tri/PositionManagement"
 import { api } from "@/lib/api"
+import { CustomSelect } from "../ui/CustomSelect"
 
 type RowItem = 
   | { type: "node"; data: OrgNode }
@@ -24,6 +27,7 @@ interface OrgStructureProps {
   selectedBranch?: string
   currentUserEmail?: string
   currentUserRole?: string
+  onAddEmployee?: () => void
 }
 
 export default function OrgStructure({
@@ -37,10 +41,11 @@ export default function OrgStructure({
   setSelectedNodeId,
   selectedBranch = "all",
   currentUserEmail,
-  currentUserRole
+  currentUserRole,
+  onAddEmployee
 }: OrgStructureProps) {
-  const isSuperAdmin = currentUserRole === "admin"
-  const [viewMode, setViewMode] = useState<"diagram" | "list">("diagram")
+  const isSuperAdmin = currentUserRole === "role-admin"
+  const [viewMode, setViewMode] = useState<"diagram" | "list" | "catalog">("diagram")
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
   const [filterStatus, setFilterStatus] = useState<string>("all")
@@ -61,6 +66,17 @@ export default function OrgStructure({
     }
   }, [orgNodes, hasInitListExpanded])
   const [viewingMembersNode, setViewingMembersNode] = useState<OrgNode | null>(null)
+  const [historyConfirm, setHistoryConfirm] = useState<{
+    employeeId: string
+    type: "permanent" | "temporary"
+    tempDates?: { startDate: string; endDate: string }
+    targetNode: OrgNode
+    defaultNote: string
+    customNote: string
+    isManagerAppoint?: boolean
+    managerTitle?: string
+    historyType?: "transfer" | "promotion"
+  } | null>(null)
 
   const getDescendants = (nodeId: string, nodes: OrgNode[]): OrgNode[] => {
     const descendants: OrgNode[] = []
@@ -172,8 +188,7 @@ export default function OrgStructure({
       totalEmployees: filteredEmployees.length,
       branches: activeNodes.filter(n => n.type === "branch").length,
       departments: activeNodes.filter(n => n.type === "department").length,
-      positions: activeNodes.filter(n => n.type === "sub-department" || n.type === "position").length,
-      teams: activeNodes.filter(n => n.type === "team").length
+      positions: activeNodes.filter(n => n.type === "sub-department" || n.type === "position").length
     }
   }, [nodesInActiveBranch, employees, assignments])
 
@@ -263,6 +278,239 @@ export default function OrgStructure({
     })
   }
 
+  const executeAssignMember = (
+    employeeId: string,
+    type: "permanent" | "temporary",
+    tempDates?: { startDate: string; endDate: string },
+    targetNode?: OrgNode,
+    writeHistory: boolean = false,
+    historyNote: string = "",
+    historyType: "transfer" | "promotion" = "transfer"
+  ) => {
+    if (!targetNode) return
+
+    if (type === "permanent") {
+      const emp = employees.find(e => e.id === employeeId)
+      if (emp) {
+        let updatedWorkHistory = emp.workHistory || []
+
+        if (writeHistory) {
+          const path = []
+          let curr = orgNodes.find(n => n.id === targetNode.id)
+          while (curr) {
+            path.push(curr.name)
+            const pId = curr.parentId
+            curr = pId ? orgNodes.find(n => n.id === pId) : undefined
+          }
+          const snapshot = path.reverse().join(" · ")
+
+          if (updatedWorkHistory.length === 0) {
+            const joinEntry = {
+              id: 1,
+              type: "join" as const,
+              date: emp.joinDate || new Date().toISOString().split("T")[0].split("-").reverse().join("/"),
+              toDate: "",
+              title: emp.position || "Nhân viên",
+              orgNodeId: emp.orgNodeId || "",
+              snapshot: "",
+              note: "Bắt đầu công tác"
+            }
+            updatedWorkHistory.push(joinEntry)
+          }
+
+          const newHistoryEntry = {
+            id: updatedWorkHistory.length + 1,
+            type: historyType,
+            date: new Date().toISOString().split("T")[0].split("-").reverse().join("/"),
+            toDate: "",
+            title: targetNode.type === "position" ? targetNode.name : emp.position,
+            orgNodeId: targetNode.id,
+            snapshot: snapshot,
+            note: historyNote || "Thuyên chuyển từ sơ đồ cơ cấu"
+          }
+          updatedWorkHistory = [...updatedWorkHistory, newHistoryEntry]
+        }
+
+        const updatedEmpData = {
+          ...emp,
+          orgNodeId: targetNode.id,
+          department: targetNode.type === "department" ? targetNode.name : emp.department,
+          position: targetNode.type === "position" ? targetNode.name : emp.position,
+          workHistory: updatedWorkHistory
+        }
+
+        api.employees.update(employeeId, updatedEmpData)
+          .then(updated => {
+            if (updated) {
+              setEmployees(prev => prev.map(e => e.id === employeeId ? (updated as Employee) : e))
+            }
+          })
+          .catch(err => {
+            console.error("Lỗi cập nhật nhân viên:", err)
+            setEmployees(prev => prev.map(e => e.id === employeeId ? (updatedEmpData as Employee) : e))
+          })
+
+        const newAsPayload = {
+          employeeId,
+          nodeId: targetNode.id,
+          type: "permanent" as const,
+          startDate: new Date().toISOString().split("T")[0],
+          status: "active" as const
+        }
+
+        api.assignments.create(newAsPayload)
+          .then(created => {
+            if (created) {
+              setAssignments(prev => {
+                const completedOld = prev.map(as => {
+                  if (as.employeeId === employeeId && as.status === "active") {
+                    return {
+                      ...as,
+                      status: "completed" as const,
+                      endDate: new Date().toISOString().split("T")[0]
+                    }
+                  }
+                  return as
+                })
+                return [...completedOld, created as Assignment]
+              })
+            }
+          })
+          .catch(err => {
+            console.error("Lỗi tạo assignment:", err)
+          })
+      }
+    } else if (type === "temporary" && tempDates) {
+      const newAsPayload = {
+        employeeId,
+        nodeId: targetNode.id,
+        type: "temporary" as const,
+        startDate: tempDates.startDate,
+        endDate: tempDates.endDate,
+        status: "active" as const
+      }
+
+      api.assignments.create(newAsPayload)
+        .then(created => {
+          if (created) {
+            setAssignments(prev => [...prev, created as Assignment])
+          }
+        })
+        .catch(err => {
+          console.error("Lỗi tạo temporary assignment:", err)
+          const newAs: Assignment = {
+            id: `as-${Date.now()}`,
+            employeeId,
+            nodeId: targetNode.id,
+            type: "temporary",
+            startDate: tempDates.startDate,
+            endDate: tempDates.endDate,
+            status: "active"
+          }
+          setAssignments(prev => [...prev, newAs])
+        })
+    }
+  }
+
+  const executeAssignManager = (
+    employeeId: string,
+    targetNode: OrgNode,
+    managerTitle: string,
+    writeHistory: boolean,
+    historyNote: string,
+    historyType: "transfer" | "promotion" = "promotion"
+  ) => {
+    const emp = employees.find(e => e.id === employeeId)
+    if (emp) {
+      let updatedWorkHistory = emp.workHistory || []
+
+      if (writeHistory) {
+        const path = []
+        let curr = orgNodes.find(n => n.id === targetNode.id)
+        while (curr) {
+          path.push(curr.name)
+          const pId = curr.parentId
+          curr = pId ? orgNodes.find(n => n.id === pId) : undefined
+        }
+        const snapshot = path.reverse().join(" · ")
+
+        if (updatedWorkHistory.length === 0) {
+          const joinEntry = {
+            id: 1,
+            type: "join" as const,
+            date: emp.joinDate || new Date().toISOString().split("T")[0].split("-").reverse().join("/"),
+            toDate: "",
+            title: emp.position || "Nhân viên",
+            orgNodeId: emp.orgNodeId || "",
+            snapshot: "",
+            note: "Bắt đầu công tác"
+          }
+          updatedWorkHistory.push(joinEntry)
+        }
+
+        const newHistoryEntry = {
+          id: updatedWorkHistory.length + 1,
+          type: historyType,
+          date: new Date().toISOString().split("T")[0].split("-").reverse().join("/"),
+          toDate: "",
+          title: managerTitle,
+          orgNodeId: targetNode.id,
+          snapshot: snapshot,
+          note: historyNote || `Bổ nhiệm làm ${managerTitle} - ${targetNode.name}`
+        }
+        updatedWorkHistory = [...updatedWorkHistory, newHistoryEntry]
+      }
+
+      const updatedEmpData = {
+        ...emp,
+        position: managerTitle,
+        workHistory: updatedWorkHistory
+      }
+
+      api.employees.update(employeeId, updatedEmpData)
+        .then(updated => {
+          if (updated) {
+            setEmployees(prev => prev.map(e => e.id === employeeId ? (updated as Employee) : e))
+          }
+        })
+        .catch(err => {
+          console.error("Lỗi cập nhật nhân viên:", err)
+          setEmployees(prev => prev.map(e => e.id === employeeId ? (updatedEmpData as Employee) : e))
+        })
+
+      const updatedNodeData = {
+        ...targetNode,
+        managerId: employeeId,
+        managerTitle
+      }
+
+      api.orgNodes.update(targetNode.id, updatedNodeData)
+        .then(updated => {
+          if (updated) {
+            setOrgNodes(prev => prev.map(n => n.id === targetNode.id ? (updated as OrgNode) : n))
+          }
+        })
+        .catch(err => {
+          console.error("Lỗi cập nhật đơn vị:", err)
+          setOrgNodes(prev => prev.map(n => n.id === targetNode.id ? updatedNodeData : n))
+        })
+    }
+  }
+
+  const handleConfirmHistory = (writeHistory: boolean) => {
+    if (!historyConfirm) return
+    const { employeeId, type, tempDates, targetNode, customNote, defaultNote, isManagerAppoint, managerTitle, historyType } = historyConfirm
+    setHistoryConfirm(null)
+
+    const finalType = historyType || (isManagerAppoint ? "promotion" : "transfer")
+
+    if (isManagerAppoint && managerTitle) {
+      executeAssignManager(employeeId, targetNode, managerTitle, writeHistory, customNote || defaultNote, finalType)
+    } else {
+      executeAssignMember(employeeId, type, tempDates, targetNode, writeHistory, customNote || defaultNote, finalType)
+    }
+  }
+
   const handleAssignMember = (
     employeeId: string,
     type: "permanent" | "temporary",
@@ -272,53 +520,45 @@ export default function OrgStructure({
     if (!targetNode) return
 
     if (type === "permanent") {
-      setEmployees(prev =>
-        prev.map(emp => {
-          if (emp.id === employeeId) {
-            return {
-              ...emp,
-              orgNodeId: targetNode.id,
-              department: targetNode.type === "department" ? targetNode.name : emp.department,
-              position: targetNode.type === "position" ? targetNode.name : emp.position
-            }
-          }
-          return emp
-        })
-      )
+      const emp = employees.find(e => e.id === employeeId)
+      if (emp) {
+        const isDeptChanged = targetNode.type === "department" && targetNode.name !== emp.department
+        const isPosChanged = targetNode.type === "position" && targetNode.name !== emp.position
 
-      setAssignments(prev => {
-        const completedOld = prev.map(as => {
-          if (as.employeeId === employeeId && as.status === "active") {
-            return {
-              ...as,
-              status: "completed" as const,
-              endDate: new Date().toISOString().split("T")[0]
-            }
-          }
-          return as
-        })
-        const newAs: Assignment = {
-          id: `as-${Date.now()}`,
-          employeeId,
-          nodeId: targetNode.id,
-          type: "permanent",
-          startDate: new Date().toISOString().split("T")[0],
-          status: "active"
+        if (isDeptChanged || isPosChanged) {
+          setHistoryConfirm({
+            employeeId,
+            type,
+            tempDates,
+            targetNode,
+            defaultNote: "Thuyên chuyển từ sơ đồ cơ cấu",
+            customNote: "Thuyên chuyển từ sơ đồ cơ cấu",
+            historyType: "transfer"
+          })
+          return
         }
-        return [...completedOld, newAs]
-      })
-    } else if (type === "temporary" && tempDates) {
-      const newAs: Assignment = {
-        id: `as-${Date.now()}`,
-        employeeId,
-        nodeId: targetNode.id,
-        type: "temporary",
-        startDate: tempDates.startDate,
-        endDate: tempDates.endDate,
-        status: "active"
       }
-      setAssignments(prev => [...prev, newAs])
     }
+
+    executeAssignMember(employeeId, type, tempDates, targetNode, false, "")
+  }
+
+  const handleAssignManager = (nodeId: string, employeeId: string, managerTitle: string) => {
+    const targetNode = orgNodes.find(n => n.id === nodeId)
+    const emp = employees.find(e => e.id === employeeId)
+    if (!targetNode || !emp) return
+
+    const defaultNote = `Bổ nhiệm làm ${managerTitle} tại ${targetNode.name}`
+    setHistoryConfirm({
+      employeeId,
+      type: "permanent",
+      targetNode,
+      defaultNote,
+      customNote: defaultNote,
+      isManagerAppoint: true,
+      managerTitle,
+      historyType: "promotion"
+    })
   }
 
   const handleExport = () => {
@@ -380,45 +620,59 @@ export default function OrgStructure({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-gray-800 tracking-tight">Cơ cấu tổ chức</h2>
-          <p className="text-sm text-gray-400 mt-1">Quản lý và thiết lập cơ cấu tổ chức trong doanh nghiệp</p>
+      <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
+        <div className="flex items-center">
+          <div className="flex gap-1.5 items-center mr-4 shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-white/30 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white/60 animate-pulse delay-75"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150"></span>
+          </div>
+          <div>
+            <h2 className="text-xl font-black tracking-tight text-white">Cơ cấu tổ chức</h2>
+            <p className="text-xs text-white/80 mt-1">Quản lý và thiết lập cơ cấu tổ chức trong doanh nghiệp</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors bg-white shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold text-white transition-colors cursor-pointer"
           >
-            <Download size={15} /> Xuất sơ đồ
+            <Download size={14} /> Xuất sơ đồ
+          </button>
+          <button
+            onClick={onAddEmployee}
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold text-white transition-colors cursor-pointer"
+          >
+            <UserPlus size={14} /> Thêm nhân viên
           </button>
           <button
             onClick={handleOpenAdd}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-sm font-bold transition-colors shadow-sm shadow-[#C62828]/25"
+            className="flex items-center gap-2 px-4 py-2 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm cursor-pointer"
           >
-            <Plus size={15} /> Thêm đơn vị
+            <Plus size={14} /> Thêm đơn vị
           </button>
-          <div className="flex bg-gray-100 rounded-xl p-1 shadow-inner border border-gray-200">
-            <button
-              onClick={() => {
-                setSelectedNodeId(null)
-                setViewMode("diagram")
-              }}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "diagram" && !selectedNodeId ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
-            >
-              Sơ đồ
-            </button>
-            <button
-              onClick={() => {
-                setSelectedNodeId(null)
-                setViewMode("list")
-              }}
-              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "list" && !selectedNodeId ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
-            >
-              Danh sách
-            </button>
-          </div>
         </div>
+      </div>
+
+      <div className="flex bg-gray-100 rounded-xl p-1 shadow-inner border border-gray-200 w-fit">
+        <button
+          onClick={() => { setSelectedNodeId(null); setViewMode("diagram") }}
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "diagram" && !selectedNodeId ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+        >
+          Sơ đồ
+        </button>
+        <button
+          onClick={() => { setSelectedNodeId(null); setViewMode("list") }}
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "list" && !selectedNodeId ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+        >
+          Danh sách
+        </button>
+        <button
+          onClick={() => { setSelectedNodeId(null); setViewMode("catalog") }}
+          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${viewMode === "catalog" ? "bg-white text-[#C62828] shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+        >
+          <Briefcase size={11} />Chức danh
+        </button>
       </div>
 
       {!selectedNodeId && (
@@ -427,8 +681,7 @@ export default function OrgStructure({
             { label: "Tổng nhân sự", value: stats.totalEmployees, sub: "+12% so với tháng trước", color: "text-[#C62828]", bg: "bg-red-50/50" },
             { label: "Chi nhánh", value: stats.branches, sub: "Đang hoạt động", color: "text-purple-600", bg: "bg-purple-50/30" },
             { label: "Phòng ban", value: stats.departments, sub: "Đơn vị trực thuộc", color: "text-orange-600", bg: "bg-orange-50/30" },
-            { label: "Bộ phận / Vị trí", value: stats.positions, sub: "Cơ cấu chuyên môn", color: "text-green-600", bg: "bg-green-50/30" },
-            { label: "Nhóm", value: stats.teams, sub: "Team triển khai", color: "text-pink-600", bg: "bg-pink-50/30" }
+            { label: "Bộ phận / Vị trí", value: stats.positions, sub: "Cơ cấu chuyên môn", color: "text-green-600", bg: "bg-green-50/30" }
           ].map(card => (
             <div key={card.label} className={`rounded-2xl p-5 border border-black/[0.04] bg-white flex flex-col justify-between shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden group`}>
               <div className={`absolute top-0 left-0 w-1.5 h-full ${card.color.replace("text-", "bg-")}`} />
@@ -442,7 +695,13 @@ export default function OrgStructure({
         </div>
       )}
 
-      {selectedNodeId && selectedNode ? (
+      {viewMode === "catalog" && !selectedNodeId && (
+        <div className="bg-white rounded-3xl border border-black/[0.05] shadow-sm p-6">
+          <PositionManagement />
+        </div>
+      )}
+
+      {viewMode !== "catalog" && selectedNodeId && selectedNode ? (
         <OrgDetailView
           node={selectedNode}
           orgNodes={nodesToRender}
@@ -455,8 +714,9 @@ export default function OrgStructure({
           onDeleteNode={requestDeleteNode}
           onSelectNode={setSelectedNodeId}
           onAssignMember={handleAssignMember}
+          onAssignManager={handleAssignManager}
         />
-      ) : (
+      ) : viewMode !== "catalog" ? (
         <>
           {!selectedNodeId && (
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/[0.05] flex gap-3 flex-wrap items-center justify-between">
@@ -470,28 +730,29 @@ export default function OrgStructure({
                 />
               </div>
               <div className="flex gap-2.5">
-                <select
+                <CustomSelect
                   value={filterType}
-                  onChange={e => setFilterType(e.target.value)}
-                  className="px-3.5 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 text-gray-600 bg-white font-semibold cursor-pointer"
-                >
-                  <option value="all">Tất cả phân cấp</option>
-                  <option value="branch">Chi nhánh</option>
-                  <option value="department">Phòng ban</option>
-                  <option value="sub-department">Bộ phận</option>
-                  <option value="position">Vị trí</option>
-                  <option value="team">Nhóm</option>
-                </select>
+                  onChange={setFilterType}
+                  options={[
+                    { value: "all", label: "Tất cả phân cấp" },
+                    { value: "branch", label: "Chi nhánh" },
+                    { value: "department", label: "Phòng ban" },
+                    { value: "sub-department", label: "Bộ phận" },
+                    { value: "position", label: "Vị trí" }
+                  ]}
+                  className="w-44"
+                />
 
-                <select
+                <CustomSelect
                   value={filterStatus}
-                  onChange={e => setFilterStatus(e.target.value)}
-                  className="px-3.5 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 text-gray-600 bg-white font-semibold cursor-pointer"
-                >
-                  <option value="all">Tất cả trạng thái</option>
-                  <option value="active">Đang hoạt động</option>
-                  <option value="inactive">Tạm ngưng hoạt động</option>
-                </select>
+                  onChange={setFilterStatus}
+                  options={[
+                    { value: "all", label: "Tất cả trạng thái" },
+                    { value: "active", label: "Đang hoạt động" },
+                    { value: "inactive", label: "Tạm ngưng hoạt động" }
+                  ]}
+                  className="w-44"
+                />
               </div>
             </div>
           )}
@@ -690,7 +951,7 @@ export default function OrgStructure({
         )
       })()}
         </>
-      )}
+      ) : null}
 
       <AddUnitModal
         isOpen={isModalOpen}
@@ -718,6 +979,89 @@ export default function OrgStructure({
         employees={employees}
         assignments={assignments}
       />
+
+      {historyConfirm && createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[150] p-4 animate-in fade-in duration-200">
+          <div className="bg-[#F5F1EF] rounded-3xl w-full max-w-md shadow-2xl p-6 border border-black/5 animate-in zoom-in-95 duration-100">
+            <div className="flex items-center gap-3 text-[#C62828] mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+                <ClipboardList size={20} />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-800 text-sm">Ghi nhận lịch sử công tác?</h4>
+                <p className="text-[11px] text-gray-400">Hệ thống phát hiện thuyên chuyển bộ phận/chức danh</p>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-4 space-y-2">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Đơn vị mới</p>
+              <p className="text-sm text-gray-800 font-extrabold">{historyConfirm.targetNode.name}</p>
+            </div>
+
+            {historyConfirm.historyType && (
+              <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-4 space-y-2">
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Loại biến động</p>
+                <div className="flex gap-6 pt-1">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-gray-700">
+                    <input
+                      type="radio"
+                      name="historyType"
+                      value="transfer"
+                      checked={historyConfirm.historyType === "transfer"}
+                      onChange={() => setHistoryConfirm(prev => prev ? { ...prev, historyType: "transfer" } : null)}
+                      className="text-[#C62828] focus:ring-[#C62828]"
+                    />
+                    Thuyên chuyển
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-gray-700">
+                    <input
+                      type="radio"
+                      name="historyType"
+                      value="promotion"
+                      checked={historyConfirm.historyType === "promotion"}
+                      onChange={() => setHistoryConfirm(prev => prev ? { ...prev, historyType: "promotion" } : null)}
+                      className="text-[#C62828] focus:ring-[#C62828]"
+                    />
+                    Thăng chức
+                  </label>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5 mb-5">
+              <label className="block text-xs font-semibold text-gray-500">Nội dung ghi chú trong lịch sử</label>
+              <input
+                type="text"
+                value={historyConfirm.customNote}
+                onChange={e => setHistoryConfirm(prev => prev ? { ...prev, customNote: e.target.value } : null)}
+                placeholder="Nhập ghi chú thêm..."
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 bg-white text-gray-800"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => handleConfirmHistory(true)}
+                className="w-full py-2.5 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-[#C62828]/10"
+              >
+                Đồng ý & ghi nhận lịch sử
+              </button>
+              <button
+                onClick={() => handleConfirmHistory(false)}
+                className="w-full py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold transition-all"
+              >
+                Chỉ lưu thông tin (không ghi lịch sử)
+              </button>
+              <button
+                onClick={() => setHistoryConfirm(null)}
+                className="w-full py-2.5 hover:bg-gray-100 text-gray-400 rounded-xl text-xs font-bold transition-all mt-1"
+              >
+                Hủy lệnh thuyên chuyển
+              </button>
+            </div>
+          </div>
+        </div>
+      , document.body)}
     </div>
   )
 }

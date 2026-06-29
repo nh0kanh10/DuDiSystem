@@ -30,9 +30,9 @@ function autoCancelExpiredRequests() {
   for (const req of all) {
     if (req.status === "pending") {
       try {
-        const end = parseVnDate(req.endDate)
-        end.setHours(0, 0, 0, 0)
-        if (end < today) {
+        const start = parseVnDate(req.startDate)
+        start.setHours(0, 0, 0, 0)
+        if (start < today) {
           repo.update(req.id, { status: "cancelled" })
         }
       } catch (e) {

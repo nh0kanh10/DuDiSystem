@@ -2,7 +2,7 @@
   {
     "id": "ra-001",
     "userId": "U001",
-    "scopeType": "company",
+    "scopeType": "self",
     "scopeId": null,
     "isPrimary": true
   },
@@ -79,8 +79,8 @@
   {
     "id": "ra-012",
     "userId": "U012",
-    "scopeType": "self",
-    "scopeId": null,
+    "scopeType": "branch",
+    "scopeId": "branch-hn",
     "isPrimary": true
   },
   {

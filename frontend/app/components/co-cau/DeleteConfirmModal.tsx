@@ -1,4 +1,5 @@
 import { X, AlertTriangle } from "lucide-react"
+import { createPortal } from "react-dom"
 
 interface DeleteConfirmModalProps {
   isOpen: boolean
@@ -17,7 +18,7 @@ export default function DeleteConfirmModal({
 }: DeleteConfirmModalProps) {
   if (!isOpen) return null
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 p-6 relative">
         <button
@@ -73,5 +74,5 @@ export default function DeleteConfirmModal({
         </div>
       </div>
     </div>
-  )
+  , document.body)
 }

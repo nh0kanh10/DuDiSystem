@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { ZoomIn, ZoomOut, Maximize2, Plus, Edit2, Trash2, ChevronDown, ChevronUp, Users, Building2, Clipboard, Settings, Briefcase, Users2, AlertCircle, Ban, CheckCircle } from "lucide-react"
+import { ZoomIn, ZoomOut, Maximize2, Plus, Edit2, Trash2, ChevronDown, ChevronUp, Users, Building2, Clipboard, Settings, Briefcase, AlertCircle, Ban, CheckCircle } from "lucide-react"
 import { OrgNode, OrgNodeType, Employee } from "../../types"
 
 interface OrgTreeViewProps {
@@ -118,13 +118,6 @@ export default function OrgTreeView({
           dot: "bg-blue-500",
           icon: <Briefcase size={16} />
         }
-      case "team":
-        return {
-          border: "border-pink-400 hover:border-pink-600 shadow-sm hover:shadow-pink-100/50",
-          iconBg: "bg-pink-100 text-pink-700",
-          dot: "bg-pink-500",
-          icon: <Users2 size={16} />
-        }
     }
   }
 
@@ -219,7 +212,7 @@ export default function OrgTreeView({
       )
     }
 
-    const showCompact = node.type === "position" || node.type === "team"
+    const showCompact = node.type === "position"
 
     return (
       <div className="flex flex-col items-center">
@@ -233,7 +226,7 @@ export default function OrgTreeView({
                 )}
               </div>
               <p className="text-[10px] text-gray-400 mt-0.5 truncate">
-                {node.type === "position" ? "Vị trí" : "Nhóm"}
+                Vị trí
               </p>
               <button
                 type="button"
@@ -281,16 +274,14 @@ export default function OrgTreeView({
           )}
 
           <div className="absolute -top-3 right-4 bg-white border border-gray-200 shadow-sm rounded-lg py-1 px-2 hidden group-hover:flex items-center gap-1.5 z-20">
-            {node.type !== "team" && (
-              <button
-                type="button"
-                onClick={() => onAddChild(node.id)}
-                className="p-1 hover:bg-gray-100 rounded text-green-600"
-                title="Thêm cấp con"
-              >
-                <Plus size={12} />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => onAddChild(node.id)}
+              className="p-1 hover:bg-gray-100 rounded text-green-600"
+              title="Thêm cấp con"
+            >
+              <Plus size={12} />
+            </button>
             <button
               type="button"
               onClick={() => onEditNode(node)}
@@ -453,10 +444,6 @@ export default function OrgTreeView({
         <div className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
           <span>Vị trí</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-pink-500" />
-          <span>Nhóm</span>
         </div>
       </div>
 

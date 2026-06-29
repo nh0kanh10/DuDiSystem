@@ -29,13 +29,20 @@ export function AttendanceManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-gray-800 tracking-tight">Quản lý chấm công</h2>
-          <p className="text-sm text-gray-400 mt-1">Nhật ký chấm công nhân sự và trạng thái hiện diện hàng ngày</p>
+      <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
+        <div className="flex items-center">
+          <div className="flex gap-1.5 items-center mr-4 shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-white/30 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white/60 animate-pulse delay-75"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150"></span>
+          </div>
+          <div>
+            <h2 className="text-xl font-black tracking-tight text-white">Quản lý chấm công</h2>
+            <p className="text-xs text-white/80 mt-1">Nhật ký chấm công nhân sự và trạng thái hiện diện hàng ngày</p>
+          </div>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors bg-white shadow-sm">
-          <Download size={15} /> Xuất file excel
+        <button className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
+          <Download size={14} /> Xuất file excel
         </button>
       </div>
 

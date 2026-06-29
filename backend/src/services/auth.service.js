@@ -17,7 +17,7 @@ export async function login(loginKey, password) {
   const branchId = resolveBranchId(user.id)
 
   const token = jwt.sign(
-    { id: user.id, employeeId: user.employeeId, role: user.role, branchId },
+    { id: user.id, employeeId: user.employeeId, roleId: user.roleId, branchId },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   )

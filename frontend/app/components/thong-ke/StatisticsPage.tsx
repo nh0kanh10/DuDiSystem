@@ -3,6 +3,8 @@ import { Clock, TrendingUp, AlertCircle, Users, Download, Search, Award, Calenda
 import { api } from "@/lib/api"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomCombobox } from "../ui/CustomCombobox"
+import { Modal } from "../ui/Modal"
+import { CustomDatePicker } from "../ui/CustomDatePicker"
 
 const getDayOfWeekVN = (dateStr: string) => {
   const [y, m, d] = dateStr.split("-").map(Number)
@@ -52,7 +54,9 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
   const currentMonthStr = useMemo(() => String(now.getMonth() + 1).padStart(2, "0"), [now])
 
   const [activeTab, setActiveTab] = useState<"official" | "intern" | "personal" | "violation">("official")
-  const [filterType, setFilterType] = useState<"week" | "month">("month")
+  const [filterType, setFilterType] = useState<"week" | "month" | "range">("month")
+  const [rangeStart, setRangeStart] = useState<string>("")
+  const [rangeEnd, setRangeEnd] = useState<string>("")
   const [selectedYear, setSelectedYear] = useState<string>(currentYearStr)
   const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthStr)
   const [selectedWeekId, setSelectedWeekId] = useState<string>("w1")
@@ -63,6 +67,19 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [exporting, setExporting] = useState<boolean>(false)
+  const [activeRankDetail, setActiveRankDetail] = useState<{
+    title: string
+    countLabel: string
+    employees: {
+      id: string
+      name: string
+      department: string
+      late: number
+      leave: number
+      total: number
+      onTimeRate: number
+    }[]
+  } | null>(null)
   const [systemConfig, setSystemConfig] = useState<{
     morningStart: string
     morningEnd: string
@@ -203,23 +220,36 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
     }
   }, [filterType, weeksOptions, selectedYear, selectedMonth, selectedWeekId])
 
+  const parseVNtoISO = (vnDate: string) => {
+    if (!vnDate) return ""
+    const [d, m, y] = vnDate.split("/")
+    if (!d || !m || !y) return ""
+    return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`
+  }
+
   const dateRange = useMemo(() => {
     const year = selectedYear.length === 4 ? parseInt(selectedYear) : parseInt(currentYearStr)
     const month = parseInt(selectedMonth)
-    
+
+    if (filterType === "range") {
+      const start = parseVNtoISO(rangeStart)
+      const end = parseVNtoISO(rangeEnd)
+      if (start && end) return { start, end }
+      if (start) return { start, end: start }
+      return { start: `${year}-${String(month).padStart(2,"0")}-01`, end: `${year}-${String(month).padStart(2,"0")}-01` }
+    }
+
     if (filterType === "week") {
       const matched = weeksOptions.find(w => w.id === selectedWeekId) ?? weeksOptions[0]
-      if (matched) {
-        return { start: matched.startDate, end: matched.endDate }
-      }
+      if (matched) return { start: matched.startDate, end: matched.endDate }
     }
-    
+
     const lastDay = new Date(year, month, 0).getDate()
     return {
       start: `${year}-${String(month).padStart(2, "0")}-01`,
       end: `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
     }
-  }, [filterType, selectedYear, selectedMonth, selectedWeekId, weeksOptions, currentYearStr])
+  }, [filterType, selectedYear, selectedMonth, selectedWeekId, weeksOptions, currentYearStr, rangeStart, rangeEnd])
 
   const maxNotches = useMemo(() => {
     if (filterType === "week") return 5
@@ -293,12 +323,41 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
         total: stats.total,
         onTimeRate: stats.total > 0 ? Math.round((stats.onTime / stats.total) * 100) : 100
       }
+    }).sort((a, b) => b.late - a.late || b.leave - a.leave || a.name.localeCompare(b.name))
+
+    const lateEmployees = list.filter(item => item.late > 0)
+    const lateGroupsMap: Record<number, typeof list> = {}
+    lateEmployees.forEach(emp => {
+      if (!lateGroupsMap[emp.late]) lateGroupsMap[emp.late] = []
+      lateGroupsMap[emp.late].push(emp)
     })
+    const sortedLateCounts = Object.keys(lateGroupsMap)
+      .map(Number)
+      .sort((a, b) => b - a)
+      .slice(0, 3)
+    const topLateGroups = sortedLateCounts.map((count, index) => ({
+      rank: index + 1,
+      count,
+      employees: lateGroupsMap[count].sort((a, b) => a.name.localeCompare(b.name))
+    }))
 
-    const topLate = [...list].sort((a, b) => b.late - a.late || a.name.localeCompare(b.name)).slice(0, 5)
-    const topLeave = [...list].sort((a, b) => b.leave - a.leave || a.name.localeCompare(b.name)).slice(0, 5)
+    const leaveEmployees = list.filter(item => item.leave > 0)
+    const leaveGroupsMap: Record<number, typeof list> = {}
+    leaveEmployees.forEach(emp => {
+      if (!leaveGroupsMap[emp.leave]) leaveGroupsMap[emp.leave] = []
+      leaveGroupsMap[emp.leave].push(emp)
+    })
+    const sortedLeaveCounts = Object.keys(leaveGroupsMap)
+      .map(Number)
+      .sort((a, b) => b - a)
+      .slice(0, 3)
+    const topLeaveGroups = sortedLeaveCounts.map((count, index) => ({
+      rank: index + 1,
+      count,
+      employees: leaveGroupsMap[count].sort((a, b) => a.name.localeCompare(b.name))
+    }))
 
-    return { list, topLate, topLeave }
+    return { list, topLateGroups, topLeaveGroups }
   }, [filteredEmployeesList, statsMap])
 
   const departmentOptions = useMemo(() => {
@@ -323,7 +382,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
 
   const personalStats = useMemo(() => {
-    const isManagerOrAdmin = currentUserRole === "admin" || currentUserRole === "manager"
+    const isManagerOrAdmin = currentUserRole === "role-admin" || currentUserRole === "role-manager"
     const empId = isManagerOrAdmin ? personalEmployeeId : (personalEmployeeId || currentEmployeeId)
     if (!empId) return null
     const emp = employees.find(e => e.id === empId)
@@ -492,21 +551,28 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="space-y-1">
-          <h2 className="text-xl font-bold text-gray-800">Thống kê chấm công</h2>
-          <p className="text-xs text-gray-500 font-medium">Báo cáo trực quan hiệu suất làm việc và vi phạm kỷ luật</p>
+      <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
+        <div className="flex items-center">
+          <div className="flex gap-1.5 items-center mr-4 shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-white/30 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white/60 animate-pulse delay-75"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150"></span>
+          </div>
+          <div>
+            <h2 className="text-xl font-black tracking-tight text-white">Thống kê chấm công</h2>
+            <p className="text-xs text-white/80 mt-1">Báo cáo trực quan hiệu suất làm việc và vi phạm kỷ luật</p>
+          </div>
         </div>
         {(activeTab !== "personal" || personalStats) && (
           <button onClick={handleExport} disabled={exporting}
-            className="flex items-center gap-2 px-4 py-2 bg-[#C62828] text-white rounded-2xl text-sm font-bold hover:bg-[#B71C1C] transition-colors shadow-sm active:scale-95 duration-150 disabled:opacity-50">
+            className="flex items-center gap-2 px-4 py-2 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50 cursor-pointer">
             {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />} 
             {exporting ? "Đang xuất..." : "Xuất báo cáo"}
           </button>
         )}
       </div>
 
-      <div className="bg-[#FAF9F9] rounded-3xl p-4 border border-black/5 shadow-xs flex flex-wrap items-center gap-4">
+      <div className="bg-[#FAF9F9] rounded-3xl p-4 border border-black/5 shadow-xs flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1.5 min-w-[130px] flex-1 lg:flex-none">
           <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Loại bộ lọc</span>
           <CustomSelect
@@ -514,25 +580,93 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
             onChange={val => setFilterType(val as any)}
             options={[
               { value: "week", label: "Theo tuần" },
-              { value: "month", label: "Theo tháng" }
+              { value: "month", label: "Theo tháng" },
+              { value: "range", label: "Khoảng thời gian" }
             ]}
           />
         </div>
 
-        <div className="flex flex-col gap-1.5 min-w-[100px] flex-1 lg:flex-none">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Chọn năm</span>
-          <input type="text" value={selectedYear} onChange={e => handleYearChange(e.target.value)} maxLength={4}
-            className="w-full px-3 py-1.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-[#C62828]/40 text-gray-700 bg-white font-bold text-center h-[34px]" />
-        </div>
+        {filterType !== "range" && (
+          <div className="flex flex-col gap-1.5 min-w-[100px] flex-1 lg:flex-none">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Chọn năm</span>
+            <input type="text" value={selectedYear} onChange={e => handleYearChange(e.target.value)} maxLength={4}
+              className="w-full px-3 py-1.5 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-[#C62828]/40 text-gray-700 bg-white font-bold text-center h-[34px]" />
+          </div>
+        )}
 
-        <div className="flex flex-col gap-1.5 min-w-[100px] flex-1 lg:flex-none">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Chọn tháng</span>
-          <CustomSelect
-            value={selectedMonth}
-            onChange={setSelectedMonth}
-            options={monthOptions}
-          />
-        </div>
+        {filterType !== "range" && (
+          <div className="flex flex-col gap-1.5 min-w-[100px] flex-1 lg:flex-none">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Chọn tháng</span>
+            <CustomSelect
+              value={selectedMonth}
+              onChange={setSelectedMonth}
+              options={monthOptions}
+            />
+          </div>
+        )}
+
+        {filterType === "range" && (
+          <>
+            <div className="flex flex-col gap-1.5 min-w-[140px]">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Từ ngày</span>
+              <CustomDatePicker
+                value={rangeStart}
+                onChange={v => { setRangeStart(v); if (rangeEnd && v > rangeEnd) setRangeEnd("") }}
+                placeholder="Chọn ngày bắt đầu"
+                className="w-full px-3 border border-gray-200 rounded-xl text-xs bg-white font-bold h-[34px] focus:outline-none focus:border-[#C62828]/40"
+              />
+            </div>
+            <span className="text-gray-300 font-black text-sm leading-[34px]">→</span>
+            <div className="flex flex-col gap-1.5 min-w-[140px]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Đến ngày</span>
+                {rangeStart && rangeEnd && (() => {
+                  const s = parseVNtoISO(rangeStart), e = parseVNtoISO(rangeEnd)
+                  const days = Math.round((new Date(e).getTime() - new Date(s).getTime()) / 86400000) + 1
+                  return days > 0 ? <span className="text-[10px] font-black text-[#C62828] bg-[#C62828]/8 px-1.5 py-0.5 rounded-full">{days} ngày</span> : null
+                })()}
+              </div>
+              <CustomDatePicker
+                value={rangeEnd}
+                onChange={setRangeEnd}
+                placeholder="Chọn ngày kết thúc"
+                className="w-full px-3 border border-gray-200 rounded-xl text-xs bg-white font-bold h-[34px] focus:outline-none focus:border-[#C62828]/40"
+              />
+            </div>
+            <div className="flex gap-1.5 flex-wrap self-end">
+              {[
+                { label: "7 ngày", days: 7 },
+                { label: "30 ngày", days: 30 },
+                { label: "Tháng này", days: 0, type: "thisMonth" },
+                { label: "Quý này", days: 0, type: "thisQuarter" },
+              ].map(preset => (
+                <button key={preset.label} type="button"
+                  onClick={() => {
+                    const today = new Date()
+                    const fmt = (d: Date) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`
+                    if (preset.type === "thisMonth") {
+                      setRangeStart(fmt(new Date(today.getFullYear(), today.getMonth(), 1)))
+                      setRangeEnd(fmt(new Date(today.getFullYear(), today.getMonth()+1, 0)))
+                    } else if (preset.type === "thisQuarter") {
+                      const q = Math.floor(today.getMonth() / 3)
+                      setRangeStart(fmt(new Date(today.getFullYear(), q*3, 1)))
+                      setRangeEnd(fmt(new Date(today.getFullYear(), q*3+3, 0)))
+                    } else {
+                      const end = new Date(today)
+                      const start = new Date(today)
+                      start.setDate(today.getDate() - preset.days + 1)
+                      setRangeStart(fmt(start))
+                      setRangeEnd(fmt(end))
+                    }
+                  }}
+                  className="h-[34px] px-3 rounded-xl text-[10px] font-black text-gray-500 bg-white border border-gray-200 hover:border-[#C62828]/40 hover:text-[#C62828] transition-colors"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         {filterType === "week" && (
           <div className="flex flex-col gap-1.5 min-w-[130px] flex-1 lg:flex-none">
@@ -545,7 +679,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         )}
 
-        {(currentUserRole === "admin" || currentUserRole === "manager") && (
+        {(currentUserRole === "role-admin" || currentUserRole === "role-manager") && (
           <div className="flex flex-col gap-1.5 min-w-[150px] flex-1 lg:flex-none">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Phòng ban</span>
             <CustomSelect
@@ -559,7 +693,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         )}
 
-        {activeTab === "personal" && (currentUserRole === "admin" || currentUserRole === "manager") && (
+        {activeTab === "personal" && (currentUserRole === "role-admin" || currentUserRole === "role-manager") && (
           <div className="flex flex-col gap-1.5 min-w-[250px] flex-1 lg:flex-none">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Chọn nhân sự</span>
             <CustomCombobox
@@ -727,7 +861,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         ) : (
           <div className="py-12 bg-white rounded-3xl border border-gray-150 text-center text-gray-400 text-sm font-medium">
-            {currentUserRole === "admin" || currentUserRole === "manager"
+            {currentUserRole === "role-admin" || currentUserRole === "role-manager"
               ? "Vui lòng chọn nhân sự để xem báo cáo chi tiết."
               : "Không tìm thấy thông tin tài khoản nhân sự kết nối với email của bạn."}
           </div>
@@ -745,35 +879,67 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                 </h3>
               </div>
               <div className="p-6 space-y-3.5">
-                {rankData.topLate.filter(item => item.late > 0).length === 0 ? (
+                {rankData.topLateGroups.length === 0 ? (
                   <div className="py-8 text-center text-gray-400 text-xs font-semibold">Ghi nhận 0 lượt đi trễ trong kỳ này</div>
                 ) : (
-                  rankData.topLate.filter(item => item.late > 0).map((v, i) => (
-                    <div key={v.id} className="flex items-center gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
-                        ${i === 0 ? "bg-amber-100 text-amber-700 border border-amber-200" : i === 1 ? "bg-slate-100 text-slate-700 border border-slate-200" : i === 2 ? "bg-orange-100 text-orange-700 border border-orange-200" : "bg-gray-50 text-gray-500"}`}>
-                        {i + 1}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between mb-1">
-                          <div>
-                            <span className="text-sm font-bold text-gray-800 block leading-tight">{v.name}</span>
-                            <span className="text-[10px] text-gray-400 font-semibold">{v.id} — {v.department}</span>
+                  rankData.topLateGroups.map((group) => {
+                    const displayedEmps = group.employees.slice(0, 2)
+                    const remainingCount = group.employees.length - 2
+
+                    return (
+                      <div key={group.rank} className="flex items-center gap-4">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
+                          ${group.rank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200" 
+                            : group.rank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200" 
+                            : "bg-orange-100 text-orange-700 border border-orange-200"}`}>
+                          {group.rank}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-1 gap-2">
+                            <div className="min-w-0 flex-1">
+                              {group.employees.length === 1 ? (
+                                <>
+                                  <span className="text-sm font-bold text-gray-800 block leading-tight truncate">
+                                    {group.employees[0].name}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-semibold truncate block">
+                                    {group.employees[0].id} — {group.employees[0].department}
+                                  </span>
+                                </>
+                              ) : (
+                                <div className="cursor-pointer" onClick={() => setActiveRankDetail({
+                                  title: `Top đi trễ - Hạng ${group.rank} (${group.count} ngày muộn)`,
+                                  countLabel: `${group.count} ngày muộn`,
+                                  employees: group.employees
+                                })}>
+                                  <span className="text-sm font-bold text-gray-800 block leading-tight truncate hover:text-[#C62828] transition-colors">
+                                    {displayedEmps.map(e => e.name).join(", ")}
+                                    {remainingCount > 0 && ` và ${remainingCount} người khác...`}
+                                  </span>
+                                  <span className="text-[10px] text-[#C62828] font-black hover:underline mt-0.5 flex items-center gap-1">
+                                    <AlertCircle size={11} className="flex-shrink-0" />
+                                    Đồng hạng — Bấm để xem chi tiết ({group.employees.length} nhân sự)
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-xs font-bold text-[#C62828] bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg h-fit flex-shrink-0">
+                              {group.count} ngày muộn
+                            </span>
                           </div>
-                          <span className="text-xs font-bold text-[#C62828] bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg h-fit">{v.late} ngày muộn</span>
-                        </div>
-                        <div className={`flex h-1.5 mt-2 ${maxNotches === 5 ? "gap-1" : "gap-[2px]"}`}>
-                          {Array.from({ length: maxNotches }).map((_, idx) => {
-                            const isFilled = idx < v.late
-                            const colorClass = i === 0 ? "bg-[#C62828]" : i === 1 ? "bg-[#EA580C]" : i === 2 ? "bg-[#F59E0B]" : "bg-gray-400"
-                            return (
-                              <div key={idx} className={`flex-1 h-full rounded-xs transition-colors duration-300 ${isFilled ? colorClass : "bg-gray-100"}`} />
-                            )
-                          })}
+                          <div className={`flex h-1.5 mt-2 ${maxNotches === 5 ? "gap-1" : "gap-[2px]"}`}>
+                            {Array.from({ length: maxNotches }).map((_, idx) => {
+                              const isFilled = idx < group.count
+                              const colorClass = group.rank === 1 ? "bg-[#C62828]" : group.rank === 2 ? "bg-[#EA580C]" : "bg-[#F59E0B]"
+                              return (
+                                <div key={idx} className={`flex-1 h-full rounded-xs transition-colors duration-300 ${isFilled ? colorClass : "bg-gray-100"}`} />
+                              )
+                            })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             </div>
@@ -786,35 +952,67 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                 </h3>
               </div>
               <div className="p-6 space-y-3.5">
-                {rankData.topLeave.filter(item => item.leave > 0).length === 0 ? (
+                {rankData.topLeaveGroups.length === 0 ? (
                   <div className="py-8 text-center text-gray-400 text-xs font-semibold">Ghi nhận 0 lượt nghỉ/vắng trong kỳ này</div>
                 ) : (
-                  rankData.topLeave.filter(item => item.leave > 0).map((v, i) => (
-                    <div key={v.id} className="flex items-center gap-4">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
-                        ${i === 0 ? "bg-amber-100 text-amber-700 border border-amber-200" : i === 1 ? "bg-slate-100 text-slate-700 border border-slate-200" : i === 2 ? "bg-orange-100 text-orange-700 border border-orange-200" : "bg-gray-50 text-gray-500"}`}>
-                        {i + 1}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between mb-1">
-                          <div>
-                            <span className="text-sm font-bold text-gray-800 block leading-tight">{v.name}</span>
-                            <span className="text-[10px] text-gray-400 font-semibold">{v.id} — {v.department}</span>
+                  rankData.topLeaveGroups.map((group) => {
+                    const displayedEmps = group.employees.slice(0, 2)
+                    const remainingCount = group.employees.length - 2
+
+                    return (
+                      <div key={group.rank} className="flex items-center gap-4">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
+                          ${group.rank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200" 
+                            : group.rank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200" 
+                            : "bg-orange-100 text-orange-700 border border-orange-200"}`}>
+                          {group.rank}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-1 gap-2">
+                            <div className="min-w-0 flex-1">
+                              {group.employees.length === 1 ? (
+                                <>
+                                  <span className="text-sm font-bold text-gray-800 block leading-tight truncate">
+                                    {group.employees[0].name}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-semibold truncate block">
+                                    {group.employees[0].id} — {group.employees[0].department}
+                                  </span>
+                                </>
+                              ) : (
+                                <div className="cursor-pointer" onClick={() => setActiveRankDetail({
+                                  title: `Top nghỉ phép - Hạng ${group.rank} (${group.count} ngày nghỉ)`,
+                                  countLabel: `${group.count} ngày nghỉ`,
+                                  employees: group.employees
+                                })}>
+                                  <span className="text-sm font-bold text-gray-800 block leading-tight truncate hover:text-blue-600 transition-colors">
+                                    {displayedEmps.map(e => e.name).join(", ")}
+                                    {remainingCount > 0 && ` và ${remainingCount} người khác...`}
+                                  </span>
+                                  <span className="text-[10px] text-blue-500 font-black hover:underline mt-0.5 flex items-center gap-1">
+                                    <AlertCircle size={11} className="flex-shrink-0" />
+                                    Đồng hạng — Bấm để xem chi tiết ({group.employees.length} nhân sự)
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-lg h-fit flex-shrink-0">
+                              {group.count} ngày nghỉ
+                            </span>
                           </div>
-                          <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-lg h-fit">{v.leave} ngày nghỉ</span>
-                        </div>
-                        <div className={`flex h-1.5 mt-2 ${maxNotches === 5 ? "gap-1" : "gap-[2px]"}`}>
-                          {Array.from({ length: maxNotches }).map((_, idx) => {
-                            const isFilled = idx < v.leave
-                            const colorClass = i === 0 ? "bg-blue-600" : i === 1 ? "bg-blue-500" : i === 2 ? "bg-blue-400" : "bg-gray-400"
-                            return (
-                              <div key={idx} className={`flex-1 h-full rounded-xs transition-colors duration-300 ${isFilled ? colorClass : "bg-gray-100"}`} />
-                            )
-                          })}
+                          <div className={`flex h-1.5 mt-2 ${maxNotches === 5 ? "gap-1" : "gap-[2px]"}`}>
+                            {Array.from({ length: maxNotches }).map((_, idx) => {
+                              const isFilled = idx < group.count
+                              const colorClass = group.rank === 1 ? "bg-blue-600" : group.rank === 2 ? "bg-blue-500" : "bg-blue-400"
+                              return (
+                                <div key={idx} className={`flex-1 h-full rounded-xs transition-colors duration-300 ${isFilled ? colorClass : "bg-gray-100"}`} />
+                              )
+                            })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    )
+                  })
                 )}
               </div>
             </div>
@@ -881,6 +1079,42 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         </div>
       )}
+      <Modal
+        open={!!activeRankDetail}
+        onClose={() => setActiveRankDetail(null)}
+        title={activeRankDetail?.title || ""}
+        icon={Award}
+        width="lg"
+        footer={
+          <button 
+            onClick={() => setActiveRankDetail(null)}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+          >
+            Đóng
+          </button>
+        }
+      >
+        <div className="p-6 overflow-y-auto space-y-3 max-h-[60vh]" style={{ scrollbarWidth: "thin" }}>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2">Danh sách nhân sự đồng hạng:</p>
+          <div className="divide-y divide-gray-100">
+            {activeRankDetail?.employees.map((emp) => (
+              <div key={emp.id} className="py-3 flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-gray-800 truncate">{emp.name}</p>
+                  <p className="text-[11px] text-gray-400 font-semibold">{emp.id} — {emp.department}</p>
+                </div>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
+                  activeRankDetail.countLabel.includes("muộn") 
+                    ? "text-[#C62828] bg-rose-50 border-rose-100" 
+                    : "text-blue-600 bg-blue-50 border-blue-100"
+                }`}>
+                  {activeRankDetail.countLabel}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
@@ -1012,9 +1246,18 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
       })
       .filter(v => selectedEmpId === "all" || v.id === selectedEmpId)
       .sort((a, b) => {
-        const idxA = employees.findIndex(e => e.id === a.id)
-        const idxB = employees.findIndex(e => e.id === b.id)
-        return idxA - idxB
+        const severityScore = (v: typeof empViolations[0]) => {
+          if (v.absentList.length > 0) return 4
+          if (v.leaveList.length > 0) return 3
+          if (v.violations > 0) return 2
+          return 1
+        }
+        const sA = severityScore(a)
+        const sB = severityScore(b)
+        if (sB !== sA) return sB - sA
+        const totalA = a.absentList.length + a.leaveList.length + a.violations
+        const totalB = b.absentList.length + b.leaveList.length + b.violations
+        return totalB - totalA
       })
   }, [empViolations, filterType, selectedEmpId, employees])
 

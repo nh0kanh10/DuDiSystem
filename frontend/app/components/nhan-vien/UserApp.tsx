@@ -1013,15 +1013,34 @@ function SettingsContent({ onLogout }: { onLogout: () => void }) {
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
-export default function UserPortalApp({ onLogout }: { onLogout: () => void }) {
+const BUBBLE_MODULE_MAP: Record<BubbleId, string> = {
+  checkin: "user-attendance",
+  employee: "user-profile",
+  leave: "user-timeoff",
+  tasks: "cong-viec",
+  settings: "user-settings",
+  chat: "user-chat",
+  workflow: "user-workflow",
+  notifications: "thong-bao"
+};
+
+// ─── App ─────────────────────────────────────────────────────────────────────
+export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: () => void; modules?: string[] }) {
   const [activePage, setActivePage] = useState<BubbleId | null>(null);
   const [checkedIn, setCheckedIn] = useState(false);
   const [hovId, setHovId] = useState<BubbleId | null>(null);
 
   const handleBubbleClick = (id: BubbleId) => setActivePage(id);
 
+  const allowedBubbles = BUBBLES.filter(b => {
+    // If modules is empty (e.g. before fetching finishes), show all system default modules
+    if (modules.length === 0) return true;
+    const moduleKey = BUBBLE_MODULE_MAP[b.id];
+    return modules.includes(moduleKey);
+  });
+
   // Individual float keyframe values per bubble for organic feel
-  const floatKeyframes = BUBBLES.map(b => `
+  const floatKeyframes = allowedBubbles.map(b => `
     @keyframes floatBubble${b.id} {
       0%, 100% { transform: translateY(0px); }
       33%       { transform: translateY(-${4 + (b.delay * 1.5).toFixed(0)}px) rotate(${(b.delay * 0.2).toFixed(1)}deg); }
@@ -1074,7 +1093,7 @@ export default function UserPortalApp({ onLogout }: { onLogout: () => void }) {
 
         {/* Bubbles layer */}
         <div style={{ position: "absolute", inset: 0 }}>
-          {BUBBLES.map(b => (
+          {allowedBubbles.map(b => (
             <Bubble key={b.id} b={b} hovId={hovId} setHovId={setHovId} onClick={handleBubbleClick} />
           ))}
         </div>

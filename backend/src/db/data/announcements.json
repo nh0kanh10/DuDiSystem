@@ -1,0 +1,57 @@
+[
+  {
+    "id": "ANN001",
+    "title": "Nghỉ lễ Quốc khánh 2/9",
+    "type": "event",
+    "content": "Toàn thể nhân viên được nghỉ lễ Quốc khánh ngày 02/09/2026 (Thứ Tư). Chúc mừng ngày lễ lớn của dân tộc!",
+    "priority": "high",
+    "startTime": "01/09/2026 08:00",
+    "endTime": "02/09/2026 23:59",
+    "status": "scheduled",
+    "createdAt": "29/06/2026"
+  },
+  {
+    "id": "ANN002",
+    "title": "Cập nhật hệ thống DuDi v2.1",
+    "type": "info",
+    "content": "Hệ thống đã được nâng cấp lên phiên bản v2.1 với nhiều tính năng mới. Vui lòng liên hệ IT nếu gặp sự cố.",
+    "priority": "medium",
+    "startTime": "28/06/2026 09:00",
+    "endTime": "05/07/2026 17:00",
+    "status": "active",
+    "createdAt": "28/06/2026"
+  },
+  {
+    "id": "ANN003",
+    "title": "Nhắc nhở chấm công tháng 6",
+    "type": "warning",
+    "content": "Hạn chót chỉnh sửa bảng chấm công tháng 6 là 30/06/2026. Nhân viên chưa hoàn thiện vui lòng cập nhật trước hạn.",
+    "priority": "high",
+    "startTime": "25/06/2026 08:00",
+    "endTime": "30/06/2026 17:00",
+    "status": "active",
+    "createdAt": "25/06/2026"
+  },
+  {
+    "id": "ANN004",
+    "title": "Họp toàn công ty Q2/2026",
+    "type": "event",
+    "content": "Buổi họp tổng kết Q2 và định hướng Q3 sẽ diễn ra vào 15/07/2026 lúc 14:00 tại phòng họp lớn tầng 3.",
+    "priority": "medium",
+    "startTime": "10/07/2026 08:00",
+    "endTime": "15/07/2026 16:00",
+    "status": "scheduled",
+    "createdAt": "29/06/2026"
+  },
+  {
+    "id": "ANN005",
+    "title": "Bảo trì hệ thống email nội bộ",
+    "type": "warning",
+    "content": "Hệ thống email nội bộ sẽ tạm ngưng bảo trì từ 20:00–23:00 ngày 20/06/2026.",
+    "priority": "low",
+    "startTime": "20/06/2026 18:00",
+    "endTime": "21/06/2026 00:00",
+    "status": "expired",
+    "createdAt": "18/06/2026"
+  }
+]

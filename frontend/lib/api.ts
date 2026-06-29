@@ -40,6 +40,12 @@ export const api = {
     resetPassword: (id: string) => req<any>("POST", `/users/${id}/reset-password`),
     delete: (id: string) => req<any>("DELETE", `/users/${id}`),
   },
+  roles: {
+    list: () => req<any[]>("GET", "/roles"),
+    create: (data: any) => req<any>("POST", "/roles", data),
+    update: (id: string, data: any) => req<any>("PUT", `/roles/${id}`, data),
+    delete: (id: string) => req<any>("DELETE", `/roles/${id}`),
+  },
 
 
   employees: {
@@ -89,8 +95,38 @@ export const api = {
     delete: (id: string) => req<unknown>("DELETE", `/requests/${id}`),
   },
 
+  projects: {
+    list: (params?: { status?: string; q?: string; managerId?: string }) =>
+      req<unknown[]>("GET", `/projects${qs(params)}`),
+    getById: (id: string) => req<unknown>("GET", `/projects/${id}`),
+    create: (data: unknown) => req<unknown>("POST", "/projects", data),
+    update: (id: string, data: unknown) => req<unknown>("PUT", `/projects/${id}`, data),
+    delete: (id: string) => req<unknown>("DELETE", `/projects/${id}`),
+    addAttachment: (id: string, data: unknown) => req<unknown>("POST", `/projects/${id}/attachments`, data),
+    removeAttachment: (id: string, attachmentId: string) =>
+      req<unknown>("DELETE", `/projects/${id}/attachments/${attachmentId}`),
+    addTeam: (id: string, data: unknown) => req<unknown>("POST", `/projects/${id}/teams`, data),
+    updateTeam: (id: string, teamId: string, data: unknown) => req<unknown>("PUT", `/projects/${id}/teams/${teamId}`, data),
+    removeTeam: (id: string, teamId: string) => req<unknown>("DELETE", `/projects/${id}/teams/${teamId}`),
+  },
+
+  groups: {
+    list: () => req<unknown[]>("GET", "/groups"),
+    create: (data: unknown) => req<unknown>("POST", "/groups", data),
+    update: (id: string, data: unknown) => req<unknown>("PUT", `/groups/${id}`, data),
+    delete: (id: string) => req<unknown>("DELETE", `/groups/${id}`),
+  },
+
+  announcements: {
+    list:   ()                          => req<unknown[]>("GET", "/announcements"),
+    stats:  ()                          => req<unknown>("GET", "/announcements/stats"),
+    create: (data: unknown)             => req<unknown>("POST", "/announcements", data),
+    update: (id: string, data: unknown) => req<unknown>("PUT", `/announcements/${id}`, data),
+    delete: (id: string)                => req<unknown>("DELETE", `/announcements/${id}`),
+  },
+
   tasks: {
-    list: (params?: { status?: string; priority?: string; assigneeId?: string }) =>
+    list: (params?: { status?: string; priority?: string; assigneeId?: string; projectId?: string }) =>
       req<unknown[]>("GET", `/tasks${qs(params)}`),
     create: (data: unknown) => req<unknown>("POST", "/tasks", data),
     update: (id: string, data: unknown) => req<unknown>("PUT", `/tasks/${id}`, data),
@@ -279,6 +315,13 @@ export const api = {
   systemConfig: {
     get: () => req<any>("GET", "/system-config"),
     update: (data: any) => req<any>("PUT", "/system-config", data),
+  },
+  positions: {
+    list: (params?: Record<string, string | undefined>) => req<any[]>("GET", `/positions${qs(params)}`),
+    getById: (id: string) => req<any>("GET", `/positions/${id}`),
+    create: (data: any) => req<any>("POST", "/positions", data),
+    update: (id: string, data: any) => req<any>("PUT", `/positions/${id}`, data),
+    delete: (id: string) => req<any>("DELETE", `/positions/${id}`),
   },
 }
 

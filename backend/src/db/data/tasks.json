@@ -1,12 +1,198 @@
 [
-  { "id": "T1",  "title": "Redesign dashboard UI",              "assigneeId": "NV003", "dueDate": "30/06/2026", "priority": "high",   "status": "in-progress" },
-  { "id": "T2",  "title": "Fix attendance API bug",             "assigneeId": "NV002", "dueDate": "26/06/2026", "priority": "high",   "status": "todo" },
-  { "id": "T3",  "title": "Tài liệu onboarding nhân viên mới", "assigneeId": "NV005", "dueDate": "01/07/2026", "priority": "medium", "status": "todo" },
-  { "id": "T4",  "title": "Review code module Nhân sự",         "assigneeId": "NV004", "dueDate": "28/06/2026", "priority": "medium", "status": "in-progress" },
-  { "id": "T5",  "title": "Setup CI/CD pipeline",               "assigneeId": "NV008", "dueDate": "27/06/2026", "priority": "high",   "status": "done" },
-  { "id": "T6",  "title": "Báo cáo tháng 6",                   "assigneeId": "NV005", "dueDate": "05/07/2026", "priority": "low",    "status": "todo" },
-  { "id": "T7",  "title": "Tích hợp API backend vào FE",       "assigneeId": "NV001", "dueDate": "29/06/2026", "priority": "high",   "status": "in-progress" },
-  { "id": "T8",  "title": "Viết unit test module chấm công",    "assigneeId": "NV002", "dueDate": "03/07/2026", "priority": "medium", "status": "todo" },
-  { "id": "T9",  "title": "Deploy lên staging server",          "assigneeId": "NV008", "dueDate": "30/06/2026", "priority": "high",   "status": "done" },
-  { "id": "T10", "title": "Thiết kế màn hình báo cáo v2",      "assigneeId": "NV003", "dueDate": "07/07/2026", "priority": "medium", "status": "todo" }
+  {
+    "id": "T1",
+    "title": "Redesign dashboard UI",
+    "assigneeId": "NV003",
+    "dueDate": "30/06/2026",
+    "priority": "high",
+    "status": "in-progress",
+    "projectId": "PRJ001"
+  },
+  {
+    "id": "T2",
+    "title": "Fix attendance API bug",
+    "assigneeId": "NV002",
+    "dueDate": "26/06/2026",
+    "priority": "high",
+    "status": "done",
+    "projectId": "PRJ001"
+  },
+  {
+    "id": "T3",
+    "title": "Tích hợp API backend vào FE",
+    "assigneeId": "NV001",
+    "dueDate": "29/06/2026",
+    "priority": "high",
+    "status": "in-progress",
+    "projectId": "PRJ001"
+  },
+  {
+    "id": "T4",
+    "title": "Viết unit test module chấm công",
+    "assigneeId": "NV002",
+    "dueDate": "03/07/2026",
+    "priority": "medium",
+    "status": "todo",
+    "projectId": "PRJ001"
+  },
+  {
+    "id": "T5",
+    "title": "Setup CI/CD pipeline",
+    "assigneeId": "NV008",
+    "dueDate": "27/06/2026",
+    "priority": "high",
+    "status": "done",
+    "projectId": "PRJ007"
+  },
+  {
+    "id": "T6",
+    "title": "Deploy lên staging server",
+    "assigneeId": "NV008",
+    "dueDate": "30/06/2026",
+    "priority": "high",
+    "status": "done",
+    "projectId": "PRJ007"
+  },
+  {
+    "id": "T7",
+    "title": "Migrate CI/CD sang GitHub Actions",
+    "assigneeId": "NV002",
+    "dueDate": "05/07/2026",
+    "priority": "high",
+    "status": "in-progress",
+    "projectId": "PRJ007"
+  },
+  {
+    "id": "T8",
+    "title": "Cấu hình monitoring Grafana",
+    "assigneeId": "NV008",
+    "dueDate": "10/07/2026",
+    "priority": "medium",
+    "status": "todo",
+    "projectId": "PRJ007"
+  },
+  {
+    "id": "T9",
+    "title": "Thiết kế màn hình báo cáo v2",
+    "assigneeId": "NV003",
+    "dueDate": "07/07/2026",
+    "priority": "medium",
+    "status": "todo",
+    "projectId": "PRJ001"
+  },
+  {
+    "id": "T10",
+    "title": "Tài liệu onboarding nhân viên mới",
+    "assigneeId": "NV005",
+    "dueDate": "01/07/2026",
+    "priority": "medium",
+    "status": "todo",
+    "projectId": "PRJ006"
+  },
+  {
+    "id": "T11",
+    "title": "Kết nối Zalo OA API",
+    "assigneeId": "NV002",
+    "dueDate": "25/06/2026",
+    "priority": "high",
+    "status": "done",
+    "projectId": "PRJ005"
+  },
+  {
+    "id": "T12",
+    "title": "Thiết kế template thông báo chấm công",
+    "assigneeId": "NV003",
+    "dueDate": "28/06/2026",
+    "priority": "medium",
+    "status": "done",
+    "projectId": "PRJ005"
+  },
+  {
+    "id": "T13",
+    "title": "Tích hợp gửi thông báo duyệt đơn",
+    "assigneeId": "NV001",
+    "dueDate": "05/07/2026",
+    "priority": "medium",
+    "status": "done",
+    "projectId": "PRJ005"
+  },
+  {
+    "id": "T14",
+    "title": "Test toàn bộ luồng Zalo notification",
+    "assigneeId": "NV006",
+    "dueDate": "12/07/2026",
+    "priority": "low",
+    "status": "todo",
+    "projectId": "PRJ005"
+  },
+  {
+    "id": "T15",
+    "title": "Phân tích yêu cầu module tuyển dụng",
+    "assigneeId": "NV004",
+    "dueDate": "20/07/2026",
+    "priority": "high",
+    "status": "todo",
+    "projectId": "PRJ002"
+  },
+  {
+    "id": "T16",
+    "title": "Thiết kế wireframe luồng tuyển dụng",
+    "assigneeId": "NV003",
+    "dueDate": "25/07/2026",
+    "priority": "medium",
+    "status": "todo",
+    "projectId": "PRJ002"
+  },
+  {
+    "id": "T17",
+    "title": "Báo cáo nhân sự Q2 tổng hợp",
+    "assigneeId": "NV005",
+    "dueDate": "05/07/2026",
+    "priority": "high",
+    "status": "done",
+    "projectId": "PRJ004"
+  },
+  {
+    "id": "T18",
+    "title": "Báo cáo chấm công Q2",
+    "assigneeId": "NV012",
+    "dueDate": "05/07/2026",
+    "priority": "high",
+    "status": "done",
+    "projectId": "PRJ004"
+  },
+  {
+    "id": "T19",
+    "title": "Slide thuyết trình ban lãnh đạo",
+    "assigneeId": "NV004",
+    "dueDate": "09/07/2026",
+    "priority": "medium",
+    "status": "done",
+    "projectId": "PRJ004"
+  },
+  {
+    "id": "T20",
+    "title": "Review code module Nhân sự",
+    "assigneeId": "NV004",
+    "dueDate": "28/06/2026",
+    "priority": "medium",
+    "status": "done",
+    "projectId": "PRJ001"
+  },
+  {
+    "id": "T21",
+    "title": "Ăn chơi ",
+    "assigneeId": "NV001",
+    "dueDate": "29/06/2026",
+    "priority": "medium",
+    "status": "todo"
+  },
+  {
+    "id": "T22",
+    "title": "a",
+    "assigneeId": "NV001",
+    "dueDate": "29/06/2026",
+    "priority": "low",
+    "status": "in-progress"
+  }
 ]

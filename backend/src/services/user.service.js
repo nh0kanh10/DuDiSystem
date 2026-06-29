@@ -2,6 +2,7 @@ import * as repo from "../repositories/user.repository.js"
 import * as empRepo from "../repositories/employee.repository.js"
 import * as raRepo from "../repositories/roleAssignment.repository.js"
 import * as orgRepo from "../repositories/orgNode.repository.js"
+import * as roleRepo from "../repositories/role.repository.js"
 import bcrypt from "bcryptjs"
 
 export function resolveBranchId(userId) {
@@ -45,7 +46,7 @@ function resolveScopeFromEmployee(employeeId) {
 }
 
 export async function createUser(data) {
-  const { email, role, employeeId, status, scopeId } = data
+  const { email, roleId, employeeId, status, scopeId } = data
   if (!email) throw new Error("Email là bắt buộc")
 
   const existing = repo.getByEmail(email)
@@ -67,12 +68,13 @@ export async function createUser(data) {
     id: `U-${Date.now()}`,
     email,
     password: hashedPassword,
-    role: role || "user",
+    roleId: roleId || "role-user",
     employeeId: employeeId || null,
     status: status || "active"
   })
 
-  const scopeType = role === "admin" ? "company" : role === "manager" ? "branch" : "self"
+  const roleObj = roleRepo.getById(roleId)
+  const scopeType = roleObj?.scopeType || "self"
   raRepo.create({
     id: `ra-${Date.now()}`,
     userId: user.id,
@@ -86,7 +88,7 @@ export async function createUser(data) {
 }
 
 export function updateUser(id, patch) {
-  const ALLOWED = ["email", "role", "employeeId", "status"]
+  const ALLOWED = ["email", "roleId", "employeeId", "status"]
   const safePatch = Object.fromEntries(Object.entries(patch).filter(([k]) => ALLOWED.includes(k)))
 
   if (safePatch.email) {
@@ -97,9 +99,10 @@ export function updateUser(id, patch) {
   const updated = repo.update(id, safePatch)
   if (!updated) throw new Error("Không tìm thấy tài khoản")
 
-  if (safePatch.role || patch.scopeId !== undefined) {
-    const role = safePatch.role || updated.role
-    const scopeType = role === "admin" ? "company" : role === "manager" ? "branch" : "self"
+  if (safePatch.roleId || patch.scopeId !== undefined) {
+    const roleId = safePatch.roleId || updated.roleId
+    const roleObj = roleRepo.getById(roleId)
+    const scopeType = roleObj?.scopeType || "self"
     const primary = raRepo.getPrimary(id)
     if (primary) {
       raRepo.update(primary.id, {

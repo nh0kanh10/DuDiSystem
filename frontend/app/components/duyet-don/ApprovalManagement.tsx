@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react"
+import { createPortal } from "react-dom"
 import {
   Search, Check, X, Plus, FileText,
   Calendar, Clock, TrendingUp,
@@ -11,6 +12,8 @@ import {
 import { api } from "@/lib/api"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomCombobox } from "../ui/CustomCombobox"
+import { CustomDatePicker } from "../ui/CustomDatePicker"
+import { Employee } from "../../types"
 
 export type TOStatus = "approved" | "pending" | "rejected" | "cancelled"
 
@@ -50,7 +53,7 @@ function initials(name: string): string {
   return name.split(" ").pop()?.charAt(0) ?? "?"
 }
 
-function AvatarCircle({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
+function AvatarCircle({ name, photo, size = "md" }: { name: string; photo?: string; size?: "sm" | "md" | "lg" }) {
   const s = size === "sm" ? "w-8 h-8 text-xs" : size === "lg" ? "w-12 h-12 text-base" : "w-10 h-10 text-sm"
   const colors = [
     "from-[#C62828] to-[#E64A19]",
@@ -60,6 +63,9 @@ function AvatarCircle({ name, size = "md" }: { name: string; size?: "sm" | "md" 
     "from-[#E65100] to-[#F57C00]",
   ]
   const colorIdx = name.charCodeAt(0) % colors.length
+  if (photo) {
+    return <img src={photo} alt={name} className={`${s} rounded-full object-cover flex-shrink-0 shadow-sm border border-white/20`} />
+  }
   return (
     <div className={`${s} rounded-full bg-gradient-to-br ${colors[colorIdx]} flex items-center justify-center text-white font-black flex-shrink-0 shadow-sm`}>
       {initials(name)}
@@ -476,9 +482,9 @@ function isRequestExpired(req: RequestRecord): boolean {
   try {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const end = parseVnDate(req.endDate)
-    end.setHours(0, 0, 0, 0)
-    return end < today
+    const start = parseVnDate(req.startDate)
+    start.setHours(0, 0, 0, 0)
+    return start < today
   } catch {
     return false
   }
@@ -491,7 +497,13 @@ function isSlotExpired(slot: TimeOffSlot, requests: RequestRecord[]): boolean {
   return req ? isRequestExpired(req) : false
 }
 
-export default function ApprovalManagement({ selectedBranch = "all" }: { selectedBranch?: string }) {
+export default function ApprovalManagement({ 
+  selectedBranch = "all",
+  onRequestsUpdated
+}: { 
+  selectedBranch?: string
+  onRequestsUpdated?: () => void
+}) {
   const COLUMN_COLORS: Record<number, string> = {
     1: "bg-white",
     2: "bg-slate-50/70",
@@ -500,6 +512,10 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
     5: "bg-white",
   }
   const [requests, setRequests] = useState<RequestRecord[]>([])
+
+  useEffect(() => {
+    onRequestsUpdated?.()
+  }, [requests, onRequestsUpdated])
   const [tab, setTab] = useState<"leave" | "timeoff" | "stats">("timeoff")
   const [statusFilter, setStatusFilter] = useState("all")
   const [searchEmp, setSearchEmp] = useState("")
@@ -515,7 +531,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
   const [selectedMonth, setSelectedMonth] = useState(6)
   const [weekFilter, setWeekFilter] = useState("W26")
   const [deptFilter, setDeptFilter] = useState("all")
-  const [employees, setEmployees] = useState<{ id: string; name: string; department: string; position?: string; joinDate?: string; orgNodeId?: string }[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
   const [showToday, setShowToday] = useState(false)
   const [quickAddSlot, setQuickAddSlot] = useState<{ empId: string; empName: string; day: number; session: "sang" | "chieu" } | null>(null)
   const [quickAddReason, setQuickAddReason] = useState("")
@@ -532,7 +548,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
   useEffect(() => {
     Promise.all([
       api.requests.list().then(d => setRequests(d as RequestRecord[])),
-      api.employees.list().then(d => setEmployees(d as { id: string; name: string; department: string; position?: string; joinDate?: string; orgNodeId?: string }[])),
+      api.employees.list().then(d => setEmployees(d as Employee[])),
       api.orgNodes.list().then(d => setOrgNodes(d as any[])),
     ])
       .catch(() => setInitError(true))
@@ -540,11 +556,19 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
   }, [])
 
   useEffect(() => {
+    if (weekFilter === "all") return
     const weeks = computeWeeksInMonth(selectedYear, selectedMonth)
     if (weeks.length > 0 && !weeks.find(w => w.value === weekFilter)) {
       setWeekFilter(weeks[0].value)
     }
-  }, [selectedYear, selectedMonth])
+  }, [selectedYear, selectedMonth, weekFilter])
+
+  useEffect(() => {
+    if (tab !== "leave" && weekFilter === "all") {
+      const now = new Date()
+      setWeekFilter(`W${getISOWeek(now)}`)
+    }
+  }, [tab, weekFilter])
 
   const findBranchForNode = (nodeId: string, nodes: any[]): string => {
     const node = nodes.find(n => n.id === nodeId)
@@ -630,6 +654,15 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
         return false
       }
       if (tab === "leave") {
+        if (statusFilter !== "all") {
+          if (statusFilter === "expired") {
+            if (!((r.status === "pending" && isRequestExpired(r)) || r.status === "cancelled")) return false
+          } else if (statusFilter === "pending") {
+            if (!(r.status === "pending" && !isRequestExpired(r))) return false
+          } else {
+            if (r.status !== statusFilter) return false
+          }
+        }
         if (leaveDeptFilter !== "all" && r.department !== leaveDeptFilter) {
           return false
         }
@@ -638,7 +671,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
         }
         if (leaveDateFilter !== "") {
           try {
-            const filterDate = new Date(leaveDateFilter)
+            const filterDate = parseVnDate(leaveDateFilter)
             filterDate.setHours(0, 0, 0, 0)
             const start = parseVnDate(r.startDate)
             start.setHours(0, 0, 0, 0)
@@ -649,17 +682,60 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
             return false
           }
         }
+        if (weekFilter !== "all") {
+          try {
+            const dates = getDateRange(r.startDate, r.endDate)
+            const isInWeek = dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+            if (!isInWeek) return false
+          } catch {
+            return false
+          }
+        }
       } else if (tab === "timeoff") {
+        // Lịch tuần -> Lọc theo tuần được chọn
+        if (weekFilter !== "all") {
+          try {
+            const dates = getDateRange(r.startDate, r.endDate)
+            const isInWeek = dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+            if (!isInWeek) return false
+          } catch {
+            return false
+          }
+        }
         if (deptFilter !== "all" && r.department !== deptFilter) {
           return false
         }
         if (searchEmp.trim() !== "" && !r.employeeName.toLowerCase().includes(searchEmp.toLowerCase())) {
           return false
         }
+      } else if (tab === "stats") {
+        // Tab thống kê: Lọc theo tuần (hoặc hôm nay nếu showToday được bật)
+        if (showToday) {
+          try {
+            const todayDate = new Date()
+            todayDate.setHours(0, 0, 0, 0)
+            const start = parseVnDate(r.startDate)
+            start.setHours(0, 0, 0, 0)
+            const end = parseVnDate(r.endDate)
+            end.setHours(0, 0, 0, 0)
+            const isToday = todayDate >= start && todayDate <= end
+            if (!isToday) return false
+          } catch {
+            return false
+          }
+        } else if (weekFilter !== "all") {
+          try {
+            const dates = getDateRange(r.startDate, r.endDate)
+            const isInWeek = dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+            if (!isInWeek) return false
+          } catch {
+            return false
+          }
+        }
       }
       return true
     })
-  }, [requests, selectedBranch, tab, leaveDeptFilter, leaveSearchFilter, leaveDateFilter, deptFilter, searchEmp, orgNodes, employees])
+  }, [requests, selectedBranch, tab, statusFilter, leaveDeptFilter, leaveSearchFilter, leaveDateFilter, deptFilter, searchEmp, weekFilter, showToday, orgNodes, employees])
 
   const totalLeave = statsFilteredReqs.length
 
@@ -683,6 +759,53 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
   const pendingSlotCount = slots.filter(s => s.status === "pending").length
   const approvedSlotCount = slots.filter(s => s.status === "approved").length
   const rejectedSlotCount = slots.filter(s => s.status === "rejected").length
+
+  const todayRequests = useMemo(() => {
+    const todayDate = new Date()
+    todayDate.setHours(0, 0, 0, 0)
+    return requests.filter(req => {
+      if (selectedBranch !== "all" && !isEmployeeInBranch(req.employeeId, selectedBranch)) return false
+      try {
+        const start = parseVnDate(req.startDate)
+        start.setHours(0, 0, 0, 0)
+        const end = parseVnDate(req.endDate)
+        end.setHours(0, 0, 0, 0)
+        return todayDate >= start && todayDate <= end
+      } catch {
+        return false
+      }
+    })
+  }, [requests, selectedBranch, orgNodes, employees])
+
+  const requestsInWeek = useMemo(() => {
+    return requests.filter(req => {
+      if (selectedBranch !== "all" && !isEmployeeInBranch(req.employeeId, selectedBranch)) return false
+      try {
+        const dates = getDateRange(req.startDate, req.endDate)
+        return dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+      } catch { return false }
+    })
+  }, [requests, weekFilter, selectedBranch, orgNodes, employees])
+
+  const pendingRequestsInWeek = useMemo(() => {
+    const list = showToday ? todayRequests : requestsInWeek
+    return list.filter(req => req.status === "pending" && !isRequestExpired(req))
+  }, [showToday, todayRequests, requestsInWeek])
+
+  const allPendingRequestsInWeek = useMemo(() => {
+    const list = showToday ? todayRequests : requestsInWeek
+    return list.filter(req => req.status === "pending")
+  }, [showToday, todayRequests, requestsInWeek])
+
+  const approvedRequestsInWeek = useMemo(() => {
+    const list = showToday ? todayRequests : requestsInWeek
+    return list.filter(req => req.status === "approved")
+  }, [showToday, todayRequests, requestsInWeek])
+
+  const rejectedRequestsInWeek = useMemo(() => {
+    const list = showToday ? todayRequests : requestsInWeek
+    return list.filter(req => req.status === "rejected")
+  }, [showToday, todayRequests, requestsInWeek])
 
   const approveReq = async (id: string) => {
     addProcessing(id)
@@ -869,7 +992,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
       }
       if (leaveDateFilter !== "") {
         try {
-          const filterDate = new Date(leaveDateFilter)
+          const filterDate = parseVnDate(leaveDateFilter)
           filterDate.setHours(0, 0, 0, 0)
           const start = parseVnDate(r.startDate)
           start.setHours(0, 0, 0, 0)
@@ -880,10 +1003,19 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
           return false
         }
       }
+      if (weekFilter !== "all" && tab === "leave") {
+        try {
+          const dates = getDateRange(r.startDate, r.endDate)
+          const isInWeek = dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+          if (!isInWeek) return false
+        } catch {
+          return false
+        }
+      }
       const matchBranch = selectedBranch === "all" || isEmployeeInBranch(r.employeeId, selectedBranch)
       return matchBranch
     })
-  }, [requests, statusFilter, leaveDeptFilter, leaveSearchFilter, leaveDateFilter, selectedBranch, orgNodes, employees])
+  }, [requests, statusFilter, leaveDeptFilter, leaveSearchFilter, leaveDateFilter, weekFilter, tab, selectedBranch, orgNodes, employees])
 
   const weeksInMonth = useMemo(
     () => computeWeeksInMonth(selectedYear, selectedMonth),
@@ -931,7 +1063,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
         return matchSearch && matchDept && matchBranch
       })
       .sort((a, b) => parseVnDate(a.joinDate) - parseVnDate(b.joinDate))
-      .map(e => ({ empId: e.id, empName: e.name, empCode: e.id, department: e.department ?? "", position: e.position ?? "" }))
+      .map(e => ({ empId: e.id, empName: e.name, empCode: e.id, department: e.department ?? "", position: e.position ?? "", empPhoto: e.photos?.[0] }))
   }, [employees, searchEmp, deptFilter, selectedBranch, orgNodes])
 
   const slotsLookup = useMemo(() => {
@@ -1011,6 +1143,10 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
     return showToday ? _todaySlots : slots
   }, [showToday, _todaySlots, slots])
 
+  const activeStatsRequests = useMemo(() => {
+    return showToday ? todayRequests : requestsInWeek
+  }, [showToday, todayRequests, requestsInWeek])
+
   const statByEmp = useMemo(() => {
     const map: Record<string, { name: string; count: number }> = {}
     activeStatsSlots.forEach(s => {
@@ -1025,20 +1161,20 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
 
   const statByDept = useMemo(() => {
     const map: Record<string, { dept: string; approved: number; pending: number; rejected: number }> = {}
-    activeStatsSlots.forEach(s => {
-      if (!map[s.department]) {
-        map[s.department] = { dept: s.department, approved: 0, pending: 0, rejected: 0 }
+    activeStatsRequests.forEach(r => {
+      if (!map[r.department]) {
+        map[r.department] = { dept: r.department, approved: 0, pending: 0, rejected: 0 }
       }
-      if (s.status === "approved") map[s.department].approved += 1
-      else if (s.status === "pending") map[s.department].pending += 1
-      else if (s.status === "rejected") map[s.department].rejected += 1
+      if (r.status === "approved") map[r.department].approved += 1
+      else if (r.status === "pending") map[r.department].pending += 1
+      else if (r.status === "rejected") map[r.department].rejected += 1
     })
     return Object.values(map)
-  }, [activeStatsSlots])
+  }, [activeStatsRequests])
 
   return (
     <div className="space-y-4 pb-24">
-      {quickAddSlot && (
+      {quickAddSlot && createPortal(
         <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-xl">
             <h3 className="font-black text-lg">Đăng ký nghỉ hộ {quickAddSlot.empName}</h3>
@@ -1058,101 +1194,169 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
               <button onClick={handleCreateQuickSlot} disabled={processingIds.includes("quick-create")} className="flex-1 px-4 py-2 rounded-xl bg-[#C62828] text-white font-bold text-sm">Duyệt</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {toastMessage && (
+      {toastMessage && createPortal(
         <div className={`fixed bottom-24 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[60] border backdrop-blur-sm animate-in slide-in-from-right duration-300
           ${toastType === "success"
             ? "bg-gray-900/95 text-white border-white/10"
             : "bg-red-900/95 text-white border-red-500/20"}`}>
           <div className={`w-2.5 h-2.5 rounded-full ${toastType === "success" ? "bg-emerald-400" : "bg-red-400"} animate-pulse`} />
           <span className="text-sm font-semibold">{toastMessage}</span>
-        </div>
+        </div>,
+        document.body
       )}
 
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-xl font-black text-gray-800">Quản lý nghỉ phép</h2>
-          <p className="text-sm text-gray-400 mt-0.5">Theo dõi & xử lý đơn nghỉ phép nhân viên</p>
+      <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
+        <div className="flex items-center">
+          <div className="flex gap-1.5 items-center mr-4 shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-white/30 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white/60 animate-pulse delay-75"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150"></span>
+          </div>
+          <div>
+            <h2 className="text-xl font-black tracking-tight text-white">Quản lý nghỉ phép</h2>
+            <p className="text-xs text-white/80 mt-1">Theo dõi & xử lý đơn nghỉ phép nhân viên</p>
+          </div>
         </div>
-        <div className="flex gap-2.5 flex-wrap">
-          <div className="rounded-2xl px-4 py-2 border text-center min-w-[90px] bg-blue-50/60 border-blue-100/70 animate-in fade-in duration-200 shadow-sm flex flex-col justify-center">
-            <p className="text-lg font-black text-blue-700 leading-none">{totalLeave}</p>
-            <p className="text-[9px] text-gray-500 font-bold mt-1 uppercase tracking-wider">Tổng đơn</p>
+        <div className="flex gap-2 flex-wrap">
+          <div className="rounded-xl px-3 py-1.5 bg-white/10 border border-white/10 text-center min-w-[70px] backdrop-blur-xs flex flex-col justify-center">
+            <p className="text-sm font-black text-white leading-none">{totalLeave}</p>
+            <p className="text-[9px] text-white/70 font-bold mt-1 uppercase tracking-wider">Tổng đơn</p>
           </div>
-          <div className="rounded-2xl px-4 py-2 border text-center min-w-[90px] bg-amber-50/60 border-amber-100/70 animate-in fade-in duration-200 shadow-sm flex flex-col justify-center">
-            <p className="text-lg font-black text-amber-700 leading-none">{pendingLeave}</p>
-            <p className="text-[9px] text-gray-500 font-bold mt-1 uppercase tracking-wider">Chờ duyệt</p>
+          <div className="rounded-xl px-3 py-1.5 bg-white/10 border border-white/10 text-center min-w-[70px] backdrop-blur-xs flex flex-col justify-center">
+            <p className="text-sm font-black text-amber-300 leading-none">{pendingLeave}</p>
+            <p className="text-[9px] text-white/70 font-bold mt-1 uppercase tracking-wider">Chờ duyệt</p>
           </div>
-          <div className="rounded-2xl px-4 py-2 border text-center min-w-[90px] bg-emerald-50/60 border-emerald-100/70 animate-in fade-in duration-200 shadow-sm flex flex-col justify-center">
-            <p className="text-lg font-black text-emerald-700 leading-none">{approvedLeave}</p>
-            <p className="text-[9px] text-gray-500 font-bold mt-1 uppercase tracking-wider">Đã duyệt</p>
+          <div className="rounded-xl px-3 py-1.5 bg-white/10 border border-white/10 text-center min-w-[70px] backdrop-blur-xs flex flex-col justify-center">
+            <p className="text-sm font-black text-emerald-300 leading-none">{approvedLeave}</p>
+            <p className="text-[9px] text-white/70 font-bold mt-1 uppercase tracking-wider">Đã duyệt</p>
           </div>
-          <div className="rounded-2xl px-4 py-2 border text-center min-w-[90px] bg-rose-50/60 border-rose-100/70 animate-in fade-in duration-200 shadow-sm flex flex-col justify-center">
-            <p className="text-lg font-black text-rose-700 leading-none">{rejectedLeave}</p>
-            <p className="text-[9px] text-gray-500 font-bold mt-1 uppercase tracking-wider">Từ chối</p>
+          <div className="rounded-xl px-3 py-1.5 bg-white/10 border border-white/10 text-center min-w-[70px] backdrop-blur-xs flex flex-col justify-center">
+            <p className="text-sm font-black text-rose-300 leading-none">{rejectedLeave}</p>
+            <p className="text-[9px] text-white/70 font-bold mt-1 uppercase tracking-wider">Từ chối</p>
           </div>
-          <div className="rounded-2xl px-4 py-2 border text-center min-w-[90px] bg-gray-50/80 border-gray-150 animate-in fade-in duration-200 shadow-sm flex flex-col justify-center">
-            <p className="text-lg font-black text-gray-600 leading-none">{expiredLeave}</p>
-            <p className="text-[9px] text-gray-400 font-bold mt-1 uppercase tracking-wider">Hủy/Quá hạn</p>
+          <div className="rounded-xl px-3 py-1.5 bg-white/10 border border-white/10 text-center min-w-[70px] backdrop-blur-xs flex flex-col justify-center">
+            <p className="text-sm font-black text-white/60 leading-none">{expiredLeave}</p>
+            <p className="text-[9px] text-white/50 font-bold mt-1 uppercase tracking-wider">Hủy/Hạn</p>
           </div>
         </div>
       </div>
 
-      <div className="flex bg-white rounded-2xl p-1.5 shadow-sm border border-black/[0.06] overflow-x-auto gap-1">
-        {([
-          ["timeoff", "Lịch tuần",    LayoutGrid],
-          ["leave",   "Đơn xin nghỉ", ClipboardList],
-          ["stats",   "Thống kê",     TrendingUp],
-        ] as [string, string, React.ElementType][]).map(([v, l, Icon]) => (
-          <button key={v} onClick={() => setTab(v as any)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex-shrink-0
-              ${tab === v ? "bg-[#C62828] text-white shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
-            <Icon size={14} />
-            {l}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex bg-white rounded-2xl p-1.5 shadow-sm border border-black/[0.06] overflow-x-auto gap-1">
+          {([
+            ["timeoff", "Lịch tuần",    LayoutGrid],
+            ["leave",   "Đơn xin nghỉ", ClipboardList],
+            ["stats",   "Thống kê",     TrendingUp],
+          ] as [string, string, React.ElementType][]).map(([v, l, Icon]) => (
+            <button key={v} onClick={() => setTab(v as any)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-all flex-shrink-0
+                ${tab === v ? "bg-[#C62828] text-white shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
+              <Icon size={14} />
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* Global Date & Week Selector */}
+        <div className="flex items-center gap-1.5 bg-white rounded-2xl px-3 py-2 border border-black/[0.06] shadow-sm flex-shrink-0 animate-in fade-in duration-200">
+          <input
+            type="text" inputMode="numeric" value={selectedYear}
+            onChange={e => {
+              if (/^\d{0,4}$/.test(e.target.value)) {
+                setSelectedYear(Number(e.target.value))
+                setShowToday(false)
+                if (tab === "leave") setLeaveDateFilter("")
+              }
+            }}
+            onBlur={e => { const v = Number(e.target.value); setSelectedYear(v < 2020 ? 2020 : v > 2035 ? 2035 : v) }}
+            className="bg-transparent text-sm font-bold text-gray-700 focus:outline-none w-12 text-center cursor-text hover:text-[#C62828] focus:text-[#C62828] transition-colors"
+          />
+          <span className="text-gray-300">/</span>
+          <input
+            type="text" inputMode="numeric" value={selectedMonth}
+            onChange={e => {
+              if (/^\d{0,2}$/.test(e.target.value)) {
+                setSelectedMonth(Number(e.target.value))
+                setShowToday(false)
+                if (tab === "leave") setLeaveDateFilter("")
+              }
+            }}
+            onBlur={e => { const v = Number(e.target.value); setSelectedMonth(v < 1 ? 1 : v > 12 ? 12 : v) }}
+            className="bg-transparent text-sm font-bold text-gray-700 focus:outline-none w-7 text-center cursor-text hover:text-[#C62828] focus:text-[#C62828] transition-colors"
+          />
+          <span className="text-gray-300">›</span>
+          <CustomSelect
+            value={weekFilter}
+            onChange={val => {
+              setWeekFilter(val)
+              setShowToday(false)
+              if (val !== "all" && tab === "leave") {
+                setLeaveDateFilter("")
+              }
+            }}
+            heightClass="h-[28px]"
+            className="w-[240px]"
+            options={
+              tab === "leave"
+                ? [
+                    { value: "all", label: "Tất cả các tuần" },
+                    ...weeksInMonth.map(w => ({ value: w.value, label: w.label }))
+                  ]
+                : weeksInMonth.map(w => ({ value: w.value, label: w.label }))
+            }
+          />
+          <span className="w-px h-4 bg-gray-200 mx-0.5" />
+          <button
+            onClick={() => {
+              const now = new Date()
+              setSelectedYear(now.getFullYear())
+              setSelectedMonth(now.getMonth() + 1)
+              const w = `W${getISOWeek(now)}`
+              setWeekFilter(w)
+              if (tab === "leave") {
+                setLeaveDateFilter("")
+              } else {
+                setShowToday(false)
+              }
+            }}
+            className="text-xs font-bold text-gray-500 hover:text-[#C62828] transition-colors whitespace-nowrap active:scale-95"
+          >
+            Tuần này
           </button>
-        ))}
+          <span className="w-px h-4 bg-gray-200 mx-0.5" />
+          <button
+            onClick={() => {
+              const now = new Date()
+              setSelectedYear(now.getFullYear())
+              setSelectedMonth(now.getMonth() + 1)
+              const w = `W${getISOWeek(now)}`
+              if (tab === "leave") {
+                setWeekFilter("all")
+                const formattedToday = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`
+                setLeaveDateFilter(formattedToday)
+              } else {
+                setWeekFilter(w)
+                setShowToday(true)
+              }
+            }}
+            className={`text-xs font-bold transition-colors whitespace-nowrap active:scale-95 ${
+              tab === "leave"
+                ? leaveDateFilter !== "" ? "text-[#C62828] font-extrabold" : "text-gray-500 hover:text-[#C62828]"
+                : showToday ? "text-[#C62828] font-extrabold" : "text-gray-500 hover:text-[#C62828]"
+            }`}
+          >
+            Hôm nay
+          </button>
+        </div>
       </div>
 
       {tab === "timeoff" && (
         <div className="space-y-4">
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/[0.06] flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
-              <input
-                type="text" inputMode="numeric" value={selectedYear}
-                onChange={e => { if (/^\d{0,4}$/.test(e.target.value)) setSelectedYear(Number(e.target.value)) }}
-                onBlur={e => { const v = Number(e.target.value); setSelectedYear(v < 2020 ? 2020 : v > 2035 ? 2035 : v) }}
-                className="bg-transparent text-sm font-bold text-gray-700 focus:outline-none w-12 text-center cursor-text hover:text-[#C62828] focus:text-[#C62828] transition-colors"
-              />
-              <span className="text-gray-300">/</span>
-              <input
-                type="text" inputMode="numeric" value={selectedMonth}
-                onChange={e => { if (/^\d{0,2}$/.test(e.target.value)) setSelectedMonth(Number(e.target.value)) }}
-                onBlur={e => { const v = Number(e.target.value); setSelectedMonth(v < 1 ? 1 : v > 12 ? 12 : v) }}
-                className="bg-transparent text-sm font-bold text-gray-700 focus:outline-none w-7 text-center cursor-text hover:text-[#C62828] focus:text-[#C62828] transition-colors"
-              />
-              <span className="text-gray-300">›</span>
-              <CustomSelect
-                value={weekFilter}
-                onChange={setWeekFilter}
-                heightClass="h-[28px]"
-                className="w-40"
-                options={weeksInMonth.map(w => ({ value: w.value, label: w.label }))}
-              />
-              <span className="w-px h-4 bg-gray-200 mx-0.5" />
-              <button
-                onClick={() => {
-                  const now = new Date()
-                  setSelectedYear(now.getFullYear())
-                  setSelectedMonth(now.getMonth() + 1)
-                  setWeekFilter(`W${getISOWeek(now)}`)
-                }}
-                className="text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors whitespace-nowrap"
-              >
-                Tuần này
-              </button>
-            </div>
 
             <CustomSelect
               value={deptFilter}
@@ -1213,12 +1417,15 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
             ) : (
               <>
                 <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-200 overflow-hidden grid divide-x divide-gray-200 shadow-sm animate-in fade-in duration-200" style={{ gridTemplateColumns: "repeat(5, 20%)" }}>
-                  {DAYS.map(d => (
-                    <div key={d.day} className={`text-center py-2.5 ${COLUMN_COLORS[d.day] || ""}`}>
-                      <p className="text-xs font-black text-gray-700">{d.label}</p>
-                      <p className="text-[10px] font-mono font-semibold text-gray-500">{d.date}</p>
-                    </div>
-                  ))}
+                  {DAYS.map(d => {
+                    const isToday = showToday && d.date === _todayStr
+                    return (
+                      <div key={d.day} className={`text-center py-2.5 relative transition-all duration-200 ${COLUMN_COLORS[d.day] || ""}`}>
+                        <p className={`text-xs font-black ${isToday ? "text-[#C62828]" : "text-gray-700"}`}>{d.label}</p>
+                        <p className={`text-[10px] font-mono font-bold ${isToday ? "text-[#C62828]" : "text-gray-500"}`}>{d.date}</p>
+                      </div>
+                    )
+                  })}
                 </div>
                 {empRows.map(emp => {
                 const spanStartMap = new Map<number, { slot: TimeOffSlot; colSpan: number; isLeftCont: boolean; isRightCont: boolean }>()
@@ -1237,7 +1444,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
                 return (
                   <div key={emp.empId} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 bg-[#C62828]">
-                      <AvatarCircle name={emp.empName} size="sm" />
+                      <AvatarCircle name={emp.empName} photo={emp.empPhoto} size="sm" />
                       <div className="min-w-0 flex-1 flex items-center gap-2 overflow-hidden">
                         <p className="font-black text-white text-sm truncate leading-tight flex-shrink-0 max-w-[55%]">{emp.empName}</p>
                         {(emp.position || emp.department) && (
@@ -1255,11 +1462,14 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
                       </button>
                       <div className="flex gap-1.5 flex-shrink-0">
                         {(["approved", "pending", "rejected"] as TOStatus[]).map(st => {
-                          const count = DAYS.reduce((acc, d) => {
-                            const s = getSlot(emp.empId, d.day, "sang")
-                            const c = getSlot(emp.empId, d.day, "chieu")
-                            return acc + (s?.status === st ? 1 : 0) + (c?.status === st ? 1 : 0)
-                          }, 0) + [...spanStartMap.values()].filter(v => v.slot.status === st).length
+                          const count = requests.filter(req => {
+                            if (req.employeeId !== emp.empId) return false
+                            if (req.status !== st) return false
+                            try {
+                              const dates = getDateRange(req.startDate, req.endDate)
+                              return dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+                            } catch { return false }
+                          }).length
                           if (count === 0) return null
                           const colors = { approved: "bg-emerald-100 text-emerald-700", pending: "bg-amber-100 text-amber-700", rejected: "bg-red-100 text-red-600", cancelled: "bg-gray-100 text-gray-500" }
                           return (
@@ -1370,12 +1580,16 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-black text-gray-500">Ngày nghỉ</label>
-              <input
-                type="date"
+              <label className="text-xs font-black text-gray-500">Ngày nghỉ cụ thể</label>
+              <CustomDatePicker
                 value={leaveDateFilter}
-                onChange={e => setLeaveDateFilter(e.target.value)}
-                className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10 bg-white font-semibold text-gray-700"
+                onChange={val => {
+                  setLeaveDateFilter(val)
+                  if (val !== "") {
+                    setWeekFilter("all")
+                  }
+                }}
+                className="w-full px-3.5 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10 bg-white font-semibold text-gray-700 animate-in fade-in duration-100"
               />
             </div>
             <div className="space-y-1.5">
@@ -1392,11 +1606,12 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
                   showSearchIcon={true}
                   options={employees.map(e => ({ value: e.name, label: e.name, desc: e.id }))}
                 />
-                {(statusFilter !== "all" || leaveDeptFilter !== "all" || leaveDateFilter !== "" || leaveSearchFilter.trim() !== "") && (
+                {(statusFilter !== "all" || leaveDeptFilter !== "all" || weekFilter !== "all" || leaveDateFilter !== "" || leaveSearchFilter.trim() !== "") && (
                   <button
                     onClick={() => {
                       setStatusFilter("all")
                       setLeaveDeptFilter("all")
+                      setWeekFilter("all")
                       setLeaveDateFilter("")
                       setLeaveSearchFilter("")
                     }}
@@ -1455,7 +1670,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
                   <tr key={req.id} className="hover:bg-gray-50/30 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        <AvatarCircle name={req.employeeName} size="sm" />
+                        <AvatarCircle name={req.employeeName} photo={employees.find(e => e.id === req.employeeId)?.photos?.[0]} size="sm" />
                         <span className="font-bold text-gray-900 text-sm">{req.employeeName}</span>
                       </div>
                     </td>
@@ -1540,63 +1755,15 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
               <span className="text-xs font-bold text-gray-500">Đang xem: </span>
               <span className="text-xs font-black text-gray-800">{weeksInMonth.find(w => w.value === weekFilter)?.label ?? weekFilter}</span>
             </div>
-            <div className="flex items-center gap-1.5 bg-white rounded-xl px-3 py-2 border border-gray-200 shadow-sm">
-              <input
-                type="text" inputMode="numeric" value={selectedYear}
-                onChange={e => { if (/^\d{0,4}$/.test(e.target.value)) setSelectedYear(Number(e.target.value)) }}
-                onBlur={e => { const v = Number(e.target.value); setSelectedYear(v < 2020 ? 2020 : v > 2035 ? 2035 : v) }}
-                className="bg-transparent text-sm font-bold text-gray-700 focus:outline-none w-12 text-center cursor-text hover:text-[#C62828] focus:text-[#C62828] transition-colors"
-              />
-              <span className="text-gray-300">/</span>
-              <input
-                type="text" inputMode="numeric" value={selectedMonth}
-                onChange={e => { if (/^\d{0,2}$/.test(e.target.value)) setSelectedMonth(Number(e.target.value)) }}
-                onBlur={e => { const v = Number(e.target.value); setSelectedMonth(v < 1 ? 1 : v > 12 ? 12 : v) }}
-                className="bg-transparent text-sm font-bold text-gray-700 focus:outline-none w-7 text-center cursor-text hover:text-[#C62828] focus:text-[#C62828] transition-colors"
-              />
-              <span className="text-gray-300">›</span>
-              <CustomSelect
-                value={weekFilter}
-                onChange={setWeekFilter}
-                heightClass="h-[28px]"
-                className="w-40"
-                options={weeksInMonth.map(w => ({ value: w.value, label: w.label }))}
-              />
-              <span className="w-px h-4 bg-gray-200 mx-0.5" />
-              <button
-                onClick={() => {
-                  const now = new Date()
-                  setSelectedYear(now.getFullYear())
-                  setSelectedMonth(now.getMonth() + 1)
-                  setWeekFilter(`W${getISOWeek(now)}`)
-                  setShowToday(false)
-                }}
-                className="text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors whitespace-nowrap"
-              >
-                Tuần này
-              </button>
-              <span className="w-px h-4 bg-gray-200 mx-0.5" />
-              <button
-                onClick={() => {
-                  const now = new Date()
-                  setSelectedYear(now.getFullYear())
-                  setSelectedMonth(now.getMonth() + 1)
-                  setWeekFilter(`W${getISOWeek(now)}`)
-                  setShowToday(true)
-                }}
-                className={`text-xs font-bold transition-colors whitespace-nowrap ${showToday ? "text-[#C62828]" : "text-gray-500 hover:text-[#C62828]"}`}
-              >
-                Hôm nay
-              </button>
-            </div>
+            {/* Week selector is managed globally at the top of the page */}
           </div>
 
           <div className="grid grid-cols-4 gap-3">
             {[
-              { label: showToday ? "NV nghỉ hôm nay" : "Nhân viên nghỉ", value: new Set(activeStatsSlots.filter(s => s.status !== "rejected").map(s => s.empId)).size, cls: "text-gray-900", bg: "bg-white border-gray-200" },
-              { label: showToday ? "Đã duyệt hôm nay" : "Đã duyệt",   value: activeStatsSlots.filter(s => s.status === "approved").length, cls: "text-blue-700",  bg: "bg-blue-50 border-blue-100"  },
-              { label: showToday ? "Chờ duyệt hôm nay" : "Chờ duyệt", value: activeStatsSlots.filter(s => s.status === "pending").length,  cls: "text-amber-700", bg: "bg-amber-50 border-amber-100" },
-              { label: showToday ? "Từ chối hôm nay" : "Từ chối",     value: activeStatsSlots.filter(s => s.status === "rejected").length, cls: "text-red-700",   bg: "bg-red-50 border-red-100"    },
+              { label: showToday ? "NV nghỉ hôm nay" : "Nhân viên nghỉ", value: new Set(activeStatsRequests.filter(r => r.status !== "rejected").map(s => s.employeeId)).size, cls: "text-gray-900", bg: "bg-white border-gray-200" },
+              { label: showToday ? "Đã duyệt hôm nay" : "Đã duyệt",   value: activeStatsRequests.filter(r => r.status === "approved").length, cls: "text-blue-700",  bg: "bg-blue-50 border-blue-100"  },
+              { label: showToday ? "Chờ duyệt hôm nay" : "Chờ duyệt", value: activeStatsRequests.filter(r => r.status === "pending").length,  cls: "text-amber-700", bg: "bg-amber-50 border-amber-100" },
+              { label: showToday ? "Từ chối hôm nay" : "Từ chối",     value: activeStatsRequests.filter(r => r.status === "rejected").length, cls: "text-red-700",   bg: "bg-red-50 border-red-100"    },
             ].map(k => (
               <div key={k.label} className={`rounded-2xl p-4 text-center border shadow-sm ${k.bg}`}>
                 <p className={`text-3xl font-black ${k.cls}`}>{k.value}</p>
@@ -1681,36 +1848,38 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
       {tab === "timeoff" && (
         <div className="sticky bottom-0 -mx-0 mt-2 z-30 px-5 py-3 bg-white/95 backdrop-blur-xl border border-gray-200 rounded-2xl shadow-[0_-2px_20px_rgba(0,0,0,0.07)] flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-gray-500">Tuần {weekFilter}:</span>
+            <span className="text-xs font-semibold text-gray-500">
+              {showToday ? "Hôm nay:" : `Tuần ${weekFilter}:`}
+            </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
-              <AlertCircle size={11} /> {pendingSlotCount} chờ duyệt
+              <AlertCircle size={11} /> {allPendingRequestsInWeek.length} chờ duyệt
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-              <CheckCircle2 size={11} /> {approvedSlotCount} đã duyệt
+              <CheckCircle2 size={11} /> {approvedRequestsInWeek.length} đã duyệt
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-50 text-red-600 text-xs font-bold border border-red-200">
-              <XCircle size={11} /> {rejectedSlotCount} từ chối
+              <XCircle size={11} /> {rejectedRequestsInWeek.length} từ chối
             </span>
           </div>
 
           <div className="flex gap-2 ml-auto flex-wrap">
-            {pendingSlotCount > 0 && (
+            {allPendingRequestsInWeek.length > 0 && (
               <>
                 <button
-                  onClick={() => setConfirmAction({ label: "Từ chối tất cả ca nghỉ chờ duyệt?", count: pendingSlotCount, variant: "reject", onConfirm: handleRejectAllPending })}
+                  onClick={() => setConfirmAction({ label: showToday ? "Từ chối tất cả đơn xin nghỉ chờ duyệt hôm nay?" : "Từ chối tất cả đơn xin nghỉ chờ duyệt tuần này?", count: allPendingRequestsInWeek.length, variant: "reject", onConfirm: handleRejectAllPending })}
                   disabled={processingIds.includes("bulk-slots-reject") || processingIds.includes("bulk-slots")}
                   className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-gray-500 rounded-xl text-xs font-black transition-all border border-gray-200 hover:border-red-200 active:scale-95">
                   {processingIds.includes("bulk-slots-reject")
                     ? <div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-red-500 rounded-full animate-spin" />
-                    : <X size={13} className="stroke-[3px]" />} Từ chối tất cả ({pendingSlotCount})
+                    : <X size={13} className="stroke-[3px]" />} Từ chối tất cả ({allPendingRequestsInWeek.length})
                 </button>
                 <button
-                  onClick={() => setConfirmAction({ label: "Duyệt tất cả ca nghỉ chờ duyệt còn hạn?", count: slots.filter(s => s.status === "pending" && !isSlotExpired(s, requests)).length, variant: "approve", onConfirm: handleApproveAllPending })}
-                  disabled={processingIds.includes("bulk-slots") || processingIds.includes("bulk-slots-reject") || slots.filter(s => s.status === "pending" && !isSlotExpired(s, requests)).length === 0}
+                  onClick={() => setConfirmAction({ label: showToday ? "Duyệt tất cả đơn xin nghỉ chờ duyệt còn hạn hôm nay?" : "Duyệt tất cả đơn xin nghỉ chờ duyệt còn hạn tuần này?", count: pendingRequestsInWeek.length, variant: "approve", onConfirm: handleApproveAllPending })}
+                  disabled={processingIds.includes("bulk-slots") || processingIds.includes("bulk-slots-reject") || pendingRequestsInWeek.length === 0}
                   className="flex items-center gap-1.5 px-5 py-2 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:from-[#B71C1C] hover:to-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black transition-all shadow-sm shadow-red-500/20 active:scale-95">
                   {processingIds.includes("bulk-slots")
                     ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    : <Zap size={13} fill="currentColor" />} Duyệt nhanh còn hạn ({slots.filter(s => s.status === "pending" && !isSlotExpired(s, requests)).length})
+                    : <Zap size={13} fill="currentColor" />} Duyệt nhanh còn hạn ({pendingRequestsInWeek.length})
                 </button>
               </>
             )}
@@ -1718,7 +1887,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
         </div>
       )}
 
-      {confirmAction && (
+      {confirmAction && createPortal(
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfirmAction(null)}>
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className={`px-6 pt-6 pb-4 flex gap-4 items-start`}>
@@ -1746,10 +1915,11 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {selectedSlot && (
+      {selectedSlot && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedSlot(null)}>
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
@@ -1811,7 +1981,8 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {viewEmpId && (() => {
@@ -1819,7 +1990,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
         const emp = empData ? { empName: empData.name, empCode: viewEmpId, department: empData.department ?? "" } : null
         const empSlots = slots.filter(s => s.empId === viewEmpId)
         const empReqs = requests.filter(r => emp && r.employeeName === emp.empName)
-        return (
+        return createPortal(
           <div className="fixed inset-0 z-40 flex justify-end" onClick={() => setViewEmpId(null)}>
             <div
               className="w-[400px] h-full bg-white shadow-2xl flex flex-col border-l border-gray-100 animate-in slide-in-from-right duration-200"
@@ -1827,7 +1998,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <div className="flex items-center gap-3">
-                  {emp && <AvatarCircle name={emp.empName} size="md" />}
+                  {emp && <AvatarCircle name={emp.empName} photo={empData?.photos?.[0]} size="md" />}
                   <div>
                     <p className="font-black text-gray-800 text-sm">{emp?.empName ?? "—"}</p>
                     <p className="text-xs text-gray-400">{emp?.department} · <span className="font-mono">{emp?.empCode}</span></p>
@@ -1932,11 +2103,12 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )
       })()}
 
-      {quickAddSlot && (
+      {quickAddSlot && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setQuickAddSlot(null)}>
           <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
@@ -1999,10 +2171,11 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {selectedRequest && (
+      {selectedRequest && createPortal(
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedRequest(null)}>
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
@@ -2023,7 +2196,7 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
             <div className="p-6 space-y-4">
               <div className="bg-gray-50 rounded-2xl p-5 space-y-3.5 border border-gray-100">
                 <div className="flex items-start gap-3">
-                  <AvatarCircle name={selectedRequest.employeeName} size="md" />
+                  <AvatarCircle name={selectedRequest.employeeName} photo={employees.find(e => e.id === selectedRequest.employeeId)?.photos?.[0]} size="md" />
                   <div>
                     <p className="font-black text-gray-800 text-sm">{selectedRequest.employeeName}</p>
                     <p className="text-xs text-gray-400">{selectedRequest.department}</p>
@@ -2075,7 +2248,8 @@ export default function ApprovalManagement({ selectedBranch = "all" }: { selecte
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

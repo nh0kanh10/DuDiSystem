@@ -1,4 +1,5 @@
 import React, { useState } from "react"
+import { createPortal } from "react-dom"
 import { Users, Phone, Mail, Search } from "lucide-react"
 import { Employee } from "../../types"
 import { INIT_EMPLOYEES } from "../../constants"
@@ -32,7 +33,7 @@ export function UserDirectory() {
       </div>
 
       {/* View Detail Modal for Directory */}
-      {selectedEmp && (
+      {selectedEmp && createPortal(
         <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-[100] p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) setSelectedEmp(null) }}>
           <div className="relative w-full max-w-5xl animate-in zoom-in duration-200">
             {/* Unified User profile component rendered here */}
@@ -40,7 +41,8 @@ export function UserDirectory() {
               <UserProfile emp={selectedEmp} onClose={() => setSelectedEmp(null)} />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

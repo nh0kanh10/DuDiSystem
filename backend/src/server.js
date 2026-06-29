@@ -14,6 +14,11 @@ import notificationRoutes from "./routes/notification.routes.js"
 import dashboardRoutes from "./routes/dashboard.routes.js"
 import userRoutes from "./routes/user.routes.js"
 import systemConfigRoutes from "./routes/systemConfig.routes.js"
+import projectRoutes from "./routes/project.routes.js"
+import groupRoutes from "./routes/group.routes.js"
+import announcementRoutes from "./routes/announcement.routes.js"
+import positionRoutes from "./routes/position.routes.js"
+import roleRoutes from "./routes/role.routes.js"
 
 const app = express()
 
@@ -33,6 +38,11 @@ app.use("/api/notifications", notificationRoutes)
 app.use("/api/dashboard", dashboardRoutes)
 app.use("/api/users", userRoutes)
 app.use("/api/system-config", systemConfigRoutes)
+app.use("/api/projects", projectRoutes)
+app.use("/api/groups", groupRoutes)
+app.use("/api/announcements", announcementRoutes)
+app.use("/api/positions", positionRoutes)
+app.use("/api/roles", roleRoutes)
 
 app.use(notFoundHandler)
 app.use(errorHandler)

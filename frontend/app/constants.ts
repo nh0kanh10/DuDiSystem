@@ -125,7 +125,7 @@ export const STATUS_LABEL: Record<string, string> = {
   "on-time": "Đúng giờ", late: "Đi trễ", absent: "Vắng mặt", leave: "Nghỉ phép",
   pending: "Chờ duyệt", approved: "Đã duyệt", rejected: "Từ chối",
   high: "Cao", medium: "Trung bình", low: "Thấp",
-  todo: "Cần làm", "in-progress": "Đang làm", done: "Hoàn thành",
+  todo: "Chưa làm", "in-progress": "Đang làm", done: "Đã xong",
 }
 
 export const STATUS_COLOR: Record<string, string> = {

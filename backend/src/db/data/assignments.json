@@ -1,3 +1,27 @@
 [
-  { "id": "AS001", "employeeId": "NV007", "nodeId": "team-be-core", "type": "temporary", "startDate": "2026-06-25", "endDate": "2026-08-25", "status": "active" }
+  {
+    "id": "AS001",
+    "employeeId": "NV007",
+    "nodeId": "team-be-core",
+    "type": "temporary",
+    "startDate": "2026-06-25",
+    "endDate": "2026-08-25",
+    "status": "active"
+  },
+  {
+    "id": "as-1782723963861",
+    "employeeId": "NV005",
+    "nodeId": "sub-recruitment",
+    "type": "permanent",
+    "startDate": "2026-06-29",
+    "status": "active"
+  },
+  {
+    "id": "as-1782723974482",
+    "employeeId": "NV002",
+    "nodeId": "sub-recruitment",
+    "type": "permanent",
+    "startDate": "2026-06-29",
+    "status": "active"
+  }
 ]

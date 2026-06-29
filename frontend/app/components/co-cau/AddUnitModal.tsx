@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
-import { X, Building2, Clipboard, Users2, Settings, Briefcase } from "lucide-react"
+import { createPortal } from "react-dom"
+import { X, Building2, Clipboard, Settings, Briefcase } from "lucide-react"
 import { OrgNode, OrgNodeType, Employee } from "../../types"
 
 interface AddUnitModalProps {
@@ -50,7 +51,6 @@ export default function AddUnitModal({
         if (parentNode.type === "branch") setType("department")
         else if (parentNode.type === "department") setType("sub-department")
         else if (parentNode.type === "sub-department") setType("position")
-        else if (parentNode.type === "position") setType("team")
       }
       setName("")
       setCode("")
@@ -86,11 +86,26 @@ export default function AddUnitModal({
     if (type === "department") return n.type === "branch"
     if (type === "sub-department") return n.type === "department"
     if (type === "position") return n.type === "sub-department"
-    if (type === "team") return n.type === "position"
     return false
   })
 
   const handleNext = () => {
+    if (step === 2 && (type === "position")) {
+      onSave({
+        name,
+        code,
+        type,
+        managerId: undefined,
+        managerTitle: "",
+        memberCount,
+        parentId: selectedParentId || undefined,
+        status,
+        createdDate
+      })
+      onClose()
+      return
+    }
+
     if (step < 3) {
       setStep(step + 1)
     } else {
@@ -113,7 +128,7 @@ export default function AddUnitModal({
     if (step > 1) setStep(step - 1)
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl w-full max-w-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -154,8 +169,7 @@ export default function AddUnitModal({
                   { key: "branch", label: "Chi nhánh", desc: "Đơn vị cấp cao nhất đại diện khu vực", color: "border-purple-200 hover:border-purple-500", iconBg: "bg-purple-50", iconCol: "text-purple-600", icon: Building2 },
                   { key: "department", label: "Phòng ban", desc: "Đơn vị trực thuộc chi nhánh", color: "border-orange-200 hover:border-orange-500", iconBg: "bg-orange-50", iconCol: "text-orange-600", icon: Clipboard },
                   { key: "sub-department", label: "Bộ phận", desc: "Đơn vị trực thuộc phòng ban chuyên môn", color: "border-green-200 hover:border-green-500", iconBg: "bg-green-50", iconCol: "text-green-600", icon: Settings },
-                  { key: "position", label: "Vị trí", desc: "Chức vụ nghề nghiệp thuộc bộ phận", color: "border-blue-200 hover:border-blue-500", iconBg: "bg-blue-50", iconCol: "text-blue-600", icon: Briefcase },
-                  { key: "team", label: "Nhóm", desc: "Nhóm triển khai trực thuộc vị trí/bộ phận", color: "border-pink-200 hover:border-pink-500", iconBg: "bg-pink-50", iconCol: "text-pink-600", icon: Users2 }
+                  { key: "position", label: "Vị trí", desc: "Vị trí chuyên môn thuộc bộ phận", color: "border-blue-200 hover:border-blue-500", iconBg: "bg-blue-50", iconCol: "text-blue-600", icon: Briefcase },
                 ].map(opt => (
                   <button
                     key={opt.key}
@@ -298,10 +312,10 @@ export default function AddUnitModal({
             disabled={step === 2 && (!name.trim() || !code.trim() || (type !== "branch" && !selectedParentId))}
             className="px-5 py-2 bg-[#C62828] hover:bg-[#B71C1C] disabled:bg-gray-300 text-white rounded-xl text-sm font-bold transition-colors shadow-sm shadow-[#C62828]/10 flex items-center gap-1.5"
           >
-            {step === 3 ? (editNode ? "Lưu thay đổi" : "Hoàn tất") : "Tiếp tục"}
+            {(step === 3 || (step === 2 && (type === "position"))) ? (editNode ? "Lưu thay đổi" : "Hoàn tất") : "Tiếp tục"}
           </button>
         </div>
       </div>
     </div>
-  )
+  , document.body)
 }

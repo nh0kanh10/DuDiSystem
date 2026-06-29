@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react"
-import { Settings, Clock, ShieldAlert, Check, RefreshCw } from "lucide-react"
+import { Settings, Clock, ShieldAlert, Check, RefreshCw, Users, Layers } from "lucide-react"
 import { api } from "@/lib/api"
 
 function CustomTimePicker({ value, onChange }: { value: string; onChange: (val: string) => void }) {
@@ -119,7 +119,9 @@ export function SystemConfigPage() {
     afternoonEnd: "17:00",
     lateGraceMinutes: 15,
     earlyGraceMinutes: 15,
-    requireIP: false
+    requireIP: false,
+    internshipMonths: 2,
+    projectDeadlineWarningDays: 7,
   })
 
   useEffect(() => {
@@ -136,7 +138,9 @@ export function SystemConfigPage() {
             afternoonEnd: res.afternoonEnd || "17:00",
             lateGraceMinutes: Number(res.lateGraceMinutes ?? 15),
             earlyGraceMinutes: Number(res.earlyGraceMinutes ?? 15),
-            requireIP: !!res.requireIP
+            requireIP: !!res.requireIP,
+            internshipMonths: Number(res.internshipMonths ?? 2),
+            projectDeadlineWarningDays: Number(res.projectDeadlineWarningDays ?? 7),
           })
         }
       } catch (err) {
@@ -173,11 +177,18 @@ export function SystemConfigPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800">Tiện ích hệ thống</h2>
-          <p className="text-xs text-gray-400 mt-1">Quản lý và điều chỉnh các thiết lập dùng chung trên toàn hệ thống.</p>
+    <div className="space-y-5">
+      <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
+        <div className="flex items-center">
+          <div className="flex gap-1.5 items-center mr-4 shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-white/30 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white/60 animate-pulse delay-75"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150"></span>
+          </div>
+          <div>
+            <h2 className="text-xl font-black tracking-tight text-white">Tiện ích hệ thống</h2>
+            <p className="text-xs text-white/80 mt-1">Quản lý và điều chỉnh các thiết lập dùng chung trên toàn hệ thống.</p>
+          </div>
         </div>
       </div>
 
@@ -185,7 +196,7 @@ export function SystemConfigPage() {
         <div className="lg:col-span-2 bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
           <div className="bg-[#C62828] text-white px-6 py-4 flex items-center gap-2">
             <Settings size={18} />
-            <h3 className="font-black text-sm text-white">Cấu hình thời gian làm việc & chấm công</h3>
+            <h3 className="font-black text-sm text-white">Cấu hình hệ thống</h3>
           </div>
 
           <form onSubmit={handleSave} className="p-6 space-y-6">
@@ -284,10 +295,48 @@ export function SystemConfigPage() {
               </div>
             </div>
 
+            <div className="border-t border-gray-150 pt-5 mt-5">
+              <h4 className="text-xs font-bold text-[#C62828] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Users size={14} /> Cấu hình quản lý nhân sự
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Thời gian thực tập mặc định (Tháng)</label>
+                  <input
+                    type="number"
+                    value={config.internshipMonths || 2}
+                    onChange={e => setConfig({ ...config, internshipMonths: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-150 pt-5 mt-5">
+              <h4 className="text-xs font-bold text-[#C62828] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Layers size={14} /> Quản lý dự án
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Nhắc nhở deadline trước (Ngày)</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={config.projectDeadlineWarningDays}
+                    onChange={e => setConfig({ ...config, projectDeadlineWarningDays: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">Hiển thị cảnh báo trong trang Quản lý dự án khi còn ≤ số ngày này đến deadline</p>
+                </div>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between border-t border-gray-100 pt-4">
               <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
                 <ShieldAlert size={14} className="text-gray-300" />
-                <span>Các thay đổi sẽ có hiệu lực ngay lập tức với bảng chấm công.</span>
+                <span>Các thay đổi sẽ có hiệu lực ngay lập tức.</span>
               </div>
               <div className="flex items-center gap-3">
                 {success && (

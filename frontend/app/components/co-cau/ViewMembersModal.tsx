@@ -1,4 +1,5 @@
 import { X, Users, Mail, Phone, Briefcase, Award } from "lucide-react"
+import { createPortal } from "react-dom"
 import { OrgNode, Employee, Assignment } from "../../types"
 
 interface ViewMembersModalProps {
@@ -47,7 +48,7 @@ export default function ViewMembersModal({
     return empNodeIds.some(nodeId => descendantIds.includes(nodeId!))
   })
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl border border-gray-100 flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-200">
         {/* Header */}
@@ -126,5 +127,5 @@ export default function ViewMembersModal({
         </div>
       </div>
     </div>
-  )
+  , document.body)
 }

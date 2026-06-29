@@ -56,8 +56,6 @@
     "name": "Team Leader",
     "code": "DEV-TL",
     "type": "position",
-    "managerId": "NV009",
-    "managerTitle": "Team Leader",
     "parentId": "sub-dev",
     "status": "active",
     "createdDate": "01/01/2020"
@@ -104,28 +102,6 @@
     "code": "DEV-INT",
     "type": "position",
     "parentId": "sub-dev",
-    "status": "active",
-    "createdDate": "01/01/2020"
-  },
-  {
-    "id": "team-be-core",
-    "name": "Nhóm Backend Core",
-    "code": "BE-CORE",
-    "type": "team",
-    "managerId": "NV002",
-    "managerTitle": "Team Lead",
-    "parentId": "pos-dev-be",
-    "status": "active",
-    "createdDate": "01/01/2020"
-  },
-  {
-    "id": "team-fe-erp",
-    "name": "Nhóm Frontend ERP",
-    "code": "FE-ERP",
-    "type": "team",
-    "managerId": "NV001",
-    "managerTitle": "Team Lead",
-    "parentId": "pos-dev-fe",
     "status": "active",
     "createdDate": "01/01/2020"
   },

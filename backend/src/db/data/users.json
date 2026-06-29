@@ -2,9 +2,9 @@
   {
     "id": "U001",
     "employeeId": "NV001",
-    "email": "lien.tran@dudi.vn",
+    "email": "NV001",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "admin",
+    "roleId": "role-user",
     "status": "active"
   },
   {
@@ -12,7 +12,7 @@
     "employeeId": "NV002",
     "email": "NV002",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "manager",
+    "roleId": "role-manager",
     "status": "active"
   },
   {
@@ -20,7 +20,7 @@
     "employeeId": "NV003",
     "email": "NV003",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "user",
+    "roleId": "role-user",
     "status": "active"
   },
   {
@@ -28,7 +28,7 @@
     "employeeId": "NV004",
     "email": "NV004",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "user",
+    "roleId": "role-user",
     "status": "active"
   },
   {
@@ -36,7 +36,7 @@
     "employeeId": "NV005",
     "email": "NV005",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "admin",
+    "roleId": "role-admin",
     "status": "active"
   },
   {
@@ -44,7 +44,7 @@
     "employeeId": "NV006",
     "email": "NV006",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "user",
+    "roleId": "role-user",
     "status": "active"
   },
   {
@@ -52,7 +52,7 @@
     "employeeId": "NV007",
     "email": "NV007",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "user",
+    "roleId": "role-user",
     "status": "active"
   },
   {
@@ -60,7 +60,7 @@
     "employeeId": "NV008",
     "email": "NV008",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "user",
+    "roleId": "role-user",
     "status": "active"
   },
   {
@@ -68,7 +68,7 @@
     "employeeId": "NV009",
     "email": "NV009",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "manager",
+    "roleId": "role-manager",
     "status": "active"
   },
   {
@@ -76,7 +76,7 @@
     "employeeId": "NV010",
     "email": "admin@dudi.vn",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "admin",
+    "roleId": "role-admin",
     "status": "active"
   },
   {
@@ -84,7 +84,7 @@
     "employeeId": "NV011",
     "email": "NV011",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "user",
+    "roleId": "role-user",
     "status": "active"
   },
   {
@@ -92,7 +92,7 @@
     "employeeId": "NV012",
     "email": "NV012",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "user",
+    "roleId": "role-manager",
     "status": "active"
   },
   {
@@ -100,7 +100,7 @@
     "employeeId": "NV013",
     "email": "NV013",
     "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "role": "user",
+    "roleId": "role-user",
     "status": "active"
   }
 ]

@@ -1,0 +1,145 @@
+[
+  {
+    "id": "PRJ001",
+    "name": "Nâng cấp hệ thống DuDi v2",
+    "code": "DUDI-V2",
+    "description": "Tái cấu trúc toàn bộ giao diện và backend, tích hợp module quản lý dự án, chấm công thông minh.",
+    "status": "active",
+    "startDate": "01/06/2026",
+    "endDate": "01/07/2026",
+    "managerId": "NV001",
+    "memberIds": ["NV008", "NV001", "NV011", "NV002"],
+    "progress": 45,
+    "attachments": [
+      { "id": "A1", "name": "PRD DuDi v2.pdf", "url": "#", "type": "file", "uploadedAt": "01/06/2026", "size": "2.4 MB" },
+      { "id": "A2", "name": "Figma Design System", "url": "https://figma.com", "type": "link", "uploadedAt": "03/06/2026", "size": "" },
+      { "id": "A3", "name": "API Documentation v2.docx", "url": "#", "type": "file", "uploadedAt": "05/06/2026", "size": "890 KB" }
+    ],
+    "teams": [],
+    "createdAt": "01/06/2026"
+  },
+  {
+    "id": "PRJ002",
+    "name": "Module tuyển dụng nội bộ",
+    "code": "HR-RECRUIT",
+    "description": "Xây dựng luồng tuyển dụng từ đăng tin, tiếp nhận CV, phỏng vấn đến onboarding trực tiếp trên DuDi.",
+    "status": "planning",
+    "startDate": "15/07/2026",
+    "endDate": "30/09/2026",
+    "managerId": "NV005",
+    "memberIds": ["NV004", "NV005", "NV011"],
+    "progress": 0,
+    "attachments": [
+      { "id": "A4", "name": "Yêu cầu nghiệp vụ tuyển dụng.docx", "url": "#", "type": "file", "uploadedAt": "10/06/2026", "size": "450 KB" },
+      { "id": "A5", "name": "Wireframe tuyển dụng v1", "url": "https://figma.com", "type": "link", "uploadedAt": "12/06/2026", "size": "" }
+    ],
+    "teams": [],
+    "createdAt": "10/06/2026"
+  },
+  {
+    "id": "PRJ003",
+    "name": "Hệ thống chấm công sinh trắc học",
+    "code": "ATD-BIO",
+    "description": "Tích hợp camera nhận diện khuôn mặt với module chấm công hiện tại, hỗ trợ check-in từ xa.",
+    "status": "on-hold",
+    "startDate": "01/05/2026",
+    "endDate": "30/09/2026",
+    "managerId": "NV009",
+    "memberIds": ["NV006", "NV007", "NV008"],
+    "progress": 30,
+    "attachments": [
+      { "id": "A6", "name": "Đề xuất giải pháp AI Camera.pdf", "url": "#", "type": "file", "uploadedAt": "02/05/2026", "size": "3.1 MB" }
+    ],
+    "teams": [],
+    "createdAt": "01/05/2026"
+  },
+  {
+    "id": "PRJ004",
+    "name": "Báo cáo thống kê Q2/2026",
+    "code": "RPT-Q2-26",
+    "description": "Tổng hợp toàn bộ báo cáo nhân sự, chấm công, KPI và chi phí nhân sự quý 2 năm 2026.",
+    "status": "completed",
+    "startDate": "01/06/2026",
+    "endDate": "10/07/2026",
+    "managerId": "NV012",
+    "memberIds": ["NV004", "NV005", "NV012"],
+    "progress": 100,
+    "attachments": [
+      { "id": "A7", "name": "Báo cáo Q2-2026 Final.xlsx", "url": "#", "type": "file", "uploadedAt": "10/07/2026", "size": "1.1 MB" },
+      { "id": "A8", "name": "Slide thuyết trình ban lãnh đạo.pptx", "url": "#", "type": "file", "uploadedAt": "10/07/2026", "size": "4.5 MB" }
+    ],
+    "teams": [],
+    "createdAt": "01/06/2026"
+  },
+  {
+    "id": "PRJ005",
+    "name": "Tích hợp Zalo OA thông báo nội bộ",
+    "code": "ZALO-NOTIF",
+    "description": "Kết nối DuDi với Zalo Official Account để gửi thông báo chấm công, duyệt đơn, nhắc lịch cho nhân viên.",
+    "status": "active",
+    "startDate": "10/06/2026",
+    "endDate": "15/08/2026",
+    "managerId": "NV002",
+    "memberIds": ["NV001", "NV002", "NV006"],
+    "progress": 60,
+    "attachments": [
+      { "id": "A9", "name": "Zalo OA API Reference", "url": "https://developers.zalo.me", "type": "link", "uploadedAt": "10/06/2026", "size": "" },
+      { "id": "A10", "name": "Mapping thông báo - kênh gửi.xlsx", "url": "#", "type": "file", "uploadedAt": "15/06/2026", "size": "210 KB" }
+    ],
+    "teams": [],
+    "createdAt": "10/06/2026"
+  },
+  {
+    "id": "PRJ006",
+    "name": "Đào tạo nhân viên mới Q3/2026",
+    "code": "TRAIN-Q3",
+    "description": "Lên chương trình và tổ chức đào tạo hội nhập cho toàn bộ nhân viên mới tuyển dụng quý 3.",
+    "status": "planning",
+    "startDate": "01/07/2026",
+    "endDate": "31/07/2026",
+    "managerId": "NV005",
+    "memberIds": ["NV003", "NV005", "NV011", "NV013"],
+    "progress": 0,
+    "attachments": [
+      { "id": "A11", "name": "Chương trình đào tạo Q3 draft.docx", "url": "#", "type": "file", "uploadedAt": "25/06/2026", "size": "320 KB" }
+    ],
+    "teams": [],
+    "createdAt": "25/06/2026"
+  },
+  {
+    "id": "PRJ007",
+    "name": "Nâng cấp hạ tầng DevOps",
+    "code": "DEVOPS-UP",
+    "description": "Migrate toàn bộ CI/CD sang GitHub Actions, cấu hình lại staging và production server, thiết lập monitoring.",
+    "status": "active",
+    "startDate": "15/06/2026",
+    "endDate": "31/07/2026",
+    "managerId": "NV008",
+    "memberIds": ["NV002", "NV008"],
+    "progress": 75,
+    "attachments": [
+      { "id": "A12", "name": "Infrastructure Architecture v2.pdf", "url": "#", "type": "file", "uploadedAt": "15/06/2026", "size": "1.8 MB" },
+      { "id": "A13", "name": "GitHub Actions Workflow", "url": "https://github.com", "type": "link", "uploadedAt": "20/06/2026", "size": "" }
+    ],
+    "teams": [],
+    "createdAt": "15/06/2026"
+  },
+  {
+    "id": "PRJ008",
+    "name": "Kiểm toán bảo mật hệ thống",
+    "code": "SEC-AUDIT",
+    "description": "Rà soát lỗ hổng bảo mật, kiểm tra phân quyền API, penetration test và hardening toàn bộ hệ thống.",
+    "status": "completed",
+    "startDate": "01/05/2026",
+    "endDate": "31/05/2026",
+    "managerId": "NV009",
+    "memberIds": ["NV002", "NV007", "NV009"],
+    "progress": 100,
+    "attachments": [
+      { "id": "A14", "name": "Security Audit Report May 2026.pdf", "url": "#", "type": "file", "uploadedAt": "31/05/2026", "size": "2.9 MB" },
+      { "id": "A15", "name": "Danh sách lỗi cần xử lý.xlsx", "url": "#", "type": "file", "uploadedAt": "31/05/2026", "size": "180 KB" }
+    ],
+    "teams": [],
+    "createdAt": "01/05/2026"
+  }
+]

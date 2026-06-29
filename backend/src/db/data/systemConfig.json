@@ -8,6 +8,8 @@
     "afternoonEnd": "17:00",
     "lateGraceMinutes": 15,
     "earlyGraceMinutes": 15,
-    "requireIP": false
+    "requireIP": false,
+    "internshipMonths": 3,
+    "projectDeadlineWarningDays": 7
   }
 ]

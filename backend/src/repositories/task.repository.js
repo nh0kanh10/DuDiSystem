@@ -7,6 +7,7 @@ export function getAll(filter = {}) {
   if (filter.status) rows = rows.filter(t => t.status === filter.status)
   if (filter.priority) rows = rows.filter(t => t.priority === filter.priority)
   if (filter.assigneeId) rows = rows.filter(t => t.assigneeId === filter.assigneeId)
+  if (filter.projectId) rows = rows.filter(t => t.projectId === filter.projectId)
   return rows
 }
 
