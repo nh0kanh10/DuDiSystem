@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react"
+import { createPortal } from "react-dom"
 import { 
   CheckSquare, Plus, Edit2, Trash2, RefreshCw, Briefcase
 } from "lucide-react"
@@ -7,6 +8,7 @@ import { api } from "@/lib/api"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomDatePicker } from "../ui/CustomDatePicker"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
+import ConfirmModal from "../ui/ConfirmModal"
 
 export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   const [tasks, setTasks] = useState<any[]>([])
@@ -14,6 +16,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   const [orgNodes, setOrgNodes] = useState<OrgNode[]>([])
   const [loading, setLoading] = useState(false)
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null)
 
   const [selectedDept, setSelectedDept] = useState("all")
   const [selectedEmp, setSelectedEmp] = useState("all")
@@ -40,7 +43,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   const [startDate, setStartDate] = useState(getTodayVnStr())
   const [endDate, setEndDate] = useState(getFutureVnStr(6))
 
-  // Modal States
   const [showModal, setShowModal] = useState(false)
   const [editingTask, setEditingTask] = useState<any | null>(null)
   const [form, setForm] = useState({
@@ -52,7 +54,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     status: "todo" as "todo" | "in-progress" | "done"
   })
 
-  // Toast State
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type })
@@ -199,7 +200,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     
     return (
       <>
-        {/* Ngày Column */}
         {isFirstOfGroup && (
           <td rowSpan={dateGroupLength} className={`px-5 py-3 border-r border-gray-100 align-middle text-left ${bgClass}`}>
             <div className="flex flex-col text-xs font-bold gap-0.5">
@@ -209,7 +209,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
           </td>
         )}
 
-        {/* Công việc Column */}
         <td className="px-5 py-3 border-r border-gray-100 align-middle">
           <div
             className={`h-[38px] px-3 flex items-center border rounded-xl text-xs font-bold w-full truncate transition-all ${
@@ -233,7 +232,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
           </div>
         </td>
 
-        {/* Trạng thái Column */}
         <td className="px-5 py-3 border-r border-gray-100 align-middle text-left">
           <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
             isDone ? "bg-emerald-50 text-emerald-700 border-emerald-100"
@@ -244,7 +242,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
           </span>
         </td>
 
-        {/* Thao tác Column */}
         <td className="px-5 py-3 text-center align-middle">
           <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
             <button
@@ -335,28 +332,33 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   }
 
   const handleDeleteTask = async (id: string) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa công việc này?")) return
+    setDeleteTaskId(id)
+  }
+
+  const confirmDeleteTask = async () => {
+    if (!deleteTaskId) return
     try {
-      setProcessingId(id)
-      await api.tasks.delete(id)
+      setProcessingId(deleteTaskId)
+      await api.tasks.delete(deleteTaskId)
       showToast("Đã xóa công việc")
       loadData()
     } catch (err: any) {
       showToast(err.message || "Lỗi xóa công việc", "error")
     } finally {
       setProcessingId(null)
+      setDeleteTaskId(null)
     }
   }
 
   return (
     <div className="space-y-5">
-      {toast && (
-        <div className={`fixed bottom-24 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[60] border backdrop-blur-sm animate-in slide-in-from-right duration-300
+      {toast && createPortal(
+        <div className={`fixed bottom-6 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] border backdrop-blur-sm animate-in slide-in-from-right duration-300
           ${toast.type === "success" ? "bg-gray-900/95 text-white border-white/10" : "bg-red-900/95 text-white border-red-500/20"}`}>
           <div className={`w-2.5 h-2.5 rounded-full ${toast.type === "success" ? "bg-emerald-400" : "bg-red-400"} animate-pulse`} />
           <span className="text-sm font-semibold">{toast.message}</span>
         </div>
-      )}
+      , document.body)}
 
       <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
         <div className="flex items-center">
@@ -461,7 +463,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
         </div>
       </div>
 
-      {/* Main Grid/Table of Tasks */}
       <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -679,6 +680,17 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
             </form>
       </Modal>
+
+      <ConfirmModal
+        isOpen={deleteTaskId !== null}
+        onClose={() => setDeleteTaskId(null)}
+        onConfirm={confirmDeleteTask}
+        title="Xóa công việc"
+        message="Bạn có chắc chắn muốn xóa công việc này không? Tiến độ dự án liên quan sẽ được tự động tính toán lại."
+        confirmText="Xác nhận xóa"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   )
 }

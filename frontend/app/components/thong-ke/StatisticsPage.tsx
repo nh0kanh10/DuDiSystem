@@ -80,6 +80,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       onTimeRate: number
     }[]
   } | null>(null)
+  const [showFullRank, setShowFullRank] = useState<"late" | "leave" | null>(null)
   const [systemConfig, setSystemConfig] = useState<{
     morningStart: string
     morningEnd: string
@@ -101,7 +102,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           api.attendance.list(),
           api.systemConfig.get().catch(() => null)
         ])
-        setEmployees(empData as Employee[])
+        const filteredEmps = (empData as Employee[] || []).filter(e => !["0000000000", "1111111111", "2222222222"].includes(e.id))
+        setEmployees(filteredEmps)
         setAttendance(attData as AttendanceRecord[])
         if (configData) {
           setSystemConfig(configData)
@@ -297,6 +299,38 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
     return map
   }, [employees, filteredAttendance])
 
+  const allEmployeesList = useMemo(() => {
+    return employees.filter(e => {
+      const matchesBranch = selectedBranch === "all" || e.branchId === selectedBranch
+      if (!matchesBranch) return false
+      const matchesDept = personalDept === "all" || e.department === personalDept
+      if (!matchesDept) return false
+      const matchesType = activeTab === "official" ? e.contractType === "Chính thức" : e.contractType === "Thực tập"
+      return matchesType
+    })
+  }, [employees, selectedBranch, personalDept, activeTab])
+
+  const rankAllData = useMemo(() => {
+    const list = allEmployeesList.map(e => {
+      const stats = statsMap[e.id] || { late: 0, leave: 0, total: 0, onTime: 0 }
+      return {
+        id: e.id,
+        name: e.name,
+        department: e.department,
+        contractType: e.contractType,
+        late: stats.late,
+        leave: stats.leave,
+        total: stats.total,
+        onTimeRate: stats.total > 0 ? Math.round((stats.onTime / stats.total) * 100) : 100
+      }
+    })
+
+    const lateRanked = [...list].sort((a, b) => b.late - a.late || b.leave - a.leave || a.name.localeCompare(b.name))
+    const leaveRanked = [...list].sort((a, b) => b.leave - a.leave || b.late - a.late || a.name.localeCompare(b.name))
+
+    return { lateRanked, leaveRanked }
+  }, [allEmployeesList, statsMap])
+
   const filteredEmployeesList = useMemo(() => {
     return employees.filter(e => {
       const matchesType = activeTab === "official" ? e.contractType === "Chính thức" : e.contractType === "Thực tập"
@@ -382,7 +416,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
 
   const personalStats = useMemo(() => {
-    const isManagerOrAdmin = currentUserRole === "role-admin" || currentUserRole === "role-manager"
+    const isManagerOrAdmin = currentUserRole === "role-admin" || currentUserRole === "role-super-admin" || currentUserRole === "role-manager"
     const empId = isManagerOrAdmin ? personalEmployeeId : (personalEmployeeId || currentEmployeeId)
     if (!empId) return null
     const emp = employees.find(e => e.id === empId)
@@ -679,7 +713,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         )}
 
-        {(currentUserRole === "role-admin" || currentUserRole === "role-manager") && (
+        {(currentUserRole === "role-admin" || currentUserRole === "role-super-admin" || currentUserRole === "role-manager") && (
           <div className="flex flex-col gap-1.5 min-w-[150px] flex-1 lg:flex-none">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Phòng ban</span>
             <CustomSelect
@@ -693,7 +727,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         )}
 
-        {activeTab === "personal" && (currentUserRole === "role-admin" || currentUserRole === "role-manager") && (
+        {activeTab === "personal" && (currentUserRole === "role-admin" || currentUserRole === "role-super-admin" || currentUserRole === "role-manager") && (
           <div className="flex flex-col gap-1.5 min-w-[250px] flex-1 lg:flex-none">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Chọn nhân sự</span>
             <CustomCombobox
@@ -861,7 +895,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         ) : (
           <div className="py-12 bg-white rounded-3xl border border-gray-150 text-center text-gray-400 text-sm font-medium">
-            {currentUserRole === "role-admin" || currentUserRole === "role-manager"
+            {currentUserRole === "role-admin" || currentUserRole === "role-super-admin" || currentUserRole === "role-manager"
               ? "Vui lòng chọn nhân sự để xem báo cáo chi tiết."
               : "Không tìm thấy thông tin tài khoản nhân sự kết nối với email của bạn."}
           </div>
@@ -872,11 +906,17 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-[#FAF9F9] rounded-3xl border border-black/5 shadow-sm overflow-hidden">
-              <div className="bg-[#C62828] text-white px-6 py-4 flex items-center gap-2">
+              <div className="bg-[#C62828] text-white px-6 py-4 flex items-center justify-between gap-2">
                 <h3 className="font-black text-sm flex items-center gap-2 text-white">
                   <Award size={16} className="text-white/90" />
                   Top đi trễ nhiều nhất
                 </h3>
+                <button
+                  onClick={() => setShowFullRank("late")}
+                  className="px-3 py-1 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-[10px] font-black text-white transition-all cursor-pointer select-none active:scale-95"
+                >
+                  Chi tiết
+                </button>
               </div>
               <div className="p-6 space-y-3.5">
                 {rankData.topLateGroups.length === 0 ? (
@@ -945,11 +985,17 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
             </div>
 
             <div className="bg-[#FAF9F9] rounded-3xl border border-black/5 shadow-sm overflow-hidden">
-              <div className="bg-[#C62828] text-white px-6 py-4 flex items-center gap-2">
+              <div className="bg-[#C62828] text-white px-6 py-4 flex items-center justify-between gap-2">
                 <h3 className="font-black text-sm flex items-center gap-2 text-white">
                   <Users size={16} className="text-white/90" />
                   Top nghỉ phép nhiều nhất
                 </h3>
+                <button
+                  onClick={() => setShowFullRank("leave")}
+                  className="px-3 py-1 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-[10px] font-black text-white transition-all cursor-pointer select-none active:scale-95"
+                >
+                  Chi tiết
+                </button>
               </div>
               <div className="p-6 space-y-3.5">
                 {rankData.topLeaveGroups.length === 0 ? (
@@ -1112,6 +1158,100 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={!!showFullRank}
+        onClose={() => setShowFullRank(null)}
+        title={showFullRank === "late" ? "Bảng xếp hạng đi trễ (Toàn bộ nhân sự)" : "Bảng xếp hạng nghỉ phép (Toàn bộ nhân sự)"}
+        icon={showFullRank === "late" ? Award : Users}
+        width="xl"
+        footer={
+          <button 
+            onClick={() => setShowFullRank(null)}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+          >
+            Đóng
+          </button>
+        }
+      >
+        <div className="p-6 overflow-y-auto max-h-[65vh]" style={{ scrollbarWidth: "thin" }}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="bg-gray-50 text-gray-400 text-xs border-b border-gray-150 uppercase tracking-wider font-bold">
+                  <th className="px-4 py-3 text-center w-12">Hạng</th>
+                  <th className="px-4 py-3">Mã NV</th>
+                  <th className="px-4 py-3">Họ tên</th>
+                  <th className="px-4 py-3">Đơn vị</th>
+                  <th className="px-4 py-3">Loại hợp đồng</th>
+                  <th className="px-4 py-3 text-right">
+                    {showFullRank === "late" ? "Số ngày đi trễ" : "Số ngày nghỉ"}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(() => {
+                  const list = showFullRank === "late" ? rankAllData.lateRanked : rankAllData.leaveRanked
+                  if (list.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-6 text-center text-gray-400 text-sm font-medium">
+                          Không có dữ liệu nhân sự
+                        </td>
+                      </tr>
+                    )
+                  }
+                  
+                  let currentRank = 0
+                  let previousCount = -1
+
+                  return list.map((item, idx) => {
+                    const countVal = showFullRank === "late" ? item.late : item.leave
+                    if (countVal !== previousCount) {
+                      currentRank = currentRank + 1
+                      previousCount = countVal
+                    }
+                    const pillClass = showFullRank === "late"
+                      ? (countVal > 0 ? "bg-amber-100 text-amber-900 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-100")
+                      : (countVal > 0 ? "bg-purple-100 text-purple-900 border-purple-200" : "bg-gray-100 text-gray-700 border-gray-200")
+                    
+                    return (
+                      <tr key={item.id} className="hover:bg-gray-50/50 transition-colors font-medium text-black border-b border-gray-150">
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex w-6 h-6 rounded-full items-center justify-center text-xs font-black
+                            ${currentRank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200" 
+                              : currentRank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200" 
+                              : currentRank === 3 ? "bg-orange-100 text-orange-700 border border-orange-200"
+                              : "text-gray-500"}`}>
+                            {currentRank}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs font-mono font-medium text-black">{item.id}</td>
+                        <td className="px-4 py-3 text-black font-semibold">{item.name}</td>
+                        <td className="px-4 py-3 text-xs font-medium text-black">{item.department}</td>
+                        <td className="px-4 py-3 text-xs">
+                          <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
+                            item.contractType === "Chính thức" 
+                              ? "bg-blue-50 text-blue-700 border border-blue-100" 
+                              : "bg-orange-50 text-orange-700 border border-orange-100"
+                          }`}>
+                            {item.contractType}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${pillClass}`}>
+                            {countVal} {showFullRank === "late" ? "ngày" : "ngày"}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                })()}
+              </tbody>
+            </table>
           </div>
         </div>
       </Modal>

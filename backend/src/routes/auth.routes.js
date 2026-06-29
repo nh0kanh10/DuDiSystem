@@ -1,5 +1,6 @@
 import { Router } from "express"
-import { loginHandler } from "../controllers/auth.controller.js"
+import { loginHandler, getMeHandler } from "../controllers/auth.controller.js"
+import { authenticate } from "../middlewares/auth.js"
 import { fail } from "../utils/response.js"
 
 const router = Router()
@@ -9,5 +10,7 @@ router.post("/login", (req, res, next) => {
   if (!key || !req.body.password) return fail(res, "Thiếu mã đăng nhập hoặc mật khẩu")
   next()
 }, loginHandler)
+
+router.get("/me", authenticate, getMeHandler)
 
 export default router

@@ -8,7 +8,6 @@ import {
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import dudiLogo from "../../../imports/avatar.jpg";
 
-// ─── Brand tokens ─────────────────────────────────────────────────────────────
 const BRAND = "#E8231A";          // exact DUDI red
 const CRIMSON = "#C01525";          // deeper variant for depth
 const GOLD = "#FF8800";          // ember gold complement
@@ -16,7 +15,6 @@ const BG = "#2a0a0f";          // even brighter warm ruby
 const GR = "rgba(232,35,26,0.28)";   // red glow
 const GG = "rgba(255,136,0,0.14)";   // gold glow
 
-// ─── Shared styles ────────────────────────────────────────────────────────────
 const PANEL_BG: React.CSSProperties = {
   background: "rgba(32,8,12,0.94)",
   backdropFilter: "blur(36px)",
@@ -51,7 +49,6 @@ const BTN_S: React.CSSProperties = {
   fontFamily: "inherit",
 };
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
 type LeaveStatus = "pending" | "approved" | "cancelled";
 
 const EMP = {
@@ -104,8 +101,6 @@ const LEAVES: { id: number; date: string; type: string; reason: string; status: 
   { id: 3, date: "20/06/2026", type: "Nghỉ phép", reason: "Du lịch gia đình", status: "cancelled" },
 ];
 
-// ─── Bubble definitions ────────────────────────────────────────────────────────
-// ─── Bubble definitions ────────────────────────────────────────────────────────
 type BubbleId = "checkin" | "employee" | "leave" | "tasks" | "settings" | "chat" | "workflow" | "notifications";
 
 const BUBBLES: {
@@ -182,7 +177,6 @@ const BUBBLES: {
     },
   ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function LeaveBadge({ status }: { status: LeaveStatus }) {
   const m = {
     pending: { l: "Đang chờ duyệt", c: "#f59e0b", a: "rgba(245,158,11,0.1)", b: "rgba(245,158,11,0.22)" },
@@ -208,7 +202,6 @@ function FieldBox({ children, mono }: { children: React.ReactNode; mono?: boolea
   );
 }
 
-// ─── Ambient background ────────────────────────────────────────────────────────
 function AmbientBg() {
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
@@ -224,7 +217,6 @@ function AmbientBg() {
   );
 }
 
-// ─── Floating Clock ───────────────────────────────────────────────────────────
 function FloatingClock() {
   const [hms, setHms] = useState({ h: "00", m: "00", s: "00" });
   useEffect(() => {
@@ -249,7 +241,6 @@ function FloatingClock() {
   );
 }
 
-// ─── Single Bubble ────────────────────────────────────────────────────────────
 function Bubble({ b, hovId, setHovId, onClick }: {
   b: typeof BUBBLES[0];
   hovId: BubbleId | null;
@@ -281,14 +272,12 @@ function Bubble({ b, hovId, setHovId, onClick }: {
         zIndex: 2,
       }}
     >
-      {/* Pulse rings for center bubble */}
       {b.isCenter && (
         <>
           <div style={{ position: "absolute", inset: -16, borderRadius: "50%", border: `1.5px solid rgba(232,35,26,0.4)`, animation: "pulseRing 2.4s ease-out infinite", pointerEvents: "none" }} />
           <div style={{ position: "absolute", inset: -32, borderRadius: "50%", border: `1px solid rgba(232,35,26,0.2)`, animation: "pulseRing 2.4s ease-out 0.8s infinite", pointerEvents: "none" }} />
         </>
       )}
-      {/* Bubble body */}
       <div
         onClick={e => onClick(b.id, e)}
         onMouseEnter={() => setHovId(b.id)}
@@ -340,7 +329,6 @@ function Bubble({ b, hovId, setHovId, onClick }: {
   );
 }
 
-// ─── Panel wrapper ────────────────────────────────────────────────────────────
 function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
   activePage: BubbleId;
   onClose: () => void;
@@ -398,7 +386,6 @@ function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
           scrollbarColor: "rgba(232,35,26,0.18) transparent",
         }}
       >
-        {/* Panel header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "20px 24px 16px", borderBottom: "1px solid rgba(255,255,255,0.05)", position: "sticky", top: 0, background: "rgba(12,1,4,0.9)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderRadius: "24px 24px 0 0", zIndex: 1 }}>
           <button
             onClick={handleClose}
@@ -423,7 +410,6 @@ function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
           </button>
         </div>
 
-        {/* Panel content */}
         <div style={{ padding: "20px 24px 28px" }}>
           {activePage === "checkin" && <CheckinContent checkedIn={checkedIn} setCheckedIn={setCheckedIn} />}
           {activePage === "employee" && <EmployeeContent />}
@@ -439,7 +425,6 @@ function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
   );
 }
 
-// ─── Check-in content ─────────────────────────────────────────────────────────
 function CheckinContent({ checkedIn, setCheckedIn }: { checkedIn: boolean; setCheckedIn: (v: boolean) => void }) {
   const [hms, setHms] = useState({ h: "00", m: "00", s: "00" });
   const [ciTime, setCiTime] = useState<string | null>(null);
@@ -462,7 +447,6 @@ function CheckinContent({ checkedIn, setCheckedIn }: { checkedIn: boolean; setCh
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
       {checkedIn && ciTime && <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#22c55e", textShadow: "0 0 10px rgba(34,197,94,0.6)" }}>✓ Check-in lúc {ciTime}</p>}
 
-      {/* Live clock in panel */}
       <div style={{ display: "flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
         <span style={{ fontSize: 48, color: BRAND, textShadow: `0 0 24px ${GR}` }}>{hms.h}</span>
         <span style={{ fontSize: 48, color: BRAND, opacity: 0.3, animation: "colon-blink 1s step-end infinite" }}>:</span>
@@ -470,7 +454,6 @@ function CheckinContent({ checkedIn, setCheckedIn }: { checkedIn: boolean; setCh
         <span style={{ fontSize: 16, color: "rgba(232,35,26,0.5)", marginLeft: 6, alignSelf: "flex-start", marginTop: 6 }}>{hms.s}</span>
       </div>
 
-      {/* Check-in button */}
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {!checkedIn && (
           <>
@@ -490,7 +473,6 @@ function CheckinContent({ checkedIn, setCheckedIn }: { checkedIn: boolean; setCh
       </div>
       <p style={{ fontSize: 12, color: "rgba(255,232,236,0.25)" }}>{checkedIn ? "Bấm để ghi nhận giờ kết thúc" : "Bấm để ghi nhận giờ vào làm"}</p>
 
-      {/* KPIs row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, width: "100%" }}>
         {kpis.map(({ l, v, c, g }) => (
           <div key={l} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 12px", textAlign: "center", boxShadow: `0 0 16px ${g}` }}>
@@ -500,7 +482,6 @@ function CheckinContent({ checkedIn, setCheckedIn }: { checkedIn: boolean; setCh
         ))}
       </div>
 
-      {/* Weekly heatmap */}
       <div style={{ width: "100%", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 16px" }}>
         <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(255,232,236,0.25)", marginBottom: 10 }}>Tuần này</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 4 }}>
@@ -544,7 +525,6 @@ function CheckinContent({ checkedIn, setCheckedIn }: { checkedIn: boolean; setCh
   );
 }
 
-// ─── Employee content ─────────────────────────────────────────────────────────
 function EmployeeContent() {
   const [activeTab, setActiveTab] = useState(0);
 
@@ -559,7 +539,6 @@ function EmployeeContent() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Profile card */}
       <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "18px 20px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18 }}>
         <div style={{ position: "relative", flexShrink: 0 }}>
           <div style={{ width: 68, height: 68, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#fff", boxShadow: `0 0 24px ${GR}` }}>
@@ -575,7 +554,6 @@ function EmployeeContent() {
             <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "rgba(255,255,255,0.24)" }}>#{EMP.id}</span>
           </div>
         </div>
-        {/* DUDI Logo */}
         <div style={{ flexShrink: 0, opacity: 0.35 }}>
           <ImageWithFallback src={dudiLogo} alt="DUDI Software" style={{ width: 40, height: 40, borderRadius: 8, objectFit: "cover" }} />
         </div>
@@ -643,7 +621,6 @@ function EmployeeContent() {
         </div>
       )}
 
-      {/* Quá trình công tác */}
       <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16 }}>
         <SectionLabel>Quá trình công tác</SectionLabel>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -668,7 +645,6 @@ function EmployeeContent() {
   );
 }
 
-// ─── Leave content ────────────────────────────────────────────────────────────
 function LeaveContent() {
   const [tab, setTab] = useState<"leave" | "timeoff">("leave");
   const [leaves, setLeaves] = useState(LEAVES);
@@ -692,7 +668,6 @@ function LeaveContent() {
         </p>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: "flex", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 4 }}>
         {[{ id: "leave" as const, l: "Xin nghỉ phép" }, { id: "timeoff" as const, l: "Time Off tuần" }].map(({ id, l }) => (
           <button key={id} onClick={() => setTab(id)} style={{ flex: 1, padding: "9px", borderRadius: 10, fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "inherit", color: tab === id ? BRAND : "rgba(255,232,236,0.35)", background: tab === id ? "rgba(232,35,26,0.1)" : "transparent", boxShadow: tab === id ? `inset 0 0 0 1px rgba(232,35,26,0.22)` : "none" }}>
@@ -761,7 +736,6 @@ function LeaveContent() {
   );
 }
 
-// ─── Tasks content ────────────────────────────────────────────────────────────
 function TasksContent() {
   const kpis = [
     { l: "Chưa làm", v: 0, c: "rgba(255,255,255,0.35)", g: "transparent" },
@@ -823,7 +797,6 @@ function TasksContent() {
   );
 }
 
-// ─── Directory content ─────────────────────────────────────────────────────────
 function DirectoryContent() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -853,7 +826,6 @@ function DirectoryContent() {
   );
 }
 
-// ─── Chat content ─────────────────────────────────────────────────────────────
 function ChatContent() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -888,7 +860,6 @@ function ChatContent() {
   );
 }
 
-// ─── Workflow content ─────────────────────────────────────────────────────────
 function WorkflowContent() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -921,7 +892,6 @@ function WorkflowContent() {
   );
 }
 
-// ─── Notifications content ────────────────────────────────────────────────────
 function NotificationsContent() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -951,7 +921,6 @@ function NotificationsContent() {
   );
 }
 
-// ─── Settings content ─────────────────────────────────────────────────────────
 function SettingsContent({ onLogout }: { onLogout: () => void }) {
   const [vals, setVals] = useState(["", "", ""]);
   const [shows, setShows] = useState([false, false, false]);
@@ -960,7 +929,6 @@ function SettingsContent({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Avatar Update */}
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{ width: 60, height: 60, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: "#fff" }}>TL</div>
         <button style={{ ...BTN_S, width: "auto", padding: "8px 16px", fontSize: 12, display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#FFE8EC", boxShadow: "none" }}><Plus size={14} /> Thay ảnh đại diện</button>
@@ -1012,7 +980,6 @@ function SettingsContent({ onLogout }: { onLogout: () => void }) {
   );
 }
 
-// ─── App ─────────────────────────────────────────────────────────────────────
 const BUBBLE_MODULE_MAP: Record<BubbleId, string> = {
   checkin: "user-attendance",
   employee: "user-profile",
@@ -1024,7 +991,6 @@ const BUBBLE_MODULE_MAP: Record<BubbleId, string> = {
   notifications: "thong-bao"
 };
 
-// ─── App ─────────────────────────────────────────────────────────────────────
 export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: () => void; modules?: string[] }) {
   const [activePage, setActivePage] = useState<BubbleId | null>(null);
   const [checkedIn, setCheckedIn] = useState(false);
@@ -1082,16 +1048,13 @@ export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: ()
 
       <AmbientBg />
 
-      {/* Home view — always rendered below any panel */}
       <div style={{ position: "relative", width: "100%", height: "100%", zIndex: 1, filter: activePage ? "blur(2px) brightness(0.5)" : "none", transition: "filter 0.4s ease", pointerEvents: activePage ? "none" : "auto" }}>
         <FloatingClock />
 
-        {/* Logo watermark */}
         <div style={{ position: "absolute", bottom: 24, right: 24, opacity: 0.12 }}>
           <ImageWithFallback src={dudiLogo} alt="DUDI Software" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover" }} />
         </div>
 
-        {/* Bubbles layer */}
         <div style={{ position: "absolute", inset: 0 }}>
           {allowedBubbles.map(b => (
             <Bubble key={b.id} b={b} hovId={hovId} setHovId={setHovId} onClick={handleBubbleClick} />
@@ -1101,7 +1064,6 @@ export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: ()
 
       </div>
 
-      {/* Panel overlay */}
       {activePage && (
         <Panel
           activePage={activePage}

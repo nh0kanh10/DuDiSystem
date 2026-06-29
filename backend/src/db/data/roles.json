@@ -27,10 +27,6 @@
     "scopeType": "branch",
     "modules": [
       "dashboard",
-      "nhan-su",
-      "co-cau",
-      "cham-cong",
-      "duyet-don",
       "thong-bao",
       "user-profile",
       "user-attendance",
@@ -38,7 +34,11 @@
       "user-directory",
       "user-chat",
       "user-workflow",
-      "user-settings"
+      "user-settings",
+      "nhan-su",
+      "co-cau",
+      "cham-cong",
+      "duyet-don"
     ]
   },
   {
@@ -67,5 +67,14 @@
       "dashboard"
     ],
     "isSystem": false
+  },
+  {
+    "id": "role-super-admin",
+    "name": "Quản trị hệ thống cấp cao",
+    "isSystem": true,
+    "scopeType": "company",
+    "modules": [
+      "all"
+    ]
   }
 ]

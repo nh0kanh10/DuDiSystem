@@ -1,8 +1,9 @@
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { getByEmail, getByEmployeeId } from "../repositories/user.repository.js"
-import { JWT_SECRET, JWT_EXPIRES_IN } from "../config/index.js"
+import { JWT_SECRET } from "../config/index.js"
 import { resolveBranchId } from "./user.service.js"
+import { getSystemConfig } from "./systemConfig.service.js"
 
 export async function login(loginKey, password) {
   let user = getByEmployeeId(loginKey)
@@ -16,10 +17,13 @@ export async function login(loginKey, password) {
 
   const branchId = resolveBranchId(user.id)
 
+  const config = getSystemConfig()
+  const timeoutMinutes = config.sessionTimeoutMinutes || 30
+
   const token = jwt.sign(
-    { id: user.id, employeeId: user.employeeId, roleId: user.roleId, branchId },
+    { id: user.id, employeeId: user.employeeId, roleId: user.roleId, branchId, permissions: user.permissions || null },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
+    { expiresIn: `${timeoutMinutes}m` }
   )
 
   const { password: _, ...safeUser } = user

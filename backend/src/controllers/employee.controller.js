@@ -11,8 +11,13 @@ export function getOne(req, res) {
   ok(res, emp)
 }
 
-export function create(req, res) {
-  created(res, svc.createEmployee(req.body))
+export async function create(req, res, next) {
+  try {
+    const emp = await svc.createEmployee(req.body)
+    created(res, emp)
+  } catch (err) {
+    next(err)
+  }
 }
 
 export function update(req, res) {

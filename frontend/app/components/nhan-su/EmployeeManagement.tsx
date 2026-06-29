@@ -15,6 +15,7 @@ import UserProfile from "../nhan-vien/UserProfile"
 import { CustomDatePicker as DateInput } from "../ui/CustomDatePicker"
 import { VNAddressSelect } from "../ui/VNAddressSelect"
 import { CustomSelect } from "../ui/CustomSelect"
+import ConfirmModal from "../ui/ConfirmModal"
 
 type EditTab = "personal" | "work" | "files" | "history"
 
@@ -791,7 +792,21 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
     { key: "history",     label: "Lịch sử",       Icon: ClipboardList, badge: form.workHistory.length || undefined },
   ]
 
-  const newId = `NV${String(employees.length + 1).padStart(3, "0")}`
+  const newId = useMemo(() => {
+    const d = new Date()
+    const yy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, "0")
+    const dd = String(d.getDate()).padStart(2, "0")
+    const min = String(d.getMinutes()).padStart(2, "0")
+    const baseId = `${yy}${mm}${dd}${min}`
+    let candidate = baseId
+    let count = 1
+    while (employees.some(e => e.id === candidate)) {
+      candidate = `${baseId}-${count}`
+      count++
+    }
+    return candidate
+  }, [employees])
 
   return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3">
@@ -871,6 +886,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
   } | null>(null)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
+  const [deleteEmpId, setDeleteEmpId] = useState<string | null>(null)
 
   const branches = useMemo(() => orgNodes.filter(n => n.type === "branch"), [orgNodes])
 
@@ -883,6 +899,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
   const depts = useMemo(() => Array.from(new Set(employees.map(e => e.department))), [employees])
 
   const filtered = useMemo(() => employees.filter(e => {
+    if (["0000000000", "1111111111", "2222222222"].includes(e.id)) return false
     const q = search.toLowerCase()
     const matchQ = !q || e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
     const matchS = filterStatus === "all" || e.status === filterStatus
@@ -904,8 +921,19 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       if (editEmp) {
         setEmployees(prev => prev.map(e => e.id === editEmp.id ? { ...e, ...finalForm } : e))
       } else {
-        const newId = `NV${String(employees.length + 1).padStart(3, "0")}`
-        setEmployees(prev => [...prev, { id: newId, ...finalForm } as Employee])
+        const d = new Date()
+        const yy = d.getFullYear()
+        const mm = String(d.getMonth() + 1).padStart(2, "0")
+        const dd = String(d.getDate()).padStart(2, "0")
+        const min = String(d.getMinutes()).padStart(2, "0")
+        const baseId = `${yy}${mm}${dd}${min}`
+        let candidate = baseId
+        let count = 1
+        while (employees.some(e => e.id === candidate)) {
+          candidate = `${baseId}-${count}`
+          count++
+        }
+        setEmployees(prev => [...prev, { id: candidate, ...finalForm } as Employee])
       }
     }
     setShowModal(false)
@@ -1008,9 +1036,14 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
   }
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Bạn có chắc muốn xóa nhân viên này?")) return
-    try { await api.employees.delete(id) } catch {}
-    setEmployees(prev => prev.filter(e => e.id !== id))
+    setDeleteEmpId(id)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteEmpId) return
+    try { await api.employees.delete(deleteEmpId) } catch {}
+    setEmployees(prev => prev.filter(e => e.id !== deleteEmpId))
+    setDeleteEmpId(null)
   }
 
   const openEdit = (emp: Employee) => { setEditEmp(emp); setShowModal(true) }
@@ -1328,6 +1361,17 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
         </div>,
         document.body
       )}
+
+      <ConfirmModal
+        isOpen={deleteEmpId !== null}
+        onClose={() => setDeleteEmpId(null)}
+        onConfirm={confirmDelete}
+        title="Xóa nhân viên"
+        message="Bạn có chắc chắn muốn xóa nhân viên này khỏi hệ thống? Hành động này không thể hoàn tác."
+        confirmText="Xác nhận xóa"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   )
 }

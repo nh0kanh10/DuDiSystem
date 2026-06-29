@@ -155,7 +155,6 @@ interface OrgDetailViewProps {
   onAssignManager: (nodeId: string, employeeId: string, managerTitle: string) => void
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function OrgDetailView({
   node, orgNodes, employees, assignments,
@@ -175,7 +174,6 @@ export default function OrgDetailView({
     setActiveTab(defaultTab)
   }, [node.id, node.type])
 
-  // ── Data ──────────────────────────────────────────────────────────────────
 
   const ancestors = useMemo(() => getAncestors(node.id, orgNodes), [node.id, orgNodes])
   const childNodes = useMemo(() => orgNodes.filter(n => n.parentId === node.id), [orgNodes, node.id])
@@ -238,7 +236,6 @@ export default function OrgDetailView({
     }
   }, [node.type, childNodes, officialEmps, tempInEmps])
 
-  // ── Children renderer ─────────────────────────────────────────────────────
 
   const renderChildren = () => {
     if (childNodes.length === 0) return (
@@ -296,7 +293,6 @@ export default function OrgDetailView({
       )
     }
 
-    // Department → sub-dept cards
     if (node.type === "department") {
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -331,7 +327,6 @@ export default function OrgDetailView({
       )
     }
 
-    // Sub-dept → positions + teams
     if (node.type === "sub-department") {
       const positions = childNodes.filter(n => n.type === "position")
       const teams = childNodes.filter(n => n.type === "team")
@@ -370,7 +365,6 @@ export default function OrgDetailView({
     return null
   }
 
-  // ── Personnel renderer ────────────────────────────────────────────────────
 
   const EmpAvatar = ({ emp, size = "sm" }: { emp: Employee; size?: "sm" | "md" | "lg" }) => {
     const szMap = { sm: "w-7 h-7 rounded-lg text-[10px]", md: "w-10 h-10 rounded-xl text-xs", lg: "w-16 h-16 rounded-2xl text-xl" }
@@ -432,7 +426,6 @@ export default function OrgDetailView({
     </div>
   )
 
-  // ── Temp renderer ─────────────────────────────────────────────────────────
 
   const renderTemp = () => (
     <div className="space-y-5">
@@ -500,7 +493,6 @@ export default function OrgDetailView({
     </div>
   )
 
-  // ── Manager renderer ──────────────────────────────────────────────────────
 
   const renderManager = () => (
     manager ? (
@@ -548,7 +540,6 @@ export default function OrgDetailView({
     )
   )
 
-  // ── Info renderer ─────────────────────────────────────────────────────────
 
   const renderInfo = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-lg">
@@ -578,7 +569,6 @@ export default function OrgDetailView({
     </div>
   )
 
-  // ── Tab badge counts ──────────────────────────────────────────────────────
 
   const tabBadge = (id: TabId): number | null => {
     if (id === "children") return childNodes.length
@@ -590,11 +580,9 @@ export default function OrgDetailView({
     return null
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm text-gray-500 flex-wrap">
         <button onClick={onBack} className="flex items-center gap-1 font-medium hover:text-[#C62828] transition-colors whitespace-nowrap">
           <ArrowLeft size={14} /> Cơ cấu
@@ -611,7 +599,6 @@ export default function OrgDetailView({
         </span>
       </div>
 
-      {/* Header card */}
       <div className="bg-white rounded-3xl border border-black/[0.05] shadow-sm overflow-hidden">
         <div className={`h-1.5 bg-gradient-to-r ${theme.barGradient}`} />
         <div className="px-6 py-5 flex items-start justify-between gap-4 flex-wrap">

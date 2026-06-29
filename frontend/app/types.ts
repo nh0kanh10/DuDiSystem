@@ -7,6 +7,8 @@ export interface RoleDefinition {
   name: string
   isSystem: boolean
   modules: string[]
+  scopeType?: "company" | "branch" | "self"
+  roleType?: "management" | "staff"
 }
 
 export type Page =

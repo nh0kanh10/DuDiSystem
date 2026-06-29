@@ -31,7 +31,7 @@ interface OrgStructureProps {
 }
 
 export default function OrgStructure({
-  employees,
+  employees: rawEmployees,
   setEmployees,
   assignments,
   setAssignments,
@@ -44,7 +44,11 @@ export default function OrgStructure({
   currentUserRole,
   onAddEmployee
 }: OrgStructureProps) {
-  const isSuperAdmin = currentUserRole === "role-admin"
+  const employees = useMemo(() => {
+    return rawEmployees.filter(e => !["0000000000", "1111111111", "2222222222"].includes(e.id))
+  }, [rawEmployees])
+
+  const isSuperAdmin = currentUserRole === "role-admin" || currentUserRole === "role-super-admin"
   const [viewMode, setViewMode] = useState<"diagram" | "list" | "catalog">("diagram")
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState<string>("all")

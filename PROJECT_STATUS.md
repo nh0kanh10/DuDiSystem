@@ -1,245 +1,52 @@
-# Project Status: DuDiSystem
+# Trạng Thái Dự Án (Project Status)
 
-## 1. Current Milestone: Complete Frontend/Backend Code Merge & Fix Compilation Errors (Completed)
-- **Status:** Completed
-- **Last Updated:** 2026-06-26
+Tài liệu này ghi nhận tiến độ thực hiện các tính năng trên hệ thống quản lý DuDiSystem.
 
-## 2. Completed Tasks
+## Các tính năng đã hoàn thành (Logical Milestones)
 
-- **Chức năng phân quyền tài khoản & phân quyền module động (Milestone Completed):**
-  - Thiết kế và khởi tạo cơ sở dữ liệu vai trò tại [roles.json](file:///c:/Users/ADMIN/Desktop/DuDiSystem/backend/src/db/data/roles.json) lưu cấu hình các vai trò và các module được cấp quyền.
-  - Thực hiện di cư cơ sở dữ liệu tài khoản [users.json](file:///c:/Users/ADMIN/Desktop/DuDiSystem/backend/src/db/data/users.json), chuyển đổi trường `role` sang `roleId` (`role-admin`, `role-manager`, `role-user`) để sử dụng hệ thống vai trò động.
-  - Triển khai đầy đủ RESTful API cho vai trò ở Backend (`role.repository.js`, `role.service.js`, `role.controller.js`, `role.routes.js`) và tích hợp vào `server.js` dưới tiền tố `/api/roles`.
-  - Cập nhật Payload của mã JWT token lúc đăng nhập trả về `roleId` thay vì `role` để tối giản kích thước token.
-  - Tích hợp ở Frontend [App.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/App.tsx) để tự động tải danh sách vai trò khi khởi động ứng dụng và tính toán quyền hạn (`activeRolePermissions`) của người dùng đăng nhập.
-  - Lọc động các mục điều hướng (Sidebar NavItem) dựa trên mảng module được cấp quyền của tài khoản hiện tại. Tự động ẩn các thư mục nhóm cha nếu tất cả mục con bị chặn.
-  - Xây dựng lớp bảo vệ URL điều hướng: Tự động chuyển hướng (Redirect) người dùng về trang Dashboard nếu cố tình nhập URL của module chưa được gán quyền.
-  - Phân tách giao diện thành **2 chức năng riêng biệt** trong mục "Quản lý nhân sự" ở Sidebar:
-    - **Quản lý tài khoản (`tai-khoan`)**: Tập trung xem danh sách và thêm/sửa tài khoản, ẩn giao diện cấu hình vai trò.
-    - **Phân quyền vai trò (`phan-quyen`)**: Tập trung cấu hình vai trò, ma trận cây phân quyền module, ẩn giao diện tài khoản.
-  - Thiết kế giao diện **Ma trận phân quyền kiểu Cây (Tree-Style Permissions Matrix)** trực quan trong [AccountManagement.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/components/account/AccountManagement.tsx):
-    - Chỉ hiển thị các module quản lý admin thực tế trên Sidebar để tránh rối mắt, tự động gán ngầm các module cá nhân nhân viên ở portal đằng sau hậu trường.
-    - Cho phép bật/tắt quyền truy cập từng module riêng biệt.
-    - Nhóm các module theo phân cấp thư mục cha-con. Nút checkbox của thư mục cha tự động chọn/bỏ chọn toàn bộ các module con thuộc nhóm đó.
-    - Hỗ trợ thao tác thêm vai trò tùy chỉnh mới và xóa vai trò tùy chỉnh (chặn xóa vai trò hệ thống mặc định).
-  - Đồng bộ hóa form tạo/sửa tài khoản: Dropdown phân quyền nạp dữ liệu động từ danh sách vai trò của API thay vì danh sách tĩnh.
-  - Lọc động các Bubble điều hướng trong giao diện User Portal [UserApp.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/components/nhan-vien/UserApp.tsx) dựa trên quyền hạn được cấu hình của tài khoản, tăng tính nhất quán và bảo mật.
-  - Sửa đổi các file component liên quan (`OrgStructure.tsx`, `StatisticsPage.tsx`) cập nhật logic kiểm tra quyền quản lý để tương thích 100% với định dạng ID vai trò động mới.
+### 1. Thay thế Hộp thoại window.confirm mặc định
+- Đã phát triển thành phần UI dùng chung [ConfirmModal.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/components/ui/ConfirmModal.tsx).
+- Thay thế hoàn toàn hộp thoại `window.confirm` trên toàn bộ 5 module lớn của hệ thống: Chấm công, Duyệt đơn, Quản lý Nhân sự, Dự án, Công việc và Tài khoản.
+- Đã chạy thử nghiệm và kiểm tra thành công, đồng bộ hóa phong cách thiết kế với tông màu đỏ thương hiệu `#C62828`.
 
-- **Cơ chế Hỏi trước khi ghi Lịch sử công tác & Khắc phục Lỗi Xem chi tiết (Milestone Completed):**
-  - Khắc phục lỗi nghiêm trọng khiến không thể mở bảng Chi tiết/Gán nhân sự từ Sơ đồ cơ cấu tổ chức (do biến state `selectedNodeId` bị gán cứng thành `null` ở component cha `App.tsx`). Đã khai báo lại state đầy đủ để người dùng click vào tên ô hoặc dòng trong danh sách là lập tức hiển thị bảng Chi tiết.
-  - Tích hợp thêm nút **"Thêm nhân viên"** trực tiếp ở thanh tác vụ trên sơ đồ cơ cấu để cho phép thêm nhanh nhân sự mới vào hệ thống mà không cần chuyển trang.
-  - Tích hợp thêm nút **"Thiết lập quản lý / Thay đổi quản lý"** trực tiếp ở tab "Quản lý" của bảng chi tiết cơ cấu.
-  - Hỗ trợ **phân loại biến động (Thuyên chuyển vs Thăng chức)** linh hoạt bằng cách cho phép người dùng lựa chọn loại sự kiện trên bảng hỏi xác nhận, giải quyết trường hợp quản lý cao cấp bị giáng chức/chuyển ngang.
-  - Tự động hóa cơ chế **khởi tạo lịch sử công tác (Data Self-healing)**: Nếu lịch sử của nhân sự đang trống, hệ thống sẽ tự động điền dòng đầu tiên là `"Bắt đầu công tác"` tại ngày nhận việc trước khi chèn thêm dòng lịch sử biến động mới.
-  - Ràng buộc cấu trúc dữ liệu hợp lệ: **Ẩn hoàn toàn tính năng thiết lập Quản lý đối với các nút cơ cấu cấp "Vị trí" (Position)** (bỏ bước 3 trong modal thêm đơn vị, ẩn tab Quản lý và tự động chuyển tab mặc định sang Nhân sự khi xem chi tiết Vị trí) vì Vị trí chỉ là chức danh công việc, không phải đơn vị quản lý độc lập.
-  - Nâng cấp **CustomSelect** dùng chung trở thành dạng **Searchable Select (Combo vừa chọn vừa tìm)** để dễ dàng tìm kiếm khi số lượng nhân viên bổ nhiệm quá lớn.
-  - Đồng bộ hóa các bộ lọc phân cấp & trạng thái trên thanh tác vụ của Cơ cấu tổ chức sang sử dụng component `CustomSelect` mới nâng cấp.
-  - Tự động ghi nhận lịch sử công tác khi có biến động lớn về nhân sự: Thuyên chuyển công tác (thay đổi Phòng ban/Chức danh), Chuyển chính thức (Thực tập lên chính thức), Nghỉ việc (Đang làm sang nghỉ việc), Tái tuyển dụng (Nghỉ việc quay lại làm việc).
-  - Thiết kế cơ chế **Hỏi trước khi ghi (Confirmation Modal)** xuất hiện tại cả trang Quản lý nhân sự và Sơ đồ Cơ cấu tổ chức khi phát hiện thay đổi. Người dùng có thể tùy biến nội dung ghi chú lịch sử hoặc chọn "Chỉ lưu thông tin (không ghi lịch sử)" để tránh log rác.
-  - Loại bỏ hoàn toàn các biến hằng số cứng `PROVINCES_VN` và `DEPARTMENTS` khỏi [EmployeeManagement.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/components/nhan-su/EmployeeManagement.tsx) do dữ liệu hiện tại đã được tải động hoàn toàn từ API địa lý Việt Nam và danh sách cơ cấu `orgNodes`.
-  - Quy hoạch và **gom nhóm toàn bộ các chức năng HR** (Danh sách nhân viên, Cơ cấu tổ chức, Quản lý chấm công, Duyệt đơn & Time off, Quản lý tài khoản, Quản lý IP) vào mục cha **"Quản lý nhân sự"** trên Sidebar giúp thanh điều hướng admin tinh gọn, trực quan.
-  - Đồng bộ hóa **số lượng chờ duyệt (Badge)** của mục "Duyệt đơn & Time off" lấy dữ liệu động từ API danh sách đơn chờ duyệt (`api.requests.list()`), cập nhật thay đổi thời gian thực mỗi khi quản trị viên phê duyệt hoặc từ chối đơn.
-  - Sửa lỗi TypeScript (Property 'photos' does not exist) bằng cách nhập kiểu `Employee` chính thống từ `types.ts` và gán chính xác cho danh sách nhân sự tại `ApprovalManagement.tsx`.
-  - Khắc phục sự sai lệch số lượng trên thanh trạng thái tuần và các nút tác vụ hàng loạt ("Duyệt nhanh còn hạn" và "Từ chối tất cả"): Chuyển từ đếm theo số **ca nghỉ (slots)** (sáng/chiều) sang đếm theo số **đơn xin nghỉ thực tế (requests)** trong tuần. Giờ đây số lượng hiển thị trên nút tác vụ khớp chính xác với số lượng đơn thực tế sẽ được xử lý dưới DB.
-  - Đồng bộ hóa hoàn toàn **các huy hiệu đếm số lượng (Badge Count)** bên cạnh tên nhân sự trong giao diện Lịch tuần: Chuyển từ đếm theo số buổi/ca nghỉ (slots) sang đếm đúng số đơn nghỉ phép thực tế (requests) tương ứng của nhân viên đó trong tuần, đảm bảo tính thống nhất dữ liệu hoàn hảo giữa tab "Lịch tuần" và "Đơn xin nghỉ".
-  - Tích hợp thêm **bộ lọc theo Tuần (Week Filter)** cho tab "Đơn xin nghỉ", kế thừa giao diện chọn Năm / Tháng / Tuần cực kỳ chuyên nghiệp và trực quan của tab Lịch tuần (có kèm tùy chọn "Tất cả các tuần" để dễ dàng lọc nhanh theo nhu cầu).
-  - Tích hợp **CustomDatePicker dùng chung hệ thống** thay thế hoàn toàn cho ô chọn ngày mặc định (native HTML input) tại mục "Ngày nghỉ cụ thể" giúp đồng bộ giao diện lịch, hỗ trợ định dạng ngày Việt Nam `"DD/MM/YYYY"`.
-  - Thiết lập **trải nghiệm bộ lọc thông minh (Mutual Exclusion)**: Khi người dùng chọn một ngày nghỉ cụ thể thì bộ lọc tuần sẽ tự động trả về mặc định ("Tất cả các tuần") để tránh xung đột; và ngược lại, khi chọn một tuần nghỉ bất kỳ thì bộ lọc ngày cụ thể sẽ tự động được xóa trống.
-  - Tái cấu trúc và **đẩy bộ chọn Năm/Tháng/Tuần thành Control Bar toàn cục (Global Week Selector)**: Đặt ở góc phải của thanh điều hướng Tab. Loại bỏ hoàn toàn 3 khối chọn tuần trùng lặp trong cả 3 tab (Lịch tuần, Đơn xin nghỉ, Thống kê), giúp đồng bộ thời gian thực khi chuyển đổi tab và tinh gọn tối đa giao diện.
-  - Tối ưu hóa UI cho nút **"Hôm nay" (Today highlight)**: Thay vì ẩn đi các ngày khác làm trống lịch khi click "Hôm nay", hệ thống nay vẫn hiển thị toàn bộ tuần nhưng **tự động làm nổi bật (Highlight)** cột ngày hôm nay bằng cách đổi màu chữ đỏ, thêm viền đỏ, hiệu ứng nháy Pulse cho huy hiệu "Hôm nay" ở đầu cột, và phủ một lớp nền đỏ nhạt (`bg-red-50/20`) chạy dọc toàn bộ các ô thuộc ngày hiện tại để người dùng định vị ngày nhanh chóng.
-- **Cải tiến Quản lý Nhân sự & Phân cấp Cấu trúc 5 cấp (Milestone Completed):**
-  - Tích hợp thành công component `CustomSelect` dùng chung hệ thống cho toàn bộ các ô lựa chọn (`select`) trong `EmployeeManagement.tsx` và `VNAddressSelect.tsx`, mang lại trải nghiệm UI/UX cao cấp, đồng bộ.
-  - Sửa đổi màu nền trắng đồng điệu (`bg-white`) cho toàn bộ các trường nhập liệu (`input`, `DateInput`, và ô `textarea` Ghi chú) nhằm tạo độ tương phản đồng nhất trên nền xám nhạt của modal.
-  - Thiết kế lại logic phân tầng cơ cấu từ gốc tới lá: `Branch -> Department -> Sub-department -> Position -> Team`.
-  - Khắc phục triệt để lỗi trống dữ liệu ở dropdown **Vị trí / Chức vụ** và **Nhóm** bằng việc thiết lập quan hệ cha-con nghiêm ngặt (Strict Parenting) không dùng fallback, giúp hiển thị chính xác các đối tượng thuộc đơn vị quản lý trực tiếp và giúp người quản trị nhận biết rõ ràng tình trạng có/không có dữ liệu của từng đơn vị.
+### 2. Thiết kế Màu sắc thương hiệu & Nút bấm
+- Đổi màu mặc định của tiêu đề hộp thoại cảnh báo `AlertDialogTitle` và `DialogTitle` sang màu chữ đỏ đậm thương hiệu.
+- Đưa các nút bấm "+ Tạo tài khoản" và "+ Tạo vai trò" lên dải Header đỏ trên cùng để có trải nghiệm giao diện đồng bộ.
 
-- **Statistics Page Redesign & Dynamic Calculations (Milestone Completed):**
-  - Modularized the inline statistics code by creating `StatisticsPage.tsx`.
-  - Added a Segmented Tab header to quickly toggle between **Nhân viên chính thức** (Official), **Thực tập sinh** (Interns), and **Cá nhân** (Personal) views.
-  - Implemented dynamic database lookups using `useMemo` to query the live `attendance.json` database.
-  - Rendered high-fidelity rank visual cards for **Top đi trễ** (Top Late) and **Top nghỉ nhiều** (Top Absences/Leaves).
-  - Wrote a detailed database view for individual employee logs (check-in, check-out, dynamic status pill, and notes).
-  - Cleaned up deprecated code blocks and successfully built with zero compiler warnings.
+### 3. Phân quyền tùy chỉnh riêng cho từng Tài khoản (Custom Account Permissions)
+- **Backend**:
+  - Cập nhật [user.service.js](file:///c:/Users/ADMIN/Desktop/DuDiSystem/backend/src/services/user.service.js) cho phép thêm và cập nhật trường `permissions` trong cơ sở dữ liệu `users.json`.
+  - Cập nhật [auth.service.js](file:///c:/Users/ADMIN/Desktop/DuDiSystem/backend/src/services/auth.service.js) đưa mảng quyền tùy chọn `permissions` vào Payload mã hóa của JWT Token.
+- **Frontend**:
+  - Cấu trúc [App.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/App.tsx) ưu tiên lấy quyền tùy chỉnh của tài khoản trước khi lấy quyền mặc định của vai trò.
+  - Form thêm/sửa tài khoản: Thêm công tắc gạt **"Tùy chỉnh quyền trực tiếp"**, khi bật sẽ hiển thị khung checklist các quyền ở cột bên phải. Tự động nạp trước quyền mặc định của vai trò để làm mốc tùy biến.
+  - Tab Phân quyền: Thêm danh sách **"Tài khoản có quyền riêng"** (Custom Accounts). Hỗ trợ nút Radio chọn nhanh, ô chọn **Phòng ban** để lọc và ô nhập tìm kiếm theo **Tên/Email/Mã nhân viên** vô cùng tiện lợi.
+  - Cung cấp nút xóa (Thùng rác) bên cạnh mỗi tài khoản có quyền riêng để dễ dàng reset (khôi phục) quyền của tài khoản đó về quyền mặc định theo vai trò gốc.
+  - Tự động bảo vệ (Safety Lock): Khóa cứng không cho phép gỡ quyền `phan-quyen` của tất cả các tài khoản Admin (bao gồm cả tài khoản tùy chỉnh).
 
-- **RBAC Scoped Assignments & Dynamic Branch Filter Refactoring (Milestone Completed):**
-  - Designed and created a new file-based authorization model using `roleAssignments.json` to map users directly to their permission scopes.
-  - Eliminated the complex recursive org-tree traversal function `findBranchForNode` and `getBranchForEmployee` from the codebase.
-  - Added a direct `branchId` field in `employees.json` serving as the single source of truth for the physical home/payroll branch of each employee.
-  - Mapped the JWT `branchId` directly to the `isPrimary` role assignment `scopeId`, separating the concepts of "where an employee works" (home branch) from "where a manager manages" (permissions scope).
-  - Populated user accounts and role assignments for all 13 active employees in `users.json` and `roleAssignments.json` with a consistent default password (hash for `123456`).
-  - Added a branch selection dropdown menu for manager role creations in `AccountManagement.tsx` to explicitly define management scopes.
-  - Unified lists and filters in `AccountManagement.tsx` to read dynamic API-resolved `branchId` and `branchName` values, resolving the empty parentheses issue.
-  - Re-compiled all frontend components with zero TypeScript compilation warnings/errors and restarted the backend servers.
+### 4. Tách biệt Tab Phân quyền & Hỗ trợ phân loại vai trò (Quản lý vs Nhân viên)
+- Phân tách ma trận phân quyền thành **2 Tab trực quan**:
+  - **Quyền Quản lý / Admin**: Hiển thị các quyền điều hành như Bảng điều khiển, Nhân sự, Chấm công, Duyệt đơn, Báo cáo...
+  - **Quyền Nhân viên / Staff**: Hiển thị các quyền truy cập cổng cá nhân như Hồ sơ cá nhân, Đăng ký nghỉ phép, Chat nội bộ...
+- Bổ sung công cụ phân loại vai trò khi tạo vai trò mới:
+  - **Quản lý / Admin (Management)**: Chọn phạm vi dữ liệu mặc định (Chi nhánh hoặc Toàn công ty).
+  - **Nhân viên / Staff (Staff)**: Khóa cứng phạm vi dữ liệu là cá nhân (`self`).
+- Tự động chuyển luồng giao diện sang Cổng nhân viên (`UserPortalApp`) cho bất kỳ tài khoản nào được phân loại là Staff (nhờ biến `isStaffRole`).
+- Cho phép người dùng tùy chọn lưu chính xác quyền Nhân viên thay vì tự động điền đầy lại như trước.
 
-- **Org Chart Redesign & TypeScript Refactoring:**
-  - Resolved all typescript checking errors (`tsc` compile passes 100% cleanly).
-  - Excluded unused shadcn components folder `src/app/components/ui` in `tsconfig.json` to prevent dependency mismatch errors.
-  - Created `src/custom.d.ts` declaration file to handle image asset imports without compiler complaints.
-  - Cleaned up unused lucide icons, unused variables, and state setters inside `App.tsx`.
-  - Configured `AddUnitModal.tsx` to automatically initialize at Step 2 (General Info) when in Edit mode or Add Child mode, bypassing Step 1 (Select hierarchy).
-  - Implemented automatic child hierarchy deduction from parent node.
-  - Disabled and locked the parent dropdown selection on step 2 for both Edit and Add Child scenarios.
-  - Adjusted button footer navigation to render "Hủy" (Cancel) instead of "Quay lại" (Back) when on the initial entry step.
-  - Tilted card details: split manager details into a clean two-line layout showing Title on top and Name below.
-  - Increased horizontal node padding spacing to `px-6` to prevent node cards from overlapping.
-  - Set root node card border to `border-purple-400` to align with the branch color scheme.
-  - Strengthened border density across all tree card nodes for crisp readability.
-  - Integrated "Bung tất cả" and "Thu gọn phòng ban" control actions inside a sleek absolute container.
-  - Refactored List mode inside `OrgStructure.tsx` from flat tables to a hierarchical collapsible Tree Table.
-  - Implemented pre-order traversal tree flattening logic for unified column alignment.
-  - Added folder tree expand/collapse chevron arrow keys and level indent paddings (20px per level depth).
-  - Styled legend dot indicators on row names corresponding to their department tiers.
-  - Integrated smart list view fallback: automatically renders a flat list when search queries or filters are active to prioritize search speeds.
-  - Created a modular `DeleteConfirmModal.tsx` component designed in glassmorphism with an explicit warning block.
-  - Calculated exact recursively affected child nodes count and warned users before triggering deletions.
-  - Replaced browser alert confirmations with the premium delete modal across both `OrgTreeView` and `OrgDetailView`.
-  - Wrote a post-order descendant extraction logic to recursively purge all subtree items.
+### 5. Áp dụng Portal cho các thông báo Toast toàn hệ thống
+- Toàn bộ các thông báo Toast thành công/thất bại ở các tệp tin quản lý chính ([AccountManagement.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/components/account/AccountManagement.tsx), [TaskManagement.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/components/cong-viec/TaskManagement.tsx), [ApprovalManagement.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/components/duyet-don/ApprovalManagement.tsx), và [IPManagement.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/components/IPManagement.tsx)) đều được bao bọc trong **React Portal (`createPortal`)** gắn vào `document.body`.
+- Chỉnh sửa tọa độ đồng bộ về `bottom-6` và đặt độ ưu tiên hiển thị cao nhất `z-[9999]`. Khắc phục triệt để lỗi Toast bị lệch vị trí do hiệu ứng CSS chuyển trang của container cha.
 
-- **Employee Portal Integration & Build Fixes:**
-  - Copied all portal components from `src2/app/components/user` to `frontend/app/components/user` (Dashboard, Attendance, Profile, Settings, Tasks, TimeOff, types).
-  - Transferred image assets from `src2/imports` to `frontend/imports` to resolve image dependency errors.
-  - Swapped default `App.tsx` with the new version containing user routing, login logic, and sidebar adjustments.
-  - Resolved `Duplicate identifier` conflicts by removing the inline `ApprovalManagement` and simple `OrgChart` components in the main application file, redirecting routing to our modular components.
-  - Addressed TypeScript narrowing error (`TS2367`) on the `role` variable.
-  - Fixed interface property gaps for `createdDate` in `OrgNode` and `orgNodeId` in `Employee`.
-  - Handled missing `"user-chat"` route definition in `UserPortalLayout.tsx` by setting a functional placeholder.
-  - Adjusted `tsconfig.json` parameters (`noUnusedLocals`, `noUnusedParameters`) to compile without warnings.
-  - Cleaned up the local codebase by deleting `src2` folder upon successful integration.
-  - Added `allowedIPs` and `timeOffSlots` Mock handler APIs using `localStorage` persistence in `frontend/lib/api.ts` to allow testing IP settings and leave requests.
-  - Corrected entry point paths in `index.html` from `/src/main.tsx` to `/frontend/main.tsx`.
-  - Cleaned up duplicate and redundant configuration files at root (`default_shadcn_theme.css`, `pnpm-workspace.yaml`, `script.cjs`).
-  - Added a root `.gitignore` to prevent committing unnecessary directories like `node_modules` or AI agent folders.
-  - Resolved Recharts Tooltip conflicting alias issues in `ApprovalManagement.tsx`.
-  - Fixed missing props `emp={ME}` on the `UserProfile` call within `UserPortalLayout.tsx`.
-  - Verified 100% production build success (`npm run build` exits with code 0).
-  - Successfully committed and pushed all clean unified codebase to GitHub main branch.
-  - **Resilient Auto-Login & Backend Sync for Approval Page:**
-    - Resolved the "Cannot connect to server" false positive error caused by missing/expired JWT token (`dudi_token`) in local storage.
-    - Implemented a silent auto-login mechanism in [ApprovalManagement.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/components/leave/ApprovalManagement.tsx) that retrieves a valid admin JWT token from Backend via `lien.tran@dudi.vn` / `password` login flow before querying data.
-    - Added robust token expiration checking and auto-retry handling upon receiving 401 Unauthorized API responses.
-  - **Tô màu cột gióng hàng dọc, dọn dẹp emoji & xử lý đơn quá hạn**:
-    - Thiết kế màu nền pastel trung tính xen kẽ (Thứ 2, 4, 6 màu trắng; Thứ 3, 5 màu xám slate nhạt `bg-slate-50/70`) đồng bộ giữa Header và Grid nhân viên giúp dính mắt gióng hàng dọc cực kỳ nhanh mà hoàn toàn không mỏi mắt.
-    - Sửa bug thống kê "Hôm nay": Loại bỏ fallback sai hiển thị dữ liệu cả tuần khi xem tab "Hôm nay" vào ngày cuối tuần (Thứ 7, Chủ nhật). Số liệu các card và biểu đồ giờ đây trả về đúng `0` và hiển thị nhãn "hôm nay" chuẩn xác.
-    - Thay thế emoji 🎉 bằng icon `PartyPopper` ở thông báo cuối tuần và dọn sạch các emoji ☀️, 🌅 ở modal buổi nghỉ giúp giao diện chuẩn doanh nghiệp cao cấp.
-    - Bổ sung bộ lọc "Đã hết hạn", hiển thị nhãn cảnh báo "Đã hết hạn" đối với các đơn `pending` quá ngày nghỉ.
-    - Ràng buộc tính năng "Duyệt nhanh tất cả" chỉ phê duyệt các đơn/ca còn hạn để tránh duyệt nhầm các đơn đã trôi qua.
-    - Nâng cấp **bộ lọc tab Đơn xin nghỉ** thành dạng 4 cột chuẩn thiết kế (Trạng thái, Phòng ban, Ngày nghỉ, Tìm kiếm theo tên nhân viên).
-    - Thêm nút **"Tắt lọc"** nhỏ gọn kế bên nhãn Tìm kiếm để người dùng reset nhanh bộ lọc về mặc định.
-    - Loại bỏ badge **"Time-off chờ"** dư thừa ở header và thay bằng badge thống nhất **"Đơn chờ duyệt"** để tránh gây bối rối cho người dùng khi hai tính năng đã được hợp nhất làm một.
-    - Bổ sung **badge "từ chối"** (màu đỏ) ở sticky bottom bar của Lịch tuần để hiển thị đầy đủ thông tin thống kê trạng thái (chờ duyệt, đã duyệt, từ chối).
-     - Thiết lập **đường gạch dọc mờ nét đứt** (`border-dashed border-current/[0.08]`) phân chia các ngày bên trong khối nghỉ phép dài hạn (`colSpan > 1`) giúp người dùng luôn gióng được hàng dọc dễ dàng.
-  - **Xóa Loại nghỉ, Thêm cột Ca nghỉ & Thời gian gửi**:
-    - Xóa bỏ hoàn toàn thuộc tính Loại nghỉ (`leaveType`) khỏi cơ sở dữ liệu (`requests.json`), backend routes validator, backend service và frontend interfaces.
-    - Thay thế cột hiển thị "Loại nghỉ" bằng cột "Ca nghỉ" với các badge màu sắc trực quan (Ca sáng, Ca chiều, Cả ngày, Nhiều ngày) dựa trên giá trị ca nghỉ `session`.
-    - Bổ sung cột "Thời gian gửi" hiển thị ngày giờ tạo đơn xin nghỉ chi tiết đến giờ và phút (`HH:mm DD/MM/YYYY`).
-    - Tích hợp tính năng tự động hủy đơn khi quá hạn ở backend: tự động chuyển các đơn `pending` quá hạn sang trạng thái `"cancelled"` (Đã hủy) riêng biệt với từ chối của admin.
-    - Nâng cấp cột thao tác: thay thế các nút "Duyệt", "Từ chối" cũ bằng icon nhỏ gọn, thêm nút "Chi tiết" (Eye icon) mở Popup hiển thị đầy đủ thông tin chi tiết của đơn nghỉ phép.
-    - Cải thiện độ sắc nét các viền bao (`border-gray-200`) và các vách ngăn cột dọc (`divide-gray-200`) ở Lịch tuần và Grid nhân viên giúp người dùng gióng cột dọc cực kỳ chuẩn xác và rõ nét.
-    - Đổi nhãn hiển thị của các đơn tự hủy quá hạn trong `StatusPill` từ "Đã hủy" thành **"Hủy do quá hạn"** trực quan hơn.
-  - **Sửa lỗi Đăng nhập & Đồng bộ Backend cho trang Duyệt đơn:**
-    - Phát hiện và giải quyết xung đột cổng mạng (EADDRINUSE): Giải phóng tiến trình Node chạy ngầm chiếm dụng cổng 3001 và khởi chạy lại máy chủ Backend hoạt động ổn định.
-    - Đồng bộ hóa API xác thực: Nâng cấp hàm đăng nhập `handleLogin` trong [App.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/App.tsx) để gọi trực tiếp tới Endpoint `/auth/login` của Backend thay vì chỉ giả lập cục bộ.
-    - Lưu trữ token thông minh: Tự động lưu Token JWT nhận được vào Local Storage dưới key `dudi_token`, cung cấp phiên làm việc hợp lệ cho các yêu cầu tải danh sách nhân viên và đơn từ sau đó.
-    - Hiển thị thông tin cảnh báo trực quan: Thêm cơ chế bắt lỗi mất kết nối mạng/máy chủ trên giao diện Đăng nhập, đưa ra hướng dẫn khởi chạy backend thay vì để người dùng vượt qua đăng nhập rồi báo lỗi kết nối máy chủ không rõ nguyên nhân.
-  - **Cải tiến giao diện và logic bộ lọc của danh sách đơn xin nghỉ:**
-    - Đồng bộ hóa trạng thái hết hạn: Cập nhật logic bộ lọc "Đã hết hạn" để hiển thị cả đơn có trạng thái `"cancelled"` (Hủy do quá hạn) và đơn `"pending"` quá hạn.
-    - Tăng cường độ tương phản văn bản: Thay đổi class màu chữ của các thông tin chi tiết (Phòng ban, Thời gian, Thời gian gửi, Lý do) sang tông màu đen đậm rõ nét (`text-gray-900`, `font-bold`/`font-semibold`) giúp thông tin dễ đọc hơn.
-    - Phóng to icon và nút thao tác: Tăng kích thước các icon hành động (Chi tiết, Duyệt, Từ chối) từ `13px` lên `17px` và mở rộng padding nút bấm để người dùng click nhanh, chính xác hơn.
-    - Tích hợp nút đặt lại mặc định: Thêm nút icon `RotateCcw` đặt lại bộ lọc bên cạnh ô Tìm kiếm, xuất hiện linh hoạt khi có bất kỳ bộ lọc nào khác mặc định.
-  - **Tích hợp tính năng quản lý và lọc theo Chi nhánh (Global Branch Filter):**
-    - Thiết lập cơ sở dữ liệu chi nhánh: Bổ sung 2 chi nhánh mới ("Chi nhánh Hà Nội" - `branch-hn` và "Chi nhánh Đà Nẵng" - `branch-dn`) vào cơ sở dữ liệu backend (`orgNodes.json`) và mock state (`INIT_ORG_NODES` trong `App.tsx`).
-    - Phân bổ cơ cấu phòng ban: Gán lại "Phòng Tài chính" trực thuộc Chi nhánh Hà Nội và "Phòng Kinh doanh" trực thuộc Chi nhánh Đà Nẵng để dữ liệu lọc hiển thị chính xác và độc lập giữa các chi nhánh.
-    - Phát triển thanh chọn chi nhánh: Thêm thanh dropdown lựa chọn chi nhánh (kèm icon `Building2` hiện đại) ở góc header bên cạnh cái chuông thông báo, dành riêng cho các tài khoản quản trị (Admin).
-    - Đồng bộ hóa bộ lọc toàn cục: Liên kết trạng thái chi nhánh được chọn với trang **Duyệt đơn (ApprovalManagement)** và **Quản lý IP (IPManagement)**. Danh sách đơn, số lượng đếm, danh sách IP và các dòng nhân viên trên lịch tuần tự động cập nhật ngay khi thay đổi chi nhánh.
-  - **Sửa lỗi hiển thị sơ đồ Cơ cấu tổ chức (OrgChart - Multiple Roots Support):**
-    - Khắc phục lỗi thiếu chi nhánh: Do cấu trúc công ty có nhiều Chi nhánh cấp cao nhất (không có parentId), `OrgTreeView` ban đầu chỉ hiển thị Chi nhánh đầu tiên tìm thấy. Đã nâng cấp để hiển thị song song nhiều cây sơ đồ chi nhánh khác nhau nằm cạnh nhau.
-    - Cập nhật số liệu thống kê: Sửa đổi cách tính tổng nhân sự trên sơ đồ cơ cấu để cộng dồn chính xác số lượng nhân sự của tất cả các chi nhánh cùng cấp thay vì chỉ lấy chi nhánh đầu tiên.
-    - Hiển thị tên chức vụ trực quan: Đổi nhãn chức danh quản lý mặc định của nút chi nhánh gốc từ cứng "CEO" sang động theo `managerTitle` tương ứng để phù hợp cho từng Chi nhánh.
-    - Tính toán nhân sự thực tế tự động: Loại bỏ giá trị `memberCount` nhập tay/cố định trên cơ cấu tổ chức. Đã phát triển logic tự động đếm số lượng nhân sự thực tế thuộc nút hiện tại cùng toàn bộ các nút con/cháu trực thuộc dựa trên danh sách phân công nhiệm vụ (`assignments` và `orgNodeId` của nhân viên).
-    - Tích hợp bộ lọc Chi nhánh toàn cục: Đồng bộ hóa thanh chọn Chi nhánh ở header với trang sơ đồ Cơ cấu tổ chức. Sơ đồ sẽ tự động ẩn các chi nhánh khác và chỉ hiển thị cây sơ đồ của Chi nhánh được chọn (hoặc hiển thị tất cả nếu chọn "Tất cả chi nhánh").
-    - Đồng bộ danh sách nhân viên từ Backend: Đồng bộ hóa dữ liệu danh sách nhân viên thực tế từ Backend về ứng dụng frontend khi đăng nhập thành công. Khắc phục hoàn toàn lỗi lệch ID nhân viên (giữa mock `"0000000001"` và thực tế `"NV001"` của database) khiến số nhân sự và tên người quản lý hiển thị `0` và `—` không chính xác trên sơ đồ.
-    - Loại bỏ trùng lặp nhân sự (Unique Employee Counting): Thiết kế thuật toán lọc để gom các chức vụ/nhiệm vụ khác nhau của cùng một nhân viên, đảm bảo mỗi nhân sự chỉ được tính duy nhất 1 lần (không bị đúp số lượng) trên tổng số của chi nhánh hoặc phòng ban.
-    - Hướng dẫn giải thích số liệu (Information Notice): Tích hợp một hộp ghi chú nhỏ góc dưới bên phải sơ đồ cơ cấu tổ chức (sử dụng icon `AlertCircle` và hiệu ứng kính mờ `backdrop-blur`) để người quản trị dễ dàng đọc hiểu cách tính toán số lượng nhân sự kiêm nhiệm.
-    - **Quản lý trạng thái và Xem thành viên trực thuộc (Org Chart View Members & Status Support)**:
-      - **Hiển thị nhân sự trực thuộc cùng cấp (Leaf Employee Expansion)**: Nâng cấp chế độ "Danh sách" dạng bảng cây của Sơ đồ cơ cấu thành cấu trúc `RowItem[]` lồng ghép cả phòng ban (`node`) và nhân viên (`employee`). Hỗ trợ bung mở rộng để xem trực tiếp danh sách nhân sự trực thuộc bên dưới chức vụ/nhóm tương ứng.
-      - **Khắc phục lỗi nhân sự lặp lại khi đóng/mở (Unique Reconciliation Key)**: Thiết lập React key duy nhất kết hợp mã đơn vị cha và mã nhân viên (`key={`emp-${item.parentId}-${emp.id}`}`) giúp sửa triệt để lỗi React reconciliation nhân bản trùng lặp dòng nhân viên khi đóng mở nút liên tục.
-      - **Popup xem danh sách nhân sự nhanh (View Members Modal)**: Phát triển modal `<ViewMembersModal>` thiết kế kính mờ hiện đại hiển thị toàn bộ nhân viên trực thuộc chính thức và tạm thời (biệt phái), làm nổi bật Quản lý đơn vị bằng khung viền đỏ và badge vàng sang trọng. Gắn sự kiện click vào badge số lượng nhân sự ở cả chế độ Sơ đồ (diagram) và Danh sách (list) để mở nhanh popup này.
-      - **Lọc trạng thái & Kiểu dáng phòng tạm ngưng (Status Filter & Inactive Styling)**: Bổ sung bộ lọc trạng thái "Đang hoạt động" / "Tạm ngưng hoạt động" trên thanh công cụ. Thiết kế kiểu dáng mờ nhạt (`opacity-60 bg-gray-50/85`) cùng badge xám "Tạm ngưng" kế bên tên đối với các phòng ban/nhóm tạm ngừng hoạt động trên sơ đồ cây giúp phân biệt trực quan.
-      - **Dropdown chọn chi nhánh tùy biến (Custom Branch Selector UI)**: Thay thế dropdown select mặc định của trình duyệt bằng một menu dropdown tùy chỉnh bằng React. Thiết kế kính mờ, có hiệu ứng xoay chevron mượt mà, dấu checkmark hiển thị lựa chọn hiện tại và hiệu ứng hover nhẹ nhàng.
-      - **Nút chuyển đổi trạng thái đơn vị (Node Status Toggle Action)**: Bổ sung nút "Tạm ngưng hoạt động / Mở hoạt động" (sử dụng icon Ban/CheckCircle từ lucide-react) trên cả menu hover của thẻ sơ đồ (diagram) và cột hành động của bảng danh sách (list). Đồng bộ hóa gọi API PATCH của backend để cập nhật vào database.
-      - **Lan truyền trạng thái tạm ngưng (Subtree Status Deactivation Cascade)**: Nâng cấp hàm cập nhật trạng thái ở frontend để tìm kiếm đệ quy toàn bộ đơn vị cấp con/cháu trực thuộc và chuyển đổi trạng thái đồng bộ với đơn vị cha, khớp hoàn toàn với cơ chế lan truyền (cascade) của cơ sở dữ liệu backend.
-      - **Phân quyền xóa Chi nhánh & Phân tách quyền Admin/Quản lý**:
-        - Cho phép xóa các Chi nhánh gốc đối với tài khoản Admin tối cao (`admin@dudi.vn`).
-        - Ẩn nút Xóa của đơn vị chi nhánh (`node.type === "branch"`) đối với các tài khoản Quản lý cấp dưới để đảm bảo an toàn dữ liệu cơ cấu.
-      - **Tích hợp cổng thông tin Quản lý Chi nhánh & Tự động khóa Chi nhánh**:
-        - Mở rộng kiểu dữ liệu `Role` hỗ trợ thêm vai trò `"manager"` (Quản lý chi nhánh).
-        - Thêm nút Đăng nhập nhanh "QL Chi nhánh" (`nhan.vo@dudi.vn` / mật khẩu `123456`) trên giao diện đăng nhập.
-        - Khi Quản lý chi nhánh đăng nhập, hệ thống tự động ẩn bộ lọc Chi nhánh ở header và khóa cứng ngữ cảnh hiển thị dữ liệu (selectedBranch) chỉ thuộc về Chi nhánh TP.HCM (`branch-hcm`) của họ.
-      - **Khởi tạo bung rộng cây sơ đồ động (Dynamic Org Chart Expansion)**: Loại bỏ toàn bộ các mảng ID cứng trong sơ đồ cây và bảng danh sách. Sử dụng React `useEffect` để tự động thu thập toàn bộ mã đơn vị từ backend và mở rộng đầy đủ các chi nhánh, phòng ban khi load dữ liệu lần đầu.
-      - **Khóa chi nhánh trên trang quản lý IP (IP Branch Lock Protection)**:
-        - Đồng bộ trạng thái chi nhánh được chọn từ `App` sang trang Quản lý IP (`IPManagement`).
-        - Khi tài khoản Quản lý đăng nhập, dropdown lọc chi nhánh ở bảng IP được ẩn hoàn toàn để tập trung vào chi nhánh được phân quyền.
-        - Tại khung thêm và bảng chỉnh sửa IP, ô chọn chi nhánh được khóa cứng (`disabled`) và tự động trỏ đến đúng chi nhánh được quản lý, ngăn chặn việc gán sai chi nhánh hoặc thao tác ngoài phạm vi cho phép.
-        - Tại khung thêm và bảng chỉnh sửa IP, ô chọn chi nhánh được khóa cứng (`disabled`) and tự động trỏ đến đúng chi nhánh được quản lý, ngăn chặn việc gán sai chi nhánh hoặc thao tác ngoài phạm vi cho phép.
-      - **Tự động lọc danh sách phòng ban theo chi nhánh (Dynamic Department Filter by Branch)**:
-        - Nâng cấp logic `departments` useMemo trong [ApprovalManagement.tsx](file:///c:/Users/ADMIN/Desktop/DuDiSystem/frontend/app/components/leave/ApprovalManagement.tsx) để tự động lọc nhân viên thuộc chi nhánh được chọn trước khi trích xuất tên phòng ban.
-        - Khi một chi nhánh được chọn (hoặc bị khóa cứng cho Quản lý chi nhánh), dropdown lọc phòng ban tại cả 2 tab Lịch làm việc và Danh sách đơn xin nghỉ sẽ chỉ hiển thị các phòng ban thực sự trực thuộc hoặc có nhân sự thuộc chi nhánh đó, loại bỏ hoàn toàn các phòng ban không liên quan.
-        - **Khắc phục trường hợp Chi nhánh chưa có nhân sự**: Tích hợp thuật toán duyệt cây phòng ban động (`findBranchForNode`) giúp tự động trích xuất các Phòng ban thuộc chi nhánh trực tiếp từ cấu trúc sơ đồ tổ chức (ví dụ: Phòng Kinh doanh của Chi nhánh Đà Nẵng, Phòng Tài chính của Chi nhánh Hà Nội), đảm bảo dropdown hiển thị đầy đủ ngay cả khi chi nhánh đó chưa được phân bổ nhân sự thực tế.
-      - **Tối ưu hóa thanh thao tác hàng loạt & Hiển thị số lượng đơn ở bên trái (Bulk Actions Scoping & Counter Align)**:
-        - Thêm nhãn đếm tổng số lượng đơn chờ duyệt ở bên trái của thanh thao tác (`Danh sách chờ duyệt: X đơn`) để cân bằng bố cục và làm nổi bật thông tin cho người quản trị.
-      - **Bổ sung card "Tổng đơn" & Đồng bộ đếm số liệu theo bộ lọc active (Total Stats Card & Real-time Filter Tracking)**:
-        - Bổ sung card **"Tổng đơn"** với tông màu xanh dương (`blue`) hiện đại đứng đầu danh sách các card thống kê ở header trang nghỉ phép.
-        - Phát triển state trung gian `statsFilteredReqs` giúp tự động đồng bộ hóa số liệu của cả 5 card (Tổng đơn, Chờ duyệt, Đã duyệt, Từ chối, Hủy/Quá hạn) chạy theo các bộ lọc đang chọn (lọc theo Chi nhánh, Lọc Phòng ban, Tìm kiếm tên nhân viên, Lọc theo ngày nghỉ).
-        - Đảm bảo các card thống kê phản ánh chính xác số liệu tương ứng với dữ liệu đang được tìm kiếm và lọc trên giao diện trong thời gian thực.
-      - **Thiết kế lại Module Quản lý tài khoản đăng nhập & Tối ưu UI/UX (Account Management Redesign)**:
-        - Phân tách trang quản lý tài khoản thành module độc lập tại thư mục `components/account/AccountManagement.tsx` và tích hợp kết nối API CRUD thật với Backend.
-        - Thiết kế lại giao diện theo bản mockup: Bổ sung 4 card thống kê động (Tổng nhân viên, Đang làm việc, Đã nghỉ việc, Tài khoản bị khóa) tự động chạy theo chi nhánh được chọn.
-        - Tự động điền email của nhân sự và gợi ý quyền (Admin/Quản lý/Nhân viên) khi chọn nhân sự trong dropdown, loại bỏ hoàn toàn việc gõ tay thủ công cho admin.
-        - Khắc phục lỗi hardcode thông qua cơ chế tự động truy vết chi nhánh đệ quy (`getBranchForEmployee`) và liên kết thực thể nhân viên thật, đồng thời hỗ trợ nút tạo tài khoản nhanh trực tiếp trên dòng của nhân sự chưa có tài khoản.
-        - Thay thế toàn bộ các emoji không chuyên nghiệp trên các badge phân quyền và giao diện bằng hệ thống Lucide Icons (`Shield`, `Briefcase`, `User`, `RefreshCw` spin animation) tinh tế và sang trọng.
-      - **Nâng Cấp Searchable Combobox & Sửa Lỗi Đăng Nhập Nhanh (Milestone Completed)**:
-        - Nâng cấp ô tìm kiếm chi tiết trong "Bảng thống kê chi tiết" thành Searchable Autocomplete Combobox với nền trắng nổi bật, nút xóa nhanh "X" và dropdown gợi ý danh sách tối đa 15 nhân viên dựa trên từ khóa gõ vào.
-        - Thay thế hộp chọn nhân sự mặc định trong tab "Cá nhân" thành Searchable Combobox tuỳ chỉnh cao cấp. Hỗ trợ lọc từ khóa theo thời gian thực, hiển thị nhãn `Mã NV - Tên NV`, nút xóa nhanh "X", dropdown ChevronDown và cơ chế click-outside rollback khôi phục giá trị cũ nếu click ra ngoài.
-        - Sửa lỗi nút Đăng nhập nhanh ở trang Đăng nhập bằng cách loại bỏ cơ chế map password `"123456"` thành `"password"` trong file `App.tsx`. Cho phép mật khẩu `"123456"` được gửi trực tiếp lên backend và so khớp chính xác với hash trong database, giúp tính năng đăng nhập nhanh hoạt động mượt mà.
-        - Điều chỉnh giảm độ đậm của chữ trong Bảng thống kê chi tiết thành nét mảnh (`font-medium` cho STT, Mã NV, Đơn vị và `font-semibold` cho Họ tên/Badges) thay vì sử dụng `font-bold` và `font-black` quá mập, giúp bảng dữ liệu trở nên thanh thoát và dễ nhìn hơn nhưng vẫn giữ nguyên màu chữ đen.
+### 6. Đồng bộ Live Real-time Sync & Bảo vệ tài khoản Quản trị viên
+- **Live Real-time Sync**: Bổ sung endpoint `/auth/me` ở backend và lắng nghe sự kiện `dudi_permissions_updated` ở frontend giúp đồng bộ hóa lập tức quyền hạn thay đổi của người dùng đăng nhập hiện tại mà không yêu cầu thoát và đăng nhập lại.
+- **Vai trò ẩn hệ thống (role-super-admin)**: Tạo vai trò ẩn `role-super-admin` (Quản trị hệ thống cấp cao) cho 3 tài khoản Admin gốc, được cấu hình toàn quyền bằng mã `"all"` và ẩn hoàn toàn khỏi giao diện quản lý vai trò/phân quyền.
+- **Bảo vệ tài khoản Quản trị viên gốc**: Khóa cứng, ẩn hoàn toàn 3 tài khoản Admin gốc khỏi bảng quản lý tài khoản chính ở frontend. Chỉ cho phép cấu hình thông qua tiện ích **"Quản lý admin"** chuyên dụng.
+- **Tiện ích Quản lý Admin**: Tích hợp hộp thoại cấu hình dành riêng trong phần **"Các tiện ích quản trị khác"** ở trang Tiện ích. Cho phép thay đổi mật khẩu của 3 tài khoản quản trị hệ thống (`0000000000`, `1111111111`, `2222222222`), đồng thời khóa cứng Mã đăng nhập (Mã nhân viên) để đảm bảo tính toàn vẹn dữ liệu.
+- **Mã đăng nhập số hóa**: Thiết lập 3 tài khoản quản trị hệ thống generic có mã nhân viên và mã đăng nhập đồng bộ bằng chuỗi số:
+  - **Admin 1**: `0000000000` (Quản Trị Viên)
+  - **Admin 2**: `1111111111` (Quản Trị Viên 2)
+  - **Admin 3**: `2222222222` (Quản Trị Viên 3)
 
-- **Giao diện tab Vi phạm (ViolationTab) mới & Tối ưu hóa bộ lọc (Milestone Completed):**
-  - Thiết kế lại 6 Stat Cards chi tiết (Đi trễ, Check-out sớm, Quên check-out, Quên check-in, Nghỉ không phép, Nghỉ có phép) hiển thị nổi bật với viền trái dày có màu sắc đại diện tương ứng ở trạng thái thường (`border-l-4 border-l-...` giống như thiết kế thẻ tổng quan) và hiển thị nền màu solid khi active giúp việc click chọn/lọc trực quan.
-  - Tách biệt thanh điều khiển (Filter Bar) gồm Searchable `CustomCombobox` tìm nhân viên và `CustomSelect` chọn loại vi phạm đưa lên trên bảng, giải quyết triệt để tình trạng chật chội.
-  - Cải tiến bảng hiển thị thành layout nhiều cột đồng bộ: Cột trái cố định hiển thị Nhân viên (kèm badge thống kê), cột phải hiển thị các dòng lỗi chia 5 cột con gồm **Ngày, Loại vi phạm, Check-in, Check-out, Lý do / Ghi chú** căn chỉnh rộng rãi dàn trải đều sang bên phải màn hình.
-  - Phân tách giao diện giữa các thành viên rõ ràng bằng màu nền xen kẽ pastel cực kỳ nhạt (**xanh dương pastel** `bg-[#E0F2FE]/12` và **xanh lá pastel** `bg-[#DCFCE7]/12`) kèm đường kẻ ngang phân tách rõ nét đậm hơn `border-b-2 border-gray-300`. Cột Tên nhân viên được mở rộng lên `280px` để trình bày rõ ràng, thoáng mắt.
-  - **Kẻ cột nét đứt (border-dotted) & Căn giữa thông báo:** Toàn bộ bảng sử dụng đường kẻ dọc phân tách cột dạng nét đứt tinh tế (`border-r border-dotted border-gray-300`). Đối với các nhân sự không vi phạm, dòng thông báo *🟢 Không ghi nhận bất kỳ vi phạm hay nghỉ phép nào trong kỳ* được căn giữa hoàn hảo (`justify-center`).
-  - **Tách biệt Trang cấu hình hệ thống (SystemConfigPage) độc lập:** Phát triển một trang chức năng riêng biệt được tích hợp trong mục **Tiện ích** ở thanh menu bên trái. Hỗ trợ xem/chỉnh sửa tất cả thiết lập cấu hình của toàn hệ thống (Tên công ty, IP, các ca làm việc, grace periods) kết nối trực tiếp với backend RESTful MVC. Tự xây dựng component `CustomTimePicker` thuần Việt tuyệt đẹp, chia 2 cột "Giờ" (00-23) và "Phút" (00-59) trực quan, được tối ưu hóa khoảng đệm cuộn (`pb-8`) để dễ dàng chọn đến giờ 23 và phút 59, kết hợp tính năng tự động cuộn (scroll selection into view) mượt mà.
-  - **Tối ưu hóa cảnh báo chấm công theo trạng thái:** Loại bỏ hiển thị cảnh báo đỏ *"Chưa CI"* và *"Chưa CO"* trong các ngày nghỉ phép có lương (`leave`) hoặc vắng mặt (`absent`), thay thế bằng dấu gạch ngang màu xám `—` hợp lý.
-  - Đảm bảo header bảng sử dụng màu đỏ thương hiệu `#C62828` thống nhất với giao diện toàn cục.
-  - Cố định thứ tự hiển thị của nhân viên theo danh sách gốc của phòng ban/chi nhánh khi thay đổi bộ lọc, tránh tình trạng nhảy dòng lộn xộn.
-  - Format hiển thị ngày từ dạng `YYYY-MM-DD` sang dạng `DD/MM/YYYY` chuẩn tiếng Việt.
-  - Tích hợp 100% các component dùng chung (`CustomCombobox`, `CustomSelect`) và biên dịch hệ thống thành công không phát sinh lỗi.
-
-- **Đồng bộ hóa giao diện Banner Đỏ và Ba dấu chấm nháy (Milestone Completed):**
-  - Hiện đại hóa toàn bộ thanh Header Panel của tất cả 10 module/trang quản trị chính trên hệ thống: **Quản lý IP, Quản lý dự án, Cơ cấu tổ chức, Quản lý nhân sự, Quản lý chấm công, Quản lý nghỉ phép, Thống kê chấm công, Hộp thư thông báo, Thiết lập tài khoản & Phân quyền, Tiện ích hệ thống**.
-  - Thiết kế đồng điệu theo style cao cấp: Sử dụng tông nền đỏ đậm thương hiệu (`bg-[#C62828]`), tích hợp lưới chấm dot trắng nhạt chìm mờ tinh tế sử dụng CSS radial gradient (`bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px]`).
-  - Tích hợp 3 dấu chấm trạng thái nhấp nháy Pulse mượt mà ở góc trái của mỗi Banner (`bg-white/30`, `bg-white/60`, và `bg-white` đi kèm hiệu ứng trễ `delay-75`, `delay-150`).
-  - Thiết kế thu gọn và tích hợp liền mạch các nút tác vụ (Thêm mới, Xuất Excel, Xuất sơ đồ, Tải lại, Cài đặt mặc định) và các thẻ số liệu thống kê (Tổng đơn, Chờ duyệt,...) trực tiếp vào góc phải bên trong Banner, nâng cấp chúng sang nút màu mờ kính (`bg-white/10 hover:bg-white/20 text-white`) vô cùng sang trọng và đồng bộ.
-  - Đồng bộ hoá kích thước lề (`space-y-5`), loại bỏ viền bọc nền thẻ xám thừa của trang **Quản lý công việc** để 3 trang chức năng ngoài luồng (**Quản lý dự án**, **Quản lý công việc**, **Tiện ích hệ thống**) có vị trí, lề, chiều rộng và cấu trúc Header Banner trùng khớp tuyệt đối với các chức năng HR dưới mục Quản lý nhân sự.
-  - Kiểm tra biên dịch thành công 100% bằng TypeScript compiler (`tsc`) không phát sinh lỗi cú pháp hay kiểu dữ liệu.
-
-- **Hiệu ứng Chuyển trang & Thanh Loading Progress Bar cao cấp (Milestone Completed):**
-  - Loại bỏ hoàn toàn hiện tượng "chớp giật" (jarring/flickery jumps) khi chuyển qua lại giữa các menu điều hướng bằng cách tích hợp **hiệu ứng Fade-in & Slide-up** mượt mà cho toàn bộ trang thông qua CSS keyframes `.page-enter-active` (`0.35s cubic-bezier(0.34, 1.56, 0.64, 1)`).
-  - Triển khai **Thanh tiến trình chạy ngầm giả lập (Simulated Loading Progress Bar)** màu đỏ - cam thương hiệu nằm sát cạnh trên cùng của khung nội dung chính mỗi khi người dùng click đổi trang. Thanh tiến trình hiển thị trong `300ms` với hiệu ứng tăng chiều rộng từ 0% đến 100% cực kỳ chuyên nghiệp và hiện đại (tương tự trải nghiệm trên YouTube, GitHub).
-  - Tích hợp timer quản lý trạng thái loading tự động giải phóng trong `useEffect` của `App.tsx` mỗi khi `activePage` thay đổi.
-
-- **Cải tiến Xếp hạng Thống kê & Quản lý Đồng hạng chuyên nghiệp (Milestone Completed):**
-  - Sắp xếp danh sách "Bảng thống kê chi tiết" theo thứ tự ưu tiên vi phạm lên trên đầu: tự động phân loại và sort theo số ngày đi trễ giảm dần (`late` descending), sau đó là số ngày nghỉ phép/vắng mặt giảm dần (`leave` descending).
-  - Phát triển thuật toán nhóm xếp hạng đồng hạng (Tie-ranking Grouping) cho cả 2 widget **Top đi trễ nhiều nhất** và **Top nghỉ phép nhiều nhất**: Nếu các nhân sự có cùng số lượt vi phạm sẽ được xếp chung một thứ hạng (Ví dụ: Hạng 1 có 5 ngày, Hạng 2 đồng hạng có 3 ngày, Hạng 3 đồng hạng có 2 ngày) thay vì hiển thị tuần tự 1, 2, 3 gây bất công.
-  - Tích hợp cơ chế giới hạn hiển thị: Nếu một thứ hạng có quá nhiều nhân sự (lớn hơn 2), hệ thống sẽ hiển thị tối đa 2 nhân sự đầu tiên cùng nhãn click xem chi tiết. Bấm vào nhãn này sẽ mở ra một cửa sổ popup Modal kính mờ sang trọng hiển thị đầy đủ danh sách các nhân viên đồng hạng đó.
-  - Đảm bảo tính chuyên nghiệp tuyệt đối bằng cách loại bỏ hoàn toàn các ký tự biểu cảm emoji (như `👉`), thay thế hoàn toàn bằng hệ thống Lucide React Icons (`AlertCircle` mini) được căn lề thẳng hàng đẹp mắt.
-
-## 3. Next Steps
-- Kiểm tra tính tương thích và giao diện trên các kích thước màn hình thiết bị di động/máy tính bảng.
-- Tiếp tục tối ưu hóa hiệu năng render sơ đồ cây khi dữ liệu phình to.
-- Kiểm thử các thao tác lưu trữ và cập nhật trạng thái đơn trực tiếp với backend trong các kịch bản thực tế.
-
-
-
+## Kết quả kiểm tra (Verification)
+- Toàn bộ source code frontend đã được kiểm thử biên dịch thành công, không phát sinh lỗi kiểu hoặc cú pháp.

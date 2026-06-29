@@ -24,8 +24,11 @@ export function getBranchName(branchId) {
   return node ? node.name : "Tất cả chi nhánh"
 }
 
-export function listUsers() {
-  const users = repo.getAll()
+export function listUsers(query = {}) {
+  let users = repo.getAll()
+  if (!query.includeCoreAdmins) {
+    users = users.filter(user => !["0000000000", "1111111111", "2222222222"].includes(user.email))
+  }
   const employees = empRepo.getAll()
   return users.map(user => {
     const emp = user.employeeId ? employees.find(e => e.id === user.employeeId) : null
@@ -47,12 +50,15 @@ function resolveScopeFromEmployee(employeeId) {
 
 export async function createUser(data) {
   const { email, roleId, employeeId, status, scopeId } = data
+  if (roleId === "role-super-admin") {
+    throw new Error("Không thể gán vai trò ẩn hệ thống")
+  }
   if (!email) throw new Error("Email là bắt buộc")
 
   const existing = repo.getByEmail(email)
   if (existing) throw new Error("Email đã tồn tại")
 
-  let rawPassword = "password"
+  let rawPassword = "123456"
   if (employeeId) {
     const emp = empRepo.getById(employeeId)
     if (emp) {
@@ -70,7 +76,8 @@ export async function createUser(data) {
     password: hashedPassword,
     roleId: roleId || "role-user",
     employeeId: employeeId || null,
-    status: status || "active"
+    status: status || "active",
+    permissions: data.permissions || null
   })
 
   const roleObj = roleRepo.getById(roleId)
@@ -88,7 +95,16 @@ export async function createUser(data) {
 }
 
 export function updateUser(id, patch) {
-  const ALLOWED = ["email", "roleId", "employeeId", "status"]
+  const user = repo.getById(id)
+  if (user && ["0000000000", "1111111111", "2222222222"].includes(user.email)) {
+    throw new Error("Không thể chỉnh sửa thông tin của tài khoản Quản trị viên")
+  }
+
+  if (patch.roleId === "role-super-admin") {
+    throw new Error("Không thể gán vai trò ẩn hệ thống")
+  }
+
+  const ALLOWED = ["email", "roleId", "employeeId", "status", "permissions"]
   const safePatch = Object.fromEntries(Object.entries(patch).filter(([k]) => ALLOWED.includes(k)))
 
   if (safePatch.email) {
@@ -119,6 +135,9 @@ export function updateUser(id, patch) {
 export function toggleStatus(id) {
   const user = repo.getById(id)
   if (!user) throw new Error("Không tìm thấy tài khoản")
+  if (["0000000000", "1111111111", "2222222222"].includes(user.email)) {
+    throw new Error("Không thể thao tác tài khoản Quản trị viên")
+  }
   const newStatus = user.status === "active" ? "locked" : "active"
   const updated = repo.update(id, { status: newStatus })
   const { password: _, ...safeUser } = updated
@@ -128,8 +147,11 @@ export function toggleStatus(id) {
 export async function resetPassword(id) {
   const user = repo.getById(id)
   if (!user) throw new Error("Không tìm thấy tài khoản")
+  if (["0000000000", "1111111111", "2222222222"].includes(user.email)) {
+    throw new Error("Không thể thao tác tài khoản Quản trị viên")
+  }
 
-  let rawPassword = "password"
+  let rawPassword = "123456"
   if (user.employeeId) {
     const emp = empRepo.getById(user.employeeId)
     if (emp) {
@@ -145,8 +167,49 @@ export async function resetPassword(id) {
 }
 
 export function deleteUser(id) {
+  const user = repo.getById(id)
+  if (user && ["0000000000", "1111111111", "2222222222"].includes(user.email)) {
+    throw new Error("Không thể xóa tài khoản Quản trị viên")
+  }
+
   const deleted = repo.remove(id)
   if (!deleted) throw new Error("Không tìm thấy tài khoản")
   raRepo.removeByUserId(id)
+  return true
+}
+
+export function getUserDetails(id) {
+  const user = repo.getById(id)
+  if (!user) return null
+  const employees = empRepo.getAll()
+  const emp = user.employeeId ? employees.find(e => e.id === user.employeeId) : null
+  const assignments = raRepo.getByUserId(user.id)
+  const primary = assignments.find(a => a.isPrimary) ?? assignments[0] ?? null
+  const branchId = primary
+    ? (primary.scopeType === "company" ? "all" : primary.scopeId)
+    : "all"
+  const branchName = getBranchName(branchId)
+  const { password: _, ...safeUser } = user
+  return { ...safeUser, name: emp ? emp.name : "—", branchId, branchName, assignments }
+}
+
+export async function updateAdminAccount(id, data) {
+  const user = repo.getById(id)
+  if (!user || user.roleId !== "role-super-admin") {
+    throw new Error("Tài khoản không phải là Quản trị viên")
+  }
+
+  const { newPassword } = data
+  if (!newPassword || newPassword.trim() === "") {
+    throw new Error("Mật khẩu mới không được để trống")
+  }
+
+  const salt = await bcrypt.genSalt(10)
+  const hashedPassword = await bcrypt.hash(newPassword, salt)
+
+  repo.update(id, {
+    password: hashedPassword
+  })
+
   return true
 }

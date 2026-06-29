@@ -21,7 +21,6 @@ export default function ViewMembersModal({
 }: ViewMembersModalProps) {
   if (!isOpen || !node) return null
 
-  // Helper to get descendant IDs
   const getDescendants = (nodeId: string, nodes: OrgNode[]): OrgNode[] => {
     const descendants: OrgNode[] = []
     const queue = [nodeId]
@@ -39,7 +38,6 @@ export default function ViewMembersModal({
   const descendants = getDescendants(node.id, orgNodes)
   const descendantIds = [node.id, ...descendants.map(d => d.id)]
 
-  // Filter employees belonging to these nodes
   const members = employees.filter(e => {
     const empNodeIds = [
       e.orgNodeId,
@@ -51,7 +49,6 @@ export default function ViewMembersModal({
   return createPortal(
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl border border-gray-100 flex flex-col max-h-[85vh] animate-in fade-in zoom-in duration-200">
-        {/* Header */}
         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-red-50/50 to-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-100 text-[#C62828] rounded-xl flex items-center justify-center">
@@ -72,7 +69,6 @@ export default function ViewMembersModal({
           </button>
         </div>
 
-        {/* List of members */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {members.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -119,7 +115,6 @@ export default function ViewMembersModal({
           )}
         </div>
 
-        {/* Footer */}
         <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
           <button onClick={onClose} className="px-5 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-50 transition-colors shadow-sm">
             Đóng

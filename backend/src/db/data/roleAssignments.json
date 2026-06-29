@@ -89,5 +89,26 @@
     "scopeType": "self",
     "scopeId": null,
     "isPrimary": true
+  },
+  {
+    "id": "ra-1782759981741",
+    "userId": "U-1782759981739",
+    "scopeType": "self",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-014",
+    "userId": "U014",
+    "scopeType": "company",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-015",
+    "userId": "U015",
+    "scopeType": "company",
+    "scopeId": null,
+    "isPrimary": true
   }
 ]

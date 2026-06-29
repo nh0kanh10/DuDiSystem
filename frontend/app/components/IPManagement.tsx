@@ -696,7 +696,7 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
 
       {toast && createPortal(
         <div
-          className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-3 rounded-xl shadow-lg border transition-all duration-300 ${
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-6 py-3 rounded-xl shadow-lg border transition-all duration-300 ${
             toast.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-800"
               : "bg-red-50 border-red-200 text-red-800"

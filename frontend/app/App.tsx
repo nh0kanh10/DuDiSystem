@@ -39,7 +39,37 @@ import { INIT_EMPLOYEES, INIT_ORG_NODES, NOTIFICATIONS, INIT_ASSIGNMENTS } from 
 import { findBranchForNode, initials } from "./utils"
 import { api } from "@/lib/api"
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+function getISOWeek(d: Date): number {
+  const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  dt.setUTCDate(dt.getUTCDate() + 4 - (dt.getUTCDay() || 7))
+  const y = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1))
+  return Math.ceil((((dt.getTime() - y.getTime()) / 86400000) + 1) / 7)
+}
+
+function parseVnDate(dateStr: string): Date {
+  const [day, month, year] = dateStr.split("/").map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function isWeekend(d: Date): boolean {
+  const day = d.getDay()
+  return day === 0 || day === 6
+}
+
+function getDateRange(startStr: string, endStr: string): Date[] {
+  const start = parseVnDate(startStr)
+  const end = parseVnDate(endStr)
+  const dates: Date[] = []
+  const current = new Date(start)
+  while (current <= end) {
+    if (!isWeekend(current)) {
+      dates.push(new Date(current))
+    }
+    current.setDate(current.getDate() + 1)
+  }
+  return dates
+}
+
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return !!localStorage.getItem("dudi_token")
@@ -68,7 +98,7 @@ export default function App() {
     }
     return ""
   })
-  
+  const [sessionTimeout, setSessionTimeout] = useState<number>(30)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -102,8 +132,39 @@ export default function App() {
   }, [activePage])
 
   const activeRolePermissions = useMemo(() => {
+    const saved = localStorage.getItem("dudi_user")
+    if (saved) {
+      try {
+        const u = JSON.parse(saved)
+        if (u.permissions && Array.isArray(u.permissions) && u.permissions.length > 0) {
+          if (u.permissions.includes("all")) {
+            return [
+              "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
+              "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
+            ]
+          }
+          return u.permissions
+        }
+      } catch {}
+    }
+
+    if (role === "role-super-admin") {
+      return [
+        "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
+        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
+      ]
+    }
+
     const currentRole = rolesList.find(r => r.id === role)
-    if (currentRole) return currentRole.modules
+    if (currentRole) {
+      if (currentRole.modules.includes("all")) {
+        return [
+          "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
+          "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
+        ]
+      }
+      return currentRole.modules
+    }
     if (role === "role-admin") {
       return [
         "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
@@ -121,14 +182,25 @@ export default function App() {
       "dashboard", "user-profile", "user-attendance", "user-timeoff", 
       "user-directory", "user-chat", "user-workflow", "cong-viec", "thong-bao", "user-settings"
     ]
-  }, [role, rolesList])
+  }, [role, rolesList, isLoggedIn])
 
   const roleName = useMemo(() => {
     const currentRole = rolesList.find(r => r.id === role)
     if (currentRole) return currentRole.name
+    if (role === "role-super-admin") return "Quản trị hệ thống cấp cao"
     if (role === "role-admin") return "Quản trị hệ thống"
     if (role === "role-manager") return "Quản lý cấp trung"
     return "Nhân viên"
+  }, [role, rolesList])
+
+  const isStaffRole = useMemo(() => {
+    if (role === "role-user" || role === "user") return true
+    if (role === "role-admin" || role === "role-manager" || role === "role-super-admin" || role === "admin" || role === "manager") return false
+    const currentRole = rolesList.find(r => r.id === role)
+    if (currentRole) {
+      return (currentRole as any).roleType === "staff" || currentRole.scopeType === "self"
+    }
+    return false
   }, [role, rolesList])
 
   useEffect(() => {
@@ -139,10 +211,77 @@ export default function App() {
     }
   }, [activePage, activeRolePermissions, isLoggedIn])
 
+  useEffect(() => {
+    if (!isLoggedIn) {
+      if (location.pathname !== "/login") {
+        navigate("/login")
+      }
+    } else {
+      if (location.pathname === "/login" || location.pathname === "/") {
+        navigate("/dashboard")
+      }
+    }
+  }, [isLoggedIn, location.pathname, navigate])
+
+  // ─── LẮNG NGHE SỰ KIỆN HẾT HẠN TOKEN TOÀN CỤC (401) ───
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      handleLogout()
+      alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+    }
+    window.addEventListener("dudi_unauthorized", handleUnauthorized)
+    return () => {
+      window.removeEventListener("dudi_unauthorized", handleUnauthorized)
+    }
+  }, [])
+
+  // ─── TỰ ĐỘNG ĐĂNG XUẤT KHI KHÔNG HOẠT ĐỘNG ───
+  useEffect(() => {
+    if (!isLoggedIn) return
+
+    let timeoutId: any
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        handleLogout()
+        alert(`Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`)
+      }, sessionTimeout * 60 * 1000)
+    }
+
+    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart", "click"]
+    
+    resetTimer()
+
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer)
+    })
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId)
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer)
+      })
+    }
+  }, [isLoggedIn, sessionTimeout])
+
   const [employees, setEmployees] = useState<Employee[]>(INIT_EMPLOYEES)
   const [orgNodes, setOrgNodes] = useState<OrgNode[]>(INIT_ORG_NODES)
   const [assignments, setAssignments] = useState<Assignment[]>(INIT_ASSIGNMENTS)
   const [requests, setRequests] = useState<any[]>([])
+
+  const pendingRequestsCount = useMemo(() => {
+    const currentWeekVal = `W${getISOWeek(new Date())}`
+    return requests.filter(r => {
+      if (r.status !== "pending") return false
+      try {
+        const dates = getDateRange(r.startDate, r.endDate)
+        return dates.some(d => `W${getISOWeek(d)}` === currentWeekVal)
+      } catch {
+        return false
+      }
+    }).length
+  }, [requests])
   const [loginError, setLoginError] = useState<string | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
@@ -170,11 +309,29 @@ export default function App() {
     }
   }
 
+  const reloadPermissionsAndRoles = () => {
+    api.roles.list().then(d => {
+      if (d && Array.isArray(d)) setRolesList(d as RoleDefinition[])
+    }).catch(err => console.error("Lỗi tải roles:", err))
+
+    api.auth.me().then(user => {
+      if (user) {
+        localStorage.setItem("dudi_user", JSON.stringify(user))
+        setRole(user.roleId || "role-admin")
+        setLoggedEmail(user.employeeId || user.email || "")
+      }
+    }).catch(err => console.error("Lỗi tải thông tin tài khoản:", err))
+  }
+
   useEffect(() => {
     if (isLoggedIn) {
-      api.roles.list().then(d => {
-        if (d && Array.isArray(d)) setRolesList(d as RoleDefinition[])
-      }).catch(err => console.error("Lỗi tải roles:", err))
+      reloadPermissionsAndRoles()
+
+      api.systemConfig.get().then(res => {
+        if (res && res.sessionTimeoutMinutes) {
+          setSessionTimeout(Number(res.sessionTimeoutMinutes))
+        }
+      }).catch(err => console.error("Lỗi tải cấu hình session:", err))
 
       Promise.all([
         api.employees.list().then(d => {
@@ -194,10 +351,20 @@ export default function App() {
   }, [isLoggedIn])
 
   useEffect(() => {
+    const handleUpdate = () => {
+      if (isLoggedIn) {
+        reloadPermissionsAndRoles()
+      }
+    }
+    window.addEventListener("dudi_permissions_updated", handleUpdate)
+    return () => window.removeEventListener("dudi_permissions_updated", handleUpdate)
+  }, [isLoggedIn])
+
+  useEffect(() => {
     if (isLoggedIn && role === "role-manager" && orgNodes.length > 0) {
       const emp = employees.find(e => 
-        e.email.toLowerCase() === loggedEmail.toLowerCase() ||
-        e.id.toLowerCase() === loggedEmail.toLowerCase()
+        (e.email || "").toLowerCase() === (loggedEmail || "").toLowerCase() ||
+        (e.id || "").toLowerCase() === (loggedEmail || "").toLowerCase()
       )
       if (emp?.orgNodeId) {
         const branchId = findBranchForNode(emp.orgNodeId, orgNodes)
@@ -219,7 +386,6 @@ export default function App() {
         setLoggedEmail(user.employeeId || user.email || email)
         setSelectedBranch(user.branchId || "all")
         setIsLoggedIn(true)
-        setActivePage("dashboard")
       }
     } catch (e) {
       console.error("Backend login failed:", e)
@@ -243,19 +409,19 @@ export default function App() {
     setRole("role-admin")
     setLoggedEmail("")
     setSelectedBranch("all")
-    setActivePage("dashboard")
+    // Chuyển hướng sẽ do useEffect tự động xử lý khi isLoggedIn chuyển sang false
   }
 
   if (!isLoggedIn) return <LoginPage onLogin={handleLogin} loginError={loginError} />
 
   // ─── USER PORTAL: completely separate layout (no sidebar) ───
-  if (role === "role-user") {
+  if (isStaffRole) {
     return <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} />
   }
 
   const matchedEmp = employees.find(e => 
-    e.id.toLowerCase() === loggedEmail.toLowerCase() || 
-    e.email.toLowerCase() === loggedEmail.toLowerCase()
+    (e.id || "").toLowerCase() === (loggedEmail || "").toLowerCase() || 
+    (e.email || "").toLowerCase() === (loggedEmail || "").toLowerCase()
   )
   const currentEmp: Employee = matchedEmp || {
     id: loggedEmail || "—",
@@ -279,10 +445,10 @@ export default function App() {
 
   const renderPage = () => {
     if (activePage !== "dashboard" && activeRolePermissions.length > 0 && !activeRolePermissions.includes(activePage)) {
-      return (role as string) === "user" ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
+      return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
     }
     switch (activePage) {
-      case "dashboard": return (role as string) === "user" ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
+      case "dashboard": return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
       case "nhan-su": return <EmployeeManagement employees={employees} setEmployees={setEmployees} orgNodes={orgNodes} selectedBranch={selectedBranch} onBranchChange={setSelectedBranch} />
       case "co-cau": return (
         <OrgStructure 
@@ -322,9 +488,11 @@ export default function App() {
       case "user-chat": return <UserChat />
       case "user-workflow": return <UserWorkflow />
       case "user-settings": return <UserSettings onLogout={handleLogout} />
-      default: return (role as string) === "user" ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
+      default: return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
     }
   }
+
+
 
   const unreadNotifs = NOTIFICATIONS.filter(n => !n.read).length
 
@@ -332,7 +500,7 @@ export default function App() {
     <div className="flex h-screen bg-[#F5F1EF] overflow-hidden" onClick={() => { }}>
       <UserAwareSidebar active={activePage} onNavigate={setActivePage}
         collapsed={sidebarCollapsed} role={role} roleName={roleName} modules={activeRolePermissions} onLogout={handleLogout}
-        pendingRequestsCount={requests.filter(r => r.status === "pending").length} />
+        pendingRequestsCount={pendingRequestsCount} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Header
           onToggle={() => setSidebarCollapsed(p => !p)}
@@ -446,7 +614,7 @@ function Header({ onToggle, unread, currentUser, onLogout, onNavigate, selectedB
         </div>
       </div>
       <div className="ml-auto flex items-center gap-3">
-        {currentUser.role === "role-admin" && (
+        {(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") && (
           <div className="relative">
             <button
               onClick={() => setShowBranchDrop(!showBranchDrop)}
@@ -565,14 +733,15 @@ function Header({ onToggle, unread, currentUser, onLogout, onNavigate, selectedB
                   </div>
                 </div>
                 <div className={`mt-3 text-center text-xs font-bold py-1 rounded-lg
-                  ${currentUser.role === "role-admin" ? "bg-amber-100 text-amber-700" : "bg-blue-50 text-blue-600"}`}>
-                  {currentUser.role === "role-admin" ? "👑 Quản trị viên" : "🧑‍💻 Nhân viên"}
+                  ${(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") ? "bg-amber-100 text-amber-700" : "bg-blue-50 text-blue-600"}`}>
+                  {(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") ? "👑 Quản trị viên" : "🧑‍💻 Nhân viên"}
                 </div>
               </div>
               {/* Menu items */}
               <div className="py-1">
-                <button onClick={() => { onNavigate(currentUser.role === "role-admin" ? "tai-khoan" : "user-settings"); setShowDrop(false) }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                <button onClick={() => { onNavigate((currentUser.role === "role-admin" || currentUser.role === "role-super-admin") ? "tai-khoan" : "user-settings"); setShowDrop(false) }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                >
                   <Settings size={15} className="text-gray-400" />
                   Cài đặt tài khoản
                 </button>
@@ -721,7 +890,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
       {!collapsed && (
         <div className="px-3 pb-2">
           <div className={`rounded-xl px-3 py-2 text-center text-xs font-bold
-            ${role === "role-admin" ? "bg-amber-500/20 text-amber-300" : "bg-white/8 text-white/50"}`}>
+            ${(role === "role-admin" || role === "role-super-admin") ? "bg-amber-500/20 text-amber-300" : "bg-white/8 text-white/50"}`}>
             {roleName}
           </div>
         </div>

@@ -78,7 +78,7 @@ function StatusPill({ status }: { status: TOStatus }) {
     approved:  { icon: CheckCircle2, cls: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "Đã duyệt" },
     pending:   { icon: AlertCircle,   cls: "bg-amber-50  text-amber-700  border-amber-200",   label: "Chờ duyệt" },
     rejected:  { icon: XCircle,       cls: "bg-red-50    text-red-700    border-red-200",      label: "Từ chối" },
-    cancelled: { icon: XCircle,       cls: "bg-gray-100  text-gray-500   border-gray-200",     label: "Hủy do quá hạn" },
+    cancelled: { icon: XCircle,       cls: "bg-gray-100  text-gray-500   border-gray-200",     label: "Đã hủy" },
   }[status]
   const Icon = cfg.icon
   return (
@@ -272,7 +272,7 @@ function FullDayBlock({
         <div className="absolute bottom-2 right-2 flex items-center gap-1">
           <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
           <span className="text-[9px] font-bold opacity-70">
-            {slot.status === "approved" ? "Duyệt" : slot.status === "rejected" ? "Từ chối" : "Chờ"}
+            {slot.status === "approved" ? "Duyệt" : slot.status === "rejected" ? "Từ chối" : slot.status === "cancelled" ? "Đã hủy" : "Chờ"}
           </span>
         </div>
       </button>
@@ -376,7 +376,7 @@ function MultiDayFullBlock({
           <div className="flex items-center gap-1.5">
             <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.dot}`} />
             <span className="text-[9px] font-bold opacity-60">
-              {slot.status === "approved" ? "✓ Đã duyệt" : slot.status === "rejected" ? "✗ Từ chối" : "● Chờ duyệt"}
+              {slot.status === "approved" ? "✓ Đã duyệt" : slot.status === "rejected" ? "✗ Từ chối" : slot.status === "cancelled" ? "✗ Đã hủy" : "● Chờ duyệt"}
             </span>
           </div>
         </div>
@@ -527,9 +527,9 @@ export default function ApprovalManagement({
   const [adminNote, setAdminNote] = useState("")
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [toastType, setToastType] = useState<"success" | "error">("success")
-  const [selectedYear, setSelectedYear] = useState(2026)
-  const [selectedMonth, setSelectedMonth] = useState(6)
-  const [weekFilter, setWeekFilter] = useState("W26")
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1)
+  const [weekFilter, setWeekFilter] = useState(() => `W${getISOWeek(new Date())}`)
   const [deptFilter, setDeptFilter] = useState("all")
   const [employees, setEmployees] = useState<Employee[]>([])
   const [showToday, setShowToday] = useState(false)
@@ -1199,7 +1199,7 @@ export default function ApprovalManagement({
       )}
 
       {toastMessage && createPortal(
-        <div className={`fixed bottom-24 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[60] border backdrop-blur-sm animate-in slide-in-from-right duration-300
+        <div className={`fixed bottom-6 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] border backdrop-blur-sm animate-in slide-in-from-right duration-300
           ${toastType === "success"
             ? "bg-gray-900/95 text-white border-white/10"
             : "bg-red-900/95 text-white border-red-500/20"}`}>

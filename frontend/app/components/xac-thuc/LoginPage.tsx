@@ -83,7 +83,7 @@ export function LoginPage({ onLogin, loginError }: {
                   value={id}
                   onChange={e => setId(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="VD: NV001, NV009..."
+                  placeholder="VD: NV001, 0000000000..."
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] focus:ring-2 focus:ring-[#C62828]/10 transition-all"
                 />
               </div>
@@ -121,11 +121,11 @@ export function LoginPage({ onLogin, loginError }: {
             <p className="font-semibold text-gray-700 text-sm">Đăng nhập nhanh:</p>
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => quickLogin("NV010", "123456")}
+                onClick={() => quickLogin("0000000000", "123456")}
                 className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 transition-colors cursor-pointer text-violet-700"
               >
                 <div className="font-bold mb-0.5">Quản trị viên</div>
-                <div className="font-mono text-[10px] opacity-75">NV010 · CN HCM</div>
+                <div className="font-mono text-[10px] opacity-75">0000000000 · CN HCM</div>
               </button>
               <button
                 onClick={() => quickLogin("NV009", "123456")}
@@ -137,7 +137,7 @@ export function LoginPage({ onLogin, loginError }: {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => quickLogin("NV001", "123456")}
+                onClick={() => quickLogin("NV001", "0901234567")}
                 className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer text-emerald-700"
               >
                 <div className="font-bold mb-0.5">Bích Liên</div>

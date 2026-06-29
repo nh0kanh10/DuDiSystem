@@ -14,6 +14,7 @@ import { CustomDatePicker as DateInput } from "../ui/CustomDatePicker"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomCombobox } from "../ui/CustomCombobox"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
+import ConfirmModal from "../ui/ConfirmModal"
 
 const STATUS_CFG: Record<ProjectStatus, { label: string; cls: string; icon: React.ElementType }> = {
   planning:  { label: "Lên kế hoạch",   cls: "bg-gray-100 text-gray-600 border-gray-200",          icon: Clock },
@@ -139,6 +140,7 @@ export function ProjectManagement({
   const [teamMemberSearch, setTeamMemberSearch] = useState("")
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<Project | null>(null)
+  const [deleteGroup, setDeleteGroup] = useState<Group | null>(null)
 
   const [memberTab, setMemberTab] = useState<"member" | "group">("member")
   const [memberSearch, setMemberSearch] = useState("")
@@ -549,7 +551,7 @@ export function ProjectManagement({
                           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
                           <Edit2 size={13} />
                         </button>
-                        <button onClick={() => { if (confirm(`Xóa nhóm "${g.name}"?`)) handleDeleteGroup(g.id) }}
+                        <button onClick={() => setDeleteGroup(g)}
                           className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors">
                           <Trash size={13} />
                         </button>
@@ -1425,6 +1427,19 @@ export function ProjectManagement({
           </div>
         </div>
       , document.body)}
+
+      <ConfirmModal
+        isOpen={deleteGroup !== null}
+        onClose={() => setDeleteGroup(null)}
+        onConfirm={() => {
+          if (deleteGroup) handleDeleteGroup(deleteGroup.id)
+        }}
+        title="Xóa nhóm"
+        message={`Bạn có chắc muốn xóa nhóm "${deleteGroup?.name}"?`}
+        confirmText="Xác nhận xóa"
+        cancelText="Hủy"
+        type="danger"
+      />
     </div>
   )
 }

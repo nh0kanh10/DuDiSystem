@@ -13,6 +13,12 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
+  if (res.status === 401) {
+    localStorage.removeItem("dudi_token")
+    localStorage.removeItem("dudi_user")
+    window.dispatchEvent(new Event("dudi_unauthorized"))
+    throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+  }
   const json = await res.json()
   if (!res.ok) throw new Error(json.message ?? "Lỗi server")
   return json.data as T
@@ -31,11 +37,13 @@ export const api = {
   auth: {
     login: (email: string, password: string) =>
       req<{ token: string; user: Record<string, unknown> }>("POST", "/auth/login", { email, password }),
+    me: () => req<any>("GET", "/auth/me"),
   },
   users: {
-    list: () => req<any[]>("GET", "/users"),
+    list: (params?: { includeCoreAdmins?: boolean }) => req<any[]>("GET", `/users${qs(params as any)}`),
     create: (data: any) => req<any>("POST", "/users", data),
     update: (id: string, data: any) => req<any>("PATCH", `/users/${id}`, data),
+    updateAdmin: (id: string, data: any) => req<any>("PATCH", `/users/admin/${id}`, data),
     toggleStatus: (id: string) => req<any>("POST", `/users/${id}/toggle-status`),
     resetPassword: (id: string) => req<any>("POST", `/users/${id}/reset-password`),
     delete: (id: string) => req<any>("DELETE", `/users/${id}`),
@@ -49,8 +57,8 @@ export const api = {
 
 
   employees: {
-    list: (params?: { status?: string; department?: string; q?: string }) =>
-      req<unknown[]>("GET", `/employees${qs(params)}`),
+    list: (params?: { status?: string; department?: string; q?: string; includeCoreAdmins?: boolean }) =>
+      req<unknown[]>("GET", `/employees${qs(params as any)}`),
     getById: (id: string) => req<unknown>("GET", `/employees/${id}`),
     create: (data: unknown) => req<unknown>("POST", "/employees", data),
     update: (id: string, data: unknown) => req<unknown>("PUT", `/employees/${id}`, data),

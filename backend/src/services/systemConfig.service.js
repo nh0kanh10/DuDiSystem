@@ -12,8 +12,12 @@ export function getSystemConfig() {
       afternoonEnd: "17:00",
       lateGraceMinutes: 15,
       earlyGraceMinutes: 15,
-      requireIP: false
+      requireIP: false,
+      sessionTimeoutMinutes: 30
     })
+  }
+  if (config && config.sessionTimeoutMinutes === undefined) {
+    config.sessionTimeoutMinutes = 30
   }
   return config
 }

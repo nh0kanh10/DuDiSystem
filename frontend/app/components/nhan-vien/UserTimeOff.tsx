@@ -35,9 +35,12 @@ const STATUS_MAP = {
     rejected: { label: "Từ chối", color: "text-red-700", bg: "bg-red-100", icon: X },
 }
 
+import ConfirmModal from "../ui/ConfirmModal"
+
 export default function UserTimeOff() {
     const [tab, setTab] = useState<"register" | "history">("register")
     const [requests, setRequests] = useState<TimeOffRequest[]>(INIT_REQUESTS)
+    const [cancelId, setCancelId] = useState<string | null>(null)
 
     // Calendar state
     const [weekOffset, setWeekOffset] = useState(0) // 0 = this week, 1 = next week, etc.
@@ -97,9 +100,7 @@ export default function UserTimeOff() {
     }
 
     const handleCancel = (id: string) => {
-        if (window.confirm("Hủy yêu cầu này?")) {
-            setRequests(prev => prev.filter(r => r.id !== id))
-        }
+        setCancelId(id)
     }
 
     const daysLeft = 12.5
@@ -346,6 +347,21 @@ export default function UserTimeOff() {
                     })}
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={cancelId !== null}
+                onClose={() => setCancelId(null)}
+                onConfirm={() => {
+                    if (cancelId) {
+                        setRequests(prev => prev.filter(r => r.id !== cancelId))
+                    }
+                }}
+                title="Hủy yêu cầu nghỉ"
+                message="Bạn có chắc chắn muốn hủy yêu cầu nghỉ phép này không?"
+                confirmText="Hủy yêu cầu"
+                cancelText="Quay lại"
+                type="danger"
+            />
         </div>
     )
 }
