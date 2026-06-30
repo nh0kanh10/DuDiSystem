@@ -9,7 +9,14 @@
     "permissions": [
       "dashboard",
       "user-profile",
-      "user-settings"
+      "user-settings",
+      "user-attendance",
+      "user-timeoff",
+      "user-workflow",
+      "user-directory",
+      "user-chat",
+      "thong-bao",
+      "cong-viec"
     ]
   },
   {

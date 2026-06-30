@@ -99,6 +99,7 @@ export default function App() {
     return ""
   })
   const [sessionTimeout, setSessionTimeout] = useState<number>(30)
+  const [sessionAlertMsg, setSessionAlertMsg] = useState<string | null>(null)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -227,7 +228,7 @@ export default function App() {
   useEffect(() => {
     const handleUnauthorized = () => {
       handleLogout()
-      alert("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+      setSessionAlertMsg("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
     }
     window.addEventListener("dudi_unauthorized", handleUnauthorized)
     return () => {
@@ -245,7 +246,7 @@ export default function App() {
       if (timeoutId) clearTimeout(timeoutId)
       timeoutId = setTimeout(() => {
         handleLogout()
-        alert(`Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`)
+        setSessionAlertMsg(`Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`)
       }, sessionTimeout * 60 * 1000)
     }
 
@@ -412,11 +413,25 @@ export default function App() {
     // Chuyển hướng sẽ do useEffect tự động xử lý khi isLoggedIn chuyển sang false
   }
 
-  if (!isLoggedIn) return <LoginPage onLogin={handleLogin} loginError={loginError} />
+  if (!isLoggedIn) return (
+    <>
+      {sessionAlertMsg && (
+        <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
+      )}
+      <LoginPage onLogin={handleLogin} loginError={loginError} />
+    </>
+  )
 
   // ─── USER PORTAL: completely separate layout (no sidebar) ───
   if (isStaffRole) {
-    return <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} />
+    return (
+      <>
+        {sessionAlertMsg && (
+          <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
+        )}
+        <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} />
+      </>
+    )
   }
 
   const matchedEmp = employees.find(e => 
@@ -497,6 +512,10 @@ export default function App() {
   const unreadNotifs = NOTIFICATIONS.filter(n => !n.read).length
 
   return (
+    <>
+    {sessionAlertMsg && (
+      <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
+    )}
     <div className="flex h-screen bg-[#F5F1EF] overflow-hidden" onClick={() => { }}>
       <UserAwareSidebar active={activePage} onNavigate={setActivePage}
         collapsed={sidebarCollapsed} role={role} roleName={roleName} modules={activeRolePermissions} onLogout={handleLogout}
@@ -565,6 +584,7 @@ export default function App() {
         </main>
       </div>
     </div>
+    </>
   )
 }
 
@@ -904,5 +924,56 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
         </button>
       </div>
     </aside>
+  )
+}
+
+// ─── SESSION ALERT MODAL (thay thế browser alert()) ───
+function SessionAlertModal({ message, onClose }: { message: string; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-[340px] overflow-hidden"
+        style={{ animation: "sessionModalIn 0.22s cubic-bezier(.34,1.56,.64,1) both" }}
+      >
+        {/* Gradient header strip */}
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#C62828] to-[#E64A19]" />
+
+        {/* Icon + message */}
+        <div className="flex flex-col items-center gap-3 px-7 pt-7 pb-5">
+          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="#C62828" strokeWidth="2" />
+              <path d="M12 7v5" stroke="#C62828" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="12" cy="16.5" r="1" fill="#C62828" />
+            </svg>
+          </div>
+          <p className="text-sm text-gray-700 font-medium text-center leading-relaxed">
+            {message}
+          </p>
+        </div>
+
+        {/* Action button */}
+        <div className="px-7 pb-6 flex justify-center">
+          <button
+            id="session-alert-ok"
+            onClick={onClose}
+            autoFocus
+            className="px-8 py-2.5 rounded-xl bg-gradient-to-r from-[#C62828] to-[#E64A19] text-white text-sm font-bold shadow-md hover:opacity-90 active:scale-[0.97] transition-all focus:outline-none focus:ring-2 focus:ring-[#C62828]/40"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes sessionModalIn {
+          from { opacity: 0; transform: scale(0.88) translateY(12px); }
+          to   { opacity: 1; transform: scale(1)   translateY(0); }
+        }
+      `}</style>
+    </div>
   )
 }

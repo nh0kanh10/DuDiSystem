@@ -102,6 +102,15 @@ const STAFF_MODULE_TREE = [
       { id: "user-directory", label: "Danh bạ nhân viên" },
       { id: "user-chat", label: "Trò chuyện nội bộ" }
     ]
+  },
+  {
+    // Thêm nhóm Tiện ích nhân viên — ánh xạ tới bubble notifications & tasks trong UserPortalApp
+    id: "staff-tools",
+    label: "Tiện ích nhân viên",
+    children: [
+      { id: "thong-bao", label: "Thông báo hệ thống" },
+      { id: "cong-viec", label: "Công việc cá nhân" }
+    ]
   }
 ]
 
@@ -138,7 +147,7 @@ export default function AccountManagement({
   const [rolePermissions, setRolePermissions] = useState<string[]>([])
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     "group-general", "group-hr", "group-work", "group-reports",
-    "staff-general", "staff-work", "staff-social"
+    "staff-general", "staff-work", "staff-social", "staff-tools"  // staff-tools: Tiện ích nhân viên (thong-bao, cong-viec)
   ])
   
   const [showModal, setShowModal] = useState(false)
@@ -400,8 +409,10 @@ export default function AccountManagement({
     try {
       const initialModules = roleForm.roleType === "staff"
         ? [
-            "dashboard", "user-profile", "user-attendance", "user-timeoff", 
-            "user-directory", "user-chat", "user-workflow", "user-settings"
+            // Modules mặc định đầy đủ cho role nhân viên — phải khớp với BUBBLE_MODULE_MAP trong UserApp.tsx
+            "user-profile", "user-attendance", "user-timeoff",
+            "user-directory", "user-chat", "user-workflow",
+            "user-settings", "thong-bao", "cong-viec"
           ]
         : ["dashboard"]
 
