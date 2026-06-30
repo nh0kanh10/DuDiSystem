@@ -6,6 +6,8 @@ import {
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { AttendanceRecord } from "../../types"
+import { CustomDatePicker } from "../ui/CustomDatePicker"
+import { CustomSelect } from "../ui/CustomSelect"
 
 const STATUS_MAP = {
   "on-time": { label: "Đúng giờ",  bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500"  },
@@ -37,6 +39,18 @@ function fmtDate(iso: string) {
   if (!iso) return "--"
   const [y, m, d] = iso.split("-")
   return `${d}/${m}/${y}`
+}
+
+function isoToVn(iso: string) {
+  if (!iso) return ""
+  const [y, m, d] = iso.split("-")
+  return `${d}/${m}/${y}`
+}
+
+function vnToIso(vn: string) {
+  if (!vn) return ""
+  const [d, m, y] = vn.split("/")
+  return `${y}-${m}-${d}`
 }
 
 function exportCSV(rows: AttendanceRecord[], label: string) {
@@ -181,6 +195,13 @@ function AddModal({ date, employees, onClose, onSave }: {
     onClose()
   }
 
+  const empOptions = useMemo(() => {
+    return [
+      { value: "", label: "-- Chọn nhân viên --" },
+      ...employees.map((e: any) => ({ value: e.id, label: `${e.name} (${e.id})` }))
+    ]
+  }, [employees])
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -195,22 +216,25 @@ function AddModal({ date, employees, onClose, onSave }: {
         <div className="p-6 space-y-4">
           <div>
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Nhân viên</label>
-            <select value={form.employeeId} onChange={e => setForm(p => ({ ...p, employeeId: e.target.value }))}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-[#C62828]/50 focus:ring-2 focus:ring-[#C62828]/10">
-              <option value="">-- Chọn nhân viên --</option>
-              {employees.map((e: any) => <option key={e.id} value={e.id}>{e.name} ({e.id})</option>)}
-            </select>
+            <CustomSelect
+              value={form.employeeId}
+              onChange={val => setForm(p => ({ ...p, employeeId: val }))}
+              options={empOptions}
+              placeholder="Chọn nhân viên..."
+              heightClass="h-10"
+              searchable
+            />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Check-in</label>
               <input type="time" value={form.checkIn} onChange={e => setForm(p => ({ ...p, checkIn: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/50 focus:ring-2 focus:ring-[#C62828]/10" />
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10" />
             </div>
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Check-out</label>
               <input type="time" value={form.checkOut} onChange={e => setForm(p => ({ ...p, checkOut: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/50 focus:ring-2 focus:ring-[#C62828]/10" />
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10" />
             </div>
           </div>
           <div>
@@ -245,7 +269,12 @@ function AddModal({ date, employees, onClose, onSave }: {
 // ─── TAB 1: Chấm công theo ngày ───────────────────────────────────────────────
 function DailyTab() {
   const todayISO = new Date().toISOString().split("T")[0]
-  const [selectedDate, setSelectedDate] = useState(todayISO)
+  const [dateMode, setDateMode] = useState<"single" | "month" | "range">("single")
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [startDate, setStartDate] = useState(todayISO)
+  const [endDate, setEndDate] = useState(todayISO)
+  const [filterEmployee, setFilterEmployee] = useState("all")
   const [search, setSearch] = useState("")
   const [filterDept, setFilterDept] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -259,12 +288,19 @@ function DailyTab() {
 
   useEffect(() => { api.employees.list().then(d => setEmployees(d as any[])) }, [])
 
-  const loadDay = useCallback(async (date: string) => {
+  const loadData = useCallback(async (start: string, end: string, empId: string) => {
     setLoading(true)
     try {
+      const queryParams: any = {
+        startDate: start,
+        endDate: end
+      }
+      if (empId !== "all") {
+        queryParams.employeeId = empId
+      }
       const [data, statsData] = await Promise.all([
-        api.attendance.list({ date }),
-        api.attendance.stats(date)
+        api.attendance.list(queryParams),
+        api.attendance.stats(queryParams)
       ])
       setRecords(data as AttendanceRecord[])
       setStats(statsData)
@@ -275,26 +311,27 @@ function DailyTab() {
     }
   }, [])
 
-  useEffect(() => { loadDay(selectedDate) }, [selectedDate])
+  useEffect(() => { loadData(startDate, endDate, filterEmployee) }, [startDate, endDate, filterEmployee, loadData])
 
   const shiftDate = (days: number) => {
-    const d = new Date(selectedDate)
-    d.setDate(d.getDate() + days)
-    setSelectedDate(d.toISOString().split("T")[0])
+    const s = new Date(startDate)
+    s.setDate(s.getDate() + days)
+    const newStart = s.toISOString().split("T")[0]
+    
+    const e = new Date(endDate)
+    e.setDate(e.getDate() + days)
+    const newEnd = e.toISOString().split("T")[0]
+    
+    setStartDate(newStart)
+    setEndDate(newEnd)
   }
 
   const handleSaveEdit = async (id: string, data: Partial<AttendanceRecord>) => {
     try {
       await api.attendance.update(id, data)
       setRecords(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
-      const updated = records.map(r => r.id === id ? { ...r, ...data } : r)
-      setStats({
-        onTime: updated.filter(r => r.status === "on-time").length,
-        late:   updated.filter(r => r.status === "late").length,
-        absent: updated.filter(r => r.status === "absent").length,
-        leave:  updated.filter(r => r.status === "leave").length,
-        total:  updated.length
-      })
+      const statsData = await api.attendance.stats({ startDate, endDate, employeeId: filterEmployee !== "all" ? filterEmployee : undefined })
+      setStats(statsData)
       setToast({ msg: "Cập nhật thành công", type: "success" })
     } catch {
       setToast({ msg: "Lỗi cập nhật", type: "error" })
@@ -305,7 +342,7 @@ function DailyTab() {
     try {
       await api.attendance.create(data)
       setToast({ msg: "Thêm bản ghi thành công", type: "success" })
-      await loadDay(selectedDate)
+      await loadData(startDate, endDate, filterEmployee)
     } catch (e: any) {
       setToast({ msg: e.message || "Lỗi thêm bản ghi", type: "error" })
     }
@@ -319,42 +356,137 @@ function DailyTab() {
   }), [records, search, filterDept, filterStatus])
 
   const departments = useMemo(() => Array.from(new Set(records.map(r => r.department).filter(Boolean))), [records])
-  const isToday = selectedDate === todayISO
+  const isToday = endDate === todayISO
+
+  const empFilterOptions = useMemo(() => {
+    return [
+      { value: "all", label: "Tất cả nhân viên" },
+      ...employees.map((e: any) => ({ value: e.id, label: `${e.name} (${e.id})` }))
+    ]
+  }, [employees])
+
+  const deptFilterOptions = useMemo(() => {
+    return [
+      { value: "all", label: "Tất cả phòng ban" },
+      ...departments.map(d => ({ value: d, label: d }))
+    ]
+  }, [departments])
+
+  const statusFilterOptions = useMemo(() => {
+    return [
+      { value: "all", label: "Tất cả trạng thái" },
+      ...Object.entries(STATUS_MAP).map(([k, v]) => ({ value: k, label: v.label }))
+    ]
+  }, [])
 
   return (
     <div className="space-y-5">
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       {editRecord && <EditModal record={editRecord} onClose={() => setEditRecord(null)} onSave={handleSaveEdit} />}
-      {showAdd && <AddModal date={selectedDate} employees={employees} onClose={() => setShowAdd(false)} onSave={handleAdd} />}
+      {showAdd && <AddModal date={endDate} employees={employees} onClose={() => setShowAdd(false)} onSave={handleAdd} />}
 
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <button onClick={() => shiftDate(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors">
-            <ChevronLeft size={15} />
-          </button>
-          <div className="relative">
-            <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
-              className="pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm font-bold text-gray-800 focus:outline-none focus:border-[#C62828]/40 cursor-pointer bg-white" />
-            <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <div className="flex items-center gap-3">
+          <div className="flex bg-gray-100 p-0.5 rounded-xl border border-gray-200/50 shrink-0">
+            <button onClick={() => { setDateMode("single"); setEndDate(startDate) }}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${dateMode === "single" ? "bg-white text-[#C62828] shadow-xs" : "text-gray-500 hover:text-gray-700"}`}>
+              Một ngày
+            </button>
+            <button onClick={() => {
+              setDateMode("month")
+              const newStart = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`
+              const newEnd = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${new Date(selectedYear, selectedMonth, 0).getDate()}`
+              setStartDate(newStart)
+              setEndDate(newEnd)
+            }}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${dateMode === "month" ? "bg-white text-[#C62828] shadow-xs" : "text-gray-500 hover:text-gray-700"}`}>
+              Theo tháng
+            </button>
+            <button onClick={() => setDateMode("range")}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${dateMode === "range" ? "bg-white text-[#C62828] shadow-xs" : "text-gray-500 hover:text-gray-700"}`}>
+              Khoảng ngày
+            </button>
           </div>
-          <button onClick={() => shiftDate(1)} disabled={isToday}
-            className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors disabled:opacity-30">
-            <ChevronRight size={15} />
-          </button>
-          {!isToday && (
-            <button onClick={() => setSelectedDate(todayISO)} className="px-3 py-1.5 text-xs font-bold text-[#C62828] border border-[#C62828]/30 rounded-xl hover:bg-red-50 transition-colors">
+
+          {dateMode === "single" ? (
+            <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
+              <button onClick={() => shiftDate(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors">
+                <ChevronLeft size={15} />
+              </button>
+              <CustomDatePicker
+                value={isoToVn(startDate)}
+                onChange={val => {
+                  const d = vnToIso(val)
+                  setStartDate(d)
+                  setEndDate(d)
+                }}
+                className="w-32 text-xs font-bold text-gray-800 bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 cursor-pointer hover:bg-gray-50"
+              />
+              <button onClick={() => shiftDate(1)} disabled={startDate === todayISO}
+                className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors disabled:opacity-30">
+                <ChevronRight size={15} />
+              </button>
+            </div>
+          ) : dateMode === "month" ? (
+            <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
+              <select value={selectedMonth} onChange={e => {
+                const m = Number(e.target.value)
+                setSelectedMonth(m)
+                const newStart = `${selectedYear}-${String(m).padStart(2, "0")}-01`
+                const newEnd = `${selectedYear}-${String(m).padStart(2, "0")}-${new Date(selectedYear, m, 0).getDate()}`
+                setStartDate(newStart)
+                setEndDate(newEnd)
+              }}
+                className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 bg-white cursor-pointer focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50">
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>
+                ))}
+              </select>
+              <select value={selectedYear} onChange={e => {
+                const y = Number(e.target.value)
+                setSelectedYear(y)
+                const newStart = `${y}-${String(selectedMonth).padStart(2, "0")}-01`
+                const newEnd = `${y}-${String(selectedMonth).padStart(2, "0")}-${new Date(y, selectedMonth, 0).getDate()}`
+                setStartDate(newStart)
+                setEndDate(newEnd)
+              }}
+                className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 bg-white cursor-pointer focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50">
+                {Array.from({ length: 5 }, (_, i) => {
+                  const y = new Date().getFullYear() - 2 + i
+                  return <option key={y} value={y}>Năm {y}</option>
+                })}
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
+              <CustomDatePicker
+                value={isoToVn(startDate)}
+                onChange={val => setStartDate(vnToIso(val))}
+                className="w-32 text-xs font-bold text-gray-800 bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 cursor-pointer hover:bg-gray-50"
+              />
+              <span className="text-gray-400 text-xs font-semibold">đến</span>
+              <CustomDatePicker
+                value={isoToVn(endDate)}
+                onChange={val => setEndDate(vnToIso(val))}
+                className="w-32 text-xs font-bold text-gray-800 bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 cursor-pointer hover:bg-gray-50"
+              />
+            </div>
+          )}
+
+          {dateMode === "single" && (!isToday || startDate !== todayISO) && (
+            <button onClick={() => { setStartDate(todayISO); setEndDate(todayISO) }} className="px-3 py-1.5 text-xs font-bold text-[#C62828] border border-[#C62828]/30 rounded-xl hover:bg-red-50 transition-colors animate-in fade-in duration-200">
               Hôm nay
             </button>
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => loadDay(selectedDate)} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+          <button onClick={() => loadData(startDate, endDate, filterEmployee)} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors">
             <RefreshCw size={13} /> Làm mới
           </button>
           <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 bg-[#C62828] text-white rounded-xl text-xs font-bold hover:bg-[#B71C1C] transition-colors">
             <Plus size={13} /> Thêm bản ghi
           </button>
-          <button onClick={() => exportCSV(filtered, selectedDate)} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors">
+          <button onClick={() => exportCSV(filtered, `${startDate}_den_${endDate}`)} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors">
             <Download size={13} /> Xuất CSV
           </button>
         </div>
@@ -386,21 +518,33 @@ function DailyTab() {
           <div className="relative flex-1 min-w-[220px]">
             <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm tên hoặc mã NV..."
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50/50 focus:outline-none focus:border-[#C62828]/40 text-gray-700" />
+              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50/50 focus:outline-none focus:border-[#C62828]/40 text-gray-700 font-bold" />
           </div>
-          <select value={filterDept} onChange={e => setFilterDept(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 bg-white cursor-pointer min-w-[140px]">
-            <option value="all">Tất cả phòng ban</option>
-            {departments.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 bg-white cursor-pointer min-w-[140px]">
-            <option value="all">Tất cả trạng thái</option>
-            {Object.entries(STATUS_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-          {(search || filterDept !== "all" || filterStatus !== "all") && (
-            <button onClick={() => { setSearch(""); setFilterDept("all"); setFilterStatus("all") }}
-              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+          <CustomSelect
+            value={filterEmployee}
+            onChange={setFilterEmployee}
+            options={empFilterOptions}
+            placeholder="Tất cả nhân viên"
+            className="min-w-[150px]"
+            searchable
+          />
+          <CustomSelect
+            value={filterDept}
+            onChange={setFilterDept}
+            options={deptFilterOptions}
+            placeholder="Tất cả phòng ban"
+            className="min-w-[150px]"
+          />
+          <CustomSelect
+            value={filterStatus}
+            onChange={setFilterStatus}
+            options={statusFilterOptions}
+            placeholder="Tất cả trạng thái"
+            className="min-w-[150px]"
+          />
+          {(search || filterEmployee !== "all" || filterDept !== "all" || filterStatus !== "all") && (
+            <button onClick={() => { setSearch(""); setFilterEmployee("all"); setFilterDept("all"); setFilterStatus("all") }}
+              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 font-bold">
               <X size={12} /> Xóa lọc
             </button>
           )}
@@ -528,6 +672,13 @@ function MonthlyTab() {
     }
   }
 
+  const deptFilterOptions = useMemo(() => {
+    return [
+      { value: "all", label: "Tất cả phòng ban" },
+      ...departments.map(d => ({ value: d, label: d }))
+    ]
+  }, [departments])
+
   return (
     <div className="space-y-5">
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
@@ -545,11 +696,13 @@ function MonthlyTab() {
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <select value={filterDept} onChange={e => setFilterDept(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 bg-white">
-            <option value="all">Tất cả phòng ban</option>
-            {departments.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+          <CustomSelect
+            value={filterDept}
+            onChange={setFilterDept}
+            options={deptFilterOptions}
+            placeholder="Tất cả phòng ban"
+            className="min-w-[150px]"
+          />
           <button onClick={() => exportCSV(records, `${year}-${month}`)}
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50">
             <Download size={13} /> Xuất CSV

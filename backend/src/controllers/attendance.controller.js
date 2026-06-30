@@ -6,7 +6,7 @@ export function list(req, res) {
 }
 
 export function stats(req, res) {
-  ok(res, svc.getAttendanceStats(req.query.date))
+  ok(res, svc.getAttendanceStats(req.query))
 }
 
 export function getOne(req, res) {

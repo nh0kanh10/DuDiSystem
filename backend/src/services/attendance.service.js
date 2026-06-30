@@ -21,8 +21,8 @@ export function listAttendance(filter) {
   return records.map(withEmployee)
 }
 
-export function getAttendanceStats(date) {
-  const records = repo.getAll(date ? { date } : {})
+export function getAttendanceStats(filter = {}) {
+  const records = repo.getAll(filter)
   return {
     onTime: records.filter(r => r.status === "on-time").length,
     late: records.filter(r => r.status === "late").length,

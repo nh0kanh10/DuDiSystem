@@ -85,9 +85,9 @@ export const api = {
   attendance: {
     list: (params?: { date?: string; employeeId?: string; status?: string; department?: string }) =>
       req<unknown[]>("GET", `/attendance${qs(params)}`),
-    stats: (date?: string) =>
+    stats: (params?: { date?: string; startDate?: string; endDate?: string; employeeId?: string; status?: string; department?: string }) =>
       req<{ onTime: number; late: number; absent: number; leave: number; total: number }>(
-        "GET", `/attendance/stats${date ? `?date=${date}` : ""}`
+        "GET", `/attendance/stats${qs(params)}`
       ),
     create: (data: unknown) => req<unknown>("POST", "/attendance", data),
     update: (id: string, data: unknown) => req<unknown>("PUT", `/attendance/${id}`, data),
