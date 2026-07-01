@@ -19,7 +19,8 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     window.dispatchEvent(new Event("dudi_unauthorized"))
     throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
   }
-  const json = await res.json()
+  const text = await res.text()
+  const json = text ? JSON.parse(text) : {}
   if (!res.ok) throw new Error(json.message ?? "Lỗi server")
   return json.data as T
 }
