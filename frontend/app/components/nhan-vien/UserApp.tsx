@@ -326,11 +326,12 @@ function Bubble({ b, hovId, setHovId, onClick, badge }: {
   );
 }
 
-function Panel({ activePage, onClose, onLogout, employee }: {
+function Panel({ activePage, onClose, onLogout, employee, embed = false }: {
   activePage: BubbleId;
   onClose: () => void;
   onLogout: () => void;
   employee: Employee | null;
+  embed?: boolean;
 }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => { const id = requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true))); return () => cancelAnimationFrame(id); }, []);
@@ -433,7 +434,7 @@ function Panel({ activePage, onClose, onLogout, employee }: {
           {activePage === "tasks" && <TasksContent employeeId={employee?.id} />}
           {activePage === "directory" && <DirectoryContent />}
           {activePage === "notifications" && <NotificationsContent />}
-          {activePage === "settings" && <SettingsContent onLogout={onLogout} />}
+          {activePage === "settings" && <SettingsContent onLogout={onLogout} embed={embed} />}
           {activePage === "crm" && <CrmStaffContent />}
         </div>
       </div>
@@ -795,7 +796,7 @@ function NotificationsContent() {
   );
 }
 
-function SettingsContent({ onLogout }: { onLogout: () => void }) {
+function SettingsContent({ onLogout, embed = false }: { onLogout: () => void; embed?: boolean }) {
   const [vals, setVals] = useState(["", "", ""]);
   const [shows, setShows] = useState([false, false, false]);
   const [saved, setSaved] = useState(false);
@@ -828,7 +829,6 @@ function SettingsContent({ onLogout }: { onLogout: () => void }) {
       </div>
 
       <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "8px 0" }} />
-
       <SectionLabel>Quản lý phiên đăng nhập</SectionLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "rgba(255,255,255,0.02)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)" }}>
@@ -875,21 +875,45 @@ export default function UserPortalApp({ onLogout, modules = [], embed = false }:
 
   useEffect(() => {
     const loadEmployee = async () => {
+      let userObj: any = null;
       try {
         const raw = localStorage.getItem("dudi_user");
-        const user = raw ? JSON.parse(raw) : null;
-        const empId = user?.employeeId;
+        userObj = raw ? JSON.parse(raw) : null;
+        const empId = userObj?.employeeId;
         if (empId) {
           const found = await api.employees.getById(empId) as Employee;
-          setEmployee(found);
-          return;
+          if (found) {
+            setEmployee(found);
+            return;
+          }
         }
-        const key = String(user?.email || "").toLowerCase();
-        if (!key) return;
-        const list = (await api.employees.list()) as Employee[];
-        const found = list.find(e => (e.email || "").toLowerCase() === key);
-        if (found) setEmployee(found);
-      } catch {
+        const key = String(userObj?.email || "").toLowerCase();
+        if (key) {
+          const list = (await api.employees.list()) as Employee[];
+          const found = list.find(e => (e.email || "").toLowerCase() === key);
+          if (found) {
+            setEmployee(found);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch employee record, using fallback:", err);
+      }
+
+      if (userObj) {
+        const fallback: Employee = {
+          id: userObj.id || userObj.employeeId || "admin",
+          name: userObj.name || "Quản trị viên",
+          email: userObj.email || "admin@dudi.vn",
+          phone: userObj.phone || "—",
+          department: userObj.department || "Ban Giám Đốc",
+          position: userObj.roleName || "Quản trị viên",
+          joinDate: userObj.joinDate || new Date().toLocaleDateString("vi-VN"),
+          status: "active",
+          contractType: "Chính thức",
+          workHistory: [],
+        } as any;
+        setEmployee(fallback);
       }
     };
     loadEmployee();
@@ -971,6 +995,7 @@ export default function UserPortalApp({ onLogout, modules = [], embed = false }:
           onClose={() => setActivePage(null)}
           onLogout={onLogout}
           employee={employee}
+          embed={embed}
         />
       )}
     </div>

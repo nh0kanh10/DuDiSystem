@@ -465,9 +465,13 @@ function withEmployee(record) {
 
 export function listAttendance(filter) {
   let records = repo.getAll(filter)
+  records = records.filter(r => !["0000000000", "1111111111", "2222222222"].includes(r.employeeId))
+
   if (filter.startDate && filter.startDate === filter.endDate) {
     const targetDate = filter.startDate
     let employees = empRepo.getAll()
+    employees = employees.filter(e => !["0000000000", "1111111111", "2222222222"].includes(e.id))
+
     if (filter.employeeId) {
       employees = employees.filter(e => e.id === filter.employeeId)
     }

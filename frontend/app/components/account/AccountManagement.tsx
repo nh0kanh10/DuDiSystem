@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { createPortal } from "react-dom"
-import { 
-  Search, Lock, Unlock, KeyRound, UserX, UserCheck, X, Copy, Edit2, 
-  Trash2, Plus, RefreshCw, Shield, Briefcase, User, ChevronDown, 
-  ChevronRight, Folder, FolderOpen, Save 
+import {
+  Search, Lock, Unlock, KeyRound, UserX, UserCheck, X, Copy, Edit2,
+  Trash2, Plus, RefreshCw, Shield, Briefcase, User, ChevronDown,
+  ChevronRight, Folder, FolderOpen, Save
 } from "lucide-react"
 import { api } from "../../../lib/api"
 import { CustomSelect } from "../ui/CustomSelect"
@@ -128,14 +128,14 @@ const STAFF_MODULE_TREE = [
   }
 ]
 
-export default function AccountManagement({ 
-  selectedBranch = "all", 
-  currentUserEmail = "", 
+export default function AccountManagement({
+  selectedBranch = "all",
+  currentUserEmail = "",
   currentUserRole = "role-user",
   mode
-}: { 
-  selectedBranch?: string; 
-  currentUserEmail?: string; 
+}: {
+  selectedBranch?: string;
+  currentUserEmail?: string;
   currentUserRole?: string;
   mode?: "accounts" | "roles"
 }) {
@@ -163,7 +163,7 @@ export default function AccountManagement({
     "group-general", "group-hr", "group-work", "group-reports",
     "staff-general", "staff-work", "staff-social", "staff-tools"  // staff-tools: Tiện ích nhân viên (thong-bao, cong-viec)
   ])
-  
+
   const [showModal, setShowModal] = useState(false)
   const [editingAcc, setEditingAcc] = useState<UserRecord | null>(null)
   const [form, setForm] = useState({
@@ -183,8 +183,8 @@ export default function AccountManagement({
   const [modalPermTab, setModalPermTab] = useState<"management" | "staff">("management")
 
   const [showRoleModal, setShowRoleModal] = useState(false)
-  const [roleForm, setRoleForm] = useState<{ 
-    name: string; 
+  const [roleForm, setRoleForm] = useState<{
+    name: string;
     scopeType: "company" | "branch" | "self";
     roleType: "management" | "staff"
   }>({
@@ -295,24 +295,24 @@ export default function AccountManagement({
   const filteredAccountsToAdd = useMemo(() => {
     return accountsWithoutCustom.filter(acc => {
       const emp = employees.find(e => e.id === acc.employeeId)
-      
+
       if (addCustomUserDeptFilter !== "all") {
         if (!emp || emp.department !== addCustomUserDeptFilter) {
           return false
         }
       }
-      
+
       if (addCustomUserSearch.trim() !== "") {
         const q = addCustomUserSearch.toLowerCase()
         const matchEmail = acc.email.toLowerCase().includes(q)
         const matchId = acc.employeeId ? acc.employeeId.toLowerCase().includes(q) : false
         const matchName = emp ? emp.name.toLowerCase().includes(q) : false
-        
+
         if (!matchEmail && !matchId && !matchName) {
           return false
         }
       }
-      
+
       return true
     })
   }, [accountsWithoutCustom, employees, addCustomUserSearch, addCustomUserDeptFilter])
@@ -328,14 +328,16 @@ export default function AccountManagement({
     if (selectedRole?.id === "role-admin" || selectedCustomUser?.roleId === "role-admin") {
       childIds = childIds.filter(id => id !== "phan-quyen")
     }
+    childIds = childIds.filter(id => id !== "user-settings")
     if (checked) {
-      setRolePermissions(prev => Array.from(new Set([...prev, ...childIds])))
+      setRolePermissions(prev => Array.from(new Set([...prev, ...childIds, "user-settings"])))
     } else {
       setRolePermissions(prev => prev.filter(id => !childIds.includes(id)))
     }
   }
 
   const handleChildCheckboxChange = (childId: string, checked: boolean) => {
+    if (childId === "user-settings") return
     if ((selectedRole?.id === "role-admin" || selectedCustomUser?.roleId === "role-admin") && childId === "phan-quyen" && !checked) {
       return
     }
@@ -349,20 +351,21 @@ export default function AccountManagement({
   const handleSavePermissions = async () => {
     if (!selectedRole && !selectedCustomUser) return
     try {
+      const finalPermissions = rolePermissions.includes("user-settings") ? rolePermissions : [...rolePermissions, "user-settings"]
       if (selectedRole) {
         await api.roles.update(selectedRole.id, {
           name: selectedRole.name,
-          modules: rolePermissions
+          modules: finalPermissions
         })
         showToast("Cập nhật quyền hạn vai trò thành công")
         await loadData(selectedRole, null)
         window.dispatchEvent(new Event("dudi_permissions_updated"))
       } else if (selectedCustomUser) {
         await api.users.update(selectedCustomUser.id, {
-          permissions: rolePermissions
+          permissions: finalPermissions
         })
         showToast("Cập nhật quyền riêng tài khoản thành công")
-        const updatedUser = { ...selectedCustomUser, permissions: rolePermissions }
+        const updatedUser = { ...selectedCustomUser, permissions: finalPermissions }
         await loadData(null, updatedUser)
         window.dispatchEvent(new Event("dudi_permissions_updated"))
       }
@@ -423,11 +426,11 @@ export default function AccountManagement({
     try {
       const initialModules = roleForm.roleType === "staff"
         ? [
-            // Modules mặc định đầy đủ cho role nhân viên — phải khớp với BUBBLE_MODULE_MAP trong UserApp.tsx
-            "user-profile", "user-attendance", "user-timeoff",
-            "user-directory", "user-chat", "user-workflow",
-            "user-settings", "thong-bao", "cong-viec"
-          ]
+          // Modules mặc định đầy đủ cho role nhân viên — phải khớp với BUBBLE_MODULE_MAP trong UserApp.tsx
+          "user-profile", "user-attendance", "user-timeoff",
+          "user-directory", "user-chat", "user-workflow",
+          "user-settings", "thong-bao", "cong-viec"
+        ]
         : ["dashboard"]
 
       const created = await api.roles.create({
@@ -486,7 +489,7 @@ export default function AccountManagement({
   const totalEmployeesCount = branchFilteredEmployees.length
   const activeEmployeesCount = branchFilteredEmployees.filter(e => e.status === "active" || e.status === "intern").length
   const resignedEmployeesCount = branchFilteredEmployees.filter(e => e.status === "inactive").length
-  
+
   const lockedAccountsCount = useMemo(() => {
     return accounts.filter(a => {
       const matchBranch = branchFilter === "all" || a.branchId === branchFilter
@@ -526,7 +529,7 @@ export default function AccountManagement({
 
   const handleEmployeeChange = (empId: string) => {
     const emp = employees.find(e => e.id === empId)
-    const targetRole = emp 
+    const targetRole = emp
       ? (emp.position?.toLowerCase().includes("trưởng") || emp.position?.toLowerCase().includes("quản lý") ? "role-manager" : "role-user")
       : form.roleId
     setForm(p => ({
@@ -587,7 +590,7 @@ export default function AccountManagement({
     })
     const hasCustom = !!(acc.permissions && acc.permissions.length > 0)
     setCustomPermissionsEnabled(hasCustom)
-    
+
     if (hasCustom) {
       setCustomPermissions(acc.permissions || [])
     } else {
@@ -610,12 +613,15 @@ export default function AccountManagement({
       return
     }
     try {
+      const finalCustomPerms = customPermissionsEnabled
+        ? (customPermissions.includes("user-settings") ? customPermissions : [...customPermissions, "user-settings"])
+        : null
       const payload = {
         email: loginIdentifier,
         roleId: form.roleId,
         employeeId: form.employeeId || null,
         scopeId: showBranchSelect ? form.scopeId : null,
-        permissions: customPermissionsEnabled ? customPermissions : null
+        permissions: finalCustomPerms
       }
       if (editingAcc) {
         await api.users.update(editingAcc.id, payload)
@@ -721,7 +727,7 @@ export default function AccountManagement({
           <div className={`w-2.5 h-2.5 rounded-full ${toast.type === "success" ? "bg-emerald-400" : "bg-red-400"} animate-pulse`} />
           <span className="text-sm font-semibold">{toast.message}</span>
         </div>
-      , document.body)}
+        , document.body)}
 
       {resetSuccess && createPortal(
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
@@ -732,7 +738,7 @@ export default function AccountManagement({
             <h3 className="text-lg font-black text-gray-800">Đặt lại mật khẩu</h3>
             <p className="text-xs text-gray-400 mt-1">Đã cấu hình mật khẩu mặc định cho</p>
             <p className="text-sm font-black text-[#C62828] mt-0.5">{resetSuccess.email}</p>
-            
+
             <div className="mt-4 p-3 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-between gap-3">
               <span className="text-xs text-gray-500 font-bold">Mật khẩu mới:</span>
               <span className="text-sm font-black font-mono text-gray-800 tracking-wider bg-white px-3 py-1.5 border border-gray-200 rounded-xl shadow-sm">{resetSuccess.rawPass}</span>
@@ -748,7 +754,7 @@ export default function AccountManagement({
             </div>
           </div>
         </div>
-      , document.body)}
+        , document.body)}
 
       <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
         <div className="flex items-center">
@@ -759,17 +765,17 @@ export default function AccountManagement({
           </div>
           <div>
             <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
-               {mode === "accounts" 
-                 ? "Quản lý tài khoản" 
-                 : mode === "roles" 
-                   ? "Phân quyền vai trò" 
-                   : "Thiết lập tài khoản & Phân quyền"}
+              {mode === "accounts"
+                ? "Quản lý tài khoản"
+                : mode === "roles"
+                  ? "Phân quyền vai trò"
+                  : "Thiết lập tài khoản & Phân quyền"}
             </h2>
             <p className="text-xs text-white/80 mt-1">
-              {mode === "accounts" 
-                ? "Quản lý danh sách tài khoản nhân viên và thông tin đăng nhập" 
-                : mode === "roles" 
-                  ? "Cấu hình danh sách vai trò và ma trận phân quyền module hệ thống" 
+              {mode === "accounts"
+                ? "Quản lý danh sách tài khoản nhân viên và thông tin đăng nhập"
+                : mode === "roles"
+                  ? "Cấu hình danh sách vai trò và ma trận phân quyền module hệ thống"
                   : "Quản lý danh sách tài khoản nhân viên và cấu hình ma trận vai trò, phân quyền module"}
             </p>
           </div>
@@ -777,19 +783,17 @@ export default function AccountManagement({
         <div className="flex items-center gap-3">
           {!mode && (
             <div className="flex bg-white/10 rounded-xl p-0.5 gap-0.5">
-              <button 
+              <button
                 onClick={() => setActiveTab("accounts")}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  activeTab === "accounts" ? "bg-white text-[#C62828] shadow-sm" : "text-white/70 hover:text-white"
-                }`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "accounts" ? "bg-white text-[#C62828] shadow-sm" : "text-white/70 hover:text-white"
+                  }`}
               >
                 Tài khoản
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab("roles")}
-                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  activeTab === "roles" ? "bg-white text-[#C62828] shadow-sm" : "text-white/70 hover:text-white"
-                }`}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === "roles" ? "bg-white text-[#C62828] shadow-sm" : "text-white/70 hover:text-white"
+                  }`}
               >
                 Vai trò
               </button>
@@ -797,18 +801,18 @@ export default function AccountManagement({
           )}
 
           {activeTab === "accounts" ? (
-            <button 
-              onClick={handleOpenCreate} 
+            <button
+              onClick={handleOpenCreate}
               className="flex items-center gap-2 px-4 py-2.5 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm cursor-pointer"
             >
               <Plus size={14} /> Tạo tài khoản
             </button>
           ) : (
-            <button 
+            <button
               onClick={() => {
                 setRoleForm({ name: "", scopeType: "branch", roleType: "management" })
                 setShowRoleModal(true)
-              }} 
+              }}
               className="flex items-center gap-2 px-4 py-2.5 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm cursor-pointer"
             >
               <Plus size={14} /> Tạo vai trò
@@ -920,7 +924,7 @@ export default function AccountManagement({
           <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white flex-wrap gap-2">
               <h3 className="font-black text-gray-800 flex items-center gap-1.5">
-                 Danh sách tài khoản nhân viên
+                Danh sách tài khoản nhân viên
               </h3>
               <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-wider border border-blue-150 shadow-xs">
                 <RefreshCw size={10} className="animate-spin" /> Dữ liệu realtime
@@ -972,10 +976,10 @@ export default function AccountManagement({
                           <td className="px-5 py-4">
                             {acc ? (
                               <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold 
-                                ${acc.roleId === "role-admin" 
-                                  ? "bg-amber-100 text-amber-700 animate-pulse" 
-                                  : acc.roleId === "role-manager" 
-                                    ? "bg-blue-100 text-blue-700" 
+                                ${acc.roleId === "role-admin"
+                                  ? "bg-amber-100 text-amber-700 animate-pulse"
+                                  : acc.roleId === "role-manager"
+                                    ? "bg-blue-100 text-blue-700"
                                     : "bg-gray-100 text-gray-600"}`}>
                                 {acc.roleId === "role-admin" ? (
                                   <><Shield size={11} /> {roleObj?.name || "Admin"}</>
@@ -995,9 +999,8 @@ export default function AccountManagement({
                                 <div className="flex gap-1 items-center">
                                   <button
                                     onClick={() => handleToggleStatus(acc.id)}
-                                    className={`p-2 rounded-lg transition-all hover:scale-105 active:scale-95 ${
-                                      acc.status === "active" ? "text-amber-600 hover:bg-amber-50" : "text-emerald-600 hover:bg-emerald-50"
-                                    }`}
+                                    className={`p-2 rounded-lg transition-all hover:scale-105 active:scale-95 ${acc.status === "active" ? "text-amber-600 hover:bg-amber-50" : "text-emerald-600 hover:bg-emerald-50"
+                                      }`}
                                     title={acc.status === "active" ? "Khóa tài khoản" : "Kích hoạt tài khoản"}
                                   >
                                     {acc.status === "active" ? <Lock size={18} /> : <Unlock size={18} />}
@@ -1053,12 +1056,12 @@ export default function AccountManagement({
 
               <div className="space-y-2">
                 {rolesList.map(r => (
-                  <div 
+                  <div
                     key={r.id}
                     onClick={() => handleRoleSelect(r)}
                     className={`w-full text-left p-3.5 rounded-2xl transition-all cursor-pointer border flex items-center justify-between
-                      ${selectedRole?.id === r.id 
-                        ? "bg-red-50/60 border-red-200 shadow-xs" 
+                      ${selectedRole?.id === r.id
+                        ? "bg-red-50/60 border-red-200 shadow-xs"
                         : "bg-white border-gray-150 hover:bg-gray-50/50"}`}
                   >
                     <div className="space-y-1 truncate">
@@ -1073,7 +1076,7 @@ export default function AccountManagement({
                           Mặc định
                         </span>
                       ) : (
-                        <button 
+                        <button
                           onClick={(e) => handleDeleteRole(r.id, e)}
                           className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                           title="Xóa vai trò"
@@ -1090,7 +1093,7 @@ export default function AccountManagement({
             <div>
               <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
                 <h3 className="font-black text-gray-800 text-xs uppercase tracking-wider">Tài khoản có quyền riêng</h3>
-                <button 
+                <button
                   onClick={() => {
                     setSelectedUserToAdd("")
                     setShowAddCustomUserModal(true)
@@ -1107,12 +1110,12 @@ export default function AccountManagement({
               ) : (
                 <div className="space-y-2">
                   {customAccounts.map(acc => (
-                    <div 
+                    <div
                       key={acc.id}
                       onClick={() => handleCustomUserSelect(acc)}
                       className={`w-full text-left p-3.5 rounded-2xl transition-all cursor-pointer border flex items-center justify-between
-                        ${selectedCustomUser?.id === acc.id 
-                          ? "bg-red-50/60 border-red-200 shadow-xs" 
+                        ${selectedCustomUser?.id === acc.id
+                          ? "bg-red-50/60 border-red-200 shadow-xs"
                           : "bg-white border-gray-150 hover:bg-gray-50/50"}`}
                     >
                       <div className="space-y-1 truncate">
@@ -1125,7 +1128,7 @@ export default function AccountManagement({
                         <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-amber-50 text-amber-600 border border-amber-100 rounded-md">
                           Quyền riêng
                         </span>
-                        <button 
+                        <button
                           onClick={(e) => {
                             e.stopPropagation()
                             handleRemoveCustomPermissions(acc.id)
@@ -1157,7 +1160,7 @@ export default function AccountManagement({
                     </h3>
                     <p className="text-xs text-gray-400 mt-0.5">Bật/Tắt module để cho phép/ngăn chặn quyền truy cập tương ứng</p>
                   </div>
-                  <button 
+                  <button
                     onClick={handleSavePermissions}
                     className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
                   >
@@ -1170,22 +1173,20 @@ export default function AccountManagement({
                   <button
                     type="button"
                     onClick={() => setPermTab("management")}
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                      permTab === "management"
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${permTab === "management"
                         ? "bg-[#C62828] text-white shadow-xs"
                         : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     Quyền Quản lý / Admin
                   </button>
                   <button
                     type="button"
                     onClick={() => setPermTab("staff")}
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                      permTab === "staff"
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${permTab === "staff"
                         ? "bg-[#C62828] text-white shadow-xs"
                         : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     Quyền Nhân viên / Staff
                   </button>
@@ -1195,14 +1196,14 @@ export default function AccountManagement({
                   {(permTab === "management" ? MODULE_TREE : STAFF_MODULE_TREE).map(group => {
                     const isExpanded = expandedGroups.includes(group.id)
                     const groupChildIds = group.children.map(c => c.id)
-                    
+
                     const checkedChildrenCount = groupChildIds.filter(id => rolePermissions.includes(id)).length
                     const isAllChecked = checkedChildrenCount === groupChildIds.length
                     const isSomeChecked = checkedChildrenCount > 0 && checkedChildrenCount < groupChildIds.length
 
                     return (
                       <div key={group.id} className="bg-white">
-                        <div 
+                        <div
                           className="flex items-center justify-between p-3.5 bg-gray-50/50 hover:bg-gray-50 transition-colors cursor-pointer select-none"
                           onClick={() => toggleGroupExpand(group.id)}
                         >
@@ -1220,7 +1221,7 @@ export default function AccountManagement({
 
                           <div className="flex items-center" onClick={e => e.stopPropagation()}>
                             <label className="relative flex items-center cursor-pointer">
-                              <input 
+                              <input
                                 type="checkbox"
                                 checked={isAllChecked}
                                 ref={el => {
@@ -1238,14 +1239,13 @@ export default function AccountManagement({
                         {isExpanded && (
                           <div className="divide-y divide-gray-50 bg-white animate-in slide-in-from-top-1 duration-150">
                             {group.children.map(child => {
-                              const isChecked = rolePermissions.includes(child.id)
-                              const isLocked = (selectedRole?.id === "role-admin" || selectedCustomUser?.roleId === "role-admin") && child.id === "phan-quyen"
+                              const isChecked = child.id === "user-settings" ? true : rolePermissions.includes(child.id)
+                              const isLocked = ((selectedRole?.id === "role-admin" || selectedCustomUser?.roleId === "role-admin") && child.id === "phan-quyen") || child.id === "user-settings"
                               return (
-                                <div 
+                                <div
                                   key={child.id}
-                                  className={`flex items-center justify-between py-3 pr-4 pl-10 transition-colors ${
-                                    isLocked ? "cursor-not-allowed opacity-50 bg-gray-50/30" : "hover:bg-gray-50/40 cursor-pointer"
-                                  }`}
+                                  className={`flex items-center justify-between py-3 pr-4 pl-10 transition-colors ${isLocked ? "cursor-not-allowed opacity-50 bg-gray-50/30" : "hover:bg-gray-50/40 cursor-pointer"
+                                    }`}
                                   onClick={() => !isLocked && handleChildCheckboxChange(child.id, !isChecked)}
                                 >
                                   <div className="flex items-center gap-2">
@@ -1258,14 +1258,13 @@ export default function AccountManagement({
                                   </div>
 
                                   <div onClick={e => e.stopPropagation()}>
-                                    <input 
+                                    <input
                                       type="checkbox"
                                       checked={isChecked}
                                       disabled={isLocked}
                                       onChange={e => handleChildCheckboxChange(child.id, e.target.checked)}
-                                      className={`w-4.5 h-4.5 rounded border-gray-300 text-[#C62828] focus:ring-[#C62828] ${
-                                        isLocked ? "cursor-not-allowed" : "cursor-pointer"
-                                      }`}
+                                      className={`w-4.5 h-4.5 rounded border-gray-300 text-[#C62828] focus:ring-[#C62828] ${isLocked ? "cursor-not-allowed" : "cursor-pointer"
+                                        }`}
                                     />
                                   </div>
                                 </div>
@@ -1296,7 +1295,7 @@ export default function AccountManagement({
               <h3 className="font-black text-gray-800 text-lg">{editingAcc ? "Chỉnh sửa tài khoản" : "Tạo tài khoản mới"}</h3>
               <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-all"><X size={16} /></button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="flex gap-6">
               <div className="flex-1 space-y-4">
                 <div>
@@ -1313,20 +1312,20 @@ export default function AccountManagement({
                   <label className="text-xs font-black text-gray-500 mb-1.5 block">
                     {form.employeeId ? "Mã đăng nhập (Mã nhân viên)" : "Tài khoản đăng nhập (Email)"}
                   </label>
-                  <input 
-                    value={form.employeeId ? form.employeeId : form.email} 
-                    onChange={e => setForm(p => ({ ...p, email: e.target.value }))} 
-                    type={form.employeeId ? "text" : "email"} 
+                  <input
+                    value={form.employeeId ? form.employeeId : form.email}
+                    onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                    type={form.employeeId ? "text" : "email"}
                     required
                     disabled={!!form.employeeId}
-                    placeholder={form.employeeId ? form.employeeId : "email@dudi.vn"} 
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-700 bg-gray-50/50 disabled:text-gray-400" 
+                    placeholder={form.employeeId ? form.employeeId : "email@dudi.vn"}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-700 bg-gray-50/50 disabled:text-gray-400"
                   />
                 </div>
                 <div>
                   <label className="text-xs font-black text-gray-500 mb-1.5 block">Phân quyền</label>
-                  <select 
-                    value={form.roleId} 
+                  <select
+                    value={form.roleId}
                     onChange={e => {
                       const nextRole = e.target.value
                       setForm(p => ({ ...p, roleId: nextRole }))
@@ -1367,7 +1366,7 @@ export default function AccountManagement({
                     <span className="text-[10px] text-gray-400 font-medium">Cấu hình riêng quyền cho tài khoản này</span>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer select-none">
-                    <input 
+                    <input
                       type="checkbox"
                       checked={customPermissionsEnabled}
                       onChange={e => {
@@ -1413,22 +1412,20 @@ export default function AccountManagement({
                     <button
                       type="button"
                       onClick={() => setModalPermTab("management")}
-                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all text-center cursor-pointer ${
-                        modalPermTab === "management"
+                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all text-center cursor-pointer ${modalPermTab === "management"
                           ? "bg-[#C62828] text-white shadow-xs"
                           : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                      }`}
+                        }`}
                     >
                       Quản lý
                     </button>
                     <button
                       type="button"
                       onClick={() => setModalPermTab("staff")}
-                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all text-center cursor-pointer ${
-                        modalPermTab === "staff"
+                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all text-center cursor-pointer ${modalPermTab === "staff"
                           ? "bg-[#C62828] text-white shadow-xs"
                           : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                      }`}
+                        }`}
                     >
                       Staff
                     </button>
@@ -1454,9 +1451,10 @@ export default function AccountManagement({
                               onChange={e => {
                                 const checked = e.target.checked
                                 if (checked) {
-                                  setCustomPermissions(prev => [...new Set([...prev, ...groupChildIds])])
+                                  setCustomPermissions(prev => [...new Set([...prev, ...groupChildIds, "user-settings"])])
                                 } else {
-                                  setCustomPermissions(prev => prev.filter(id => !groupChildIds.includes(id)))
+                                  const filterChildIds = groupChildIds.filter(id => id !== "user-settings")
+                                  setCustomPermissions(prev => prev.filter(id => !filterChildIds.includes(id)))
                                 }
                               }}
                               className="w-4 h-4 rounded border-gray-300 text-[#C62828] focus:ring-[#C62828] cursor-pointer"
@@ -1464,16 +1462,17 @@ export default function AccountManagement({
                           </div>
                           <div className="space-y-1.5 pl-0.5">
                             {group.children.map(child => {
-                              const isChecked = customPermissions.includes(child.id)
-                              const isLocked = form.roleId === "role-admin" && child.id === "phan-quyen"
+                              const isChecked = child.id === "user-settings" ? true : customPermissions.includes(child.id)
+                              const isLocked = (form.roleId === "role-admin" && child.id === "phan-quyen") || child.id === "user-settings"
                               return (
                                 <label key={child.id} className="flex items-center justify-between text-xs cursor-pointer hover:bg-white p-1 rounded-lg transition-colors">
                                   <span className="text-gray-500 font-semibold leading-none">{child.label}</span>
                                   <input
                                     type="checkbox"
-                                    checked={isChecked || isLocked}
+                                    checked={isChecked || child.id === "user-settings"}
                                     disabled={isLocked}
                                     onChange={e => {
+                                      if (child.id === "user-settings") return
                                       const checked = e.target.checked
                                       if (checked) {
                                         setCustomPermissions(prev => [...prev, child.id])
@@ -1496,7 +1495,7 @@ export default function AccountManagement({
             </form>
           </div>
         </div>
-      , document.body)}
+        , document.body)}
 
       {showRoleModal && createPortal(
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center backdrop-blur-xs">
@@ -1508,13 +1507,13 @@ export default function AccountManagement({
             <form onSubmit={handleCreateRole} className="space-y-4">
               <div>
                 <label className="text-xs font-black text-gray-500 mb-1.5 block">Tên vai trò</label>
-                <input 
-                  value={roleForm.name} 
-                  onChange={e => setRoleForm(prev => ({ ...prev, name: e.target.value }))} 
-                  type="text" 
+                <input
+                  value={roleForm.name}
+                  onChange={e => setRoleForm(prev => ({ ...prev, name: e.target.value }))}
+                  type="text"
                   required
-                  placeholder="Ví dụ: Nhân viên nhân sự, Kế toán..." 
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-700 bg-gray-50/50" 
+                  placeholder="Ví dụ: Nhân viên nhân sự, Kế toán..."
+                  className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-700 bg-gray-50/50"
                 />
               </div>
 
@@ -1526,11 +1525,10 @@ export default function AccountManagement({
                     onClick={() => {
                       setRoleForm(prev => ({ ...prev, roleType: "management", scopeType: prev.scopeType === "self" ? "branch" : prev.scopeType }))
                     }}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                      roleForm.roleType === "management"
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${roleForm.roleType === "management"
                         ? "bg-[#C62828] text-white border-[#C62828] shadow-xs"
                         : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     Quản lý / Admin
                   </button>
@@ -1539,11 +1537,10 @@ export default function AccountManagement({
                     onClick={() => {
                       setRoleForm(prev => ({ ...prev, roleType: "staff", scopeType: "self" }))
                     }}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                      roleForm.roleType === "staff"
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${roleForm.roleType === "staff"
                         ? "bg-[#C62828] text-white border-[#C62828] shadow-xs"
                         : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                    }`}
+                      }`}
                   >
                     Nhân viên / Staff
                   </button>
@@ -1553,8 +1550,8 @@ export default function AccountManagement({
               {roleForm.roleType === "management" && (
                 <div>
                   <label className="text-xs font-black text-gray-500 mb-1.5 block">Phạm vi dữ liệu mặc định</label>
-                  <select 
-                    value={roleForm.scopeType} 
+                  <select
+                    value={roleForm.scopeType}
                     onChange={e => setRoleForm(prev => ({ ...prev, scopeType: e.target.value as any }))}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-600 bg-gray-50/50"
                   >
@@ -1574,7 +1571,7 @@ export default function AccountManagement({
             </form>
           </div>
         </div>
-      , document.body)}
+        , document.body)}
       {confirmConfig && (
         <ConfirmModal
           isOpen={confirmConfig.isOpen}
@@ -1595,13 +1592,13 @@ export default function AccountManagement({
               <h3 className="font-black text-gray-800 text-sm uppercase tracking-wider">Tùy chỉnh quyền tài khoản</h3>
               <button onClick={() => setShowAddCustomUserModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-all"><X size={14} /></button>
             </div>
-            
+
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] font-black text-gray-500 mb-1 block">Phòng ban</label>
-                  <select 
-                    value={addCustomUserDeptFilter} 
+                  <select
+                    value={addCustomUserDeptFilter}
                     onChange={e => setAddCustomUserDeptFilter(e.target.value)}
                     className="w-full px-2 py-1.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 bg-gray-50/50 focus:outline-none focus:border-[#C62828]/40"
                   >
@@ -1625,7 +1622,7 @@ export default function AccountManagement({
 
               <div>
                 <label className="text-[10px] font-black text-gray-500 mb-1.5 block">Danh sách tài khoản ({filteredAccountsToAdd.length})</label>
-                <div 
+                <div
                   className="border border-gray-150 rounded-2xl overflow-y-auto max-h-[220px] divide-y divide-gray-100 bg-white"
                   style={{ scrollbarWidth: "thin" }}
                 >
@@ -1636,14 +1633,14 @@ export default function AccountManagement({
                       const emp = employees.find(e => e.id === acc.employeeId)
                       const isSelected = selectedUserToAdd === acc.id
                       const roleName = rolesList.find(r => r.id === acc.roleId)?.name || acc.roleId
-                      
+
                       return (
-                        <div 
+                        <div
                           key={acc.id}
                           onClick={() => setSelectedUserToAdd(acc.id)}
                           className={`p-3 text-left transition-colors cursor-pointer flex items-center justify-between
-                            ${isSelected 
-                              ? "bg-red-50/50 hover:bg-red-50" 
+                            ${isSelected
+                              ? "bg-red-50/50 hover:bg-red-50"
                               : "hover:bg-gray-50/50"}`}
                         >
                           <div className="space-y-0.5 truncate">
@@ -1680,8 +1677,8 @@ export default function AccountManagement({
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowAddCustomUserModal(false)} className="flex-1 py-2.5 border border-gray-200 rounded-2xl text-sm font-bold text-gray-600 hover:bg-gray-50 active:scale-95 transition-all">Huỷ</button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   disabled={!selectedUserToAdd}
                   onClick={() => handleAddCustomUser(selectedUserToAdd)}
                   className="flex-1 py-2.5 bg-[#C62828] text-white rounded-2xl text-sm font-bold hover:bg-[#B71C1C] disabled:opacity-50 active:scale-95 transition-all shadow-sm"
@@ -1692,7 +1689,7 @@ export default function AccountManagement({
             </div>
           </div>
         </div>
-      , document.body)}
+        , document.body)}
     </div>
   )
 }

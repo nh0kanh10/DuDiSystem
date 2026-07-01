@@ -97,6 +97,17 @@ export function NotificationManagement() {
   const [defaultContent, setDefaultContent] = useState("Chào mừng đến với hệ thống DuDi!")
   const [savingDefault, setSavingDefault]   = useState(false)
 
+  useEffect(() => {
+    if (showDefault) {
+      api.systemConfig.get().then((cfg: any) => {
+        if (cfg) {
+          setDefaultEnabled(cfg.defaultAnnouncementEnabled ?? true)
+          setDefaultContent(cfg.defaultAnnouncementContent ?? "Chào mừng đến với hệ thống DuDi!")
+        }
+      }).catch(() => {})
+    }
+  }, [showDefault])
+
   const [deleteConfirm, setDeleteConfirm] = useState<Announcement | null>(null)
 
   useEffect(() => { loadAll() }, [])

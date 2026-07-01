@@ -118,7 +118,7 @@ export default function App() {
       "dashboard", "nhan-su", "cham-cong", "thong-ke",
       "duyet-don", "thong-bao", "cong-viec", "du-an",
       "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
-      "crm",
+      "crm", "staff-portal",
       "user-profile", "user-attendance", "user-timeoff", "user-directory",
       "user-chat", "user-workflow", "user-settings", "user-crm"
     ]
@@ -141,6 +141,11 @@ export default function App() {
 
   const activeRolePermissions = useMemo(() => {
     const saved = localStorage.getItem("dudi_user")
+    const staffModules = [
+      "user-profile", "user-attendance", "user-timeoff", 
+      "user-directory", "user-chat", "user-workflow", "user-settings", "user-crm"
+    ]
+
     if (saved) {
       try {
         const u = JSON.parse(saved)
@@ -148,10 +153,16 @@ export default function App() {
           if (u.permissions.includes("all")) {
             return [
               "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-              "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm"
+              "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm", "staff-portal",
+              ...staffModules
             ]
           }
-          return u.permissions
+          const userPerms = [...u.permissions]
+          if (!userPerms.includes("staff-portal")) userPerms.push("staff-portal")
+          staffModules.forEach(m => {
+            if (!userPerms.includes(m)) userPerms.push(m)
+          })
+          return userPerms
         }
       } catch {}
     }
@@ -159,7 +170,8 @@ export default function App() {
     if (role === "role-super-admin") {
       return [
         "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm"
+        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm", "staff-portal",
+        ...staffModules
       ]
     }
 
@@ -168,27 +180,35 @@ export default function App() {
       if (currentRole.modules.includes("all")) {
         return [
           "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-          "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
+          "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "staff-portal",
+          ...staffModules
         ]
       }
-      return currentRole.modules
+      const rolePerms = [...currentRole.modules]
+      if (!rolePerms.includes("staff-portal")) rolePerms.push("staff-portal")
+      staffModules.forEach(m => {
+        if (!rolePerms.includes(m)) rolePerms.push(m)
+      })
+      return rolePerms
     }
     if (role === "role-admin") {
       return [
         "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm"
+        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm", "staff-portal",
+        ...staffModules
       ]
     }
     if (role === "role-manager") {
       return [
         "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
+        "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "staff-portal",
+        ...staffModules
       ]
     }
     // Default to role-user:
     return [
       "dashboard", "user-profile", "user-attendance", "user-timeoff", 
-      "user-directory", "user-chat", "user-workflow", "cong-viec", "thong-bao", "user-settings", "user-crm"
+      "user-directory", "user-chat", "user-workflow", "cong-viec", "thong-bao", "user-settings", "user-crm", "staff-portal"
     ]
   }, [role, rolesList, isLoggedIn])
 
@@ -212,7 +232,7 @@ export default function App() {
   }, [role, rolesList])
 
   useEffect(() => {
-    if (isLoggedIn && activeRolePermissions.length > 0 && activePage !== "dashboard") {
+    if (isLoggedIn && activeRolePermissions.length > 0 && activePage !== "dashboard" && activePage !== "staff-portal") {
       if (!activeRolePermissions.includes(activePage)) {
         setActivePage("dashboard")
       }
@@ -303,7 +323,7 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
-  const [showStaffPortal, setShowStaffPortal] = useState(false)
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0)
   
   const [selectedBranch, setSelectedBranch] = useState(() => {
     const saved = localStorage.getItem("dudi_user")
@@ -364,6 +384,9 @@ export default function App() {
         }),
         api.requests.list().then(d => {
           if (d && Array.isArray(d)) setRequests(d as any[])
+        }),
+        api.notifications.list().then(d => {
+          if (d && Array.isArray(d)) setUnreadNotifCount((d as any[]).filter((n: any) => !n.read).length)
         })
       ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
     }
@@ -480,7 +503,7 @@ export default function App() {
   }
 
   const renderPage = () => {
-    if (activePage !== "dashboard" && activeRolePermissions.length > 0 && !activeRolePermissions.includes(activePage)) {
+    if (activePage !== "dashboard" && activePage !== "staff-portal" && activeRolePermissions.length > 0 && !activeRolePermissions.includes(activePage)) {
       return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
     }
     switch (activePage) {
@@ -513,6 +536,11 @@ export default function App() {
       case "cong-viec": return <TaskManagement selectedBranch={selectedBranch} />
       case "tien-ich": return <SystemConfigPage />
       case "crm": return <CrmAdminPage />
+      case "staff-portal": return (
+        <div className="w-full h-[calc(100vh-130px)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
+          <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} embed={true} />
+        </div>
+      )
       case "user-profile": return (
         <div className="space-y-6">
           <h2 className="text-xl font-bold text-gray-800">Thông tin cá nhân</h2>
@@ -531,7 +559,7 @@ export default function App() {
   }
 
 
-  const unreadNotifs = NOTIFICATIONS.filter(n => !n.read).length
+  const unreadNotifs = unreadNotifCount
   const showStaffFab = canOpenStaffPortal(activeRolePermissions)
 
   return (
@@ -547,14 +575,13 @@ export default function App() {
         <Header
           onToggle={() => setSidebarCollapsed(p => !p)}
           unread={unreadNotifs}
+          onMarkAllRead={() => setUnreadNotifCount(0)}
           currentUser={currentUserInfo}
           onLogout={handleLogout}
           onNavigate={setActivePage}
           selectedBranch={selectedBranch}
           onBranchChange={setSelectedBranch}
           branches={branches}
-          onOpenStaffPortal={() => setShowStaffPortal(true)}
-          showStaffPortalButton={showStaffFab}
         />
         <main className="flex-1 overflow-y-auto p-5 relative"
           style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
@@ -609,30 +636,18 @@ export default function App() {
         </main>
       </div>
     </div>
-
-    {showStaffFab && (
-      <StaffPortalFab
-        open={showStaffPortal}
-        onOpen={() => setShowStaffPortal(true)}
-        onClose={() => setShowStaffPortal(false)}
-        permissions={activeRolePermissions}
-        onLogout={handleLogout}
-      />
-    )}
     </>
   )
 }
 
-function Header({ onToggle, unread, currentUser, onLogout, onNavigate, selectedBranch, onBranchChange, branches, onOpenStaffPortal, showStaffPortalButton }: {
-  onToggle: () => void; unread: number
+function Header({ onToggle, unread, onMarkAllRead, currentUser, onLogout, onNavigate, selectedBranch, onBranchChange, branches }: {
+  onToggle: () => void; unread: number; onMarkAllRead?: () => void
   currentUser: { name: string; id: string; role: Role; position: string; department: string }
   onLogout: () => void
   onNavigate: (p: Page) => void
   selectedBranch: string
   onBranchChange: (b: string) => void
   branches: { id: string; name: string }[]
-  onOpenStaffPortal: () => void
-  showStaffPortalButton: boolean
 }) {
   const [showDrop, setShowDrop] = useState(false)
   const [showBranchDrop, setShowBranchDrop] = useState(false)
@@ -657,6 +672,7 @@ function Header({ onToggle, unread, currentUser, onLogout, onNavigate, selectedB
   async function markAllRead() {
     await api.notifications.markAllRead()
     setNotifs(ns => ns.map(n => ({ ...n, read: true })))
+    onMarkAllRead?.()
   }
   return (
     <header className="bg-white border-b border-black/5 px-5 py-3 flex items-center gap-4 flex-shrink-0 relative">
@@ -717,15 +733,6 @@ function Header({ onToggle, unread, currentUser, onLogout, onNavigate, selectedB
               </>
             )}
           </div>
-        )}
-        {showStaffPortalButton && (
-          <button
-            onClick={onOpenStaffPortal}
-            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-br from-[#C62828] to-[#E64A19] hover:from-[#d32f2f] hover:to-[#f4511e] text-white rounded-xl text-xs font-bold shadow-md shadow-red-900/10 transition-all active:scale-[0.98] cursor-pointer"
-          >
-            <Fingerprint size={14} />
-            <span>Chấm công</span>
-          </button>
         )}
         {/* Notification dropdown */}
         <div className="relative">
@@ -913,6 +920,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 space-y-0.5 py-2" style={{ scrollbarWidth: "none" }}>
         {hasAccess("dashboard") && <NavItem page="dashboard" icon={LayoutDashboard} label="Dashboard" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        <NavItem page="staff-portal" icon={Fingerprint} label="Cổng nhân viên" active={active} onNavigate={onNavigate} collapsed={collapsed} />
 
         {(hasAccess("nhan-su") || hasAccess("co-cau") || hasAccess("cham-cong") || hasAccess("duyet-don")) && (
           <GroupNav

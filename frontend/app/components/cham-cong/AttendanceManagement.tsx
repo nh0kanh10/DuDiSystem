@@ -618,7 +618,7 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
         ))}
       </div>
 
-      <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-black/5 shadow-sm">
         <div className="p-3 border-b border-gray-100 grid grid-cols-1 xl:grid-cols-[minmax(180px,1fr)_minmax(120px,0.7fr)_minmax(130px,0.8fr)_minmax(130px,0.8fr)_minmax(130px,0.8fr)_auto] gap-2 items-center w-full">
           <div className="relative min-w-0">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -639,7 +639,7 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
             <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{filtered.length}/{records.length}</span>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-b-3xl">
           <table className="w-full text-sm text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/80 text-gray-400 font-semibold text-xs border-b border-gray-100">

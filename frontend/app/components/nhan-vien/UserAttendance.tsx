@@ -94,6 +94,15 @@ function PortalAttendanceView() {
     loading, punching, error, ipStatus, verifyWifi, punch, punchLabel, statusText, reload,
   } = useEmployeeAttendance()
   const [hms, setHms] = useState({ h: "00", m: "00", s: "00" })
+  const isSuperAdmin = React.useMemo(() => {
+    try {
+      const raw = localStorage.getItem("dudi_user")
+      const u = raw ? JSON.parse(raw) : null
+      return u?.roleId === "role-super-admin" || ["0000000000", "1111111111", "2222222222"].includes(u?.employeeId)
+    } catch {
+      return false
+    }
+  }, [])
 
   useEffect(() => {
     const tick = () => {
@@ -125,9 +134,21 @@ function PortalAttendanceView() {
       {error && (
         <p style={{ fontSize: 12, color: "#ff8888", textAlign: "center", maxWidth: 320 }}>{error}</p>
       )}
-      <WifiStatusBanner ipStatus={ipStatus} checking={loading && !ipStatus} />
+      {isSuperAdmin ? (
+        <div style={{
+          padding: "10px 14px", borderRadius: 12, width: "100%", maxWidth: 360,
+          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+          color: "rgba(255,232,236,0.65)", fontSize: 12, fontWeight: 600, textAlign: "center",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 6
+        }}>
+          <AlertCircle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
+          <span>Tài khoản Quản trị hệ thống không cần chấm công</span>
+        </div>
+      ) : (
+        <WifiStatusBanner ipStatus={ipStatus} checking={loading && !ipStatus} />
+      )}
       <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.45)", letterSpacing: "0.08em" }}>
-        {isIntern ? `${EMPLOYEE_KIND.intern.label} · theo buổi` : `${EMPLOYEE_KIND.staff.label} · theo ngày`} · {statusText}
+        {isIntern ? `${EMPLOYEE_KIND.intern.label} · theo buổi` : `${EMPLOYEE_KIND.staff.label} · theo ngày`} · {isSuperAdmin ? "Miễn chấm công" : statusText}
       </p>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
@@ -138,24 +159,26 @@ function PortalAttendanceView() {
       </div>
 
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {!working && !punchLabel.done && (
+        {!working && !punchLabel.done && !isSuperAdmin && (
           <>
             <div style={{ position: "absolute", width: 136, height: 136, borderRadius: "50%", border: `1.5px solid ${PORTAL_BRAND}`, animation: "pulseRing 2.2s ease-out infinite", pointerEvents: "none" }} />
             <div style={{ position: "absolute", width: 136, height: 136, borderRadius: "50%", border: `1px solid ${PORTAL_BRAND}`, animation: "pulseRing 2.2s ease-out 0.75s infinite", pointerEvents: "none" }} />
           </>
         )}
         <button
-          onClick={punch}
-          disabled={loading || punching || punchLabel.done}
+          onClick={isSuperAdmin ? undefined : punch}
+          disabled={loading || punching || punchLabel.done || isSuperAdmin}
           style={{
             width: 112, height: 112, borderRadius: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5,
-            border: "none", cursor: punchLabel.done ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 900, color: "#fff", opacity: punchLabel.done ? 0.5 : 1,
-            background: working ? "linear-gradient(135deg, #22c55e, #16a34a)" : `linear-gradient(135deg, ${PORTAL_BRAND}, ${PORTAL_GOLD})`,
-            boxShadow: working ? "0 0 30px rgba(34,197,94,0.55)" : `0 0 30px ${PORTAL_GR}, 0 0 60px rgba(232,35,26,0.12)`,
+            border: "none", cursor: (punchLabel.done || isSuperAdmin) ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 900, color: "#fff", opacity: (punchLabel.done || isSuperAdmin) ? 0.5 : 1,
+            background: isSuperAdmin ? "rgba(255,255,255,0.06)" : working ? "linear-gradient(135deg, #22c55e, #16a34a)" : `linear-gradient(135deg, ${PORTAL_BRAND}, ${PORTAL_GOLD})`,
+            boxShadow: isSuperAdmin ? "none" : working ? "0 0 30px rgba(34,197,94,0.55)" : `0 0 30px ${PORTAL_GR}, 0 0 60px rgba(232,35,26,0.12)`,
           }}
         >
-          {punching ? <Loader2 size={34} className="animate-spin" /> : <Fingerprint size={34} strokeWidth={1.5} />}
-          <span style={{ fontSize: 8, letterSpacing: "0.1em", textAlign: "center", padding: "0 6px" }}>{punchLabel.label.toUpperCase()}</span>
+          {punching ? <Loader2 size={34} className="animate-spin" /> : <Fingerprint size={34} strokeWidth={1.5} style={{ color: isSuperAdmin ? "rgba(255,232,236,0.3)" : undefined }} />}
+          <span style={{ fontSize: 8, letterSpacing: "0.1em", textAlign: "center", padding: "0 6px", color: isSuperAdmin ? "rgba(255,232,236,0.3)" : undefined }}>
+            {isSuperAdmin ? "KHÓA" : punchLabel.label.toUpperCase()}
+          </span>
         </button>
       </div>
 

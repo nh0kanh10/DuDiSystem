@@ -15,7 +15,7 @@ export type Page =
   | "dashboard" | "nhan-su" | "cham-cong" | "thong-ke"
   | "duyet-don" | "thong-bao" | "cong-viec" | "du-an"
   | "tai-khoan" | "phan-quyen" | "ip" | "tien-ich" | "co-cau"
-  | "crm"
+  | "crm" | "staff-portal"
   | "user-profile" | "user-attendance" | "user-timeoff" | "user-directory"
   | "user-chat" | "user-workflow" | "user-settings" | "user-crm"
 
