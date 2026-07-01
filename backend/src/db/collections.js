@@ -18,4 +18,5 @@ export const COLLECTIONS = [
   "crmDataRecords",
   "jobPostings",
   "candidates",
+  "timeOffSlots",
 ]

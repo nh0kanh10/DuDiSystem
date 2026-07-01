@@ -48,6 +48,20 @@ export function useEmployeeAttendance() {
   const [loading, setLoading] = useState(true)
   const [punching, setPunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [ipStatus, setIpStatus] = useState<{ valid: boolean; ip: string; message: string } | null>(null)
+
+  const verifyWifi = useCallback(async () => {
+    try {
+      const data = await api.attendance.checkIP()
+      setIpStatus({ valid: true, ip: data.ip, message: data.message })
+    } catch (e) {
+      setIpStatus({
+        valid: false,
+        ip: "",
+        message: e instanceof Error ? e.message : "Không xác thực được WiFi",
+      })
+    }
+  }, [])
 
   const today = todayISO()
   const monthStart = useMemo(() => {
@@ -83,19 +97,25 @@ export function useEmployeeAttendance() {
         api.attendance.stats({ startDate: monthStart, endDate: today, employeeId: empId }),
       ])
       const todayList = todayRows as AttendanceRecord[]
-      setTodayRecord(todayList[0] ?? null)
+      const todayMine =
+        todayList.find(r => r.employeeId === empId) ??
+        todayList.find(r => String(r.id).startsWith(`TEMP_${empId}_`)) ??
+        todayList[0] ??
+        null
+      setTodayRecord(todayMine)
       setHistory(
         (historyRows as AttendanceRecord[])
           .filter(r => !String(r.id).startsWith("TEMP_"))
           .sort((a, b) => b.date.localeCompare(a.date))
       )
       setMonthStats(stats)
+      await verifyWifi()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Lỗi tải chấm công")
     } finally {
       setLoading(false)
     }
-  }, [today, monthStart, historyStart])
+  }, [today, monthStart, historyStart, verifyWifi])
 
   useEffect(() => {
     load()
@@ -110,11 +130,13 @@ export function useEmployeeAttendance() {
     setError(null)
     try {
       await api.attendance.checkIP()
+      await verifyWifi()
       const time = formatTimeNow()
-      const recordId = todayRecord?.id ?? `TEMP_${employeeId}_${today}`
+      const activeRecord = todayRecord?.employeeId === employeeId ? todayRecord : null
+      const recordId = activeRecord?.id ?? `TEMP_${employeeId}_${today}`
       const body: Record<string, string> = isIntern
         ? { checkIn: time }
-        : hasPunchTime(todayRecord?.checkIn) && !hasPunchTime(todayRecord?.checkOut)
+        : hasPunchTime(activeRecord?.checkIn) && !hasPunchTime(activeRecord?.checkOut)
           ? { checkOut: time }
           : { checkIn: time }
 
@@ -126,7 +148,7 @@ export function useEmployeeAttendance() {
     } finally {
       setPunching(false)
     }
-  }, [employeeId, isIntern, today, todayRecord, load])
+  }, [employeeId, isIntern, today, todayRecord, load, verifyWifi])
 
   const punchLabel = getPunchLabel(todayRecord, isIntern)
   const statusText = getTodayStatusText(todayRecord, isIntern)
@@ -141,6 +163,8 @@ export function useEmployeeAttendance() {
     loading,
     punching,
     error,
+    ipStatus,
+    verifyWifi,
     punch,
     punchLabel,
     statusText,

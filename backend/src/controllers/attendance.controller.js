@@ -20,6 +20,8 @@ export function list(req, res) {
   const filter = { ...req.query }
   if (!canViewAllAttendance(req.user)) {
     filter.employeeId = req.user.employeeId
+  } else if (!filter.employeeId && req.user.employeeId) {
+    filter.employeeId = req.user.employeeId
   }
   ok(res, svc.listAttendance(filter))
 }
@@ -27,6 +29,8 @@ export function list(req, res) {
 export function stats(req, res) {
   const filter = { ...req.query }
   if (!canViewAllAttendance(req.user)) {
+    filter.employeeId = req.user.employeeId
+  } else if (!filter.employeeId && req.user.employeeId) {
     filter.employeeId = req.user.employeeId
   }
   ok(res, svc.getAttendanceStats(filter))

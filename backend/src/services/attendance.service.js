@@ -120,6 +120,12 @@ export function calculateStaffAttendanceStatus(checkIn, checkOut, config) {
     return { status: "absent", note: "Vắng" }
   }
   if (!checkOut || checkOut === "--") {
+    const inSec = parseToSeconds(checkIn)
+    const staffStartSec = parseToSeconds(config?.employeeStart || "09:00")
+    if (inSec !== -1 && inSec > staffStartSec) {
+      const diffSec = inSec - staffStartSec
+      return { status: "late", note: `Đi trễ ${formatDiffTimeShort(diffSec)}, chưa check-out` }
+    }
     return { status: "on-time", note: "Chưa check-out" }
   }
 
@@ -462,6 +468,9 @@ export function listAttendance(filter) {
   if (filter.startDate && filter.startDate === filter.endDate) {
     const targetDate = filter.startDate
     let employees = empRepo.getAll()
+    if (filter.employeeId) {
+      employees = employees.filter(e => e.id === filter.employeeId)
+    }
     if (filter.branchId && filter.branchId !== "all") {
       employees = employees.filter(e => e.branchId === filter.branchId)
     }
@@ -501,6 +510,9 @@ export function listAttendance(filter) {
       const emp = empRepo.getById(r.employeeId)
       return emp?.department === filter.department
     })
+  }
+  if (filter.employeeId) {
+    records = records.filter(r => r.employeeId === filter.employeeId)
   }
   return records.map(withEmployee)
 }

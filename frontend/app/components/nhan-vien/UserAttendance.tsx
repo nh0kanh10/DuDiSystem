@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { Fingerprint, CheckCircle, Clock, AlertCircle, Calendar, Loader2, RefreshCw } from "lucide-react"
+import { Fingerprint, CheckCircle, Clock, AlertCircle, Calendar, Loader2, RefreshCw, Wifi } from "lucide-react"
 import { useEmployeeAttendance, todayISO } from "../../hooks/useEmployeeAttendance"
 import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL } from "../cham-cong/attendanceDisplay"
 import { EMPLOYEE_KIND, INTERN_SESSION, internSessionRange } from "../cham-cong/attendanceModel"
@@ -34,10 +34,64 @@ function PortalSectionLabel({ children }: { children: string }) {
   )
 }
 
+function WifiStatusBanner({ ipStatus, checking }: { ipStatus: { valid: boolean; ip: string; message: string } | null; checking?: boolean }) {
+  if (checking && !ipStatus) {
+    return (
+      <p style={{ fontSize: 11, color: "rgba(255,232,236,0.4)", textAlign: "center" }}>Đang kiểm tra WiFi...</p>
+    )
+  }
+  if (!ipStatus) return null
+  if (ipStatus.valid) {
+    return (
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        padding: "10px 14px", borderRadius: 12, width: "100%", maxWidth: 360,
+        background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.28)",
+        color: "#86efac", fontSize: 12, fontWeight: 600,
+      }}>
+        <Wifi size={14} />
+        <span>{ipStatus.message || `Đúng WiFi công ty · ${ipStatus.ip}`}</span>
+      </div>
+    )
+  }
+  return (
+    <div style={{
+      display: "flex", alignItems: "flex-start", justifyContent: "center", gap: 8,
+      padding: "10px 14px", borderRadius: 12, width: "100%", maxWidth: 360,
+      background: "rgba(255,85,85,0.12)", border: "1px solid rgba(255,85,85,0.28)",
+      color: "#ffaaaa", fontSize: 12, fontWeight: 600, textAlign: "center",
+    }}>
+      <Wifi size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+      <span>{ipStatus.message}</span>
+    </div>
+  )
+}
+
+function WifiStatusBannerLight({ ipStatus, checking }: { ipStatus: { valid: boolean; ip: string; message: string } | null; checking?: boolean }) {
+  if (checking && !ipStatus) {
+    return <p className="text-xs text-gray-400 text-center">Đang kiểm tra WiFi...</p>
+  }
+  if (!ipStatus) return null
+  if (ipStatus.valid) {
+    return (
+      <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm font-medium">
+        <Wifi size={15} className="shrink-0" />
+        <span>{ipStatus.message || `Đúng WiFi công ty · ${ipStatus.ip}`}</span>
+      </div>
+    )
+  }
+  return (
+    <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+      <Wifi size={15} className="shrink-0 mt-0.5" />
+      <span>{ipStatus.message}</span>
+    </div>
+  )
+}
+
 function PortalAttendanceView() {
   const {
     isIntern, todayRecord, history, monthStats,
-    loading, punching, error, punch, punchLabel, statusText, reload,
+    loading, punching, error, ipStatus, verifyWifi, punch, punchLabel, statusText, reload,
   } = useEmployeeAttendance()
   const [hms, setHms] = useState({ h: "00", m: "00", s: "00" })
 
@@ -71,6 +125,7 @@ function PortalAttendanceView() {
       {error && (
         <p style={{ fontSize: 12, color: "#ff8888", textAlign: "center", maxWidth: 320 }}>{error}</p>
       )}
+      <WifiStatusBanner ipStatus={ipStatus} checking={loading && !ipStatus} />
       <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.45)", letterSpacing: "0.08em" }}>
         {isIntern ? `${EMPLOYEE_KIND.intern.label} · theo buổi` : `${EMPLOYEE_KIND.staff.label} · theo ngày`} · {statusText}
       </p>
@@ -134,9 +189,14 @@ function PortalAttendanceView() {
       <div style={{ width: "100%", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <PortalSectionLabel>Lịch sử gần đây</PortalSectionLabel>
-          <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button onClick={verifyWifi} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }} title="Kiểm tra WiFi">
+              <Wifi size={14} />
+            </button>
+            <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            </button>
+          </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {history.length === 0 && !loading && (
@@ -183,6 +243,8 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
     loading,
     punching,
     error,
+    ipStatus,
+    verifyWifi,
     punch,
     punchLabel,
     statusText,
@@ -207,6 +269,8 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
           </button>
         </div>
       )}
+
+      <WifiStatusBannerLight ipStatus={ipStatus} checking={loading && !ipStatus} />
 
       <div className="bg-gradient-to-br from-[#160606] to-[#2a0808] rounded-2xl p-6 text-white flex items-center justify-between shadow-lg">
         <div className="flex-1 min-w-0">
@@ -270,6 +334,9 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
           <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
             <Calendar size={13} />
             <span>{monthLabel}</span>
+            <button onClick={verifyWifi} className="p-1 hover:text-gray-600" title="Kiểm tra WiFi">
+              <Wifi size={13} />
+            </button>
             <button onClick={reload} className="p-1 hover:text-gray-600" title="Tải lại">
               <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
             </button>

@@ -38,7 +38,7 @@ export default function UserPortalLayout({ activePage, onNavigate, onLogout }: P
         switch (activePage) {
             case "user-profile": return <UserProfile emp={me} />
             case "user-attendance": return <UserAttendance />
-            case "user-timeoff": return <UserTimeOff />
+            case "user-timeoff": return <UserTimeOff employee={me as any} />
             case "user-tasks": return <UserTasks />
             case "user-settings": return <UserSettings onLogout={onLogout} />
             case "user-chat": return <div className="bg-white rounded-2xl p-10 text-center text-gray-400 border border-black/5 shadow-sm">Trò chuyện nội bộ (Tính năng đang được phát triển)</div>
