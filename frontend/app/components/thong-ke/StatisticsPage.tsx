@@ -102,11 +102,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           api.attendance.list(),
           api.systemConfig.get().catch(() => null)
         ])
-        console.log("[DEBUG] StatisticsPage empData:", empData);
-        console.log("[DEBUG] StatisticsPage selectedBranch:", selectedBranch);
         const filteredEmps = (empData as Employee[] || []).filter(e => !["0000000000", "1111111111", "2222222222"].includes(e.id))
         setEmployees(filteredEmps)
-        console.log("[DEBUG] StatisticsPage filteredEmps details:", filteredEmps.map(e => ({ id: e.id, name: e.name, contract: e.contractType, branch: e.branchId, status: e.status })));
         setAttendance(attData as AttendanceRecord[])
         if (configData) {
           setSystemConfig(configData)
@@ -287,7 +284,6 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
   const statsMap = useMemo(() => {
     const map: Record<string, { late: number; leave: number; absent: number; total: number; onTime: number }> = {}
     
-    // Generate list of weekdays up to today (or range end)
     const daysList: string[] = []
     if (dateRange.start && dateRange.end) {
       const [sy, sm, sd] = dateRange.start.split("-").map(Number)
@@ -330,7 +326,6 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
             map[e.id].total += 1
           }
         } else {
-          // No attendance record on a weekday means they were absent (vắng mặt)
           map[e.id].absent += 1
         }
       })
@@ -384,7 +379,6 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       const query = searchQuery.toLowerCase()
       return e.name.toLowerCase().includes(query) || e.id.toLowerCase().includes(query)
     })
-    console.log("[DEBUG] StatisticsPage filteredEmployeesList result:", res);
     return res
   }, [employees, activeTab, searchQuery, selectedBranch, personalDept])
 
@@ -1136,7 +1130,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                     <th className="px-6 py-3.5">Họ tên</th>
                     <th className="px-6 py-3.5">Đơn vị</th>
                     <th className="px-6 py-3.5">Số ngày đi trễ</th>
-                    <th className="px-6 py-3.5">Số ngày nghỉ</th>
+                    <th className="px-6 py-3.5">Nghỉ phép</th>
+                    <th className="px-6 py-3.5">Vắng mặt</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -1152,13 +1147,18 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                         <td className="px-6 py-4 text-black font-semibold">{item.name}</td>
                         <td className="px-6 py-4 text-xs font-medium text-black">{item.department}</td>
                         <td className="px-6 py-4">
-<span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${item.late > 0 ? "bg-amber-100 text-amber-900 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-100"}`}>
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${item.late > 0 ? "bg-amber-100 text-amber-900 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-100"}`}>
                             {item.late}
                           </span>
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${item.leave > 0 ? "bg-purple-100 text-purple-900 border-purple-200" : "bg-gray-100 text-gray-700 border-gray-200"}`}>
                             {item.leave}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${item.absent > 0 ? "bg-rose-100 text-rose-900 border-rose-200" : "bg-gray-100 text-gray-700 border-gray-200"}`}>
+                            {item.absent}
                           </span>
                         </td>
                       </tr>
