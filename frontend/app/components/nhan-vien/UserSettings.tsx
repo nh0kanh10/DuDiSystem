@@ -1,6 +1,6 @@
 import React, { useState } from "react"
 import { Camera, Lock, Shield, LogOut, Trash2, Check, Eye, EyeOff } from "lucide-react"
-import { ME } from "./types"
+import { getStoredUser } from "./types"
 
 interface Props { onLogout: () => void }
 
@@ -17,6 +17,7 @@ const SESSIONS = [
 ]
 
 export default function UserSettings({ onLogout }: Props) {
+    const me = getStoredUser()
     const [tab, setTab] = useState<"info" | "password" | "session">("info")
     const [oldPass, setOldPass] = useState("")
     const [newPass, setNewPass] = useState("")
@@ -24,8 +25,8 @@ export default function UserSettings({ onLogout }: Props) {
     const [showOld, setShowOld] = useState(false)
     const [showNew, setShowNew] = useState(false)
     const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null)
-    const [name, setName] = useState(ME.name)
-    const [phone, setPhone] = useState(ME.phone)
+    const [name, setName] = useState(me.name)
+    const [phone, setPhone] = useState(me.phone)
 
     const inp = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 focus:ring-1 focus:ring-[#C62828]/10"
 
@@ -71,11 +72,11 @@ export default function UserSettings({ onLogout }: Props) {
                     {/* Avatar */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5 flex flex-col items-center gap-4">
                         <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-3xl font-black shadow-md shadow-red-900/20">
-                            {ME.name.split(" ").pop()?.charAt(0)}
+                            {me.name.split(" ").pop()?.charAt(0)}
                         </div>
                         <div className="text-center">
-                            <p className="font-bold text-gray-800">{ME.name}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{ME.id} · {ME.position}</p>
+                            <p className="font-bold text-gray-800">{me.name}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{me.id} · {me.position}</p>
                         </div>
                         <div className="flex gap-2 w-full">
                             <button className="flex-1 flex items-center justify-center gap-1.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
@@ -97,7 +98,7 @@ export default function UserSettings({ onLogout }: Props) {
                         </div>
                         <div>
                             <label className="text-xs font-bold text-gray-500 mb-1.5 block">Email công ty</label>
-                            <input value={ME.email} disabled className={`${inp} bg-gray-50 opacity-60`} />
+                            <input value={me.email} disabled className={`${inp} bg-gray-50 opacity-60`} />
                         </div>
                         <div>
                             <label className="text-xs font-bold text-gray-500 mb-1.5 block">Số điện thoại</label>

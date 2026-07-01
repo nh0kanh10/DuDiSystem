@@ -1,7 +1,7 @@
 import React, { useState } from "react"
 import { ChevronLeft, User, Fingerprint, Calendar, CheckSquare, Settings, LogOut, Bell, MessageCircle } from "lucide-react"
+import { getStoredUser } from "./types"
 import type { UserPage } from "./types"
-import { ME } from "./types"
 import UserDashboard from "./UserDashboard"
 import UserProfile from "./UserProfile"
 import UserAttendance from "./UserAttendance"
@@ -25,7 +25,8 @@ const PAGE_META: Record<Exclude<UserPage, "dashboard">, { title: string; icon: R
 }
 
 export default function UserPortalLayout({ activePage, onNavigate, onLogout }: Props) {
-    /* ─── Dashboard: full-screen dark bubble UI ─── */
+    const me = getStoredUser()
+
     if (activePage === "dashboard") {
         return <UserDashboard onNavigate={onNavigate} onLogout={onLogout} />
     }
@@ -35,7 +36,7 @@ export default function UserPortalLayout({ activePage, onNavigate, onLogout }: P
 
     const renderPage = () => {
         switch (activePage) {
-            case "user-profile": return <UserProfile emp={ME} />
+            case "user-profile": return <UserProfile emp={me} />
             case "user-attendance": return <UserAttendance />
             case "user-timeoff": return <UserTimeOff />
             case "user-tasks": return <UserTasks />
@@ -80,13 +81,13 @@ export default function UserPortalLayout({ activePage, onNavigate, onLogout }: P
                         className="flex items-center gap-2 pl-3 border-l border-gray-100 cursor-pointer"
                     >
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-black">
-                            {ME.name.split(" ").pop()?.charAt(0)}
+                            {me.name.split(" ").pop()?.charAt(0)}
                         </div>
                         <div className="hidden sm:block">
                             <p className="text-xs font-semibold text-gray-700 leading-none">
-                                {ME.name.split(" ").slice(-2).join(" ")}
+                                {me.name.split(" ").slice(-2).join(" ")}
                             </p>
-                            <p className="text-[10px] text-gray-400 font-mono mt-0.5">{ME.id}</p>
+                            <p className="text-[10px] text-gray-400 font-mono mt-0.5">{me.id}</p>
                         </div>
                     </button>
                     <button

@@ -1,11 +1,10 @@
 import React, { useState } from "react"
 import { Calendar, Clock, CheckSquare, Award, Fingerprint, User, Bell } from "lucide-react"
 import { Page } from "../../types"
-import { INIT_EMPLOYEES } from "../../constants"
-
-const ME = INIT_EMPLOYEES[0]
+import { getStoredUser } from "../nhan-vien/types"
 
 export function UserHome({ onNavigate }: { onNavigate: (p: Page) => void }) {
+  const me = getStoredUser()
   const [checkedIn, setCheckedIn] = useState(false)
   const [checkInTime, setCheckInTime] = useState("")
 
@@ -25,8 +24,8 @@ export function UserHome({ onNavigate }: { onNavigate: (p: Page) => void }) {
           <div className="relative flex items-center justify-between gap-4">
             <div>
               <p className="text-white/55 text-sm font-medium mb-1">Xin chào,</p>
-              <h2 className="text-2xl font-bold">{ME.name}</h2>
-              <p className="text-white/70 text-sm mt-1">{ME.position} · {ME.department}</p>
+              <h2 className="text-2xl font-bold">{me.name}</h2>
+              <p className="text-white/70 text-sm mt-1">{me.position} · {me.department}</p>
             </div>
           </div>
         </div>
@@ -42,7 +41,7 @@ export function UserHome({ onNavigate }: { onNavigate: (p: Page) => void }) {
       </div>
 
       <div className="grid grid-cols-4 gap-4">
-        {[{ k: "Thông tin cá nhân", v: ME.id, sub: "Hồ sơ của bạn", ic: User, bg: "bg-blue-50 text-blue-500", p: "user-profile" },
+        {[{ k: "Thông tin cá nhân", v: me.id, sub: "Hồ sơ của bạn", ic: User, bg: "bg-blue-50 text-blue-500", p: "user-profile" },
         { k: "Nghỉ phép", v: "12", sub: "Ngày phép còn lại", ic: Calendar, bg: "bg-violet-50 text-violet-500", p: "user-timeoff" },
         { k: "Công việc", v: "3", sub: "Đang thực hiện", ic: CheckSquare, bg: "bg-amber-50 text-amber-500", p: "cong-viec" },
         { k: "Thông báo", v: "2", sub: "Chưa đọc", ic: Bell, bg: "bg-rose-50 text-rose-500", p: "thong-bao" }

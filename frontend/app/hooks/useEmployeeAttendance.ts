@@ -54,6 +54,11 @@ export function useEmployeeAttendance() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`
   }, [])
+  const historyStart = useMemo(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 30)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -72,16 +77,16 @@ export function useEmployeeAttendance() {
       setEmployeeName((profile?.name as string) || empId)
       setIsIntern(intern)
 
-      const [todayRows, monthRows, stats] = await Promise.all([
+      const [todayRows, historyRows, stats] = await Promise.all([
         api.attendance.list({ startDate: today, endDate: today, employeeId: empId }),
-        api.attendance.list({ startDate: monthStart, endDate: today, employeeId: empId }),
+        api.attendance.list({ startDate: historyStart, endDate: today, employeeId: empId }),
         api.attendance.stats({ startDate: monthStart, endDate: today, employeeId: empId }),
       ])
       const todayList = todayRows as AttendanceRecord[]
       setTodayRecord(todayList[0] ?? null)
       setHistory(
-        (monthRows as AttendanceRecord[])
-          .filter(r => r.date !== today)
+        (historyRows as AttendanceRecord[])
+          .filter(r => !String(r.id).startsWith("TEMP_"))
           .sort((a, b) => b.date.localeCompare(a.date))
       )
       setMonthStats(stats)
@@ -90,7 +95,7 @@ export function useEmployeeAttendance() {
     } finally {
       setLoading(false)
     }
-  }, [today, monthStart])
+  }, [today, monthStart, historyStart])
 
   useEffect(() => {
     load()

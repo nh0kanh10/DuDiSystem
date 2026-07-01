@@ -7,6 +7,8 @@ import {
 } from "lucide-react"
 
 import UserPortalApp from "./components/nhan-vien/UserApp"
+import { StaffPortalFab } from "./components/nhan-vien/StaffPortalFab"
+import { canOpenStaffPortal } from "./utils/staffModules"
 import ApprovalManagement from "@/app/components/duyet-don/ApprovalManagement"
 import OrgStructure from "./components/co-cau/OrgStructure"
 import UserProfile from "./components/nhan-vien/UserProfile"
@@ -300,6 +302,7 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
+  const [showStaffPortal, setShowStaffPortal] = useState(false)
   
   const [selectedBranch, setSelectedBranch] = useState(() => {
     const saved = localStorage.getItem("dudi_user")
@@ -527,8 +530,8 @@ export default function App() {
   }
 
 
-
   const unreadNotifs = NOTIFICATIONS.filter(n => !n.read).length
+  const showStaffFab = canOpenStaffPortal(activeRolePermissions)
 
   return (
     <>
@@ -603,6 +606,16 @@ export default function App() {
         </main>
       </div>
     </div>
+
+    {showStaffFab && (
+      <StaffPortalFab
+        open={showStaffPortal}
+        onOpen={() => setShowStaffPortal(true)}
+        onClose={() => setShowStaffPortal(false)}
+        permissions={activeRolePermissions}
+        onLogout={handleLogout}
+      />
+    )}
     </>
   )
 }

@@ -21,7 +21,28 @@ export interface Employee {
     contractType: string
 }
 
-// Current logged-in user mock data (NV001 - Trần Thị Bích Liên)
+function readStoredUser() {
+    try {
+        const raw = localStorage.getItem("dudi_user")
+        return raw ? JSON.parse(raw) : null
+    } catch { return null }
+}
+
+export function getStoredUser(): Employee {
+    const u = readStoredUser()
+    return {
+        id: u?.employeeId || u?.id || "--",
+        name: u?.name || "Người dùng",
+        email: u?.email || "",
+        phone: u?.phone || "",
+        department: u?.department || "",
+        position: u?.position || u?.roleName || "",
+        joinDate: u?.joinDate || "",
+        status: u?.employeeStatus || u?.status || "active",
+        contractType: u?.contractType || "",
+    }
+}
+
 export const ME: Employee = {
     id: "NV001",
     name: "Trần Thị Bích Liên",

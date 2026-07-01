@@ -8,10 +8,14 @@ import {
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import dudiLogo from "../../../imports/avatar.jpg";
 import { useEmployeeAttendance } from "../../hooks/useEmployeeAttendance";
-import { fmtIsoDate, formatAttendanceTimes } from "../cham-cong/attendanceDisplay";
+import { useMyTasks } from "../../hooks/useMyTasks";
+import { useNotifications } from "../../hooks/useNotifications";
+import { hasStaffModule, LIVE_STAFF_BUBBLES } from "../../utils/staffModules";
+import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL } from "../cham-cong/attendanceDisplay";
 import { EMPLOYEE_KIND, internSessionRange } from "../cham-cong/attendanceModel";
+import { todayISO } from "../../hooks/useEmployeeAttendance";
 import LeaveRequestPanel from "../nghi-phep/LeaveRequestPanel";
-import type { Employee } from "../../types";
+import type { Employee, WorkHistoryEntry } from "../../types";
 import { api } from "@/lib/api"
 import { CrmStaffPage } from "../crm/CrmStaffPage";
 
@@ -56,49 +60,33 @@ const BTN_S: React.CSSProperties = {
   fontFamily: "inherit",
 };
 
-const EMP = {
-  name: "Trần Thị Bích Liên",
-  id: "2026052831",
-  dob: "31/05/2003",
-  gender: "Nữ",
-  cccd: "089303002304",
-  cccdPlace: "CCS",
-  bank: "Vietcombank",
-  bankAccount: "1025840990",
-  university: "Cao đẳng công thương",
+function empInitials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
+  return name.slice(0, 2).toUpperCase();
+}
 
-  dept: "Kỹ thuật",
-  role: "Intern Tester",
-  contractType: "Thử việc",
-  joinDate: "28/05/2026",
-  status: "Đang làm việc",
+function fmtAddr(...parts: (string | undefined)[]) {
+  return parts.filter(Boolean).join(", ") || "—";
+}
 
-  email: "tranbichlien935@gmail.com",
-  phone: "0352440603",
-  hometown: "Kiến Thuận 1, Xã Kiến Thành, Huyện Chợ Mới, Tỉnh An Giang",
-  address: "12a đường số 3 linh trung thủ đức, Phường Linh Trung, Thành phố Thủ Đức, Thành phố Hồ Chí Minh",
+const EMP_STATUS_LABEL: Record<string, string> = {
+  active: "Đang làm việc",
+  inactive: "Đã nghỉ",
+  intern: "Thực tập",
 };
 
-const WEEK = [
-  { day: "T2", date: 22, s: "present" as const },
-  { day: "T3", date: 23, s: "present" as const },
-  { day: "T4", date: 24, s: "today" as const },
-  { day: "T5", date: 25, s: "future" as const },
-  { day: "T6", date: 26, s: "future" as const },
-  { day: "T7", date: 27, s: "weekend" as const },
-  { day: "CN", date: 28, s: "weekend" as const },
-];
+const TASK_STATUS_LABEL: Record<string, string> = {
+  todo: "Chưa làm",
+  "in-progress": "Đang làm",
+  done: "Đã xong",
+};
 
-const TASKS_LIST = [
-  {
-    date: "05/06/2026", day: "Thứ Sáu", items: [
-      { id: 1, t: "Viết section cho danh mục web" },
-      { id: 2, t: "Thiết kế lại trang web" },
-    ]
-  },
-  { date: "09/06/2026", day: "Thứ Ba", items: [{ id: 3, t: "Viết lại web" }] },
-  { date: "12/06/2026", day: "Thứ Sáu", items: [{ id: 4, t: "Làm web" }] },
-];
+const TASK_STATUS_COLOR: Record<string, { c: string; bg: string }> = {
+  todo: { c: "rgba(255,255,255,0.5)", bg: "rgba(255,255,255,0.06)" },
+  "in-progress": { c: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
+  done: { c: "#22c55e", bg: "rgba(34,197,94,0.08)" },
+};
 
 type BubbleId = "checkin" | "employee" | "leave" | "tasks" | "settings" | "chat" | "workflow" | "notifications" | "crm";
 
@@ -240,11 +228,12 @@ function FloatingClock() {
   );
 }
 
-function Bubble({ b, hovId, setHovId, onClick }: {
+function Bubble({ b, hovId, setHovId, onClick, badge }: {
   b: typeof BUBBLES[0];
   hovId: BubbleId | null;
   setHovId: (id: BubbleId | null) => void;
   onClick: (id: BubbleId, e: React.MouseEvent) => void;
+  badge?: number;
 }) {
   const isHov = hovId === b.id;
   const floatName = `floatBubble${b.id}`;
@@ -311,8 +300,8 @@ function Bubble({ b, hovId, setHovId, onClick }: {
       >
         <span style={{ fontSize: b.isCenter ? 36 : 28, lineHeight: 1, userSelect: "none" }}>
           {b.emoji}
-          {b.id === "notifications" && (
-            <div style={{ position: "absolute", top: 12, right: 12, width: 22, height: 22, borderRadius: "50%", background: "#ff5555", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#fff", border: "2px solid #0C0102", boxShadow: "0 0 10px rgba(255,85,85,0.8)" }}>2</div>
+          {b.id === "notifications" && badge != null && badge > 0 && (
+            <div style={{ position: "absolute", top: 12, right: 12, width: 22, height: 22, borderRadius: "50%", background: "#ff5555", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#fff", border: "2px solid #0C0102", boxShadow: "0 0 10px rgba(255,85,85,0.8)" }}>{badge > 9 ? "9+" : badge}</div>
           )}
         </span>
         <span style={{ fontSize: b.isCenter ? 12 : 11, fontWeight: 800, color: isHov ? "#FFE8EC" : "rgba(255,232,236,0.78)", textAlign: "center", lineHeight: 1.3, letterSpacing: "0.02em", padding: "0 8px" }}>
@@ -411,7 +400,16 @@ function Panel({ activePage, onClose, onLogout, employee }: {
 
         <div style={{ padding: "20px 24px 28px" }}>
           {activePage === "checkin" && <CheckinContent />}
-          {activePage === "employee" && <EmployeeContent />}
+          {activePage === "employee" && (
+            employee
+              ? <EmployeeContent employee={employee} />
+              : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "40px 0", color: "rgba(255,232,236,0.5)" }}>
+                  <Loader2 size={20} className="animate-spin" />
+                  <span style={{ fontSize: 13 }}>Đang tải hồ sơ...</span>
+                </div>
+              )
+          )}
           {activePage === "leave" && (
             employee
               ? <LeaveContent employee={employee} />
@@ -422,7 +420,7 @@ function Panel({ activePage, onClose, onLogout, employee }: {
                 </div>
               )
           )}
-          {activePage === "tasks" && <TasksContent />}
+          {activePage === "tasks" && <TasksContent employeeId={employee?.id} />}
           {activePage === "chat" && <ChatContent />}
           {activePage === "workflow" && <WorkflowContent />}
           {activePage === "notifications" && <NotificationsContent />}
@@ -452,6 +450,14 @@ function CheckinContent() {
   }, []);
 
   const working = !punchLabel.done && statusText === "Đang làm việc";
+  const todayKey = todayISO();
+  const statusColor = (status: string) => {
+    if (status === "on-time") return { c: "#22c55e", bg: "rgba(34,197,94,0.15)" };
+    if (status === "late" || status === "early" || status === "late_early") return { c: "#f59e0b", bg: "rgba(245,158,11,0.15)" };
+    if (status === "absent") return { c: "#ff5555", bg: "rgba(255,85,85,0.15)" };
+    if (status === "leave") return { c: "#a78bfa", bg: "rgba(167,139,250,0.15)" };
+    return { c: "rgba(255,232,236,0.6)", bg: "rgba(255,255,255,0.06)" };
+  };
   const kpis = [
     { l: "Đúng giờ", v: monthStats.onTime, c: "#22c55e", g: "rgba(34,197,94,0.22)" },
     { l: "Trễ / sớm", v: monthStats.late, c: "#f59e0b", g: "rgba(245,158,11,0.22)" },
@@ -525,27 +531,35 @@ function CheckinContent() {
 
       <div style={{ width: "100%", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <SectionLabel>Lịch sử tháng này</SectionLabel>
+          <SectionLabel>Lịch sử gần đây</SectionLabel>
           <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
           </button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {history.length === 0 && !loading && (
-            <p style={{ fontSize: 12, color: "rgba(255,232,236,0.3)", textAlign: "center", padding: 12 }}>Chưa có lịch sử</p>
+            <p style={{ fontSize: 12, color: "rgba(255,232,236,0.3)", textAlign: "center", padding: 12 }}>Chưa có lịch sử chấm công</p>
           )}
-          {history.slice(0, 8).map((item) => {
+          {history.slice(0, 10).map((item) => {
             const t = formatAttendanceTimes(item);
+            const isToday = item.date === todayKey;
+            const st = statusColor(item.status);
             return (
               <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 8, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>{fmtIsoDate(item.date)}</p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>{fmtIsoDate(item.date)}</p>
+                    {isToday && (
+                      <span style={{ fontSize: 9, fontWeight: 800, color: BRAND, padding: "2px 6px", background: "rgba(232,35,26,0.15)", borderRadius: 6 }}>HÔM NAY</span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 10, color: "rgba(255,232,236,0.35)", marginTop: 2 }}>{weekdayFromIso(item.date)}</p>
                   <p style={{ fontSize: 11, color: "rgba(255,232,236,0.45)", marginTop: 4, fontFamily: "monospace" }}>
                     {isIntern ? `${t.primary} | ${t.secondary}` : t.combined}
                   </p>
                 </div>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e", padding: "3px 8px", background: "rgba(34,197,94,0.15)", borderRadius: 8 }}>
-                  {item.workingHours ?? item.status}
+                <span style={{ fontSize: 10, fontWeight: 700, color: st.c, padding: "3px 8px", background: st.bg, borderRadius: 8 }}>
+                  {ATT_STATUS_LABEL[item.status] ?? item.workingHours ?? item.status}
                 </span>
               </div>
             );
@@ -556,33 +570,34 @@ function CheckinContent() {
   );
 }
 
-function EmployeeContent() {
+function EmployeeContent({ employee }: { employee: Employee }) {
   const [activeTab, setActiveTab] = useState(0);
+  const hometown = fmtAddr(employee.homeStreet, employee.homeWard, employee.homeDistrict, employee.homeProvince);
+  const address = fmtAddr(employee.curStreet, employee.curWard, employee.curDistrict, employee.curProvince);
+  const history = employee.workHistory ?? [];
 
   const FieldGroup = ({ l, v, span }: { l: string, v: React.ReactNode, span?: number }) => (
     <div style={span ? { gridColumn: `span ${span}` } : {}}>
       <FieldLabel>{l}</FieldLabel>
-      <FieldBox>{v}</FieldBox>
+      <FieldBox>{v || "—"}</FieldBox>
     </div>
   );
-
-
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "18px 20px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18 }}>
         <div style={{ position: "relative", flexShrink: 0 }}>
           <div style={{ width: 68, height: 68, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#fff", boxShadow: `0 0 24px ${GR}` }}>
-            TL
+            {empInitials(employee.name)}
           </div>
-          <div style={{ position: "absolute", bottom: 2, right: 2, width: 14, height: 14, borderRadius: "50%", background: "#22c55e", border: "2px solid #0C0102", boxShadow: "0 0 8px rgba(34,197,94,0.8)" }} />
+          <div style={{ position: "absolute", bottom: 2, right: 2, width: 14, height: 14, borderRadius: "50%", background: employee.status === "inactive" ? "#6b7280" : "#22c55e", border: "2px solid #0C0102", boxShadow: "0 0 8px rgba(34,197,94,0.8)" }} />
         </div>
         <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#FFE8EC", lineHeight: 1.2 }}>{EMP.name}</h2>
-          <p style={{ fontSize: 12, color: "rgba(255,232,236,0.38)", marginTop: 3 }}>{EMP.role}</p>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#FFE8EC", lineHeight: 1.2 }}>{employee.name}</h2>
+          <p style={{ fontSize: 12, color: "rgba(255,232,236,0.38)", marginTop: 3 }}>{employee.position}</p>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-            <span style={{ padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, color: BRAND, background: "rgba(232,35,26,0.1)", border: `1px solid rgba(232,35,26,0.2)` }}>⚡ {EMP.dept}</span>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "rgba(255,255,255,0.24)" }}>#{EMP.id}</span>
+            <span style={{ padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, color: BRAND, background: "rgba(232,35,26,0.1)", border: `1px solid rgba(232,35,26,0.2)` }}>{employee.department}</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "rgba(255,255,255,0.24)" }}>#{employee.id}</span>
           </div>
         </div>
         <div style={{ flexShrink: 0, opacity: 0.35 }}>
@@ -616,15 +631,15 @@ function EmployeeContent() {
       {activeTab === 0 && (
         <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <FieldGroup l="Mã NV" v={EMP.id} />
-            <FieldGroup l="Họ tên" v={EMP.name} />
-            <FieldGroup l="Ngày sinh" v={EMP.dob} />
-            <FieldGroup l="Giới tính" v={EMP.gender} />
-            <FieldGroup l="Số CCCD" v={EMP.cccd} />
-            <FieldGroup l="Nơi cấp" v={EMP.cccdPlace} />
-            <FieldGroup l="Ngân hàng" v={EMP.bank} />
-            <FieldGroup l="Số tài khoản" v={EMP.bankAccount} />
-            <FieldGroup l="Trường học" v={EMP.university} span={2} />
+            <FieldGroup l="Mã NV" v={employee.id} />
+            <FieldGroup l="Họ tên" v={employee.name} />
+            <FieldGroup l="Ngày sinh" v={employee.dob} />
+            <FieldGroup l="Giới tính" v={employee.gender} />
+            <FieldGroup l="Số CCCD" v={employee.cccd} />
+            <FieldGroup l="Nơi cấp" v={employee.cccdPlace} />
+            <FieldGroup l="Ngân hàng" v={employee.bank} />
+            <FieldGroup l="Số tài khoản" v={employee.bankAccount} />
+            <FieldGroup l="Trường học" v={employee.university} span={2} />
           </div>
         </div>
       )}
@@ -632,11 +647,11 @@ function EmployeeContent() {
       {activeTab === 1 && (
         <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <FieldGroup l="Phòng ban" v={EMP.dept} />
-            <FieldGroup l="Vị trí" v={EMP.role} />
-            <FieldGroup l="Loại hợp đồng" v={EMP.contractType} />
-            <FieldGroup l="Ngày bắt đầu" v={EMP.joinDate} />
-            <FieldGroup l="Trạng thái" v={EMP.status} span={2} />
+            <FieldGroup l="Phòng ban" v={employee.department} />
+            <FieldGroup l="Vị trí" v={employee.position} />
+            <FieldGroup l="Loại hợp đồng" v={employee.contractType} />
+            <FieldGroup l="Ngày bắt đầu" v={employee.joinDate} />
+            <FieldGroup l="Trạng thái" v={EMP_STATUS_LABEL[employee.status] ?? employee.status} span={2} />
           </div>
         </div>
       )}
@@ -644,98 +659,127 @@ function EmployeeContent() {
       {activeTab === 2 && (
         <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <FieldGroup l="Email" v={EMP.email} span={2} />
-            <FieldGroup l="Số điện thoại" v={EMP.phone} span={2} />
-            <FieldGroup l="Quê quán" v={EMP.hometown} span={2} />
-            <FieldGroup l="Địa chỉ hiện tại" v={EMP.address} span={2} />
+            <FieldGroup l="Email" v={employee.email} span={2} />
+            <FieldGroup l="Số điện thoại" v={employee.phone} span={2} />
+            <FieldGroup l="Quê quán" v={hometown} span={2} />
+            <FieldGroup l="Địa chỉ hiện tại" v={address} span={2} />
           </div>
         </div>
       )}
 
       <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16 }}>
         <SectionLabel>Quá trình công tác</SectionLabel>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: BRAND, marginTop: 5, boxShadow: `0 0 8px ${BRAND}` }} />
-            <div>
-              <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>Kỹ sư phần mềm (Chính thức)</p>
-              <p style={{ fontSize: 12, color: "rgba(255,232,236,0.4)", marginTop: 2 }}>Phòng Kỹ thuật • 01/05/2026 - Hiện tại</p>
-            </div>
+        {history.length === 0 ? (
+          <p style={{ fontSize: 12, color: "rgba(255,232,236,0.35)" }}>Chưa có dữ liệu</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {history.map((entry: WorkHistoryEntry, idx: number) => (
+              <div key={entry.id} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: idx === 0 ? BRAND : "rgba(255,255,255,0.2)", marginTop: 5, boxShadow: idx === 0 ? `0 0 8px ${BRAND}` : "none" }} />
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: idx === 0 ? 700 : 600, color: idx === 0 ? "#FFE8EC" : "rgba(255,232,236,0.7)" }}>{entry.title}</p>
+                  <p style={{ fontSize: 12, color: "rgba(255,232,236,0.4)", marginTop: 2 }}>
+                    {[entry.snapshot, entry.date, entry.toDate ? `– ${entry.toDate}` : "– Hiện tại"].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(255,255,255,0.2)", marginTop: 5 }} />
-            <div>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,232,236,0.7)" }}>Thực tập sinh Frontend</p>
-              <p style={{ fontSize: 12, color: "rgba(255,232,236,0.3)", marginTop: 2 }}>Phòng Kỹ thuật • 01/03/2026 - 30/04/2026</p>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
-
     </div>
   );
 }
 
 function LeaveContent({ employee }: { employee: Employee }) {
-  return (
-    <div className="rounded-2xl overflow-hidden bg-[#F5F1EF] -mx-1">
-      <LeaveRequestPanel employee={employee} />
-    </div>
-  );
+  return <LeaveRequestPanel employee={employee} variant="portal" />;
 }
 
-function TasksContent() {
+function TasksContent({ employeeId }: { employeeId?: string }) {
+  const { tasks, loading, error, reload, stats } = useMyTasks(employeeId);
+  const today = new Date().toLocaleDateString("vi-VN");
+  const todayTasks = tasks.filter(t => t.dueDate === today || (!t.dueDate && (t.status === "todo" || !t.status)));
+  const grouped = tasks.reduce<Record<string, typeof tasks>>((acc, t) => {
+    const key = t.dueDate || "Không có hạn";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(t);
+    return acc;
+  }, {});
+  const groups = Object.entries(grouped).sort(([a], [b]) => {
+    if (a === "Không có hạn") return 1;
+    if (b === "Không có hạn") return -1;
+    return b.localeCompare(a);
+  });
   const kpis = [
-    { l: "Chưa làm", v: 0, c: "rgba(255,255,255,0.35)", g: "transparent" },
-    { l: "Đang làm", v: 0, c: "#f59e0b", g: "rgba(245,158,11,0.2)" },
-    { l: "Đã xong", v: 5, c: "#22c55e", g: "rgba(34,197,94,0.2)" },
+    { l: "Chưa làm", v: stats.todo, c: "rgba(255,255,255,0.35)", g: "transparent" },
+    { l: "Đang làm", v: stats.inProgress, c: "#f59e0b", g: "rgba(245,158,11,0.2)" },
+    { l: "Đã xong", v: stats.done, c: "#22c55e", g: "rgba(34,197,94,0.2)" },
   ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <p style={{ fontSize: 12, color: "rgba(255,232,236,0.32)" }}>24/06/2026 · Thứ Tư</p>
-        <button style={{ ...BTN_S, width: "auto", padding: "8px 16px", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}><Plus size={14} /> Thêm mới</button>
+        <p style={{ fontSize: 12, color: "rgba(255,232,236,0.32)" }}>{today}</p>
+        <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
+          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+        </button>
       </div>
+
+      {error && <p style={{ fontSize: 12, color: "#ff8888" }}>{error}</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
         {kpis.map(({ l, v, c, g }) => (
           <div key={l} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, padding: "14px", boxShadow: g !== "transparent" ? `0 0 16px ${g}` : "none" }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: c, lineHeight: 1, textShadow: g !== "transparent" ? `0 0 12px ${g}` : "none" }}>{v}</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: c, lineHeight: 1, textShadow: g !== "transparent" ? `0 0 12px ${g}` : "none" }}>{loading ? "—" : v}</div>
             <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.32)", marginTop: 5 }}>{l}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, padding: "20px 16px", textAlign: "center" }}>
-        <div style={{ fontSize: 32, marginBottom: 8 }}>😴</div>
-        <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>Hôm nay không có công việc</p>
-        <p style={{ fontSize: 11, color: "rgba(255,232,236,0.3)", marginTop: 3 }}>24/06/2026 · Nghỉ ngơi chút nhé!</p>
-      </div>
+      {!loading && todayTasks.length === 0 && (
+        <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, padding: "20px 16px", textAlign: "center" }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>Hôm nay không có công việc</p>
+          <p style={{ fontSize: 11, color: "rgba(255,232,236,0.3)", marginTop: 3 }}>{today}</p>
+        </div>
+      )}
 
       <div>
         <SectionLabel>Nhật ký công việc</SectionLabel>
-        {TASKS_LIST.map((g, idx) => (
-          <div key={idx} style={{ display: "flex", gap: 14 }}>
+        {loading && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 16, color: "rgba(255,232,236,0.4)" }}>
+            <Loader2 size={16} className="animate-spin" />
+            <span style={{ fontSize: 12 }}>Đang tải...</span>
+          </div>
+        )}
+        {!loading && groups.length === 0 && (
+          <p style={{ fontSize: 12, color: "rgba(255,232,236,0.35)", padding: "8px 0" }}>Chưa có công việc được giao</p>
+        )}
+        {groups.map(([date, items], idx) => (
+          <div key={date} style={{ display: "flex", gap: 14 }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
               <div style={{ width: 10, height: 10, borderRadius: "50%", background: BRAND, boxShadow: `0 0 8px ${BRAND}`, marginTop: 2, flexShrink: 0 }} />
-              {idx < TASKS_LIST.length - 1 && <div style={{ width: 1, flex: 1, background: "rgba(232,35,26,0.15)", marginTop: 4 }} />}
+              {idx < groups.length - 1 && <div style={{ width: 1, flex: 1, background: "rgba(232,35,26,0.15)", marginTop: 4 }} />}
             </div>
-            <div style={{ flex: 1, paddingBottom: idx < TASKS_LIST.length - 1 ? 18 : 0 }}>
+            <div style={{ flex: 1, paddingBottom: idx < groups.length - 1 ? 18 : 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)" }}>{g.date}</span>
-                <span style={{ color: "rgba(255,255,255,0.18)", fontSize: 10 }}>·</span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.28)" }}>{g.day}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)" }}>{date}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                {g.items.map(item => (
-                  <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", borderRadius: 11, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.04)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                      <CheckCircle2 size={13} style={{ color: "#22c55e", filter: "drop-shadow(0 0 4px rgba(34,197,94,0.6))", flexShrink: 0 }} />
-                      <span style={{ fontSize: 13, color: "#FFE8EC" }}>{item.t}</span>
+                {items.map(item => {
+                  const st = item.status || "todo";
+                  const colors = TASK_STATUS_COLOR[st] ?? TASK_STATUS_COLOR.todo;
+                  return (
+                    <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", borderRadius: 11, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.04)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                        <CheckCircle2 size={13} style={{ color: st === "done" ? "#22c55e" : "rgba(255,255,255,0.25)", filter: st === "done" ? "drop-shadow(0 0 4px rgba(34,197,94,0.6))" : "none", flexShrink: 0 }} />
+                        <span style={{ fontSize: 13, color: "#FFE8EC" }}>{item.title}</span>
+                      </div>
+                      <span style={{ padding: "3px 9px", borderRadius: 99, fontSize: 10, fontWeight: 700, color: colors.c, background: colors.bg, border: `1px solid ${colors.c}30`, flexShrink: 0, marginLeft: 8 }}>
+                        {TASK_STATUS_LABEL[st] ?? st}
+                      </span>
                     </div>
-                    <span style={{ padding: "3px 9px", borderRadius: 99, fontSize: 10, fontWeight: 700, color: "#22c55e", background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.18)", flexShrink: 0, marginLeft: 8 }}>Đã xong</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -849,29 +893,65 @@ function WorkflowContent() {
 }
 
 function NotificationsContent() {
+  const { items, loading, error, unread, markAllRead, markRead, reload } = useNotifications();
+  const typeColor = (type?: string) => {
+    if (type === "leave" || type === "nghỉ phép") return "#22c55e";
+    if (type === "system" || type === "hệ thống") return "#f59e0b";
+    if (type === "hr" || type === "nhân sự") return "#8b5cf6";
+    return BRAND;
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <p style={{ fontSize: 12, color: "rgba(255,232,236,0.32)" }}>Bạn có 2 thông báo chưa đọc</p>
-        <button style={{ background: "none", border: "none", color: BRAND, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Đánh dấu đã đọc</button>
+        <p style={{ fontSize: 12, color: "rgba(255,232,236,0.32)" }}>
+          {unread > 0 ? `Bạn có ${unread} thông báo chưa đọc` : "Không có thông báo mới"}
+        </p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          </button>
+          {unread > 0 && (
+            <button onClick={markAllRead} style={{ background: "none", border: "none", color: BRAND, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Đánh dấu đã đọc</button>
+          )}
+        </div>
       </div>
+
+      {error && <p style={{ fontSize: 12, color: "#ff8888" }}>{error}</p>}
+
+      {loading && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 16, color: "rgba(255,232,236,0.4)" }}>
+          <Loader2 size={16} className="animate-spin" />
+          <span style={{ fontSize: 12 }}>Đang tải...</span>
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {[
-          { t: "Nhân sự", txt: "Chúc mừng sinh nhật tháng 6!", clr: "#8b5cf6" },
-          { t: "Hệ thống", txt: "Hệ thống sẽ bảo trì vào 12:00 Chủ Nhật", clr: "#f59e0b" },
-          { t: "Nghỉ phép", txt: "Đơn xin nghỉ phép của bạn đã được duyệt", clr: "#22c55e" },
-        ].map((n, i) => (
-          <div key={i} style={{ display: "flex", gap: 14, padding: "14px", background: i < 2 ? "rgba(255,255,255,0.03)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: i < 2 ? BRAND : "transparent", marginTop: 6, flexShrink: 0 }} />
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6, color: n.clr, background: `${n.clr}20` }}>{n.t}</span>
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>Hôm qua</span>
+        {!loading && items.length === 0 && (
+          <p style={{ fontSize: 12, color: "rgba(255,232,236,0.35)", textAlign: "center", padding: 16 }}>Chưa có thông báo</p>
+        )}
+        {items.map((n) => {
+          const clr = typeColor(n.type);
+          const isUnread = !n.read;
+          return (
+            <div
+              key={n.id}
+              onClick={() => { if (isUnread) markRead(n.id); }}
+              style={{ display: "flex", gap: 14, padding: "14px", background: isUnread ? "rgba(255,255,255,0.03)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: isUnread ? "pointer" : "default" }}
+            >
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: isUnread ? BRAND : "transparent", marginTop: 6, flexShrink: 0 }} />
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  {n.type && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6, color: clr, background: `${clr}20` }}>{n.type}</span>
+                  )}
+                  {n.time && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>{n.time}</span>}
+                </div>
+                <p style={{ fontSize: 13, color: isUnread ? "#FFE8EC" : "rgba(255,232,236,0.6)", fontWeight: isUnread ? 600 : 400 }}>{n.message}</p>
               </div>
-              <p style={{ fontSize: 13, color: i < 2 ? "#FFE8EC" : "rgba(255,232,236,0.6)", fontWeight: i < 2 ? 600 : 400 }}>{n.txt}</p>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -948,22 +1028,27 @@ const BUBBLE_MODULE_MAP: Record<BubbleId, string> = {
   crm: "user-crm",
 };
 
-export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: () => void; modules?: string[] }) {
+export default function UserPortalApp({ onLogout, modules = [], embed = false }: { onLogout: () => void; modules?: string[]; embed?: boolean }) {
   const [activePage, setActivePage] = useState<BubbleId | null>(null);
   const [hovId, setHovId] = useState<BubbleId | null>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
+  const { unread: notifUnread } = useNotifications();
 
   useEffect(() => {
     const loadEmployee = async () => {
       try {
         const raw = localStorage.getItem("dudi_user");
         const user = raw ? JSON.parse(raw) : null;
-        const key = String(user?.employeeId || user?.email || "").toLowerCase();
+        const empId = user?.employeeId;
+        if (empId) {
+          const found = await api.employees.getById(empId) as Employee;
+          setEmployee(found);
+          return;
+        }
+        const key = String(user?.email || "").toLowerCase();
         if (!key) return;
         const list = (await api.employees.list()) as Employee[];
-        const found = list.find(
-          e => e.id.toLowerCase() === key || (e.email || "").toLowerCase() === key,
-        );
+        const found = list.find(e => (e.email || "").toLowerCase() === key);
         if (found) setEmployee(found);
       } catch {
       }
@@ -974,10 +1059,9 @@ export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: ()
   const handleBubbleClick = (id: BubbleId) => setActivePage(id);
 
   const allowedBubbles = BUBBLES.filter(b => {
-    // If modules is empty (e.g. before fetching finishes), show all system default modules
-    if (modules.length === 0) return true;
+    if (!LIVE_STAFF_BUBBLES.has(b.id)) return false;
     const moduleKey = BUBBLE_MODULE_MAP[b.id];
-    return modules.includes(moduleKey);
+    return hasStaffModule(modules, moduleKey);
   });
 
   // Individual float keyframe values per bubble for organic feel
@@ -992,7 +1076,9 @@ export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: ()
   return (
     <div
       style={{
-        width: "100vw", height: "100vh", overflow: "hidden",
+        width: embed ? "100%" : "100vw",
+        height: embed ? "100%" : "100vh",
+        overflow: "hidden",
         background: `
           radial-gradient(ellipse at 10% 90%, rgba(220,20,35,0.4) 0%, transparent 55%),
           radial-gradient(ellipse at 90% 5%,  rgba(200,80,0,0.2) 0%, transparent 55%),
@@ -1000,7 +1086,8 @@ export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: ()
           linear-gradient(165deg, #2A040B 0%, #160205 60%, #0F0103 100%)`,
         fontFamily: "'Outfit', sans-serif",
         color: "#FFE8EC",
-        position: "relative",
+        position: embed ? "absolute" : "relative",
+        inset: embed ? 0 : undefined,
       }}
     >
       <style>{`
@@ -1032,7 +1119,7 @@ export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: ()
 
         <div style={{ position: "absolute", inset: 0 }}>
           {allowedBubbles.map(b => (
-            <Bubble key={b.id} b={b} hovId={hovId} setHovId={setHovId} onClick={handleBubbleClick} />
+            <Bubble key={b.id} b={b} hovId={hovId} setHovId={setHovId} onClick={handleBubbleClick} badge={b.id === "notifications" ? notifUnread : undefined} />
           ))}
         </div>
 
