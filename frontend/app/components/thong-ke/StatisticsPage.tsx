@@ -1419,27 +1419,15 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
     if (a.status === "leave") return "approved_leave"
     if (a.status === "absent") return "absent"
 
-    const cIn = a.checkIn
-    const cOut = a.checkOut
-
-    const hasIn = cIn && cIn !== "--" && cIn !== "-"
-    const hasOut = cOut && cOut !== "--" && cOut !== "-"
+    const hasIn = a.checkIn && a.checkIn !== "--" && a.checkIn !== "-"
+    const hasOut = a.checkOut && a.checkOut !== "--" && a.checkOut !== "-"
 
     if (!hasIn && !hasOut) return "absent"
     if (!hasIn) return "forgot_checkin"
     if (!hasOut) return "forgot_checkout"
 
-    const [inH, inM] = (cIn ?? "").split(":").map(Number)
-    const [startH, startM] = systemConfig.morningStart.split(":").map(Number)
-    const inMins = inH * 60 + inM
-    const startMins = startH * 60 + startM
-    if (inMins > startMins) return "late"
-
-    const [outH, outM] = (cOut ?? "").split(":").map(Number)
-    const [endH, endM] = systemConfig.afternoonEnd.split(":").map(Number)
-    const outMins = outH * 60 + outM
-    const endMins = endH * 60 + endM
-    if (outMins < endMins) return "early_checkout"
+    if (a.status === "late" || a.status === "late_early") return "late"
+    if (a.status === "early") return "early_checkout"
 
     return null
   }
@@ -1456,7 +1444,7 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
     const [inH, inM] = val.split(":").map(Number)
     const [startH, startM] = systemConfig.morningStart.split(":").map(Number)
     const diff = (inH * 60 + inM) - (startH * 60 + startM)
-    if (diff > 0) {
+    if (diff > 0 && (a.status === "late" || a.status === "late_early")) {
       return (
         <span className="text-amber-600 font-mono font-bold flex items-center gap-1">
           <span>{val}</span>
@@ -1479,7 +1467,7 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
     const [outH, outM] = val.split(":").map(Number)
     const [endH, endM] = systemConfig.afternoonEnd.split(":").map(Number)
     const diff = (endH * 60 + endM) - (outH * 60 + outM)
-    if (diff > 0) {
+    if (diff > 0 && (a.status === "early" || a.status === "late_early")) {
       return (
         <span className="text-orange-600 font-mono font-bold flex items-center gap-1">
           <span>{val}</span>
@@ -1493,16 +1481,16 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
   const empViolations = useMemo(() => {
     return branchEmployees.map(emp => {
       const empAtt = attendance.filter(a => a.employeeId === emp.id)
-      const lateList = empAtt.filter(a => classifyRecord(a) === "late")
-      const earlyList = empAtt.filter(a => classifyRecord(a) === "early_checkout")
-      const forgotOut = empAtt.filter(a => classifyRecord(a) === "forgot_checkout")
-      const forgotIn = empAtt.filter(a => classifyRecord(a) === "forgot_checkin")
-      const absentList = empAtt.filter(a => classifyRecord(a) === "absent")
-      const leaveList = empAtt.filter(a => classifyRecord(a) === "approved_leave")
+      const lateList = empAtt.filter(a => a.status === "late" || a.status === "late_early")
+      const earlyList = empAtt.filter(a => a.status === "early" || a.status === "late_early")
+      const forgotOut = empAtt.filter(a => (a.checkIn && a.checkIn !== "--" && a.checkIn !== "-") && (!a.checkOut || a.checkOut === "--" || a.checkOut === "-"))
+      const forgotIn = empAtt.filter(a => (!a.checkIn || a.checkIn === "--" || a.checkIn === "-") && (a.checkOut && a.checkOut !== "--" && a.checkOut !== "-"))
+      const absentList = empAtt.filter(a => a.status === "absent")
+      const leaveList = empAtt.filter(a => a.status === "leave")
       const violations = lateList.length + earlyList.length + forgotOut.length + forgotIn.length + absentList.length
       return { ...emp, lateList, earlyList, forgotOut, forgotIn, absentList, leaveList, violations }
     })
-  }, [branchEmployees, attendance, systemConfig])
+  }, [branchEmployees, attendance])
 
   const totals = useMemo(() => {
     return {
