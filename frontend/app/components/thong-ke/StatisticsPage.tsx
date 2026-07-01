@@ -42,7 +42,7 @@ interface AttendanceRecord {
   checkIn: string
   checkOut: string
   date: string
-  status: "on-time" | "late" | "absent" | "leave"
+  status: "on-time" | "late" | "absent" | "leave" | "early" | "late_early"
   note: string
   employeeName?: string
   department?: string
@@ -80,7 +80,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       onTimeRate: number
     }[]
   } | null>(null)
-  const [showFullRank, setShowFullRank] = useState<"late" | "leave" | null>(null)
+  const [showFullRank, setShowFullRank] = useState<"late" | "leave" | "absent" | null>(null)
   const [systemConfig, setSystemConfig] = useState<{
     morningStart: string
     morningEnd: string
@@ -363,8 +363,9 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
     const lateRanked = [...list].sort((a, b) => b.late - a.late || b.leave - a.leave || b.absent - a.absent || a.name.localeCompare(b.name))
     const leaveRanked = [...list].sort((a, b) => b.leave - a.leave || b.absent - a.absent || b.late - a.late || a.name.localeCompare(b.name))
+    const absentRanked = [...list].sort((a, b) => b.absent - a.absent || b.late - a.late || b.leave - a.leave || a.name.localeCompare(b.name))
 
-    return { lateRanked, leaveRanked }
+    return { lateRanked, leaveRanked, absentRanked }
   }, [allEmployeesList, statsMap])
 
   const filteredEmployeesList = useMemo(() => {
@@ -429,7 +430,23 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       employees: leaveGroupsMap[count].sort((a, b) => a.name.localeCompare(b.name))
     }))
 
-    return { list, topLateGroups, topLeaveGroups }
+    const absentEmployees = list.filter(item => item.absent > 0)
+    const absentGroupsMap: Record<number, typeof list> = {}
+    absentEmployees.forEach(emp => {
+      if (!absentGroupsMap[emp.absent]) absentGroupsMap[emp.absent] = []
+      absentGroupsMap[emp.absent].push(emp)
+    })
+    const sortedAbsentCounts = Object.keys(absentGroupsMap)
+      .map(Number)
+      .sort((a, b) => b - a)
+      .slice(0, 3)
+    const topAbsentGroups = sortedAbsentCounts.map((count, index) => ({
+      rank: index + 1,
+      count,
+      employees: absentGroupsMap[count].sort((a, b) => a.name.localeCompare(b.name))
+    }))
+
+    return { list, topLateGroups, topLeaveGroups, topAbsentGroups }
   }, [filteredEmployeesList, statsMap])
 
   const departmentOptions = useMemo(() => {
@@ -943,7 +960,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
         <ViolationTab employees={employees} attendance={attendance} selectedBranch={selectedBranch} systemConfig={systemConfig} />
       ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="bg-[#FAF9F9] rounded-3xl border border-black/5 shadow-sm overflow-hidden">
               <div className="bg-[#C62828] text-white px-6 py-4 flex items-center justify-between gap-2">
                 <h3 className="font-black text-sm flex items-center gap-2 text-white">
@@ -1038,7 +1055,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
               </div>
               <div className="p-6 space-y-3.5">
                 {rankData.topLeaveGroups.length === 0 ? (
-                  <div className="py-8 text-center text-gray-400 text-xs font-semibold">Ghi nhận 0 lượt nghỉ/vắng trong kỳ này</div>
+                  <div className="py-8 text-center text-gray-400 text-xs font-semibold">Ghi nhận 0 lượt nghỉ trong kỳ này</div>
                 ) : (
                   rankData.topLeaveGroups.map((group) => {
                     const displayedEmps = group.employees.slice(0, 2)
@@ -1089,6 +1106,85 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                             {Array.from({ length: maxNotches }).map((_, idx) => {
                               const isFilled = idx < group.count
                               const colorClass = group.rank === 1 ? "bg-blue-600" : group.rank === 2 ? "bg-blue-500" : "bg-blue-400"
+                              return (
+                                <div key={idx} className={`flex-1 h-full rounded-xs transition-colors duration-300 ${isFilled ? colorClass : "bg-gray-100"}`} />
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="bg-[#FAF9F9] rounded-3xl border border-black/5 shadow-sm overflow-hidden">
+              <div className="bg-[#C62828] text-white px-6 py-4 flex items-center justify-between gap-2">
+                <h3 className="font-black text-sm flex items-center gap-2 text-white">
+                  <UserX size={16} className="text-white/90" />
+                  Top vắng mặt nhiều nhất
+                </h3>
+                <button
+                  onClick={() => setShowFullRank("absent")}
+                  className="px-3 py-1 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-[10px] font-black text-white transition-all cursor-pointer select-none active:scale-95"
+                >
+                  Chi tiết
+                </button>
+              </div>
+              <div className="p-6 space-y-3.5">
+                {rankData.topAbsentGroups.length === 0 ? (
+                  <div className="py-8 text-center text-gray-400 text-xs font-semibold">Ghi nhận 0 lượt vắng mặt trong kỳ này</div>
+                ) : (
+                  rankData.topAbsentGroups.map((group) => {
+                    const displayedEmps = group.employees.slice(0, 2)
+                    const remainingCount = group.employees.length - 2
+
+                    return (
+                      <div key={group.rank} className="flex items-center gap-4">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
+                          ${group.rank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200" 
+                            : group.rank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200" 
+                            : "bg-orange-100 text-orange-700 border border-orange-200"}`}>
+                          {group.rank}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start mb-1 gap-2">
+                            <div className="min-w-0 flex-1">
+                              {group.employees.length === 1 ? (
+                                <>
+                                  <span className="text-sm font-bold text-gray-800 block leading-tight truncate">
+                                    {group.employees[0].name}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400 font-semibold truncate block">
+                                    {group.employees[0].id} — {group.employees[0].department}
+                                  </span>
+                                </>
+                              ) : (
+                                <div className="cursor-pointer" onClick={() => setActiveRankDetail({
+                                  title: `Top vắng mặt - Hạng ${group.rank} (${group.count} ngày vắng)`,
+                                  countLabel: `${group.count} ngày vắng`,
+                                  employees: group.employees
+                                })}>
+                                  <span className="text-sm font-bold text-gray-800 block leading-tight truncate hover:text-rose-600 transition-colors">
+                                    {displayedEmps.map(e => e.name).join(", ")}
+                                    {remainingCount > 0 && ` và ${remainingCount} người khác...`}
+                                  </span>
+                                  <span className="text-[10px] text-rose-500 font-black hover:underline mt-0.5 flex items-center gap-1">
+                                    <AlertCircle size={11} className="flex-shrink-0" />
+                                    Đồng hạng — Bấm để xem chi tiết ({group.employees.length} nhân sự)
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg h-fit flex-shrink-0">
+                              {group.count} ngày vắng
+                            </span>
+                          </div>
+                          <div className={`flex h-1.5 mt-2 ${maxNotches === 5 ? "gap-1" : "gap-[2px]"}`}>
+                            {Array.from({ length: maxNotches }).map((_, idx) => {
+                              const isFilled = idx < group.count
+                              const colorClass = group.rank === 1 ? "bg-rose-600" : group.rank === 2 ? "bg-rose-500" : "bg-rose-400"
                               return (
                                 <div key={idx} className={`flex-1 h-full rounded-xs transition-colors duration-300 ${isFilled ? colorClass : "bg-gray-100"}`} />
                               )
@@ -1210,8 +1306,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       <Modal
         open={!!showFullRank}
         onClose={() => setShowFullRank(null)}
-        title={showFullRank === "late" ? "Bảng xếp hạng đi trễ (Toàn bộ nhân sự)" : "Bảng xếp hạng nghỉ phép (Toàn bộ nhân sự)"}
-        icon={showFullRank === "late" ? Award : Users}
+        title={showFullRank === "late" ? "Bảng xếp hạng đi trễ (Toàn bộ nhân sự)" : showFullRank === "leave" ? "Bảng xếp hạng nghỉ phép (Toàn bộ nhân sự)" : "Bảng xếp hạng vắng mặt (Toàn bộ nhân sự)"}
+        icon={showFullRank === "late" ? Award : showFullRank === "leave" ? Users : UserX}
         width="xl"
         footer={
           <button 
@@ -1233,13 +1329,13 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                   <th className="px-4 py-3">Đơn vị</th>
                   <th className="px-4 py-3">Loại hợp đồng</th>
                   <th className="px-4 py-3 text-right">
-                    {showFullRank === "late" ? "Số ngày đi trễ" : "Số ngày nghỉ"}
+                    {showFullRank === "late" ? "Số ngày đi trễ" : showFullRank === "leave" ? "Số ngày nghỉ" : "Số ngày vắng mặt"}
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {(() => {
-                  const list = showFullRank === "late" ? rankAllData.lateRanked : rankAllData.leaveRanked
+                  const list = showFullRank === "late" ? rankAllData.lateRanked : showFullRank === "leave" ? rankAllData.leaveRanked : rankAllData.absentRanked
                   if (list.length === 0) {
                     return (
                       <tr>
@@ -1254,14 +1350,16 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                   let previousCount = -1
 
                   return list.map((item, idx) => {
-                    const countVal = showFullRank === "late" ? item.late : item.leave
+                    const countVal = showFullRank === "late" ? item.late : showFullRank === "leave" ? item.leave : item.absent
                     if (countVal !== previousCount) {
                       currentRank = currentRank + 1
                       previousCount = countVal
                     }
                     const pillClass = showFullRank === "late"
                       ? (countVal > 0 ? "bg-amber-100 text-amber-900 border-amber-200" : "bg-emerald-50 text-emerald-700 border-emerald-100")
-                      : (countVal > 0 ? "bg-purple-100 text-purple-900 border-purple-200" : "bg-gray-100 text-gray-700 border-gray-200")
+                      : showFullRank === "leave"
+                        ? (countVal > 0 ? "bg-purple-100 text-purple-900 border-purple-200" : "bg-gray-100 text-gray-700 border-gray-200")
+                        : (countVal > 0 ? "bg-rose-100 text-rose-900 border-rose-200" : "bg-gray-100 text-gray-700 border-gray-200")
                     
                     return (
                       <tr key={item.id} className="hover:bg-gray-50/50 transition-colors font-medium text-black border-b border-gray-150">
