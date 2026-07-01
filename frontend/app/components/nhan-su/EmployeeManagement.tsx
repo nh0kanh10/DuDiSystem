@@ -9,7 +9,7 @@ import {
 } from "lucide-react"
 import { Employee, EmpExtForm, WorkHistoryEntry, WorkHistoryType, Attachment, OrgNode } from "../../types"
 import { api } from "@/lib/api"
-import { Badge } from "../ui/Badge"
+import { Badge } from "../ui/badge"
 import { initials } from "../../utils"
 import UserProfile from "../nhan-vien/UserProfile"
 import { CustomDatePicker as DateInput } from "../ui/CustomDatePicker"

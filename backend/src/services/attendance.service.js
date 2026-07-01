@@ -430,9 +430,9 @@ function withEmployee(record) {
     }
   }
 
-  // Cờ tự điền trưa
+  // Làm cả ngày (2 lần bấm): hệ thống tự ghi giờ nghỉ trưa giữa 2 ca
   if (record.autoFilled) {
-    finalNote = "⚡ Tự điền trưa" + (finalNoteParts.length > 0 ? `, ${finalNote}` : "")
+    finalNote = "Làm cả ngày (tự ghi giờ trưa)" + (finalNoteParts.length > 0 ? ` · ${finalNote}` : "")
   }
 
   const workingHours = calcInternWorkingHours(morningIn, morningOut, afternoonIn, afternoonOut)
@@ -443,6 +443,8 @@ function withEmployee(record) {
     department: emp?.department ?? "—",
     employeeStatus: emp?.status ?? "intern",
     workingHours,
+    checkIn: morningIn !== "--" ? morningIn : afternoonIn,
+    checkOut: afternoonOut !== "--" ? afternoonOut : morningOut,
     checkInAm: morningIn,
     checkOutAm: morningOut,
     checkInPm: afternoonIn,
@@ -476,15 +478,20 @@ export function listAttendance(filter) {
     employees.forEach(emp => {
       const exists = records.some(r => r.employeeId === emp.id && r.date === targetDate)
       if (!exists) {
-        records.push({
+        const blank = {
           id: `TEMP_${emp.id}_${targetDate}`,
           employeeId: emp.id,
           date: targetDate,
           checkIn: "--",
           checkOut: "--",
+          checkInAm: "--",
+          checkOutAm: "--",
+          checkInPm: "--",
+          checkOutPm: "--",
           status: "absent",
-          note: ""
-        })
+          note: "",
+        }
+        records.push(blank)
       }
     })
   }
@@ -504,35 +511,39 @@ export function listAttendance(filter) {
   return records.map(withEmployee)
 }
 
+function addSessionStat(status, counts) {
+  if (status === "on-time") counts.onTime += 0.5
+  else if (status === "late" || status === "late_early" || status === "early") counts.late += 0.5
+  else if (status === "absent") counts.absent += 0.5
+  else if (status === "leave") counts.leave += 0.5
+}
+
+function addDayStat(status, counts) {
+  if (status === "on-time") counts.onTime += 1
+  else if (status === "late" || status === "late_early" || status === "early") counts.late += 1
+  else if (status === "absent") counts.absent += 1
+  else if (status === "leave") counts.leave += 1
+}
+
 export function getAttendanceStats(filter = {}) {
   const records = listAttendance(filter)
-  let onTime = 0
-  let late = 0
-  let absent = 0
-  let leave = 0
+  const counts = { onTime: 0, late: 0, absent: 0, leave: 0 }
 
   records.forEach(r => {
-    // Sáng
-    if (r.statusAm === "on-time") onTime += 0.5
-    else if (r.statusAm === "late" || r.statusAm === "late_early") late += 0.5
-    else if (r.statusAm === "early") late += 0.5
-    else if (r.statusAm === "absent") absent += 0.5
-    else if (r.statusAm === "leave") leave += 0.5
-
-    // Chiều
-    if (r.statusPm === "on-time") onTime += 0.5
-    else if (r.statusPm === "late" || r.statusPm === "late_early") late += 0.5
-    else if (r.statusPm === "early") late += 0.5
-    else if (r.statusPm === "absent") absent += 0.5
-    else if (r.statusPm === "leave") leave += 0.5
+    if (r.employeeStatus === "intern") {
+      addSessionStat(r.statusAm, counts)
+      addSessionStat(r.statusPm, counts)
+    } else {
+      addDayStat(r.status, counts)
+    }
   })
 
   return {
-    onTime: Math.round(onTime * 10) / 10,
-    late: Math.round(late * 10) / 10,
-    absent: Math.round(absent * 10) / 10,
-    leave: Math.round(leave * 10) / 10,
-    total: records.length
+    onTime: Math.round(counts.onTime * 10) / 10,
+    late: Math.round(counts.late * 10) / 10,
+    absent: Math.round(counts.absent * 10) / 10,
+    leave: Math.round(counts.leave * 10) / 10,
+    total: records.length,
   }
 }
 
@@ -690,8 +701,7 @@ export function updateAttendance(id, patch) {
           return { error: "Đã hoàn thành ca Sáng!", status: 400 }
         }
       } else {
-        // Sau noonBoundary
-        // Kiểm tra case quên bấm trưa (làm thông)
+        // Sau noonBoundary — làm cả ngày (vào sáng, ra chiều): tự ghi giờ nghỉ trưa
         const hasInAm = record.checkInAm && record.checkInAm !== "--"
         const hasOutAm = record.checkOutAm && record.checkOutAm !== "--"
         const hasInPm = record.checkInPm && record.checkInPm !== "--"

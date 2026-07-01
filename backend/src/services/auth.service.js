@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
 import { getByEmail, getByEmployeeId } from "../repositories/user.repository.js"
 import { JWT_SECRET } from "../config/index.js"
-import { resolveBranchId } from "./user.service.js"
+import { resolveBranchId, enrichUserProfile } from "./user.service.js"
 import { getSystemConfig } from "./systemConfig.service.js"
 
 export async function login(loginKey, password) {
@@ -26,6 +26,5 @@ export async function login(loginKey, password) {
     { expiresIn: `${timeoutMinutes}m` }
   )
 
-  const { password: _, ...safeUser } = user
-  return { token, user: { ...safeUser, branchId } }
+  return { token, user: enrichUserProfile(user) }
 }

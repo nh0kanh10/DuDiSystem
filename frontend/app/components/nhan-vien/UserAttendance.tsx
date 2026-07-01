@@ -1,130 +1,164 @@
-import React, { useState } from "react"
-import { Fingerprint, CheckCircle, Clock, AlertCircle, TrendingUp, Calendar } from "lucide-react"
+import React from "react"
+import { Fingerprint, CheckCircle, Clock, AlertCircle, Calendar, Loader2, RefreshCw } from "lucide-react"
+import { useEmployeeAttendance } from "../../hooks/useEmployeeAttendance"
+import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL } from "../cham-cong/attendanceDisplay"
 
-const ATTENDANCE_HISTORY = [
-    { date: "26/06/2026", day: "Thứ Năm", checkIn: "08:02", checkOut: "17:35", hours: "9h33", status: "on-time" },
-    { date: "25/06/2026", day: "Thứ Tư", checkIn: "08:45", checkOut: "18:10", hours: "9h25", status: "late" },
-    { date: "24/06/2026", day: "Thứ Ba", checkIn: "07:55", checkOut: "17:00", hours: "9h05", status: "on-time" },
-    { date: "23/06/2026", day: "Thứ Hai", checkIn: "--", checkOut: "--", hours: "--", status: "leave" },
-    { date: "20/06/2026", day: "Thứ Sáu", checkIn: "09:15", checkOut: "18:30", hours: "9h15", status: "late" },
-    { date: "19/06/2026", day: "Thứ Năm", checkIn: "08:00", checkOut: "17:00", hours: "9h00", status: "on-time" },
-    { date: "18/06/2026", day: "Thứ Tư", checkIn: "08:05", checkOut: "17:10", hours: "9h05", status: "on-time" },
-    { date: "17/06/2026", day: "Thứ Ba", checkIn: "--", checkOut: "--", hours: "--", status: "absent" },
-    { date: "16/06/2026", day: "Thứ Hai", checkIn: "07:58", checkOut: "17:05", hours: "9h07", status: "on-time" },
-]
+const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  "on-time": { label: "Đúng giờ", color: "text-green-700", bg: "bg-green-100" },
+  late: { label: "Đi trễ", color: "text-orange-700", bg: "bg-orange-100" },
+  early: { label: "Về sớm", color: "text-amber-700", bg: "bg-amber-100" },
+  late_early: { label: "Trễ & sớm", color: "text-orange-800", bg: "bg-orange-100" },
+  absent: { label: "Vắng mặt", color: "text-red-700", bg: "bg-red-100" },
+  leave: { label: "Nghỉ phép", color: "text-purple-700", bg: "bg-purple-100" },
+}
 
-const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-    "on-time": { label: "Đúng giờ", color: "text-green-700", bg: "bg-green-100" },
-    "late": { label: "Đi trễ", color: "text-orange-700", bg: "bg-orange-100" },
-    "absent": { label: "Vắng mặt", color: "text-red-700", bg: "bg-red-100" },
-    "leave": { label: "Nghỉ phép", color: "text-purple-700", bg: "bg-purple-100" },
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_STYLE[status] ?? { label: ATT_STATUS_LABEL[status] ?? status, color: "text-gray-600", bg: "bg-gray-100" }
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.color}`}>
+      {s.label}
+    </span>
+  )
 }
 
 export default function UserAttendance() {
-    const [checkedIn, setCheckedIn] = useState(false)
-    const [checkInTime, setCheckInTime] = useState<string | null>(null)
-    const [checkOutTime, setCheckOutTime] = useState<string | null>(null)
+  const {
+    isIntern,
+    todayRecord,
+    history,
+    monthStats,
+    loading,
+    punching,
+    error,
+    punch,
+    punchLabel,
+    statusText,
+    reload,
+  } = useEmployeeAttendance()
 
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, "0")
+  const working = !punchLabel.done && statusText === "Đang làm việc"
+  const monthLabel = new Date().toLocaleDateString("vi-VN", { month: "long", year: "numeric" })
+  const times = todayRecord ? formatAttendanceTimes(todayRecord) : null
 
-    const handleAction = () => {
-        const t = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
-        if (!checkedIn) { setCheckInTime(t); setCheckedIn(true) }
-        else { setCheckOutTime(t); setCheckedIn(false) }
-    }
-
-    const stats = {
-        total: ATTENDANCE_HISTORY.length,
-        onTime: ATTENDANCE_HISTORY.filter(r => r.status === "on-time").length,
-        late: ATTENDANCE_HISTORY.filter(r => r.status === "late").length,
-        absent: ATTENDANCE_HISTORY.filter(r => r.status === "absent").length,
-    }
-
-    return (
-        <div className="space-y-5 max-w-3xl mx-auto">
-            {/* Check-in card */}
-            <div className="bg-gradient-to-br from-[#160606] to-[#2a0808] rounded-2xl p-6 text-white flex items-center justify-between shadow-lg">
-                <div>
-                    <p className="text-white/50 text-sm mb-1">Trạng thái hôm nay</p>
-                    <h3 className="text-xl font-bold">
-                        {checkedIn ? "Đang làm việc" : checkInTime && checkOutTime ? "Đã kết thúc ca" : "Chưa chấm công"}
-                    </h3>
-                    {checkInTime && (
-                        <p className="text-white/60 text-sm mt-1.5 font-mono">
-                            Vào: {checkInTime}
-                            {checkOutTime && ` · Ra: ${checkOutTime}`}
-                        </p>
-                    )}
-                </div>
-                <button
-                    onClick={handleAction}
-                    className={`w-24 h-24 rounded-full flex flex-col items-center justify-center gap-2 transition-all duration-300 hover:scale-105 active:scale-95 border-2
-            ${checkedIn
-                            ? "bg-green-600/20 border-green-500/50 shadow-green-900/30"
-                            : "bg-[#C62828]/20 border-[#C62828]/50 shadow-red-900/30"
-                        } shadow-xl`}
-                >
-                    <Fingerprint size={30} className={checkedIn ? "text-green-400" : "text-[#FF8A50]"} />
-                    <span className="text-xs font-bold text-white">{checkedIn ? "Check-out" : "Check-in"}</span>
-                </button>
-            </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-3">
-                {[
-                    { label: "Ngày đi làm", value: stats.total, icon: CheckCircle, color: "text-blue-600", bg: "bg-blue-50" },
-                    { label: "Đúng giờ", value: stats.onTime, icon: Clock, color: "text-green-600", bg: "bg-green-50" },
-                    { label: "Đi muộn", value: stats.late, icon: AlertCircle, color: "text-orange-500", bg: "bg-orange-50" },
-                    { label: "Vắng mặt", value: stats.absent, icon: TrendingUp, color: "text-red-500", bg: "bg-red-50" },
-                ].map(s => (
-                    <div key={s.label} className={`${s.bg} rounded-2xl p-4 border border-black/[0.04]`}>
-                        <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
-                        <p className="text-xs font-semibold text-gray-600 mt-1">{s.label}</p>
-                    </div>
-                ))}
-            </div>
-
-            {/* History table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
-                    <h3 className="font-bold text-gray-800">Lịch sử chấm công</h3>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-400 font-medium">
-                        <Calendar size={13} />
-                        <span>Tháng 6/2026</span>
-                    </div>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="bg-gray-50/70 text-gray-400 text-xs">
-                                {["Ngày", "Thứ", "Giờ vào", "Giờ ra", "Số giờ", "Trạng thái"].map(h => (
-                                    <th key={h} className="px-5 py-3 text-left font-semibold">{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {ATTENDANCE_HISTORY.map(r => {
-                                const s = STATUS_MAP[r.status]
-                                return (
-                                    <tr key={r.date} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-5 py-3.5 font-semibold text-gray-700 font-mono text-xs">{r.date}</td>
-                                        <td className="px-5 py-3.5 text-gray-500 text-xs">{r.day}</td>
-                                        <td className="px-5 py-3.5 font-mono text-gray-600 text-xs">{r.checkIn}</td>
-                                        <td className="px-5 py-3.5 font-mono text-gray-600 text-xs">{r.checkOut}</td>
-                                        <td className="px-5 py-3.5 font-mono text-gray-700 text-xs font-medium">{r.hours}</td>
-                                        <td className="px-5 py-3.5">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.color}`}>
-                                                {s.label}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+  return (
+    <div className="space-y-5 max-w-3xl mx-auto">
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-medium flex items-center justify-between gap-3">
+          <span>{error}</span>
+          <button onClick={reload} className="text-xs font-bold underline">Thử lại</button>
         </div>
-    )
+      )}
+
+      <div className="bg-gradient-to-br from-[#160606] to-[#2a0808] rounded-2xl p-6 text-white flex items-center justify-between shadow-lg">
+        <div className="flex-1 min-w-0">
+          <p className="text-white/50 text-sm mb-1">
+            {isIntern ? "Thực tập · chấm theo buổi" : "Nhân viên · chấm theo ngày"}
+          </p>
+          <h3 className="text-xl font-bold">{loading ? "Đang tải..." : statusText}</h3>
+          {todayRecord && (
+            <div className="text-white/60 text-sm mt-2 font-mono space-y-0.5">
+              {isIntern ? (
+                <>
+                  <p>Sáng: {todayRecord.checkInAm ?? "--"} → {todayRecord.checkOutAm ?? "--"}</p>
+                  <p>Chiều: {todayRecord.checkInPm ?? "--"} → {todayRecord.checkOutPm ?? "--"}</p>
+                  {todayRecord.autoFilled && (
+                    <p className="text-amber-300/90 text-xs mt-1">Làm cả ngày — hệ thống tự ghi giờ nghỉ trưa</p>
+                  )}
+                </>
+              ) : (
+                <p>Vào: {todayRecord.checkIn ?? "--"}{todayRecord.checkOut && todayRecord.checkOut !== "--" ? ` · Ra: ${todayRecord.checkOut}` : ""}</p>
+              )}
+            </div>
+          )}
+          {!isIntern && times && (
+            <p className="text-white/40 text-xs mt-2">Giờ làm: {todayRecord?.workingHours ?? "--"}</p>
+          )}
+        </div>
+        <button
+          onClick={punch}
+          disabled={loading || punching || punchLabel.done}
+          className={`w-24 h-24 rounded-full flex flex-col items-center justify-center gap-2 transition-all duration-300 border-2 shrink-0
+            ${punchLabel.done ? "opacity-50 cursor-not-allowed bg-white/5 border-white/20" :
+              working ? "bg-green-600/20 border-green-500/50 hover:scale-105 active:scale-95" :
+              "bg-[#C62828]/20 border-[#C62828]/50 hover:scale-105 active:scale-95"} shadow-xl`}
+        >
+          {punching ? <Loader2 size={28} className="animate-spin text-white" /> : (
+            <Fingerprint size={30} className={working ? "text-green-400" : "text-[#FF8A50]"} />
+          )}
+          <span className="text-[10px] font-bold text-white text-center leading-tight px-1">
+            {punchLabel.label}
+          </span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Đúng giờ", value: monthStats.onTime, icon: CheckCircle, color: "text-green-600", bg: "bg-green-50" },
+          { label: "Đi trễ / sớm", value: monthStats.late, icon: AlertCircle, color: "text-orange-500", bg: "bg-orange-50" },
+          { label: "Vắng", value: monthStats.absent, icon: Clock, color: "text-red-500", bg: "bg-red-50" },
+          { label: "Nghỉ phép", value: monthStats.leave, icon: Calendar, color: "text-purple-600", bg: "bg-purple-50" },
+        ].map(s => (
+          <div key={s.label} className={`${s.bg} rounded-2xl p-4 border border-black/[0.04]`}>
+            <p className={`text-2xl font-black ${s.color}`}>{loading ? "—" : s.value}</p>
+            <p className="text-xs font-semibold text-gray-600 mt-1">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+          <h3 className="font-bold text-gray-800">Lịch sử chấm công</h3>
+          <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
+            <Calendar size={13} />
+            <span>{monthLabel}</span>
+            <button onClick={reload} className="p-1 hover:text-gray-600" title="Tải lại">
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+            </button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50/70 text-gray-400 text-xs">
+                {(isIntern
+                  ? ["Ngày", "Thứ", "Ca sáng", "Ca chiều", "Giờ", "Trạng thái"]
+                  : ["Ngày", "Thứ", "Giờ vào", "Giờ ra", "Số giờ", "Trạng thái"]
+                ).map(h => (
+                  <th key={h} className="px-5 py-3 text-left font-semibold">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                <tr><td colSpan={6} className="py-12 text-center text-gray-400">Đang tải...</td></tr>
+              ) : history.length === 0 ? (
+                <tr><td colSpan={6} className="py-12 text-center text-gray-400">Chưa có lịch sử trong tháng</td></tr>
+              ) : history.map(r => {
+                const t = formatAttendanceTimes(r)
+                return (
+                  <tr key={r.id} className="hover:bg-gray-50/50">
+                    <td className="px-5 py-3.5 font-mono text-xs text-gray-700">{fmtIsoDate(r.date)}</td>
+                    <td className="px-5 py-3.5 text-gray-500 text-xs">{weekdayFromIso(r.date)}</td>
+                    {isIntern ? (
+                      <>
+                        <td className="px-5 py-3.5 font-mono text-xs">{t.primary}</td>
+                        <td className="px-5 py-3.5 font-mono text-xs">{t.secondary}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-5 py-3.5 font-mono text-xs">{r.checkIn}</td>
+                        <td className="px-5 py-3.5 font-mono text-xs">{r.checkOut}</td>
+                      </>
+                    )}
+                    <td className="px-5 py-3.5 font-mono text-xs font-medium">{r.workingHours ?? "--"}</td>
+                    <td className="px-5 py-3.5"><StatusBadge status={r.status} /></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
 }

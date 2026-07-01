@@ -89,6 +89,7 @@ export const api = {
       req<{ onTime: number; late: number; absent: number; leave: number; total: number }>(
         "GET", `/attendance/stats${qs(params)}`
       ),
+    checkIP: () => req<{ valid: boolean; ip: string; message: string }>("GET", "/attendance/check-ip"),
     create: (data: unknown) => req<unknown>("POST", "/attendance", data),
     update: (id: string, data: unknown) => req<unknown>("PUT", `/attendance/${id}`, data),
     delete: (id: string) => req<unknown>("DELETE", `/attendance/${id}`),

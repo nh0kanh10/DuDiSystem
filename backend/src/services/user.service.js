@@ -178,11 +178,9 @@ export function deleteUser(id) {
   return true
 }
 
-export function getUserDetails(id) {
-  const user = repo.getById(id)
+export function enrichUserProfile(user) {
   if (!user) return null
-  const employees = empRepo.getAll()
-  const emp = user.employeeId ? employees.find(e => e.id === user.employeeId) : null
+  const emp = user.employeeId ? empRepo.getById(user.employeeId) : null
   const assignments = raRepo.getByUserId(user.id)
   const primary = assignments.find(a => a.isPrimary) ?? assignments[0] ?? null
   const branchId = primary
@@ -190,7 +188,21 @@ export function getUserDetails(id) {
     : "all"
   const branchName = getBranchName(branchId)
   const { password: _, ...safeUser } = user
-  return { ...safeUser, name: emp ? emp.name : "—", branchId, branchName, assignments }
+  return {
+    ...safeUser,
+    name: emp?.name ?? "—",
+    department: emp?.department ?? "—",
+    position: emp?.position ?? "—",
+    employeeStatus: emp?.status ?? "active",
+    branchId,
+    branchName,
+    assignments,
+  }
+}
+
+export function getUserDetails(id) {
+  const user = repo.getById(id)
+  return enrichUserProfile(user)
 }
 
 export async function updateAdminAccount(id, data) {

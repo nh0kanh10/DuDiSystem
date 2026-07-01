@@ -141,10 +141,19 @@ export interface AttendanceRecord {
   employeeId: string
   employeeName: string
   department: string
+  employeeStatus?: "active" | "inactive" | "intern"
   checkIn: string
   checkOut: string
+  checkInAm?: string
+  checkOutAm?: string
+  checkInPm?: string
+  checkOutPm?: string
+  statusAm?: string
+  statusPm?: string
+  workingHours?: string
+  autoFilled?: boolean
   date: string
-  status: "on-time" | "late" | "absent" | "leave"
+  status: "on-time" | "late" | "absent" | "leave" | "early" | "late_early"
   note: string
 }
 

@@ -3,10 +3,12 @@ import {
   Fingerprint, User, CalendarDays, ClipboardList, Settings,
   X, CheckCircle2, Lock, Eye, EyeOff, Plus, ArrowLeft,
   Bell, CheckSquare, Search, MessageCircle, Users, Phone, Mail,
-  FileDown, Zap, FileText, Download, Send, Paperclip
+  FileDown, Zap, FileText, Download, Send, Paperclip, Loader2, RefreshCw
 } from "lucide-react";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import dudiLogo from "../../../imports/avatar.jpg";
+import { useEmployeeAttendance } from "../../hooks/useEmployeeAttendance";
+import { fmtIsoDate, formatAttendanceTimes } from "../cham-cong/attendanceDisplay";
 
 const BRAND = "#E8231A";          // exact DUDI red
 const CRIMSON = "#C01525";          // deeper variant for depth
@@ -425,27 +427,38 @@ function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
   );
 }
 
-function CheckinContent({ checkedIn, setCheckedIn }: { checkedIn: boolean; setCheckedIn: (v: boolean) => void }) {
+function CheckinContent() {
+  const {
+    isIntern, todayRecord, history, monthStats,
+    loading, punching, error, punch, punchLabel, statusText, reload,
+  } = useEmployeeAttendance();
   const [hms, setHms] = useState({ h: "00", m: "00", s: "00" });
-  const [ciTime, setCiTime] = useState<string | null>(null);
+
   useEffect(() => {
-    const tick = () => { const n = new Date(); setHms({ h: String(n.getHours()).padStart(2, "0"), m: String(n.getMinutes()).padStart(2, "0"), s: String(n.getSeconds()).padStart(2, "0") }); };
-    tick(); const id = setInterval(tick, 1000); return () => clearInterval(id);
+    const tick = () => {
+      const n = new Date();
+      setHms({ h: String(n.getHours()).padStart(2, "0"), m: String(n.getMinutes()).padStart(2, "0"), s: String(n.getSeconds()).padStart(2, "0") });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, []);
 
-  const toggle = () => { if (!checkedIn) setCiTime(`${hms.h}:${hms.m}`); setCheckedIn(!checkedIn); };
-
+  const working = !punchLabel.done && statusText === "Đang làm việc";
   const kpis = [
-    { l: "Đi làm", v: 22, c: "#22c55e", g: "rgba(34,197,94,0.22)" },
-    { l: "Đi trễ", v: 10, c: "#f59e0b", g: "rgba(245,158,11,0.22)" },
-    { l: "Vắng mặt", v: 14, c: "#ff5555", g: "rgba(255,85,85,0.22)" },
+    { l: "Đúng giờ", v: monthStats.onTime, c: "#22c55e", g: "rgba(34,197,94,0.22)" },
+    { l: "Trễ / sớm", v: monthStats.late, c: "#f59e0b", g: "rgba(245,158,11,0.22)" },
+    { l: "Vắng / nghỉ", v: monthStats.absent + monthStats.leave, c: "#ff5555", g: "rgba(255,85,85,0.22)" },
   ];
-
-  const wc: Record<string, string> = { present: "#22c55e", late: "#f59e0b", absent: "#ff5555", weekend: "rgba(255,255,255,0.05)", future: "rgba(255,255,255,0.03)", today: BRAND };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-      {checkedIn && ciTime && <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#22c55e", textShadow: "0 0 10px rgba(34,197,94,0.6)" }}>✓ Check-in lúc {ciTime}</p>}
+      {error && (
+        <p style={{ fontSize: 12, color: "#ff8888", textAlign: "center", maxWidth: 320 }}>{error}</p>
+      )}
+      <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.45)", letterSpacing: "0.08em" }}>
+        {isIntern ? "Thực tập · theo buổi" : "Nhân viên · theo ngày"} · {statusText}
+      </p>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
         <span style={{ fontSize: 48, color: BRAND, textShadow: `0 0 24px ${GR}` }}>{hms.h}</span>
@@ -455,70 +468,81 @@ function CheckinContent({ checkedIn, setCheckedIn }: { checkedIn: boolean; setCh
       </div>
 
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {!checkedIn && (
+        {!working && !punchLabel.done && (
           <>
             <div style={{ position: "absolute", width: 136, height: 136, borderRadius: "50%", border: `1.5px solid ${BRAND}`, animation: "pulseRing 2.2s ease-out infinite", pointerEvents: "none" }} />
             <div style={{ position: "absolute", width: 136, height: 136, borderRadius: "50%", border: `1px solid ${BRAND}`, animation: "pulseRing 2.2s ease-out 0.75s infinite", pointerEvents: "none" }} />
           </>
         )}
         <button
-          onClick={toggle}
-          style={{ width: 112, height: 112, borderRadius: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 900, color: "#fff", background: checkedIn ? "linear-gradient(135deg, #22c55e, #16a34a)" : `linear-gradient(135deg, ${BRAND}, ${GOLD})`, boxShadow: checkedIn ? "0 0 30px rgba(34,197,94,0.55)" : `0 0 30px ${GR}, 0 0 60px rgba(232,35,26,0.12)`, transition: "transform 0.2s" }}
-          onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.06)")}
-          onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+          onClick={punch}
+          disabled={loading || punching || punchLabel.done}
+          style={{
+            width: 112, height: 112, borderRadius: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5,
+            border: "none", cursor: punchLabel.done ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 900, color: "#fff", opacity: punchLabel.done ? 0.5 : 1,
+            background: working ? "linear-gradient(135deg, #22c55e, #16a34a)" : `linear-gradient(135deg, ${BRAND}, ${GOLD})`,
+            boxShadow: working ? "0 0 30px rgba(34,197,94,0.55)" : `0 0 30px ${GR}, 0 0 60px rgba(232,35,26,0.12)`,
+          }}
         >
-          <Fingerprint size={34} strokeWidth={1.5} />
-          <span style={{ fontSize: 9, letterSpacing: "0.16em" }}>{checkedIn ? "CHECK OUT" : "CHECK IN"}</span>
+          {punching ? <Loader2 size={34} className="animate-spin" /> : <Fingerprint size={34} strokeWidth={1.5} />}
+          <span style={{ fontSize: 8, letterSpacing: "0.1em", textAlign: "center", padding: "0 6px" }}>{punchLabel.label.toUpperCase()}</span>
         </button>
       </div>
-      <p style={{ fontSize: 12, color: "rgba(255,232,236,0.25)" }}>{checkedIn ? "Bấm để ghi nhận giờ kết thúc" : "Bấm để ghi nhận giờ vào làm"}</p>
+
+      {todayRecord && (
+        <div style={{ fontSize: 11, color: "rgba(255,232,236,0.5)", textAlign: "center", fontFamily: "monospace", lineHeight: 1.6 }}>
+          {isIntern ? (
+            <>
+              <div>S: {todayRecord.checkInAm ?? "--"} → {todayRecord.checkOutAm ?? "--"}</div>
+              <div>C: {todayRecord.checkInPm ?? "--"} → {todayRecord.checkOutPm ?? "--"}</div>
+              {todayRecord.autoFilled && <div style={{ color: "#fbbf24", marginTop: 4 }}>Làm cả ngày — tự ghi giờ trưa</div>}
+            </>
+          ) : (
+            <div>{todayRecord.checkIn ?? "--"} → {todayRecord.checkOut ?? "--"} · {todayRecord.workingHours ?? "--"}</div>
+          )}
+        </div>
+      )}
+
+      <p style={{ fontSize: 12, color: "rgba(255,232,236,0.25)" }}>
+        {punchLabel.done ? "Đã hoàn thành chấm công hôm nay" : working ? "Bấm khi tan ca" : "Bấm khi bắt đầu làm"}
+      </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, width: "100%" }}>
         {kpis.map(({ l, v, c, g }) => (
           <div key={l} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 12px", textAlign: "center", boxShadow: `0 0 16px ${g}` }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: c, textShadow: `0 0 12px ${g}`, lineHeight: 1 }}>{v}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.38)", marginTop: 5 }}>{l} · T6</div>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: c, lineHeight: 1 }}>{loading ? "—" : v}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.38)", marginTop: 5 }}>{l}</div>
           </div>
         ))}
       </div>
 
       <div style={{ width: "100%", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 16px" }}>
-        <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(255,232,236,0.25)", marginBottom: 10 }}>Tuần này</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4, marginBottom: 4 }}>
-          {WEEK.map(({ day }) => <div key={day} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: "rgba(255,232,236,0.22)" }}>{day}</div>)}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <SectionLabel>Lịch sử tháng này</SectionLabel>
+          <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          </button>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
-          {WEEK.map(({ day, date, s }) => {
-            const today = s === "today"; const dim = s === "weekend" || s === "future";
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {history.length === 0 && !loading && (
+            <p style={{ fontSize: 12, color: "rgba(255,232,236,0.3)", textAlign: "center", padding: 12 }}>Chưa có lịch sử</p>
+          )}
+          {history.slice(0, 8).map((item) => {
+            const t = formatAttendanceTimes(item);
             return (
-              <div key={day} style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 10, background: wc[s], border: today ? `1px solid ${BRAND}` : "1px solid transparent", boxShadow: today ? `0 0 10px ${GR}` : "none", fontSize: 11, fontWeight: today ? 800 : 600, color: today ? "#fff" : dim ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.8)" }}>
-                {date}
+              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 8, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>{fmtIsoDate(item.date)}</p>
+                  <p style={{ fontSize: 11, color: "rgba(255,232,236,0.45)", marginTop: 4, fontFamily: "monospace" }}>
+                    {isIntern ? `${t.primary} | ${t.secondary}` : t.combined}
+                  </p>
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e", padding: "3px 8px", background: "rgba(34,197,94,0.15)", borderRadius: 8 }}>
+                  {item.workingHours ?? item.status}
+                </span>
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Tích hợp Lịch sử chấm công chi tiết */}
-      <div style={{ width: "100%", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 16px" }}>
-        <SectionLabel>Lịch sử chấm công</SectionLabel>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {[
-            { d: "23/06/2026", in: "08:25", out: "17:35", status: "Đúng giờ", clr: "#22c55e" },
-            { d: "22/06/2026", in: "08:45", out: "17:30", status: "Đi trễ", clr: "#f59e0b" },
-            { d: "21/06/2026", in: "08:29", out: "18:15", status: "Đúng giờ (Tăng ca)", clr: "#3b82f6" },
-          ].map((item, idx) => (
-            <div key={idx} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 8, borderBottom: idx < 2 ? "1px solid rgba(255,255,255,0.05)" : "none" }}>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>{item.d}</p>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
-                  <span style={{ fontSize: 11, color: "rgba(255,232,236,0.4)" }}>Vào: <span style={{ color: "rgba(255,232,236,0.8)" }}>{item.in}</span></span>
-                  <span style={{ fontSize: 11, color: "rgba(255,232,236,0.4)" }}>Ra: <span style={{ color: "rgba(255,232,236,0.8)" }}>{item.out}</span></span>
-                </div>
-              </div>
-              <span style={{ fontSize: 10, fontWeight: 700, color: item.clr, padding: "3px 8px", background: `${item.clr}20`, borderRadius: 8 }}>{item.status}</span>
-            </div>
-          ))}
         </div>
       </div>
     </div>
