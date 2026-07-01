@@ -1,0 +1,137 @@
+[
+  {
+    "id": "U001",
+    "employeeId": "NV001",
+    "email": "NV001",
+    "password": "$2a$10$bFlWDZ7oJv7ftHEo655TWusfOlhXTfxotkKWS3wjQKcekdr0yKnOi",
+    "roleId": "role-user",
+    "status": "active",
+    "permissions": [
+      "dashboard",
+      "user-profile",
+      "user-attendance",
+      "user-timeoff",
+      "user-directory",
+      "user-chat",
+      "user-workflow",
+      "cong-viec",
+      "thong-bao",
+      "user-settings",
+      "crm-employee-data"
+    ]
+  },
+  {
+    "id": "U002",
+    "employeeId": "NV002",
+    "email": "NV002",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-manager",
+    "status": "active",
+    "permissions": null
+  },
+  {
+    "id": "U003",
+    "employeeId": "NV003",
+    "email": "NV003",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "U004",
+    "employeeId": "NV004",
+    "email": "NV004",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "U005",
+    "employeeId": "NV005",
+    "email": "NV005",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-admin",
+    "status": "active"
+  },
+  {
+    "id": "U006",
+    "employeeId": "NV006",
+    "email": "NV006",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "U007",
+    "employeeId": "NV007",
+    "email": "NV007",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "U008",
+    "employeeId": "NV008",
+    "email": "NV008",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "U009",
+    "employeeId": "NV009",
+    "email": "NV009",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-manager",
+    "status": "active"
+  },
+  {
+    "id": "U010",
+    "employeeId": "0000000000",
+    "email": "0000000000",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-super-admin",
+    "status": "active",
+    "permissions": null
+  },
+  {
+    "id": "U011",
+    "employeeId": "NV011",
+    "email": "NV011",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "U012",
+    "employeeId": "NV012",
+    "email": "NV012",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-manager",
+    "status": "active"
+  },
+  {
+    "id": "U013",
+    "employeeId": "NV013",
+    "email": "NV013",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "U014",
+    "employeeId": "1111111111",
+    "email": "1111111111",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-super-admin",
+    "status": "active"
+  },
+  {
+    "id": "U015",
+    "employeeId": "2222222222",
+    "email": "2222222222",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-super-admin",
+    "status": "active"
+  }
+]

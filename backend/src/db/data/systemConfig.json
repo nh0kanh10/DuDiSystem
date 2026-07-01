@@ -1,0 +1,19 @@
+[
+  {
+    "id": "working_hours",
+    "companyName": "DuDi System",
+    "morningStart": "07:00",
+    "morningEnd": "12:00",
+    "afternoonStart": "13:30",
+    "afternoonEnd": "17:00",
+    "employeeStart": "09:00",
+    "employeeEnd": "17:00",
+    "noonBoundary": "14:00",
+    "lateGraceMinutes": 15,
+    "earlyGraceMinutes": 15,
+    "requireIP": true,
+    "internshipMonths": 3,
+    "projectDeadlineWarningDays": 7,
+    "sessionTimeoutMinutes": 30
+  }
+]
