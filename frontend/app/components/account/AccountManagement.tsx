@@ -77,9 +77,9 @@ const MODULE_TREE = [
   },
   {
     id: "group-crm",
-    label: "CRM - Quản lý khách hàng",
+    label: "Quản lý khách hàng",
     children: [
-      { id: "crm", label: "Dashboard & Quản lý data CRM" }
+      { id: "crm", label: "Quản lý khách hàng" }
     ]
   }
 ]
@@ -121,9 +121,9 @@ const STAFF_MODULE_TREE = [
   },
   {
     id: "staff-crm",
-    label: "CRM - Không gian làm việc",
+    label: "Quản lý khách hàng (nhân viên)",
     children: [
-      { id: "user-crm", label: "Data khách hàng được giao" }
+      { id: "user-crm", label: "Quản lý khách hàng" }
     ]
   }
 ]

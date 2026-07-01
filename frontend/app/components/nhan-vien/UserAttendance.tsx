@@ -1,6 +1,6 @@
-import React from "react"
+import React, { useEffect, useState } from "react"
 import { Fingerprint, CheckCircle, Clock, AlertCircle, Calendar, Loader2, RefreshCw } from "lucide-react"
-import { useEmployeeAttendance } from "../../hooks/useEmployeeAttendance"
+import { useEmployeeAttendance, todayISO } from "../../hooks/useEmployeeAttendance"
 import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL } from "../cham-cong/attendanceDisplay"
 import { EMPLOYEE_KIND, INTERN_SESSION, internSessionRange } from "../cham-cong/attendanceModel"
 
@@ -13,6 +13,10 @@ const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }>
   leave: { label: "Nghỉ phép", color: "text-purple-700", bg: "bg-purple-100" },
 }
 
+const PORTAL_BRAND = "#E8231A"
+const PORTAL_GOLD = "#FF8800"
+const PORTAL_GR = "rgba(232,35,26,0.28)"
+
 function StatusBadge({ status }: { status: string }) {
   const s = STATUS_STYLE[status] ?? { label: ATT_STATUS_LABEL[status] ?? status, color: "text-gray-600", bg: "bg-gray-100" }
   return (
@@ -22,7 +26,155 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-export default function UserAttendance() {
+function PortalSectionLabel({ children }: { children: string }) {
+  return (
+    <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(255,232,236,0.65)", marginBottom: 14 }}>
+      {children}
+    </p>
+  )
+}
+
+function PortalAttendanceView() {
+  const {
+    isIntern, todayRecord, history, monthStats,
+    loading, punching, error, punch, punchLabel, statusText, reload,
+  } = useEmployeeAttendance()
+  const [hms, setHms] = useState({ h: "00", m: "00", s: "00" })
+
+  useEffect(() => {
+    const tick = () => {
+      const n = new Date()
+      setHms({ h: String(n.getHours()).padStart(2, "0"), m: String(n.getMinutes()).padStart(2, "0"), s: String(n.getSeconds()).padStart(2, "0") })
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const working = !punchLabel.done && statusText === "Đang làm việc"
+  const todayKey = todayISO()
+  const statusColor = (status: string) => {
+    if (status === "on-time") return { c: "#22c55e", bg: "rgba(34,197,94,0.15)" }
+    if (status === "late" || status === "early" || status === "late_early") return { c: "#f59e0b", bg: "rgba(245,158,11,0.15)" }
+    if (status === "absent") return { c: "#ff5555", bg: "rgba(255,85,85,0.15)" }
+    if (status === "leave") return { c: "#a78bfa", bg: "rgba(167,139,250,0.15)" }
+    return { c: "rgba(255,232,236,0.6)", bg: "rgba(255,255,255,0.06)" }
+  }
+  const kpis = [
+    { l: "Đúng giờ", v: monthStats.onTime, c: "#22c55e", g: "rgba(34,197,94,0.22)" },
+    { l: "Trễ / sớm", v: monthStats.late, c: "#f59e0b", g: "rgba(245,158,11,0.22)" },
+    { l: "Vắng / nghỉ", v: monthStats.absent + monthStats.leave, c: "#ff5555", g: "rgba(255,85,85,0.22)" },
+  ]
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
+      {error && (
+        <p style={{ fontSize: 12, color: "#ff8888", textAlign: "center", maxWidth: 320 }}>{error}</p>
+      )}
+      <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.45)", letterSpacing: "0.08em" }}>
+        {isIntern ? `${EMPLOYEE_KIND.intern.label} · theo buổi` : `${EMPLOYEE_KIND.staff.label} · theo ngày`} · {statusText}
+      </p>
+
+      <div style={{ display: "flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
+        <span style={{ fontSize: 48, color: PORTAL_BRAND, textShadow: `0 0 24px ${PORTAL_GR}` }}>{hms.h}</span>
+        <span style={{ fontSize: 48, color: PORTAL_BRAND, opacity: 0.3, animation: "colon-blink 1s step-end infinite" }}>:</span>
+        <span style={{ fontSize: 48, color: PORTAL_BRAND, textShadow: `0 0 24px ${PORTAL_GR}` }}>{hms.m}</span>
+        <span style={{ fontSize: 16, color: "rgba(232,35,26,0.5)", marginLeft: 6, alignSelf: "flex-start", marginTop: 6 }}>{hms.s}</span>
+      </div>
+
+      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        {!working && !punchLabel.done && (
+          <>
+            <div style={{ position: "absolute", width: 136, height: 136, borderRadius: "50%", border: `1.5px solid ${PORTAL_BRAND}`, animation: "pulseRing 2.2s ease-out infinite", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", width: 136, height: 136, borderRadius: "50%", border: `1px solid ${PORTAL_BRAND}`, animation: "pulseRing 2.2s ease-out 0.75s infinite", pointerEvents: "none" }} />
+          </>
+        )}
+        <button
+          onClick={punch}
+          disabled={loading || punching || punchLabel.done}
+          style={{
+            width: 112, height: 112, borderRadius: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5,
+            border: "none", cursor: punchLabel.done ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 900, color: "#fff", opacity: punchLabel.done ? 0.5 : 1,
+            background: working ? "linear-gradient(135deg, #22c55e, #16a34a)" : `linear-gradient(135deg, ${PORTAL_BRAND}, ${PORTAL_GOLD})`,
+            boxShadow: working ? "0 0 30px rgba(34,197,94,0.55)" : `0 0 30px ${PORTAL_GR}, 0 0 60px rgba(232,35,26,0.12)`,
+          }}
+        >
+          {punching ? <Loader2 size={34} className="animate-spin" /> : <Fingerprint size={34} strokeWidth={1.5} />}
+          <span style={{ fontSize: 8, letterSpacing: "0.1em", textAlign: "center", padding: "0 6px" }}>{punchLabel.label.toUpperCase()}</span>
+        </button>
+      </div>
+
+      {todayRecord && (
+        <div style={{ fontSize: 11, color: "rgba(255,232,236,0.5)", textAlign: "center", fontFamily: "monospace", lineHeight: 1.6 }}>
+          {isIntern ? (
+            <>
+              <div>{internSessionRange(todayRecord, "am")}</div>
+              <div>{internSessionRange(todayRecord, "pm")}</div>
+              {todayRecord.autoFilled && <div style={{ color: "#fbbf24", marginTop: 4 }}>Làm cả ngày — tự ghi giờ trưa</div>}
+            </>
+          ) : (
+            <div>{todayRecord.checkIn ?? "--"} → {todayRecord.checkOut ?? "--"} · {todayRecord.workingHours ?? "--"}</div>
+          )}
+        </div>
+      )}
+
+      <p style={{ fontSize: 12, color: "rgba(255,232,236,0.25)" }}>
+        {punchLabel.done ? "Đã hoàn thành chấm công hôm nay" : working ? "Bấm khi tan ca" : "Bấm khi bắt đầu làm"}
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, width: "100%" }}>
+        {kpis.map(({ l, v, c, g }) => (
+          <div key={l} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 12px", textAlign: "center", boxShadow: `0 0 16px ${g}` }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: c, lineHeight: 1 }}>{loading ? "—" : v}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.38)", marginTop: 5 }}>{l}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ width: "100%", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 16px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <PortalSectionLabel>Lịch sử gần đây</PortalSectionLabel>
+          <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          </button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {history.length === 0 && !loading && (
+            <p style={{ fontSize: 12, color: "rgba(255,232,236,0.3)", textAlign: "center", padding: 12 }}>Chưa có lịch sử chấm công</p>
+          )}
+          {history.slice(0, 10).map((item) => {
+            const t = formatAttendanceTimes(item)
+            const isToday = item.date === todayKey
+            const st = statusColor(item.status)
+            return (
+              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 8, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>{fmtIsoDate(item.date)}</p>
+                    {isToday && (
+                      <span style={{ fontSize: 9, fontWeight: 800, color: PORTAL_BRAND, padding: "2px 6px", background: "rgba(232,35,26,0.15)", borderRadius: 6 }}>HÔM NAY</span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 10, color: "rgba(255,232,236,0.35)", marginTop: 2 }}>{weekdayFromIso(item.date)}</p>
+                  <p style={{ fontSize: 11, color: "rgba(255,232,236,0.45)", marginTop: 4, fontFamily: "monospace" }}>
+                    {isIntern ? `${t.primary} | ${t.secondary}` : t.combined}
+                  </p>
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 700, color: st.c, padding: "3px 8px", background: st.bg, borderRadius: 8 }}>
+                  {ATT_STATUS_LABEL[item.status] ?? item.workingHours ?? item.status}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function UserAttendance({ variant = "default" }: { variant?: "default" | "portal" }) {
+  if (variant === "portal") return <PortalAttendanceView />
+
   const {
     isIntern,
     todayRecord,
@@ -44,9 +196,15 @@ export default function UserAttendance() {
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-medium flex items-center justify-between gap-3">
-          <span>{error}</span>
-          <button onClick={reload} className="text-xs font-bold underline">Thử lại</button>
+        <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-red-950/95 border border-red-500/30 text-red-200 shadow-2xl backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-5">
+          <div className="w-1.5 h-6 rounded-full bg-red-500 flex-shrink-0" />
+          <span className="text-xs font-semibold tracking-wide">{error}</span>
+          <button
+            onClick={reload}
+            className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-xs font-bold text-red-400 transition-colors whitespace-nowrap"
+          >
+            Thử lại
+          </button>
         </div>
       )}
 

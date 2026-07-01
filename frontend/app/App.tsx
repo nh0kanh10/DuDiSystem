@@ -3,10 +3,11 @@ import { useNavigate, useLocation } from "react-router-dom"
 import {
   LayoutDashboard, Users, Clock, BarChart3, Bell,
   Wrench, LogOut, ChevronDown, ChevronRight,
-  Shield, Wifi, CheckSquare, FileText, Calendar, User, Fingerprint, Settings, MessageCircle, Layers, Menu, Search, Check, Building2
+  Shield, Wifi, CheckSquare, FileText, Calendar, User, Fingerprint, Settings, MessageCircle, Layers, Menu, Search, Check, Building2, X
 } from "lucide-react"
 
 import UserPortalApp from "./components/nhan-vien/UserApp"
+import UserDashboard from "./components/nhan-vien/UserDashboard"
 import { StaffPortalFab } from "./components/nhan-vien/StaffPortalFab"
 import { canOpenStaffPortal } from "./utils/staffModules"
 import ApprovalManagement from "@/app/components/duyet-don/ApprovalManagement"
@@ -552,6 +553,8 @@ export default function App() {
           selectedBranch={selectedBranch}
           onBranchChange={setSelectedBranch}
           branches={branches}
+          onOpenStaffPortal={() => setShowStaffPortal(true)}
+          showStaffPortalButton={showStaffFab}
         />
         <main className="flex-1 overflow-y-auto p-5 relative"
           style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
@@ -620,7 +623,7 @@ export default function App() {
   )
 }
 
-function Header({ onToggle, unread, currentUser, onLogout, onNavigate, selectedBranch, onBranchChange, branches }: {
+function Header({ onToggle, unread, currentUser, onLogout, onNavigate, selectedBranch, onBranchChange, branches, onOpenStaffPortal, showStaffPortalButton }: {
   onToggle: () => void; unread: number
   currentUser: { name: string; id: string; role: Role; position: string; department: string }
   onLogout: () => void
@@ -628,6 +631,8 @@ function Header({ onToggle, unread, currentUser, onLogout, onNavigate, selectedB
   selectedBranch: string
   onBranchChange: (b: string) => void
   branches: { id: string; name: string }[]
+  onOpenStaffPortal: () => void
+  showStaffPortalButton: boolean
 }) {
   const [showDrop, setShowDrop] = useState(false)
   const [showBranchDrop, setShowBranchDrop] = useState(false)
@@ -712,6 +717,15 @@ function Header({ onToggle, unread, currentUser, onLogout, onNavigate, selectedB
               </>
             )}
           </div>
+        )}
+        {showStaffPortalButton && (
+          <button
+            onClick={onOpenStaffPortal}
+            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-br from-[#C62828] to-[#E64A19] hover:from-[#d32f2f] hover:to-[#f4511e] text-white rounded-xl text-xs font-bold shadow-md shadow-red-900/10 transition-all active:scale-[0.98] cursor-pointer"
+          >
+            <Fingerprint size={14} />
+            <span>Chấm công</span>
+          </button>
         )}
         {/* Notification dropdown */}
         <div className="relative">
@@ -936,7 +950,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="CRM" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý khách hàng" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
 
       {/* Role badge */}

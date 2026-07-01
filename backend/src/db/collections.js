@@ -1,4 +1,3 @@
-/** JSON data files / Mongo collection names (19 total). */
 export const COLLECTIONS = [
   "users",
   "employees",

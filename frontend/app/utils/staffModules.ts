@@ -36,6 +36,7 @@ export const LIVE_STAFF_BUBBLES = new Set([
   "checkin",
   "employee",
   "leave",
+  "directory",
   "tasks",
   "notifications",
   "settings",

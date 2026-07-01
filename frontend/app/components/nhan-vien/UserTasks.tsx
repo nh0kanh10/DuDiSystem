@@ -1,20 +1,11 @@
 import React, { useState } from "react"
-import { CheckSquare, Circle, Clock, Flag, Plus, X } from "lucide-react"
+import { CheckSquare, Circle, Clock, Flag, Plus, X, Loader2 } from "lucide-react"
+import { getStoredUser } from "./types"
+import { useMyTasks } from "../../hooks/useMyTasks"
+import { api } from "@/lib/api"
 
 type Priority = "high" | "medium" | "low"
 type Status = "todo" | "in-progress" | "done"
-
-interface Task {
-    id: string; title: string; dueDate: string; priority: Priority; status: Status; note?: string
-}
-
-const INIT_TASKS: Task[] = [
-    { id: "T1", title: "Redesign dashboard UI component", dueDate: "30/06/2026", priority: "high", status: "in-progress", note: "Làm theo mockup mới từ design team" },
-    { id: "T2", title: "Review code module Nhân sự", dueDate: "28/06/2026", priority: "medium", status: "todo" },
-    { id: "T3", title: "Viết unit test cho AttendanceAPI", dueDate: "27/06/2026", priority: "high", status: "todo" },
-    { id: "T4", title: "Cập nhật tài liệu onboarding", dueDate: "01/07/2026", priority: "low", status: "done" },
-    { id: "T5", title: "Fix bug hiển thị chart tuần", dueDate: "26/06/2026", priority: "high", status: "done" },
-]
 
 const PRIORITY_MAP = {
     high: { label: "Cao", color: "text-red-600", bg: "bg-red-100", dot: "bg-red-500" },
@@ -29,48 +20,71 @@ const STATUS_MAP = {
 }
 
 export default function UserTasks() {
-    const [tasks, setTasks] = useState<Task[]>(INIT_TASKS)
+    const me = getStoredUser()
+    const { tasks, loading, error, reload, stats } = useMyTasks(me.id)
     const [filter, setFilter] = useState<Status | "all">("all")
     const [showAdd, setShowAdd] = useState(false)
     const [newTitle, setNewTitle] = useState("")
     const [newDate, setNewDate] = useState("")
     const [newPriority, setNewPriority] = useState<Priority>("medium")
+    const [actionLoading, setActionLoading] = useState(false)
 
-    const filtered = filter === "all" ? tasks : tasks.filter(t => t.status === filter)
+    const filtered = filter === "all" ? tasks : tasks.filter(t => (t.status || "todo") === filter)
 
-    const toggleDone = (id: string) => setTasks(prev => prev.map(t =>
-        t.id === id ? { ...t, status: t.status === "done" ? "todo" : "done" } : t
-    ))
+    const toggleDone = async (id: string, currentStatus?: string) => {
+        setActionLoading(true)
+        try {
+            const nextStatus = currentStatus === "done" ? "todo" : "done"
+            await api.tasks.update(id, { status: nextStatus })
+            await reload()
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Thao tác thất bại")
+        } finally {
+            setActionLoading(false)
+        }
+    }
 
-    const addTask = () => {
+    const addTask = async () => {
         if (!newTitle.trim()) return
-        setTasks(prev => [{
-            id: `T${Date.now()}`, title: newTitle,
-            dueDate: newDate ? newDate.split("-").reverse().join("/") : "–",
-            priority: newPriority, status: "todo",
-        }, ...prev])
-        setNewTitle(""); setNewDate(""); setNewPriority("medium"); setShowAdd(false)
+        setActionLoading(true)
+        try {
+            await api.tasks.create({
+                title: newTitle,
+                dueDate: newDate ? newDate.split("-").reverse().join("/") : "–",
+                priority: newPriority,
+                status: "todo",
+                assigneeId: me.id,
+                assigneeName: me.name
+            })
+            setNewTitle(""); setNewDate(""); setNewPriority("medium"); setShowAdd(false)
+            await reload()
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Không thể thêm công việc")
+        } finally {
+            setActionLoading(false)
+        }
     }
 
-    const stats = {
-        total: tasks.length,
-        done: tasks.filter(t => t.status === "done").length,
-        todo: tasks.filter(t => t.status === "todo").length,
-        inProgress: tasks.filter(t => t.status === "in-progress").length,
-    }
+    const totalCount = tasks.length
 
     return (
         <div className="space-y-5 max-w-3xl mx-auto">
+            {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-medium">
+                    {error}
+                </div>
+            )}
+
             {/* Stats */}
             <div className="grid grid-cols-4 gap-3">
                 {[
-                    { l: "Tổng cộng", v: stats.total, c: "text-gray-800", bg: "bg-white border border-black/5" },
+                    { l: "Tổng cộng", v: totalCount, c: "text-gray-800", bg: "bg-white border border-black/5" },
                     { l: "Đang làm", v: stats.inProgress, c: "text-orange-600", bg: "bg-orange-50" },
                     { l: "Cần làm", v: stats.todo, c: "text-blue-600", bg: "bg-blue-50" },
                     { l: "Hoàn thành", v: stats.done, c: "text-green-600", bg: "bg-green-50" },
                 ].map(s => (
                     <div key={s.l} className={`${s.bg} rounded-2xl p-4`}>
-                        <p className={`text-2xl font-black ${s.c}`}>{s.v}</p>
+                        <p className={`text-2xl font-black ${s.c}`}>{loading ? "—" : s.v}</p>
                         <p className="text-xs font-semibold text-gray-600 mt-1">{s.l}</p>
                     </div>
                 ))}
@@ -88,7 +102,8 @@ export default function UserTasks() {
                     ))}
                 </div>
                 <button onClick={() => setShowAdd(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-sm font-bold transition-colors shadow-sm">
+                    disabled={actionLoading || loading}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-sm font-bold transition-colors shadow-sm disabled:opacity-50">
                     <Plus size={15} /> Thêm việc
                 </button>
             </div>
@@ -102,16 +117,19 @@ export default function UserTasks() {
                     </div>
                     <input value={newTitle} onChange={e => setNewTitle(e.target.value)}
                         placeholder="Tên công việc..."
+                        disabled={actionLoading}
                         className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40" />
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="text-xs font-bold text-gray-500 mb-1 block">Hạn chót</label>
                             <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)}
+                                disabled={actionLoading}
                                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40" />
                         </div>
                         <div>
                             <label className="text-xs font-bold text-gray-500 mb-1 block">Ưu tiên</label>
                             <select value={newPriority} onChange={e => setNewPriority(e.target.value as Priority)}
+                                disabled={actionLoading}
                                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none">
                                 <option value="high">🔴 Cao</option>
                                 <option value="medium">🟡 Trung bình</option>
@@ -121,11 +139,14 @@ export default function UserTasks() {
                     </div>
                     <div className="flex gap-2 pt-1">
                         <button onClick={() => setShowAdd(false)}
+                            disabled={actionLoading}
                             className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">
                             Hủy
                         </button>
                         <button onClick={addTask}
-                            className="flex-1 py-2.5 bg-[#C62828] text-white rounded-xl text-sm font-bold hover:bg-[#B71C1C]">
+                            disabled={actionLoading}
+                            className="flex-1 py-2.5 bg-[#C62828] text-white rounded-xl text-sm font-bold hover:bg-[#B71C1C] flex items-center justify-center gap-1.5">
+                            {actionLoading && <Loader2 size={14} className="animate-spin" />}
                             Thêm
                         </button>
                     </div>
@@ -134,47 +155,55 @@ export default function UserTasks() {
 
             {/* Task list */}
             <div className="space-y-3">
-                {filtered.length === 0 && (
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                        <Loader2 size={24} className="animate-spin text-[#C62828] mb-2" />
+                        <span className="text-xs font-medium">Đang tải danh sách công việc...</span>
+                    </div>
+                ) : filtered.length === 0 ? (
                     <div className="bg-white rounded-2xl p-10 text-center text-gray-400 border border-black/5 shadow-sm">
                         <CheckSquare size={32} className="mx-auto mb-2 opacity-30" />
                         <p className="text-sm">Không có công việc nào</p>
                     </div>
-                )}
-                {filtered.map(task => {
-                    const p = PRIORITY_MAP[task.priority]
-                    const s = STATUS_MAP[task.status]
-                    return (
-                        <div key={task.id}
-                            className={`bg-white rounded-2xl p-5 border shadow-sm flex items-start gap-4 transition-all
-                ${task.status === "done" ? "border-green-100 opacity-70" : "border-black/5 hover:border-[#C62828]/20"}`}>
-                            <button onClick={() => toggleDone(task.id)} className="flex-shrink-0 mt-0.5 transition-transform hover:scale-110">
-                                {task.status === "done"
-                                    ? <CheckSquare size={22} className="text-green-500" />
-                                    : <Circle size={22} className="text-gray-300 hover:text-[#C62828] transition-colors" />
-                                }
-                            </button>
-                            <div className="flex-1 min-w-0">
-                                <p className={`font-semibold text-sm ${task.status === "done" ? "line-through text-gray-400" : "text-gray-800"}`}>
-                                    {task.title}
-                                </p>
-                                {task.note && <p className="text-xs text-gray-400 mt-0.5 italic">{task.note}</p>}
-                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${s.bg} ${s.color}`}>
-                                        {s.label}
-                                    </span>
-                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${p.bg} ${p.color}`}>
-                                        <Flag size={10} /> {p.label}
-                                    </span>
-                                    {task.dueDate !== "–" && (
-                                        <span className="flex items-center gap-1 text-xs text-gray-400">
-                                            <Clock size={11} /> {task.dueDate}
+                ) : (
+                    filtered.map(task => {
+                        const priorityKey = (task.priority || "medium") as Priority
+                        const statusKey = (task.status || "todo") as Status
+                        const p = PRIORITY_MAP[priorityKey] ?? PRIORITY_MAP.medium
+                        const s = STATUS_MAP[statusKey] ?? STATUS_MAP.todo
+                        return (
+                            <div key={task.id}
+                                className={`bg-white rounded-2xl p-5 border shadow-sm flex items-start gap-4 transition-all
+                    ${statusKey === "done" ? "border-green-100 opacity-70" : "border-black/5 hover:border-[#C62828]/20"}`}>
+                                <button onClick={() => toggleDone(task.id, statusKey)} disabled={actionLoading} className="flex-shrink-0 mt-0.5 transition-transform hover:scale-110 disabled:opacity-50">
+                                    {statusKey === "done"
+                                        ? <CheckSquare size={22} className="text-green-500" />
+                                        : <Circle size={22} className="text-gray-300 hover:text-[#C62828] transition-colors" />
+                                    }
+                                </button>
+                                <div className="flex-1 min-w-0">
+                                    <p className={`font-semibold text-sm ${statusKey === "done" ? "line-through text-gray-400" : "text-gray-800"}`}>
+                                        {task.title}
+                                    </p>
+                                    {task.description && <p className="text-xs text-gray-400 mt-0.5 italic">{task.description}</p>}
+                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${s.bg} ${s.color}`}>
+                                            {s.label}
                                         </span>
-                                    )}
+                                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${p.bg} ${p.color}`}>
+                                            <Flag size={10} /> {p.label}
+                                        </span>
+                                        {task.dueDate && task.dueDate !== "–" && (
+                                            <span className="flex items-center gap-1 text-xs text-gray-400">
+                                                <Clock size={11} /> {task.dueDate}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )
-                })}
+                        )
+                    })
+                )}
             </div>
         </div>
     )

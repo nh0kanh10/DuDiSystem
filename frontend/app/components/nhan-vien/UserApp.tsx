@@ -1,19 +1,17 @@
 import { useState, useEffect } from "react";
 import {
-  Fingerprint, User, CalendarDays, ClipboardList, Settings,
+  User, CalendarDays, ClipboardList, Settings,
   X, CheckCircle2, Lock, Eye, EyeOff, Plus, ArrowLeft,
-  Bell, CheckSquare, Search, MessageCircle, Users, Phone, Mail,
+  Bell, CheckSquare, Search, Users, Phone, Mail,
   FileDown, Zap, FileText, Download, Send, Paperclip, Loader2, RefreshCw
 } from "lucide-react";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import dudiLogo from "../../../imports/avatar.jpg";
-import { useEmployeeAttendance } from "../../hooks/useEmployeeAttendance";
 import { useMyTasks } from "../../hooks/useMyTasks";
 import { useNotifications } from "../../hooks/useNotifications";
+import { useEmployeeDirectory } from "../../hooks/useEmployeeDirectory";
 import { hasStaffModule, LIVE_STAFF_BUBBLES } from "../../utils/staffModules";
-import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL } from "../cham-cong/attendanceDisplay";
-import { EMPLOYEE_KIND, internSessionRange } from "../cham-cong/attendanceModel";
-import { todayISO } from "../../hooks/useEmployeeAttendance";
+import UserAttendance from "./UserAttendance";
 import LeaveRequestPanel from "../nghi-phep/LeaveRequestPanel";
 import type { Employee, WorkHistoryEntry } from "../../types";
 import { api } from "@/lib/api"
@@ -88,7 +86,7 @@ const TASK_STATUS_COLOR: Record<string, { c: string; bg: string }> = {
   done: { c: "#22c55e", bg: "rgba(34,197,94,0.08)" },
 };
 
-type BubbleId = "checkin" | "employee" | "leave" | "tasks" | "settings" | "chat" | "workflow" | "notifications" | "crm";
+type BubbleId = "checkin" | "employee" | "leave" | "directory" | "tasks" | "settings" | "chat" | "workflow" | "notifications" | "crm";
 
 const BUBBLES: {
   id: BubbleId; label: string; sub: string; emoji: string | React.ReactNode;
@@ -112,6 +110,15 @@ const BUBBLES: {
         </svg>
       ),
       lx: "78%", ty: "28%", size: 140, dur: 8.9, delay: 1.1
+    },
+    {
+      id: "directory", label: "Danh bạ", sub: "Nội bộ",
+      emoji: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
+          <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157v.003Z" />
+        </svg>
+      ),
+      lx: "88%", ty: "55%", size: 136, dur: 9.8, delay: 1.5
     },
     {
       id: "workflow", label: "Quy trình", sub: "Trình duyệt",
@@ -163,7 +170,7 @@ const BUBBLES: {
       lx: "50%", ty: "88%", size: 128, dur: 8.7, delay: 0.5
     },
     {
-      id: "crm", label: "CRM", sub: "Khách hàng",
+      id: "crm", label: "Quản lý KH", sub: "Khách hàng",
       emoji: (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
           <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157v.003Z" />
@@ -206,17 +213,19 @@ function AmbientBg() {
 
 function FloatingClock() {
   const [hms, setHms] = useState({ h: "00", m: "00", s: "00" });
+  const [dateLine, setDateLine] = useState("");
   useEffect(() => {
     const tick = () => {
       const n = new Date();
       setHms({ h: String(n.getHours()).padStart(2, "0"), m: String(n.getMinutes()).padStart(2, "0"), s: String(n.getSeconds()).padStart(2, "0") });
+      setDateLine(n.toLocaleDateString("vi-VN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
     };
     tick(); const id = setInterval(tick, 1000); return () => clearInterval(id);
   }, []);
   return (
     <div style={{ textAlign: "center", paddingTop: "5vh", position: "relative", zIndex: 1 }}>
       <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(255,232,236,0.25)", marginBottom: 10 }}>
-        Thứ Tư · 24 Tháng 6 · 2026
+        {dateLine}
       </p>
       <div style={{ display: "inline-flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
         <span style={{ fontSize: "clamp(48px, 8vw, 80px)", color: BRAND, textShadow: `0 0 40px ${GR}, 0 0 80px rgba(232,35,26,0.1)` }}>{hms.h}</span>
@@ -334,12 +343,13 @@ function Panel({ activePage, onClose, onLogout, employee }: {
     checkin: "Tổng quan & Chấm công",
     employee: "Thông tin nhân viên",
     leave: "Quản lý ngày nghỉ",
+    directory: "Danh bạ nội bộ",
     tasks: "Quản lý công việc",
     settings: "Cài đặt tài khoản",
     chat: "Chat nội bộ",
     workflow: "Quy trình nội bộ",
     notifications: "Thông báo hệ thống",
-    crm: "Data khách hàng",
+    crm: "Quản lý khách hàng",
   };
 
   return (
@@ -364,7 +374,7 @@ function Panel({ activePage, onClose, onLogout, employee }: {
         style={{
           ...PANEL_BG,
           width: "100%",
-          maxWidth: activePage === "leave" ? 920 : 640,
+          maxWidth: activePage === "leave" ? 920 : activePage === "directory" ? 720 : 640,
           maxHeight: "86vh",
           overflowY: "auto",
           position: "relative",
@@ -399,7 +409,7 @@ function Panel({ activePage, onClose, onLogout, employee }: {
         </div>
 
         <div style={{ padding: "20px 24px 28px" }}>
-          {activePage === "checkin" && <CheckinContent />}
+          {activePage === "checkin" && <UserAttendance variant="portal" />}
           {activePage === "employee" && (
             employee
               ? <EmployeeContent employee={employee} />
@@ -421,8 +431,7 @@ function Panel({ activePage, onClose, onLogout, employee }: {
               )
           )}
           {activePage === "tasks" && <TasksContent employeeId={employee?.id} />}
-          {activePage === "chat" && <ChatContent />}
-          {activePage === "workflow" && <WorkflowContent />}
+          {activePage === "directory" && <DirectoryContent />}
           {activePage === "notifications" && <NotificationsContent />}
           {activePage === "settings" && <SettingsContent onLogout={onLogout} />}
           {activePage === "crm" && <CrmStaffContent />}
@@ -432,139 +441,63 @@ function Panel({ activePage, onClose, onLogout, employee }: {
   );
 }
 
-function CheckinContent() {
-  const {
-    isIntern, todayRecord, history, monthStats,
-    loading, punching, error, punch, punchLabel, statusText, reload,
-  } = useEmployeeAttendance();
-  const [hms, setHms] = useState({ h: "00", m: "00", s: "00" });
-
-  useEffect(() => {
-    const tick = () => {
-      const n = new Date();
-      setHms({ h: String(n.getHours()).padStart(2, "0"), m: String(n.getMinutes()).padStart(2, "0"), s: String(n.getSeconds()).padStart(2, "0") });
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const working = !punchLabel.done && statusText === "Đang làm việc";
-  const todayKey = todayISO();
-  const statusColor = (status: string) => {
-    if (status === "on-time") return { c: "#22c55e", bg: "rgba(34,197,94,0.15)" };
-    if (status === "late" || status === "early" || status === "late_early") return { c: "#f59e0b", bg: "rgba(245,158,11,0.15)" };
-    if (status === "absent") return { c: "#ff5555", bg: "rgba(255,85,85,0.15)" };
-    if (status === "leave") return { c: "#a78bfa", bg: "rgba(167,139,250,0.15)" };
-    return { c: "rgba(255,232,236,0.6)", bg: "rgba(255,255,255,0.06)" };
-  };
-  const kpis = [
-    { l: "Đúng giờ", v: monthStats.onTime, c: "#22c55e", g: "rgba(34,197,94,0.22)" },
-    { l: "Trễ / sớm", v: monthStats.late, c: "#f59e0b", g: "rgba(245,158,11,0.22)" },
-    { l: "Vắng / nghỉ", v: monthStats.absent + monthStats.leave, c: "#ff5555", g: "rgba(255,85,85,0.22)" },
-  ];
+function DirectoryContent() {
+  const [search, setSearch] = useState("");
+  const { employees, loading, error, reload } = useEmployeeDirectory();
+  const list = employees.filter(e => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return e.name.toLowerCase().includes(q) || e.department.toLowerCase().includes(q) || e.position.toLowerCase().includes(q) || (e.email || "").toLowerCase().includes(q);
+  });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
-      {error && (
-        <p style={{ fontSize: 12, color: "#ff8888", textAlign: "center", maxWidth: 320 }}>{error}</p>
-      )}
-      <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.45)", letterSpacing: "0.08em" }}>
-        {isIntern ? `${EMPLOYEE_KIND.intern.label} · theo buổi` : `${EMPLOYEE_KIND.staff.label} · theo ngày`} · {statusText}
-      </p>
-
-      <div style={{ display: "flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
-        <span style={{ fontSize: 48, color: BRAND, textShadow: `0 0 24px ${GR}` }}>{hms.h}</span>
-        <span style={{ fontSize: 48, color: BRAND, opacity: 0.3, animation: "colon-blink 1s step-end infinite" }}>:</span>
-        <span style={{ fontSize: 48, color: BRAND, textShadow: `0 0 24px ${GR}` }}>{hms.m}</span>
-        <span style={{ fontSize: 16, color: "rgba(232,35,26,0.5)", marginLeft: 6, alignSelf: "flex-start", marginTop: 6 }}>{hms.s}</span>
-      </div>
-
-      <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {!working && !punchLabel.done && (
-          <>
-            <div style={{ position: "absolute", width: 136, height: 136, borderRadius: "50%", border: `1.5px solid ${BRAND}`, animation: "pulseRing 2.2s ease-out infinite", pointerEvents: "none" }} />
-            <div style={{ position: "absolute", width: 136, height: 136, borderRadius: "50%", border: `1px solid ${BRAND}`, animation: "pulseRing 2.2s ease-out 0.75s infinite", pointerEvents: "none" }} />
-          </>
-        )}
-        <button
-          onClick={punch}
-          disabled={loading || punching || punchLabel.done}
-          style={{
-            width: 112, height: 112, borderRadius: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5,
-            border: "none", cursor: punchLabel.done ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 900, color: "#fff", opacity: punchLabel.done ? 0.5 : 1,
-            background: working ? "linear-gradient(135deg, #22c55e, #16a34a)" : `linear-gradient(135deg, ${BRAND}, ${GOLD})`,
-            boxShadow: working ? "0 0 30px rgba(34,197,94,0.55)" : `0 0 30px ${GR}, 0 0 60px rgba(232,35,26,0.12)`,
-          }}
-        >
-          {punching ? <Loader2 size={34} className="animate-spin" /> : <Fingerprint size={34} strokeWidth={1.5} />}
-          <span style={{ fontSize: 8, letterSpacing: "0.1em", textAlign: "center", padding: "0 6px" }}>{punchLabel.label.toUpperCase()}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm tên nhân viên, phòng ban..." style={{ ...INPUT_S, paddingLeft: 40 }} />
+          <Search size={16} style={{ position: "absolute", left: 14, top: 11, color: "rgba(255,255,255,0.3)" }} />
+        </div>
+        <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)", padding: 8 }}>
+          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
 
-      {todayRecord && (
-        <div style={{ fontSize: 11, color: "rgba(255,232,236,0.5)", textAlign: "center", fontFamily: "monospace", lineHeight: 1.6 }}>
-          {isIntern ? (
-            <>
-              <div>{internSessionRange(todayRecord, "am")}</div>
-              <div>{internSessionRange(todayRecord, "pm")}</div>
-              {todayRecord.autoFilled && <div style={{ color: "#fbbf24", marginTop: 4 }}>Làm cả ngày — tự ghi giờ trưa</div>}
-            </>
-          ) : (
-            <div>{todayRecord.checkIn ?? "--"} → {todayRecord.checkOut ?? "--"} · {todayRecord.workingHours ?? "--"}</div>
-          )}
+      {error && <p style={{ fontSize: 12, color: "#ff8888" }}>{error}</p>}
+
+      {loading && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 24, color: "rgba(255,232,236,0.4)" }}>
+          <Loader2 size={18} className="animate-spin" />
+          <span style={{ fontSize: 13 }}>Đang tải...</span>
         </div>
       )}
 
-      <p style={{ fontSize: 12, color: "rgba(255,232,236,0.25)" }}>
-        {punchLabel.done ? "Đã hoàn thành chấm công hôm nay" : working ? "Bấm khi tan ca" : "Bấm khi bắt đầu làm"}
-      </p>
+      {!loading && list.length === 0 && (
+        <p style={{ fontSize: 12, color: "rgba(255,232,236,0.35)", textAlign: "center", padding: 24 }}>Không tìm thấy nhân viên</p>
+      )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, width: "100%" }}>
-        {kpis.map(({ l, v, c, g }) => (
-          <div key={l} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 12px", textAlign: "center", boxShadow: `0 0 16px ${g}` }}>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: c, lineHeight: 1 }}>{loading ? "—" : v}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.38)", marginTop: 5 }}>{l}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {list.map(emp => (
+          <div key={emp.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
+              {empInitials(emp.name)}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: "#FFE8EC", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.name}</p>
+                <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(255,255,255,0.05)", borderRadius: 99, color: "rgba(255,255,255,0.4)", flexShrink: 0 }}>{emp.department}</span>
+              </div>
+              <p style={{ fontSize: 12, color: "rgba(255,232,236,0.4)", marginTop: 2 }}>{emp.position}</p>
+              <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+                {emp.phone && (
+                  <a href={`tel:${emp.phone}`} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: BRAND, textDecoration: "none", fontWeight: 600 }}><Phone size={12} /> {emp.phone}</a>
+                )}
+                {emp.email && (
+                  <a href={`mailto:${emp.email}`} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "rgba(255,232,236,0.5)", textDecoration: "none", fontWeight: 600 }}><Mail size={12} /> {emp.email}</a>
+                )}
+              </div>
+            </div>
           </div>
         ))}
-      </div>
-
-      <div style={{ width: "100%", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <SectionLabel>Lịch sử gần đây</SectionLabel>
-          <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          </button>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {history.length === 0 && !loading && (
-            <p style={{ fontSize: 12, color: "rgba(255,232,236,0.3)", textAlign: "center", padding: 12 }}>Chưa có lịch sử chấm công</p>
-          )}
-          {history.slice(0, 10).map((item) => {
-            const t = formatAttendanceTimes(item);
-            const isToday = item.date === todayKey;
-            const st = statusColor(item.status);
-            return (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 8, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>{fmtIsoDate(item.date)}</p>
-                    {isToday && (
-                      <span style={{ fontSize: 9, fontWeight: 800, color: BRAND, padding: "2px 6px", background: "rgba(232,35,26,0.15)", borderRadius: 6 }}>HÔM NAY</span>
-                    )}
-                  </div>
-                  <p style={{ fontSize: 10, color: "rgba(255,232,236,0.35)", marginTop: 2 }}>{weekdayFromIso(item.date)}</p>
-                  <p style={{ fontSize: 11, color: "rgba(255,232,236,0.45)", marginTop: 4, fontFamily: "monospace" }}>
-                    {isIntern ? `${t.primary} | ${t.secondary}` : t.combined}
-                  </p>
-                </div>
-                <span style={{ fontSize: 10, fontWeight: 700, color: st.c, padding: "3px 8px", background: st.bg, borderRadius: 8 }}>
-                  {ATT_STATUS_LABEL[item.status] ?? item.workingHours ?? item.status}
-                </span>
-              </div>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
@@ -789,105 +722,10 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
   );
 }
 
-function DirectoryContent() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ position: "relative" }}>
-        <input type="text" placeholder="Tìm tên nhân viên, phòng ban..." style={{ ...INPUT_S, paddingLeft: 40 }} />
-        <Search size={16} style={{ position: "absolute", left: 14, top: 11, color: "rgba(255,255,255,0.3)" }} />
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {[1, 2, 3].map(i => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14 }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 900, color: "#fff" }}>NV</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "#FFE8EC" }}>Nguyễn Văn A</p>
-                <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(255,255,255,0.05)", borderRadius: 99, color: "rgba(255,255,255,0.4)" }}>Marketing</span>
-              </div>
-              <p style={{ fontSize: 12, color: "rgba(255,232,236,0.4)", marginTop: 2 }}>Trưởng phòng Marketing</p>
-              <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
-                <a href="#" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: BRAND, textDecoration: "none", fontWeight: 600 }}><Phone size={12} /> 0901 234 567</a>
-                <a href="#" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "rgba(255,232,236,0.5)", textDecoration: "none", fontWeight: 600 }}><Mail size={12} /> a.nguyen@dudi.vn</a>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ChatContent() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 5 }}>
-        {["Tất cả", "Nhóm", "Chưa đọc"].map((t, i) => (
-          <button key={t} style={{ padding: "6px 14px", borderRadius: 99, border: "none", fontSize: 12, fontWeight: 700, background: i === 0 ? "rgba(232,35,26,0.15)" : "rgba(255,255,255,0.03)", color: i === 0 ? BRAND : "rgba(255,255,255,0.4)", cursor: "pointer", whiteSpace: "nowrap" }}>{t}</button>
-        ))}
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {[1, 2, 3].map(i => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px", background: "rgba(255,255,255,0.02)", borderRadius: 14, cursor: "pointer" }}>
-            <div style={{ position: "relative" }}>
-              <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" }}><Users size={20} color="rgba(255,255,255,0.4)" /></div>
-              {i === 1 && <div style={{ position: "absolute", top: -2, right: -2, width: 12, height: 12, borderRadius: "50%", background: BRAND, border: "2px solid #0C0102" }} />}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <p style={{ fontSize: 14, fontWeight: 800, color: "#FFE8EC" }}>Nhóm Dự án Dudi</p>
-                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>10:42</p>
-              </div>
-              <p style={{ fontSize: 12, color: i === 1 ? "#FFE8EC" : "rgba(255,232,236,0.4)", fontWeight: i === 1 ? 600 : 400 }}>Sếp: Mai họp lúc 9h nhé mọi người ơi!</p>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-        <input type="text" placeholder="Nhập tin nhắn..." style={{ ...INPUT_S, flex: 1 }} />
-        <button style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Paperclip size={18} /></button>
-        <button style={{ width: 40, height: 40, borderRadius: 12, background: BRAND, border: "none", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 16px ${GR}` }}><Send size={18} /></button>
-      </div>
-    </div>
-  );
-}
-
 function CrmStaffContent() {
   return (
     <div style={{ margin: "0 -24px -28px" }}>
       <CrmStaffPage />
-    </div>
-  );
-}
-
-function WorkflowContent() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <p style={{ fontSize: 12, color: "rgba(255,232,236,0.32)" }}>Quản lý các quy trình trình duyệt, thanh toán, hợp đồng</p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <button style={{ ...BTN_S, background: "rgba(255,255,255,0.03)", color: "#FFE8EC", boxShadow: "none", border: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
-          <Plus size={16} color={BRAND} /> Tạo quy trình
-        </button>
-        <button style={{ ...BTN_S, background: "rgba(255,255,255,0.03)", color: "#FFE8EC", boxShadow: "none", border: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}>
-          <Download size={16} color="#f59e0b" /> Tải biểu mẫu
-        </button>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-        <SectionLabel>Quy trình đang chờ</SectionLabel>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "16px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <FileDown size={16} color="#3b82f6" />
-              <p style={{ fontSize: 14, fontWeight: 700, color: "#FFE8EC" }}>Đề nghị thanh toán</p>
-            </div>
-            <span style={{ padding: "2px 8px", borderRadius: 99, fontSize: 10, fontWeight: 700, color: "#f59e0b", background: "rgba(245,158,11,0.1)" }}>Chờ Kế toán</span>
-          </div>
-          <div style={{ width: "100%", height: 4, background: "rgba(255,255,255,0.05)", borderRadius: 99, overflow: "hidden" }}>
-            <div style={{ width: "66%", height: "100%", background: "#3b82f6" }} />
-          </div>
-          <p style={{ fontSize: 11, color: "rgba(255,232,236,0.3)" }}>Bước 2/3 · Cập nhật 2 giờ trước</p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1020,6 +858,7 @@ const BUBBLE_MODULE_MAP: Record<BubbleId, string> = {
   checkin: "user-attendance",
   employee: "user-profile",
   leave: "user-timeoff",
+  directory: "user-directory",
   tasks: "cong-viec",
   settings: "user-settings",
   chat: "user-chat",
