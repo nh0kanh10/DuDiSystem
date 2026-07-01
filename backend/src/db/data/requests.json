@@ -183,7 +183,7 @@
     "endDate": "30/06/2026",
     "session": "sang",
     "reason": "Việc gia đình đột xuất",
-    "status": "pending",
+    "status": "cancelled",
     "submittedAt": "26/06/2026"
   },
   {
@@ -194,7 +194,7 @@
     "endDate": "01/07/2026",
     "session": "all",
     "reason": "Phẫu thuật nhỏ, cần nghỉ dưỡng",
-    "status": "pending",
+    "status": "cancelled",
     "submittedAt": "25/06/2026"
   },
   {
@@ -227,7 +227,7 @@
     "endDate": "04/07/2026",
     "session": "all",
     "reason": "Nghỉ hè kết hợp du lịch",
-    "status": "pending",
+    "status": "approved",
     "submittedAt": "24/06/2026"
   },
   {

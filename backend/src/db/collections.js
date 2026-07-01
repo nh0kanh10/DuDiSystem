@@ -1,0 +1,22 @@
+/** JSON data files / Mongo collection names (19 total). */
+export const COLLECTIONS = [
+  "users",
+  "employees",
+  "orgNodes",
+  "assignments",
+  "attendance",
+  "requests",
+  "tasks",
+  "notifications",
+  "projects",
+  "groups",
+  "announcements",
+  "positions",
+  "roles",
+  "roleAssignments",
+  "systemConfig",
+  "allowedIPs",
+  "crmDataRecords",
+  "jobPostings",
+  "candidates",
+]

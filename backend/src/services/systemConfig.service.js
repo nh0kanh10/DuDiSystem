@@ -10,14 +10,20 @@ export function getSystemConfig() {
       morningEnd: "12:00",
       afternoonStart: "13:30",
       afternoonEnd: "17:00",
+      employeeStart: "09:00",
+      employeeEnd: "17:00",
       lateGraceMinutes: 15,
       earlyGraceMinutes: 15,
       requireIP: false,
+      noonBoundary: "14:00",
       sessionTimeoutMinutes: 30
     })
   }
   if (config && config.sessionTimeoutMinutes === undefined) {
     config.sessionTimeoutMinutes = 30
+  }
+  if (config && config.noonBoundary === undefined) {
+    config.noonBoundary = "14:00"
   }
   return config
 }

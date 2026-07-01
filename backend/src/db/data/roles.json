@@ -17,7 +17,9 @@
       "thong-bao",
       "du-an",
       "cong-viec",
-      "tien-ich"
+      "tien-ich",
+      "crm-dashboard",
+      "crm-data"
     ]
   },
   {
@@ -56,7 +58,8 @@
       "user-workflow",
       "cong-viec",
       "thong-bao",
-      "user-settings"
+      "user-settings",
+      "crm-employee-data"
     ]
   },
   {
