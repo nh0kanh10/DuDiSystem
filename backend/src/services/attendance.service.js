@@ -8,7 +8,6 @@ export function validateClientIP(employeeId, clientIP, reqUser) {
   const config = getSystemConfig()
   if (!config.requireIP) return { valid: true }
 
-  // Bypass cho Admin/HR sửa chấm công (được cấp quyền "cham-cong" hoặc có role admin)
   if (reqUser && (reqUser.roleId === "role-admin" || reqUser.permissions?.includes("cham-cong"))) {
     return { valid: true }
   }
@@ -19,12 +18,11 @@ export function validateClientIP(employeeId, clientIP, reqUser) {
   }
 
   const activeIPs = allowedIPRepo.getAll({ status: "active" })
-  if (activeIPs.length === 0) return { valid: true } // Chưa cấu hình IP nào thì cho qua
+  if (activeIPs.length === 0) return { valid: true } 
 
   const employeeBranchId = employee.branchId
   const cleanClientIp = (clientIP || "").replace("::ffff:", "").trim()
 
-  // Bypass local IP để test local nếu không cấu hình IP local cụ thể
   if (cleanClientIp === "127.0.0.1" || cleanClientIp === "::1" || cleanClientIp === "localhost") {
     const hasLocalConfig = activeIPs.some(item => {
       const cleanItemIp = item.ip.replace("::ffff:", "").trim()
@@ -99,7 +97,6 @@ export function calcStaffWorkingHours(checkIn, checkOut, config) {
 
   let diffSec = outSec - inSec
 
-  // Tính overlap với giờ nghỉ trưa từ morningEnd đến afternoonStart
   const noonStartSec = parseToSeconds(config?.morningEnd || "12:00")
   const noonEndSec = parseToSeconds(config?.afternoonStart || "13:30")
   const overlapSec = calcOverlap(inSec, outSec, noonStartSec, noonEndSec)
@@ -411,12 +408,10 @@ function withEmployee(record) {
     notePm = "Vắng chiều"
   }
 
-  // Đánh giá ghi chú hiển thị tổng quan theo spec Intern:
   let finalNoteParts = []
   if (morningIn !== "--" && noteAm && noteAm !== "Đúng giờ") finalNoteParts.push(noteAm)
   if (afternoonIn !== "--" && notePm && notePm !== "Đúng giờ") finalNoteParts.push(notePm)
   
-  // Nếu có đi làm cả 2 ca hoặc chỉ 1 ca, và đều đúng giờ
   let finalNote = finalNoteParts.join(", ")
   if (!finalNote) {
     if (morningIn === "--" && afternoonIn === "--") {
@@ -430,7 +425,6 @@ function withEmployee(record) {
     }
   }
 
-  // Làm cả ngày (2 lần bấm): hệ thống tự ghi giờ nghỉ trưa giữa 2 ca
   if (record.autoFilled) {
     finalNote = "Làm cả ngày (tự ghi giờ trưa)" + (finalNoteParts.length > 0 ? ` · ${finalNote}` : "")
   }
@@ -554,7 +548,6 @@ export function getAttendance(id) {
 }
 
 export function createAttendance(data) {
-  // Validate IP
   const ipCheck = validateClientIP(data.employeeId, data.ip, data.reqUser)
   if (!ipCheck.valid) {
     return { error: ipCheck.error, status: 403 }
@@ -579,14 +572,12 @@ export function createAttendance(data) {
     recordFields.checkIn = data.checkIn || "--"
     recordFields.checkOut = data.checkOut || "--"
   } else {
-    // Nếu FE truyền rõ checkInAm hoặc checkInPm thì ưu tiên dùng luôn
     if (data.checkInAm !== undefined || data.checkOutAm !== undefined || data.checkInPm !== undefined || data.checkOutPm !== undefined) {
       recordFields.checkInAm = data.checkInAm || "--"
       recordFields.checkOutAm = data.checkOutAm || "--"
       recordFields.checkInPm = data.checkInPm || "--"
       recordFields.checkOutPm = data.checkOutPm || "--"
     } else {
-      // Fallback: FE gửi checkIn chung → tự phân ca theo noonBoundary
       const timeStr = data.checkIn || "--"
       if (timeStr < noonBoundary) {
         recordFields.checkInAm = timeStr
@@ -612,7 +603,6 @@ export function createAttendance(data) {
 }
 
 export function updateAttendance(id, patch) {
-  // Tìm employeeId của bản ghi để check IP
   let employeeId = null
   let record = null
   if (id.startsWith("TEMP_")) {
@@ -624,7 +614,6 @@ export function updateAttendance(id, patch) {
   }
 
   if (employeeId) {
-    // Validate IP
     const ipCheck = validateClientIP(employeeId, patch.ip, patch.reqUser)
     if (!ipCheck.valid) {
       return { error: ipCheck.error, status: 403 }
@@ -666,9 +655,7 @@ export function updateAttendance(id, patch) {
     return withEmployee(record)
   }
 
-  // Đối với bản ghi thực sự đang tồn tại
   if (!isIntern) {
-    // Nhân viên chính thức
     if (patch.checkOut && patch.checkOut !== "--") {
       if (record.checkOut && record.checkOut !== "--") {
         return { error: "Bạn đã hoàn thành chấm công ngày hôm nay!", status: 400 }
@@ -678,8 +665,7 @@ export function updateAttendance(id, patch) {
     const safe = Object.fromEntries(Object.entries(patch).filter(([k]) => ALLOWED.includes(k)))
     record = repo.update(id, safe)
   } else {
-    // Thực tập sinh
-    // Chặn bấm lần 5
+  
     const cia = record.checkInAm && record.checkInAm !== "--"
     const coa = record.checkOutAm && record.checkOutAm !== "--"
     const cip = record.checkInPm && record.checkInPm !== "--"
@@ -701,7 +687,6 @@ export function updateAttendance(id, patch) {
           return { error: "Đã hoàn thành ca Sáng!", status: 400 }
         }
       } else {
-        // Sau noonBoundary — làm cả ngày (vào sáng, ra chiều): tự ghi giờ nghỉ trưa
         const hasInAm = record.checkInAm && record.checkInAm !== "--"
         const hasOutAm = record.checkOutAm && record.checkOutAm !== "--"
         const hasInPm = record.checkInPm && record.checkInPm !== "--"
@@ -725,11 +710,9 @@ export function updateAttendance(id, patch) {
       }
     }
 
-    // Cho phép Admin chỉnh sửa trực tiếp các trường cụ thể bằng tay
     const ADMIN_ALLOWED = ["checkInAm", "checkOutAm", "checkInPm", "checkOutPm", "statusAm", "statusPm", "noteAm", "notePm", "status", "note", "autoFilled"]
     const adminSafe = Object.fromEntries(Object.entries(patch).filter(([k]) => ADMIN_ALLOWED.includes(k)))
 
-    // Nếu có updateFields tự động thì dùng, không thì dùng adminSafe
     const finalUpdate = Object.keys(updateFields).length > 0 ? updateFields : adminSafe
     record = repo.update(id, finalUpdate)
   }

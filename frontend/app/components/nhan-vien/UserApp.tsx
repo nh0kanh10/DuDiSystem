@@ -9,6 +9,11 @@ import { ImageWithFallback } from "../figma/ImageWithFallback";
 import dudiLogo from "../../../imports/avatar.jpg";
 import { useEmployeeAttendance } from "../../hooks/useEmployeeAttendance";
 import { fmtIsoDate, formatAttendanceTimes } from "../cham-cong/attendanceDisplay";
+import { EMPLOYEE_KIND, internSessionRange } from "../cham-cong/attendanceModel";
+import LeaveRequestPanel from "../nghi-phep/LeaveRequestPanel";
+import type { Employee } from "../../types";
+import { api } from "@/lib/api"
+import { CrmStaffPage } from "../crm/CrmStaffPage";
 
 const BRAND = "#E8231A";          // exact DUDI red
 const CRIMSON = "#C01525";          // deeper variant for depth
@@ -50,8 +55,6 @@ const BTN_S: React.CSSProperties = {
   boxShadow: `0 0 24px ${GR}`,
   fontFamily: "inherit",
 };
-
-type LeaveStatus = "pending" | "approved" | "cancelled";
 
 const EMP = {
   name: "Trần Thị Bích Liên",
@@ -97,13 +100,7 @@ const TASKS_LIST = [
   { date: "12/06/2026", day: "Thứ Sáu", items: [{ id: 4, t: "Làm web" }] },
 ];
 
-const LEAVES: { id: number; date: string; type: string; reason: string; status: LeaveStatus }[] = [
-  { id: 1, date: "10/06/2026", type: "Nghỉ phép", reason: "Việc cá nhân", status: "approved" },
-  { id: 2, date: "15/06/2026", type: "Nghỉ ốm", reason: "Không khỏe", status: "approved" },
-  { id: 3, date: "20/06/2026", type: "Nghỉ phép", reason: "Du lịch gia đình", status: "cancelled" },
-];
-
-type BubbleId = "checkin" | "employee" | "leave" | "tasks" | "settings" | "chat" | "workflow" | "notifications";
+type BubbleId = "checkin" | "employee" | "leave" | "tasks" | "settings" | "chat" | "workflow" | "notifications" | "crm";
 
 const BUBBLES: {
   id: BubbleId; label: string; sub: string; emoji: string | React.ReactNode;
@@ -120,7 +117,7 @@ const BUBBLES: {
       lx: "22%", ty: "28%", size: 140, dur: 9.3, delay: 0.6
     },
     {
-      id: "leave", label: "Ngày nghỉ", sub: "Phép & Time off",
+      id: "leave", label: "Xin nghỉ", sub: "Tạo đơn · Lịch sử",
       emoji: (
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
           <path fillRule="evenodd" d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z" clipRule="evenodd" />
@@ -177,16 +174,16 @@ const BUBBLES: {
       ),
       lx: "50%", ty: "88%", size: 128, dur: 8.7, delay: 0.5
     },
+    {
+      id: "crm", label: "CRM", sub: "Khách hàng",
+      emoji: (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="36" height="36" color="#FF8800" style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}>
+          <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157v.003Z" />
+        </svg>
+      ),
+      lx: "50%", ty: "15%", size: 128, dur: 9.1, delay: 0.9
+    },
   ];
-
-function LeaveBadge({ status }: { status: LeaveStatus }) {
-  const m = {
-    pending: { l: "Đang chờ duyệt", c: "#f59e0b", a: "rgba(245,158,11,0.1)", b: "rgba(245,158,11,0.22)" },
-    approved: { l: "Đã duyệt", c: "#22c55e", a: "rgba(34,197,94,0.1)", b: "rgba(34,197,94,0.22)" },
-    cancelled: { l: "Đã huỷ", c: "#ff5555", a: "rgba(255,85,85,0.1)", b: "rgba(255,85,85,0.22)" },
-  }[status];
-  return <span style={{ padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, color: m.c, background: m.a, border: `1px solid ${m.b}` }}>{m.l}</span>;
-}
 
 function SectionLabel({ children }: { children: string }) {
   return <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(255,232,236,0.65)", marginBottom: 14 }}>{children}</p>;
@@ -331,12 +328,11 @@ function Bubble({ b, hovId, setHovId, onClick }: {
   );
 }
 
-function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
+function Panel({ activePage, onClose, onLogout, employee }: {
   activePage: BubbleId;
   onClose: () => void;
-  checkedIn: boolean;
-  setCheckedIn: (v: boolean) => void;
   onLogout: () => void;
+  employee: Employee | null;
 }) {
   const [visible, setVisible] = useState(false);
   useEffect(() => { const id = requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true))); return () => cancelAnimationFrame(id); }, []);
@@ -354,6 +350,7 @@ function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
     chat: "Chat nội bộ",
     workflow: "Quy trình nội bộ",
     notifications: "Thông báo hệ thống",
+    crm: "Data khách hàng",
   };
 
   return (
@@ -378,7 +375,7 @@ function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
         style={{
           ...PANEL_BG,
           width: "100%",
-          maxWidth: 640,
+          maxWidth: activePage === "leave" ? 920 : 640,
           maxHeight: "86vh",
           overflowY: "auto",
           position: "relative",
@@ -413,14 +410,24 @@ function Panel({ activePage, onClose, checkedIn, setCheckedIn, onLogout }: {
         </div>
 
         <div style={{ padding: "20px 24px 28px" }}>
-          {activePage === "checkin" && <CheckinContent checkedIn={checkedIn} setCheckedIn={setCheckedIn} />}
+          {activePage === "checkin" && <CheckinContent />}
           {activePage === "employee" && <EmployeeContent />}
-          {activePage === "leave" && <LeaveContent />}
+          {activePage === "leave" && (
+            employee
+              ? <LeaveContent employee={employee} />
+              : (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "40px 0", color: "rgba(255,232,236,0.5)" }}>
+                  <Loader2 size={20} className="animate-spin" />
+                  <span style={{ fontSize: 13 }}>Đang tải hồ sơ...</span>
+                </div>
+              )
+          )}
           {activePage === "tasks" && <TasksContent />}
           {activePage === "chat" && <ChatContent />}
           {activePage === "workflow" && <WorkflowContent />}
           {activePage === "notifications" && <NotificationsContent />}
           {activePage === "settings" && <SettingsContent onLogout={onLogout} />}
+          {activePage === "crm" && <CrmStaffContent />}
         </div>
       </div>
     </div>
@@ -457,7 +464,7 @@ function CheckinContent() {
         <p style={{ fontSize: 12, color: "#ff8888", textAlign: "center", maxWidth: 320 }}>{error}</p>
       )}
       <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.45)", letterSpacing: "0.08em" }}>
-        {isIntern ? "Thực tập · theo buổi" : "Nhân viên · theo ngày"} · {statusText}
+        {isIntern ? `${EMPLOYEE_KIND.intern.label} · theo buổi` : `${EMPLOYEE_KIND.staff.label} · theo ngày`} · {statusText}
       </p>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
@@ -493,8 +500,8 @@ function CheckinContent() {
         <div style={{ fontSize: 11, color: "rgba(255,232,236,0.5)", textAlign: "center", fontFamily: "monospace", lineHeight: 1.6 }}>
           {isIntern ? (
             <>
-              <div>S: {todayRecord.checkInAm ?? "--"} → {todayRecord.checkOutAm ?? "--"}</div>
-              <div>C: {todayRecord.checkInPm ?? "--"} → {todayRecord.checkOutPm ?? "--"}</div>
+              <div>{internSessionRange(todayRecord, "am")}</div>
+              <div>{internSessionRange(todayRecord, "pm")}</div>
               {todayRecord.autoFilled && <div style={{ color: "#fbbf24", marginTop: 4 }}>Làm cả ngày — tự ghi giờ trưa</div>}
             </>
           ) : (
@@ -669,93 +676,10 @@ function EmployeeContent() {
   );
 }
 
-function LeaveContent() {
-  const [tab, setTab] = useState<"leave" | "timeoff">("leave");
-  const [leaves, setLeaves] = useState(LEAVES);
-  const [lType, setLType] = useState("Nghỉ phép");
-  const [lDate, setLDate] = useState("");
-  const [lReason, setLReason] = useState("");
-  const [sent, setSent] = useState(false);
-  const nw = [
-    { l: "T2", d: "29/06" }, { l: "T3", d: "30/06" }, { l: "T4", d: "01/07" },
-    { l: "T5", d: "02/07" }, { l: "T6", d: "03/07" },
-    { l: "T7", d: "04/07", w: true }, { l: "CN", d: "05/07", w: true },
-  ];
-  const [slots, setSlots] = useState<Set<string>>(new Set());
-  const toggleSlot = (k: string) => setSlots(p => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
-
+function LeaveContent({ employee }: { employee: Employee }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <p style={{ fontSize: 13, color: "rgba(255,232,236,0.38)" }}>
-          Phép còn lại: <span style={{ color: BRAND, fontWeight: 800 }}>8 ngày</span>
-        </p>
-      </div>
-
-      <div style={{ display: "flex", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 4 }}>
-        {[{ id: "leave" as const, l: "Xin nghỉ phép" }, { id: "timeoff" as const, l: "Time Off tuần" }].map(({ id, l }) => (
-          <button key={id} onClick={() => setTab(id)} style={{ flex: 1, padding: "9px", borderRadius: 10, fontSize: 13, fontWeight: 700, border: "none", cursor: "pointer", fontFamily: "inherit", color: tab === id ? BRAND : "rgba(255,232,236,0.35)", background: tab === id ? "rgba(232,35,26,0.1)" : "transparent", boxShadow: tab === id ? `inset 0 0 0 1px rgba(232,35,26,0.22)` : "none" }}>
-            {l}
-          </button>
-        ))}
-      </div>
-
-      {tab === "leave" && (
-        <>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div><FieldLabel>Loại nghỉ</FieldLabel><select value={lType} onChange={e => setLType(e.target.value)} style={{ ...INPUT_S, appearance: "none" as const }}><option className="bg-gray-900">Nghỉ phép</option><option className="bg-gray-900">Nghỉ ốm</option><option className="bg-gray-900">Nghỉ không lương</option></select></div>
-            <div><FieldLabel>Ngày nghỉ</FieldLabel><input type="date" value={lDate} onChange={e => setLDate(e.target.value)} style={{ ...INPUT_S, colorScheme: "dark" }} /></div>
-            <div><FieldLabel>Lý do</FieldLabel><textarea rows={2} value={lReason} onChange={e => setLReason(e.target.value)} placeholder="Mô tả lý do..." style={{ ...INPUT_S, resize: "none" }} /></div>
-            {sent && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(34,197,94,0.09)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e", fontSize: 13, fontWeight: 600 }}><CheckCircle2 size={14} /> Đã gửi thành công!</div>}
-            <button onClick={() => {
-              setSent(true);
-              setTimeout(() => setSent(false), 3000);
-              setLeaves([{ id: Date.now(), date: lDate || "24/06/2026", type: lType, reason: lReason || "Nghỉ phép", status: "pending" }, ...leaves]);
-            }} style={BTN_S}>Gửi duyệt</button>
-          </div>
-
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 14 }}>
-            <SectionLabel>Lịch sử xin nghỉ</SectionLabel>
-            {leaves.map(item => (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "#FFE8EC" }}>{item.type}</p>
-                  <p style={{ fontSize: 11, color: "rgba(255,232,236,0.32)", marginTop: 2 }}>{item.date} · {item.reason}</p>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <LeaveBadge status={item.status} />
-                  {item.status === "pending" && (
-                    <button onClick={() => setLeaves(leaves.filter(l => l.id !== item.id))} style={{ background: "none", border: "none", color: "rgba(255,85,85,0.8)", cursor: "pointer", padding: 4 }} title="Hủy yêu cầu">
-                      <X size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {tab === "timeoff" && (
-        <>
-          <p style={{ fontSize: 11, color: "rgba(255,232,236,0.3)" }}>Tuần tới: 29/06 – 05/07/2026 · Chọn buổi muốn nghỉ</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 8 }}>
-            {nw.map(day => (
-              <div key={day.d} style={{ textAlign: "center" }}>
-                <p style={{ fontSize: 9, fontWeight: 700, marginBottom: 3, color: day.w ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.38)" }}>{day.l}</p>
-                <p style={{ fontSize: 9, marginBottom: 6, color: "rgba(255,255,255,0.2)" }}>{day.d}</p>
-                {["Sáng", "Chiều"].map(slot => {
-                  const k = `${day.d}-${slot}`; const sel = slots.has(k);
-                  return day.w
-                    ? <div key={slot} style={{ padding: "5px 0", borderRadius: 8, fontSize: 9, color: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", marginBottom: 4, textAlign: "center" }}>{slot}</div>
-                    : <button key={slot} onClick={() => toggleSlot(k)} style={{ width: "100%", padding: "5px 0", borderRadius: 8, fontSize: 9, fontWeight: 700, marginBottom: 4, cursor: "pointer", border: "none", fontFamily: "inherit", transition: "all 0.15s", color: sel ? BRAND : "rgba(255,255,255,0.3)", background: sel ? "rgba(232,35,26,0.12)" : "rgba(255,255,255,0.03)", boxShadow: sel ? `inset 0 0 0 1px rgba(232,35,26,0.28)` : "inset 0 0 0 1px rgba(255,255,255,0.06)" }}>{slot}</button>;
-                })}
-              </div>
-            ))}
-          </div>
-          <button style={BTN_S}>Gửi sếp phê duyệt</button>
-        </>
-      )}
+    <div className="rounded-2xl overflow-hidden bg-[#F5F1EF] -mx-1">
+      <LeaveRequestPanel employee={employee} />
     </div>
   );
 }
@@ -880,6 +804,14 @@ function ChatContent() {
         <button style={{ width: 40, height: 40, borderRadius: 12, background: "rgba(255,255,255,0.05)", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Paperclip size={18} /></button>
         <button style={{ width: 40, height: 40, borderRadius: 12, background: BRAND, border: "none", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 16px ${GR}` }}><Send size={18} /></button>
       </div>
+    </div>
+  );
+}
+
+function CrmStaffContent() {
+  return (
+    <div style={{ margin: "0 -24px -28px" }}>
+      <CrmStaffPage />
     </div>
   );
 }
@@ -1012,13 +944,32 @@ const BUBBLE_MODULE_MAP: Record<BubbleId, string> = {
   settings: "user-settings",
   chat: "user-chat",
   workflow: "user-workflow",
-  notifications: "thong-bao"
+  notifications: "thong-bao",
+  crm: "user-crm",
 };
 
 export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: () => void; modules?: string[] }) {
   const [activePage, setActivePage] = useState<BubbleId | null>(null);
-  const [checkedIn, setCheckedIn] = useState(false);
   const [hovId, setHovId] = useState<BubbleId | null>(null);
+  const [employee, setEmployee] = useState<Employee | null>(null);
+
+  useEffect(() => {
+    const loadEmployee = async () => {
+      try {
+        const raw = localStorage.getItem("dudi_user");
+        const user = raw ? JSON.parse(raw) : null;
+        const key = String(user?.employeeId || user?.email || "").toLowerCase();
+        if (!key) return;
+        const list = (await api.employees.list()) as Employee[];
+        const found = list.find(
+          e => e.id.toLowerCase() === key || (e.email || "").toLowerCase() === key,
+        );
+        if (found) setEmployee(found);
+      } catch {
+      }
+    };
+    loadEmployee();
+  }, []);
 
   const handleBubbleClick = (id: BubbleId) => setActivePage(id);
 
@@ -1092,9 +1043,8 @@ export default function UserPortalApp({ onLogout, modules = [] }: { onLogout: ()
         <Panel
           activePage={activePage}
           onClose={() => setActivePage(null)}
-          checkedIn={checkedIn}
-          setCheckedIn={setCheckedIn}
           onLogout={onLogout}
+          employee={employee}
         />
       )}
     </div>

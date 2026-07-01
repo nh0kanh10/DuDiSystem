@@ -2,6 +2,7 @@ import React from "react"
 import { Fingerprint, CheckCircle, Clock, AlertCircle, Calendar, Loader2, RefreshCw } from "lucide-react"
 import { useEmployeeAttendance } from "../../hooks/useEmployeeAttendance"
 import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL } from "../cham-cong/attendanceDisplay"
+import { EMPLOYEE_KIND, INTERN_SESSION, internSessionRange } from "../cham-cong/attendanceModel"
 
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
   "on-time": { label: "Đúng giờ", color: "text-green-700", bg: "bg-green-100" },
@@ -52,15 +53,15 @@ export default function UserAttendance() {
       <div className="bg-gradient-to-br from-[#160606] to-[#2a0808] rounded-2xl p-6 text-white flex items-center justify-between shadow-lg">
         <div className="flex-1 min-w-0">
           <p className="text-white/50 text-sm mb-1">
-            {isIntern ? "Thực tập · chấm theo buổi" : "Nhân viên · chấm theo ngày"}
+            {isIntern ? `${EMPLOYEE_KIND.intern.label} · chấm theo buổi` : `${EMPLOYEE_KIND.staff.label} · chấm theo ngày`}
           </p>
           <h3 className="text-xl font-bold">{loading ? "Đang tải..." : statusText}</h3>
           {todayRecord && (
             <div className="text-white/60 text-sm mt-2 font-mono space-y-0.5">
               {isIntern ? (
                 <>
-                  <p>Sáng: {todayRecord.checkInAm ?? "--"} → {todayRecord.checkOutAm ?? "--"}</p>
-                  <p>Chiều: {todayRecord.checkInPm ?? "--"} → {todayRecord.checkOutPm ?? "--"}</p>
+                  <p>{internSessionRange(todayRecord, "am")}</p>
+                  <p>{internSessionRange(todayRecord, "pm")}</p>
                   {todayRecord.autoFilled && (
                     <p className="text-amber-300/90 text-xs mt-1">Làm cả ngày — hệ thống tự ghi giờ nghỉ trưa</p>
                   )}
@@ -121,7 +122,7 @@ export default function UserAttendance() {
             <thead>
               <tr className="bg-gray-50/70 text-gray-400 text-xs">
                 {(isIntern
-                  ? ["Ngày", "Thứ", "Ca sáng", "Ca chiều", "Giờ", "Trạng thái"]
+                  ? ["Ngày", "Thứ", `${INTERN_SESSION.am.label}`, `${INTERN_SESSION.pm.label}`, "Giờ", "Trạng thái"]
                   : ["Ngày", "Thứ", "Giờ vào", "Giờ ra", "Số giờ", "Trạng thái"]
                 ).map(h => (
                   <th key={h} className="px-5 py-3 text-left font-semibold">{h}</th>

@@ -15,8 +15,9 @@ export type Page =
   | "dashboard" | "nhan-su" | "cham-cong" | "thong-ke"
   | "duyet-don" | "thong-bao" | "cong-viec" | "du-an"
   | "tai-khoan" | "phan-quyen" | "ip" | "tien-ich" | "co-cau"
+  | "crm"
   | "user-profile" | "user-attendance" | "user-timeoff" | "user-directory"
-  | "user-chat" | "user-workflow" | "user-settings"
+  | "user-chat" | "user-workflow" | "user-settings" | "user-crm"
 
 export type WorkHistoryType = "join" | "resign" | "rehire" | "transfer" | "promotion"
 
@@ -159,10 +160,16 @@ export interface AttendanceRecord {
 
 export interface LeaveRequest {
   id: string
-  employeeName: string
-  department: string
+  employeeId: string
+  employeeName?: string
+  department?: string
+  category: "leave" | "timeoff"
+  leaveType: "annual" | "sick" | "personal" | "unpaid" | "timeoff"
+  scope: "full_day" | "date_range" | "half_session" | "multi_session"
   startDate: string
-  endDate: string
+  endDate?: string
+  session?: "sang" | "chieu"
+  sessions?: { date: string; session: "sang" | "chieu" }[]
   reason: string
   status: "pending" | "approved" | "rejected" | "cancelled"
   submittedAt: string

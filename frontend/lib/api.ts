@@ -1,3 +1,5 @@
+import { touchSession } from "./session"
+
 const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001/api"
 
 function token() {
@@ -22,6 +24,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   const text = await res.text()
   const json = text ? JSON.parse(text) : {}
   if (!res.ok) throw new Error(json.message ?? "Lỗi server")
+  if (!path.startsWith("/auth/")) touchSession()
   return json.data as T
 }
 
@@ -39,6 +42,7 @@ export const api = {
     login: (email: string, password: string) =>
       req<{ token: string; user: Record<string, unknown> }>("POST", "/auth/login", { email, password }),
     me: () => req<any>("GET", "/auth/me"),
+    refresh: () => req<{ token: string }>("POST", "/auth/refresh"),
   },
   users: {
     list: (params?: { includeCoreAdmins?: boolean }) => req<any[]>("GET", `/users${qs(params as any)}`),
@@ -84,9 +88,24 @@ export const api = {
   },
 
   attendance: {
-    list: (params?: { date?: string; employeeId?: string; status?: string; department?: string }) =>
-      req<unknown[]>("GET", `/attendance${qs(params)}`),
-    stats: (params?: { date?: string; startDate?: string; endDate?: string; employeeId?: string; status?: string; department?: string }) =>
+    list: (params?: {
+      date?: string
+      startDate?: string
+      endDate?: string
+      employeeId?: string
+      status?: string
+      department?: string
+      branchId?: string
+    }) => req<unknown[]>("GET", `/attendance${qs(params)}`),
+    stats: (params?: {
+      date?: string
+      startDate?: string
+      endDate?: string
+      employeeId?: string
+      status?: string
+      department?: string
+      branchId?: string
+    }) =>
       req<{ onTime: number; late: number; absent: number; leave: number; total: number }>(
         "GET", `/attendance/stats${qs(params)}`
       ),
@@ -102,6 +121,8 @@ export const api = {
     create: (data: unknown) => req<unknown>("POST", "/requests", data),
     approve: (id: string) => req<unknown>("PATCH", `/requests/${id}/approve`),
     reject: (id: string) => req<unknown>("PATCH", `/requests/${id}/reject`),
+    cancel: (id: string, employeeId?: string) =>
+      req<unknown>("PATCH", `/requests/${id}/cancel`, employeeId ? { employeeId } : undefined),
     delete: (id: string) => req<unknown>("DELETE", `/requests/${id}`),
   },
 
@@ -325,6 +346,32 @@ export const api = {
   systemConfig: {
     get: () => req<any>("GET", "/system-config"),
     update: (data: any) => req<any>("PUT", "/system-config", data),
+  },
+  crm: {
+    // Admin
+    listData: (params?: Record<string, any>) => req<any>("GET", `/crm/data${qs(params)}`),
+    createData: (data: any) => req<any>("POST", "/crm/data", data),
+    updateData: (id: string, data: any) => req<any>("PUT", `/crm/data/${id}`, data),
+    deleteData: (id: string) => req<any>("DELETE", `/crm/data/${id}`),
+    deleteBulk: (ids: string[]) => req<any>("POST", "/crm/data/delete-bulk", { ids }),
+    importCsv: (file: File) => {
+      const form = new FormData()
+      form.append("file", file)
+      return fetch(`${BASE}/crm/data/import-csv`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}` },
+        body: form,
+      }).then(r => r.json()).then(j => j.data)
+    },
+    autoAssign: (employeeIds: string[]) => req<any>("POST", "/crm/data/auto-assign", { employeeIds }),
+    assignOne: (dataId: string, employeeId: string) => req<any>("POST", "/crm/assignments/assign", { dataId, employeeId }),
+    assignBulk: (dataIds: string[], employeeId: string) => req<any>("POST", "/crm/assignments/assign-bulk", { dataIds, employeeId }),
+    adminDashboard: () => req<any>("GET", "/crm/dashboard/admin"),
+    updateNote: (id: string, note: string) => req<any>("PATCH", `/crm/data/${id}/note`, { note }),
+    // Employee
+    listMyData: (params?: Record<string, any>) => req<any>("GET", `/crm/employee/data${qs(params)}`),
+    updateMyStatus: (id: string, status: string) => req<any>("PATCH", `/crm/employee/data/${id}/status`, { status }),
+    employeeDashboard: () => req<any>("GET", "/crm/dashboard/employee"),
   },
   positions: {
     list: (params?: Record<string, string | undefined>) => req<any[]>("GET", `/positions${qs(params)}`),

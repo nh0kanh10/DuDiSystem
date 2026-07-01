@@ -12,7 +12,16 @@ export function getOne(req, res) {
 }
 
 export function create(req, res) {
-  created(res, svc.createRequest(req.body))
+  const result = svc.createRequest(req.body)
+  if (result?.error) return fail(res, result.error, result.status)
+  created(res, result)
+}
+
+export function cancel(req, res) {
+  const result = svc.cancelRequest(req.params.id, req.body?.employeeId)
+  if (!result) return notFound(res, "Không tìm thấy đơn")
+  if (result.error) return fail(res, result.error, result.status)
+  ok(res, result)
 }
 
 export function approve(req, res) {

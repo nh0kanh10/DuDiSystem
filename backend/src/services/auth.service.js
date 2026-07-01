@@ -1,9 +1,33 @@
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
-import { getByEmail, getByEmployeeId } from "../repositories/user.repository.js"
+import { getByEmail, getByEmployeeId, getById } from "../repositories/user.repository.js"
 import { JWT_SECRET } from "../config/index.js"
-import { resolveBranchId, enrichUserProfile } from "./user.service.js"
-import { getSystemConfig } from "./systemConfig.service.js"
+import { enrichUserProfile, resolveBranchId } from "./user.service.js"
+
+const JWT_MAX_HOURS = 12
+
+function signToken(payload) {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: `${JWT_MAX_HOURS}h` })
+}
+
+function tokenPayload(user, branchId) {
+  return {
+    id: user.id,
+    employeeId: user.employeeId,
+    roleId: user.roleId,
+    branchId,
+    permissions: user.permissions || null,
+  }
+}
+
+export function refreshSession(decoded) {
+  const user = getById(decoded.id)
+  if (!user || user.status !== "active") {
+    return { error: "Tài khoản không hợp lệ", status: 401 }
+  }
+  const branchId = resolveBranchId(user.id)
+  return { token: signToken(tokenPayload(user, branchId)) }
+}
 
 export async function login(loginKey, password) {
   let user = getByEmployeeId(loginKey)
@@ -16,15 +40,7 @@ export async function login(loginKey, password) {
   if (user.status !== "active") return { error: "Tài khoản đã bị vô hiệu hóa", status: 403 }
 
   const branchId = resolveBranchId(user.id)
-
-  const config = getSystemConfig()
-  const timeoutMinutes = config.sessionTimeoutMinutes || 30
-
-  const token = jwt.sign(
-    { id: user.id, employeeId: user.employeeId, roleId: user.roleId, branchId, permissions: user.permissions || null },
-    JWT_SECRET,
-    { expiresIn: `${timeoutMinutes}m` }
-  )
+  const token = signToken(tokenPayload(user, branchId))
 
   return { token, user: enrichUserProfile(user) }
 }

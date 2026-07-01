@@ -1,4 +1,4 @@
-import { login } from "../services/auth.service.js"
+import { login, refreshSession } from "../services/auth.service.js"
 import { getUserDetails } from "../services/user.service.js"
 import { ok, fail } from "../utils/response.js"
 
@@ -7,6 +7,12 @@ export async function loginHandler(req, res) {
   const result = await login(loginKey ?? email, password)
   if (result.error) return fail(res, result.error, result.status)
   ok(res, result)
+}
+
+export function refreshHandler(req, res) {
+  const result = refreshSession(req.user)
+  if (result.error) return fail(res, result.error, result.status)
+  ok(res, { token: result.token })
 }
 
 export async function getMeHandler(req, res) {

@@ -24,6 +24,8 @@ import { TaskManagement } from "./components/cong-viec/TaskManagement"
 import { PlaceholderPage } from "./components/giao-dien/PlaceholderPage"
 import { SystemConfigPage } from "./components/giao-dien/SystemConfigPage"
 import { ProjectManagement } from "./components/du-an/ProjectManagement"
+import { CrmAdminPage } from "./components/crm/CrmAdminPage"
+import { CrmStaffPage } from "./components/crm/CrmStaffPage"
 
 // Imported user portal components
 import { UserHome } from "./components/nhan-vien/UserHome"
@@ -38,6 +40,7 @@ import { Role, Page, Employee, OrgNode, Assignment, RoleDefinition } from "./typ
 import { INIT_EMPLOYEES, INIT_ORG_NODES, NOTIFICATIONS, INIT_ASSIGNMENTS } from "./constants"
 import { findBranchForNode, initials } from "./utils"
 import { api } from "@/lib/api"
+import { touchSession, resetSessionTouchClock } from "@/lib/session"
 
 function getISOWeek(d: Date): number {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
@@ -112,8 +115,9 @@ export default function App() {
       "dashboard", "nhan-su", "cham-cong", "thong-ke",
       "duyet-don", "thong-bao", "cong-viec", "du-an",
       "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
+      "crm",
       "user-profile", "user-attendance", "user-timeoff", "user-directory",
-      "user-chat", "user-workflow", "user-settings"
+      "user-chat", "user-workflow", "user-settings", "user-crm"
     ]
     if (validPages.includes(rawPath as Page)) {
       return rawPath as Page
@@ -141,7 +145,7 @@ export default function App() {
           if (u.permissions.includes("all")) {
             return [
               "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-              "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
+              "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm"
             ]
           }
           return u.permissions
@@ -152,7 +156,7 @@ export default function App() {
     if (role === "role-super-admin") {
       return [
         "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
+        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm"
       ]
     }
 
@@ -169,7 +173,7 @@ export default function App() {
     if (role === "role-admin") {
       return [
         "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
+        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm"
       ]
     }
     if (role === "role-manager") {
@@ -181,7 +185,7 @@ export default function App() {
     // Default to role-user:
     return [
       "dashboard", "user-profile", "user-attendance", "user-timeoff", 
-      "user-directory", "user-chat", "user-workflow", "cong-viec", "thong-bao", "user-settings"
+      "user-directory", "user-chat", "user-workflow", "cong-viec", "thong-bao", "user-settings", "user-crm"
     ]
   }, [role, rolesList, isLoggedIn])
 
@@ -236,32 +240,42 @@ export default function App() {
     }
   }, [])
 
-  // ─── TỰ ĐỘNG ĐĂNG XUẤT KHI KHÔNG HOẠT ĐỘNG ───
   useEffect(() => {
     if (!isLoggedIn) return
 
-    let timeoutId: any
+    let idleTimeoutId: ReturnType<typeof setTimeout> | undefined
+    let activityDebounceId: ReturnType<typeof setTimeout> | undefined
 
-    const resetTimer = () => {
-      if (timeoutId) clearTimeout(timeoutId)
-      timeoutId = setTimeout(() => {
+    const scheduleIdleLogout = () => {
+      if (idleTimeoutId) clearTimeout(idleTimeoutId)
+      idleTimeoutId = setTimeout(() => {
         handleLogout()
         setSessionAlertMsg(`Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`)
       }, sessionTimeout * 60 * 1000)
     }
 
-    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart", "click"]
-    
-    resetTimer()
+    const onActivity = () => {
+      if (activityDebounceId) clearTimeout(activityDebounceId)
+      activityDebounceId = setTimeout(() => {
+        touchSession()
+        scheduleIdleLogout()
+      }, 500)
+    }
+
+    const events = ["mousedown", "keydown", "scroll", "touchstart", "click", "visibilitychange"] as const
+
+    touchSession()
+    scheduleIdleLogout()
 
     events.forEach(event => {
-      window.addEventListener(event, resetTimer)
+      window.addEventListener(event, onActivity)
     })
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId)
+      if (idleTimeoutId) clearTimeout(idleTimeoutId)
+      if (activityDebounceId) clearTimeout(activityDebounceId)
       events.forEach(event => {
-        window.removeEventListener(event, resetTimer)
+        window.removeEventListener(event, onActivity)
       })
     }
   }, [isLoggedIn, sessionTimeout])
@@ -387,6 +401,8 @@ export default function App() {
         setLoggedEmail(user.employeeId || user.email || email)
         setSelectedBranch(user.branchId || "all")
         setIsLoggedIn(true)
+        resetSessionTouchClock()
+        touchSession()
       }
     } catch (e) {
       console.error("Backend login failed:", e)
@@ -406,6 +422,7 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem("dudi_token")
     localStorage.removeItem("dudi_user")
+    resetSessionTouchClock()
     setIsLoggedIn(false)
     setRole("role-admin")
     setLoggedEmail("")
@@ -481,7 +498,7 @@ export default function App() {
           onAddEmployee={() => setGlobalAddEmpOpen(true)}
         />
       )
-      case "cham-cong": return <AttendanceManagement />
+      case "cham-cong": return <AttendanceManagement selectedBranch={selectedBranch} />
       case "thong-ke": return <StatisticsPage selectedBranch={selectedBranch} currentUserEmail={loggedEmail} currentUserRole={role} />
       case "thong-bao": return <NotificationManagement />
       case "duyet-don": return <ApprovalManagement selectedBranch={selectedBranch} onRequestsUpdated={fetchRequests} />
@@ -491,6 +508,7 @@ export default function App() {
       case "du-an": return <ProjectManagement currentUserId={currentEmp.id} currentUserRole={role} selectedBranch={selectedBranch} />
       case "cong-viec": return <TaskManagement selectedBranch={selectedBranch} />
       case "tien-ich": return <SystemConfigPage />
+      case "crm": return <CrmAdminPage />
       case "user-profile": return (
         <div className="space-y-6">
           <h2 className="text-xl font-bold text-gray-800">Thông tin cá nhân</h2>
@@ -498,11 +516,12 @@ export default function App() {
         </div>
       )
       case "user-attendance": return <UserAttendance />
-      case "user-timeoff": return <UserTimeOff />
+      case "user-timeoff": return <UserTimeOff employee={currentEmp} />
       case "user-directory": return <UserDirectory />
       case "user-chat": return <UserChat />
       case "user-workflow": return <UserWorkflow />
       case "user-settings": return <UserSettings onLogout={handleLogout} />
+      case "user-crm": return <CrmStaffPage />
       default: return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
     }
   }
@@ -904,6 +923,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="CRM" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
 
       {/* Role badge */}
