@@ -1,0 +1,34 @@
+[
+  {
+    "id": "GRP001",
+    "name": "Frontend Team",
+    "leaderId": "NV001",
+    "memberIds": ["NV001", "NV011"],
+    "description": "Nhóm phát triển giao diện người dùng",
+    "createdAt": "01/06/2026"
+  },
+  {
+    "id": "GRP002",
+    "name": "Backend Team",
+    "leaderId": "NV002",
+    "memberIds": ["NV002", "NV008"],
+    "description": "Nhóm phát triển hệ thống backend",
+    "createdAt": "01/06/2026"
+  },
+  {
+    "id": "GRP003",
+    "name": "QA & Testing",
+    "leaderId": "NV007",
+    "memberIds": ["NV007", "NV006"],
+    "description": "Nhóm kiểm thử chất lượng sản phẩm",
+    "createdAt": "01/06/2026"
+  },
+  {
+    "id": "GRP004",
+    "name": "Design & UX",
+    "leaderId": "NV005",
+    "memberIds": ["NV005", "NV004"],
+    "description": "Nhóm thiết kế giao diện và trải nghiệm người dùng",
+    "createdAt": "01/06/2026"
+  }
+]

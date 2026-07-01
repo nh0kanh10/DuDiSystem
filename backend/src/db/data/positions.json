@@ -1,0 +1,18 @@
+[
+  { "id": "POS001", "code": "DIR-BR",  "name": "Giám đốc Chi nhánh",   "level": 6, "department": "",          "description": "Quản lý toàn bộ hoạt động của chi nhánh",              "status": "active" },
+  { "id": "POS002", "code": "SYS-ADM", "name": "System Administrator", "level": 5, "department": "IT",        "description": "Quản trị hệ thống CNTT toàn công ty",                   "status": "active" },
+  { "id": "POS003", "code": "LEAD-DEV","name": "Lead Developer",        "level": 4, "department": "Kỹ thuật", "description": "Dẫn dắt nhóm phát triển, review code, thiết kế hệ thống","status": "active" },
+  { "id": "POS004", "code": "DEV",     "name": "Developer",             "level": 3, "department": "Kỹ thuật", "description": "Phát triển tính năng phần mềm",                         "status": "active" },
+  { "id": "POS005", "code": "INTERN",  "name": "Intern Developer",      "level": 1, "department": "Kỹ thuật", "description": "Thực tập sinh phát triển phần mềm",                     "status": "active" },
+  { "id": "POS006", "code": "DEVOPS",  "name": "DevOps Engineer",       "level": 3, "department": "Kỹ thuật", "description": "Vận hành hạ tầng, CI/CD, monitoring",                   "status": "active" },
+  { "id": "POS007", "code": "UIUX",    "name": "UI/UX Designer",        "level": 3, "department": "Thiết kế", "description": "Thiết kế giao diện và trải nghiệm người dùng",           "status": "active" },
+  { "id": "POS008", "code": "PM",      "name": "Project Manager",       "level": 5, "department": "",          "description": "Quản lý dự án, lập kế hoạch, theo dõi tiến độ",         "status": "active" },
+  { "id": "POS009", "code": "HR-MGR",  "name": "HR Manager",            "level": 5, "department": "Nhân sự",  "description": "Quản lý nhân sự, tuyển dụng, đào tạo",                   "status": "active" },
+  { "id": "POS010", "code": "ACCT",    "name": "Kế toán tổng hợp",      "level": 3, "department": "Kế toán",  "description": "Hạch toán kế toán, báo cáo tài chính",                   "status": "active" },
+  { "id": "POS011", "code": "SALES",   "name": "Sales Executive",       "level": 2, "department": "Kinh doanh","description": "Tìm kiếm và chăm sóc khách hàng",                      "status": "active" },
+  { "id": "POS012", "code": "MGR",     "name": "Quản lý",               "level": 5, "department": "",          "description": "Quản lý chung theo phòng ban",                           "status": "active" },
+  { "id": "POS013", "code": "QA",      "name": "QA/QC Tester",          "level": 2, "department": "Kỹ thuật", "description": "Kiểm thử chất lượng phần mềm",                          "status": "active" },
+  { "id": "POS014", "code": "BA",      "name": "Business Analyst",      "level": 2, "department": "Kỹ thuật", "description": "Phân tích nghiệp vụ, viết tài liệu yêu cầu",             "status": "active" },
+  { "id": "POS015", "code": "MKT",     "name": "Marketing Executive",   "level": 2, "department": "Marketing","description": "Triển khai chiến dịch marketing",                        "status": "active" },
+  { "id": "POS016", "code": "CS",      "name": "Customer Service",      "level": 2, "department": "Kinh doanh","description": "Chăm sóc và hỗ trợ khách hàng",                        "status": "active" }
+]

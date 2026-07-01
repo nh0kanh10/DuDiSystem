@@ -1,0 +1,58 @@
+[
+  {
+    "id": "N1",
+    "type": "birthday",
+    "message": "Sinh nhật Nguyễn Văn Minh hôm nay",
+    "time": "26/06/2026",
+    "read": true
+  },
+  {
+    "id": "N2",
+    "type": "request",
+    "message": "Lê Thu Hương gửi đơn xin nghỉ ốm chờ duyệt",
+    "time": "26/06/2026",
+    "read": false
+  },
+  {
+    "id": "N3",
+    "type": "request",
+    "message": "Võ Minh Tuấn xin nghỉ phép 2 ngày (04–05/07)",
+    "time": "25/06/2026",
+    "read": false
+  },
+  {
+    "id": "N4",
+    "type": "request",
+    "message": "Nguyễn Văn Minh xin nghỉ phép 3 ngày (28–30/06)",
+    "time": "25/06/2026",
+    "read": false
+  },
+  {
+    "id": "N5",
+    "type": "intern",
+    "message": "Võ Minh Tuấn kết thúc thực tập vào 30/07/2026",
+    "time": "24/06/2026",
+    "read": true
+  },
+  {
+    "id": "N6",
+    "type": "birthday",
+    "message": "Sinh nhật Phạm Đức Thành vào tuần tới (03/07)",
+    "time": "24/06/2026",
+    "read": true
+  },
+  {
+    "id": "N7",
+    "type": "system",
+    "message": "Hệ thống cập nhật lên phiên bản v2.1.0 thành công",
+    "time": "23/06/2026",
+    "read": true
+  },
+  {
+    "id": "N8",
+    "type": "system",
+    "message": "Backup dữ liệu tháng 5 hoàn tất",
+    "time": "22/06/2026",
+    "read": true
+  }
+]

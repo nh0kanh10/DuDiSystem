@@ -1,0 +1,34 @@
+import { findAll, updateById, insertOne } from "../db/index.js"
+
+export function getSystemConfig() {
+  let config = findAll("systemConfig")[0]
+  if (!config) {
+    config = insertOne("systemConfig", {
+      id: "working_hours",
+      companyName: "DuDi System",
+      morningStart: "09:00",
+      morningEnd: "12:00",
+      afternoonStart: "13:30",
+      afternoonEnd: "17:00",
+      employeeStart: "09:00",
+      employeeEnd: "17:00",
+      lateGraceMinutes: 15,
+      earlyGraceMinutes: 15,
+      requireIP: false,
+      noonBoundary: "14:00",
+      sessionTimeoutMinutes: 30
+    })
+  }
+  if (config && config.sessionTimeoutMinutes === undefined) {
+    config.sessionTimeoutMinutes = 30
+  }
+  if (config && config.noonBoundary === undefined) {
+    config.noonBoundary = "14:00"
+  }
+  return config
+}
+
+export function updateSystemConfig(patch) {
+  const config = getSystemConfig()
+  return updateById("systemConfig", config.id, patch)
+}
