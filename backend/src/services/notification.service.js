@@ -7,10 +7,11 @@ export function listNotifications(filter) {
 export function createNotification(data) {
   const count = repo.count()
   return repo.create({
-    id: `N${count + 1}`,
+    id: `N${Date.now()}`,
+    recipientId: data.recipientId || null,
     type: data.type,
     message: data.message,
-    time: data.time || new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+    time: data.time || new Date().toLocaleDateString("vi-VN"),
     read: false
   })
 }
@@ -19,8 +20,8 @@ export function markRead(id) {
   return repo.markRead(id)
 }
 
-export function markAllRead() {
-  return repo.markAllRead()
+export function markAllRead(recipientId) {
+  return repo.markAllReadForUser(recipientId)
 }
 
 export function deleteNotification(id) {

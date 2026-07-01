@@ -102,8 +102,11 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           api.attendance.list(),
           api.systemConfig.get().catch(() => null)
         ])
+        console.log("[DEBUG] StatisticsPage empData:", empData);
+        console.log("[DEBUG] StatisticsPage selectedBranch:", selectedBranch);
         const filteredEmps = (empData as Employee[] || []).filter(e => !["0000000000", "1111111111", "2222222222"].includes(e.id))
         setEmployees(filteredEmps)
+        console.log("[DEBUG] StatisticsPage filteredEmps details:", filteredEmps.map(e => ({ id: e.id, name: e.name, contract: e.contractType, branch: e.branchId, status: e.status })));
         setAttendance(attData as AttendanceRecord[])
         if (configData) {
           setSystemConfig(configData)
@@ -115,7 +118,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       }
     }
     loadData()
-  }, [])
+  }, [selectedBranch])
 
   const currentEmployeeId = useMemo(() => {
     if (!currentUserEmail) return null
@@ -282,22 +285,59 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
   }, [dateRange])
 
   const statsMap = useMemo(() => {
-    const map: Record<string, { late: number; leave: number; total: number; onTime: number }> = {}
-    employees.forEach(e => {
-      map[e.id] = { late: 0, leave: 0, total: 0, onTime: 0 }
-    })
-    filteredAttendance.forEach(r => {
-      if (!map[r.employeeId]) {
-        map[r.employeeId] = { late: 0, leave: 0, total: 0, onTime: 0 }
+    const map: Record<string, { late: number; leave: number; absent: number; total: number; onTime: number }> = {}
+    
+    // Generate list of weekdays up to today (or range end)
+    const daysList: string[] = []
+    if (dateRange.start && dateRange.end) {
+      const [sy, sm, sd] = dateRange.start.split("-").map(Number)
+      const [ey, em, ed] = dateRange.end.split("-").map(Number)
+      let current = new Date(sy, sm - 1, sd)
+      const end = new Date(ey, em - 1, ed)
+      const todayStr = new Date().toISOString().split("T")[0]
+
+      while (current <= end) {
+        const yStr = current.getFullYear()
+        const mStr = String(current.getMonth() + 1).padStart(2, "0")
+        const dStr = String(current.getDate()).padStart(2, "0")
+        const dayStr = `${yStr}-${mStr}-${dStr}`
+        
+        const dt = new Date(yStr, current.getMonth(), current.getDate())
+        const isWeekend = dt.getDay() === 0 || dt.getDay() === 6
+        
+        if (!isWeekend && dayStr <= todayStr) {
+          daysList.push(dayStr)
+        }
+        current.setDate(current.getDate() + 1)
       }
-      const m = map[r.employeeId]
-      m.total += 1
-      if (r.status === "late") m.late += 1
-      else if (r.status === "leave" || r.status === "absent") m.leave += 1
-      else if (r.status === "on-time") m.onTime += 1
+    }
+
+    employees.forEach(e => {
+      map[e.id] = { late: 0, leave: 0, absent: 0, total: 0, onTime: 0 }
+      
+      daysList.forEach(day => {
+        const matched = attendance.find(r => r.employeeId === e.id && r.date === day)
+        if (matched) {
+          if (matched.status === "late" || matched.status === "late_early") {
+            map[e.id].late += 1
+            map[e.id].total += 1
+          } else if (matched.status === "leave") {
+            map[e.id].leave += 1
+          } else if (matched.status === "absent") {
+            map[e.id].absent += 1
+          } else if (matched.status === "on-time" || matched.status === "early") {
+            map[e.id].onTime += 1
+            map[e.id].total += 1
+          }
+        } else {
+          // No attendance record on a weekday means they were absent (vắng mặt)
+          map[e.id].absent += 1
+        }
+      })
     })
+
     return map
-  }, [employees, filteredAttendance])
+  }, [employees, attendance, dateRange])
 
   const allEmployeesList = useMemo(() => {
     return employees.filter(e => {
@@ -312,7 +352,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
   const rankAllData = useMemo(() => {
     const list = allEmployeesList.map(e => {
-      const stats = statsMap[e.id] || { late: 0, leave: 0, total: 0, onTime: 0 }
+      const stats = statsMap[e.id] || { late: 0, leave: 0, absent: 0, total: 0, onTime: 0 }
       return {
         id: e.id,
         name: e.name,
@@ -320,19 +360,20 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
         contractType: e.contractType,
         late: stats.late,
         leave: stats.leave,
+        absent: stats.absent,
         total: stats.total,
         onTimeRate: stats.total > 0 ? Math.round((stats.onTime / stats.total) * 100) : 100
       }
     })
 
-    const lateRanked = [...list].sort((a, b) => b.late - a.late || b.leave - a.leave || a.name.localeCompare(b.name))
-    const leaveRanked = [...list].sort((a, b) => b.leave - a.leave || b.late - a.late || a.name.localeCompare(b.name))
+    const lateRanked = [...list].sort((a, b) => b.late - a.late || b.leave - a.leave || b.absent - a.absent || a.name.localeCompare(b.name))
+    const leaveRanked = [...list].sort((a, b) => b.leave - a.leave || b.absent - a.absent || b.late - a.late || a.name.localeCompare(b.name))
 
     return { lateRanked, leaveRanked }
   }, [allEmployeesList, statsMap])
 
   const filteredEmployeesList = useMemo(() => {
-    return employees.filter(e => {
+    const res = employees.filter(e => {
       const matchesType = activeTab === "official" ? e.contractType === "Chính thức" : e.contractType === "Thực tập"
       if (!matchesType) return false
       const matchesBranch = selectedBranch === "all" || e.branchId === selectedBranch
@@ -343,21 +384,24 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       const query = searchQuery.toLowerCase()
       return e.name.toLowerCase().includes(query) || e.id.toLowerCase().includes(query)
     })
+    console.log("[DEBUG] StatisticsPage filteredEmployeesList result:", res);
+    return res
   }, [employees, activeTab, searchQuery, selectedBranch, personalDept])
 
   const rankData = useMemo(() => {
     const list = filteredEmployeesList.map(e => {
-      const stats = statsMap[e.id] || { late: 0, leave: 0, total: 0, onTime: 0 }
+      const stats = statsMap[e.id] || { late: 0, leave: 0, absent: 0, total: 0, onTime: 0 }
       return {
         id: e.id,
         name: e.name,
         department: e.department,
         late: stats.late,
         leave: stats.leave,
+        absent: stats.absent,
         total: stats.total,
         onTimeRate: stats.total > 0 ? Math.round((stats.onTime / stats.total) * 100) : 100
       }
-    }).sort((a, b) => b.late - a.late || b.leave - a.leave || a.name.localeCompare(b.name))
+    }).sort((a, b) => b.late - a.late || b.leave - a.leave || b.absent - a.absent || a.name.localeCompare(b.name))
 
     const lateEmployees = list.filter(item => item.late > 0)
     const lateGroupsMap: Record<number, typeof list> = {}
@@ -510,14 +554,15 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
         let filename = "bao-cao-thong-ke.csv"
 
         if (activeTab === "official" || activeTab === "intern") {
-          headers = ["STT", "Mã nhân viên", "Họ và tên", "Phòng ban", "Số ngày đi trễ", "Số ngày nghỉ/vắng"]
+          headers = ["STT", "Mã nhân viên", "Họ và tên", "Phòng ban", "Số ngày đi trễ", "Nghỉ phép", "Vắng mặt"]
           rows = rankData.list.map((emp, index) => [
             index + 1,
             emp.id,
             emp.name,
             emp.department,
             emp.late,
-            emp.leave
+            emp.leave,
+            emp.absent
           ])
           filename = activeTab === "official" 
             ? `thong-ke-nhan-vien-chinh-thuc-${selectedMonth}-${selectedYear}.csv`

@@ -5,6 +5,8 @@ export function list(req, res) {
   const filter = {}
   if (req.query.read === "true") filter.read = true
   if (req.query.read === "false") filter.read = false
+  const recipientId = req.user?.employeeId || req.user?.id || null
+  if (recipientId) filter.recipientId = recipientId
   ok(res, svc.listNotifications(filter))
 }
 
@@ -19,7 +21,8 @@ export function markRead(req, res) {
 }
 
 export function markAllRead(req, res) {
-  ok(res, { count: svc.markAllRead() })
+  const recipientId = req.user?.employeeId || req.user?.id || null
+  ok(res, { count: svc.markAllRead(recipientId) })
 }
 
 export function remove(req, res) {

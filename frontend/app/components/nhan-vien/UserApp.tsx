@@ -732,7 +732,7 @@ function CrmStaffContent() {
 }
 
 function NotificationsContent() {
-  const { items, loading, error, unread, markAllRead, markRead, reload } = useNotifications();
+  const { items, loading, error, unread, markAllRead, markRead, deleteItem, reload } = useNotifications();
   const typeColor = (type?: string) => {
     if (type === "leave" || type === "nghỉ phép") return "#22c55e";
     if (type === "system" || type === "hệ thống") return "#f59e0b";
@@ -776,10 +776,10 @@ function NotificationsContent() {
             <div
               key={n.id}
               onClick={() => { if (isUnread) markRead(n.id); }}
-              style={{ display: "flex", gap: 14, padding: "14px", background: isUnread ? "rgba(255,255,255,0.03)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: isUnread ? "pointer" : "default" }}
+              style={{ display: "flex", gap: 14, padding: "14px", background: isUnread ? "rgba(255,255,255,0.03)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: isUnread ? "pointer" : "default", position: "relative" }}
             >
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: isUnread ? BRAND : "transparent", marginTop: 6, flexShrink: 0 }} />
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                   {n.type && (
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6, color: clr, background: `${clr}20` }}>{n.type}</span>
@@ -788,6 +788,13 @@ function NotificationsContent() {
                 </div>
                 <p style={{ fontSize: 13, color: isUnread ? "#FFE8EC" : "rgba(255,232,236,0.6)", fontWeight: isUnread ? 600 : 400 }}>{n.message}</p>
               </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteItem(n.id); }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.2)", padding: "2px 4px", borderRadius: 6, flexShrink: 0, alignSelf: "center" }}
+                title="Xóa"
+              >
+                <X size={13} />
+              </button>
             </div>
           );
         })}

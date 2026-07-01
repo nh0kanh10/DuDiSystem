@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { api } from "@/lib/api"
 
 export interface StaffNotification {
@@ -9,13 +9,14 @@ export interface StaffNotification {
   read?: boolean
 }
 
-export function useNotifications() {
+export function useNotifications(pollInterval = 30000) {
   const [items, setItems] = useState<StaffNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     setError(null)
     try {
       const data = await api.notifications.list() as StaffNotification[]
@@ -23,11 +24,15 @@ export function useNotifications() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tải được thông báo")
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    timerRef.current = setInterval(() => load(true), pollInterval)
+    return () => { if (timerRef.current) clearInterval(timerRef.current) }
+  }, [load, pollInterval])
 
   const unread = items.filter(n => !n.read).length
 
@@ -41,5 +46,10 @@ export function useNotifications() {
     setItems(prev => prev.map(n => ({ ...n, read: true })))
   }
 
-  return { items, loading, error, unread, reload: load, markRead, markAllRead }
+  const deleteItem = async (id: string) => {
+    await api.notifications.delete(id)
+    setItems(prev => prev.filter(n => n.id !== id))
+  }
+
+  return { items, loading, error, unread, reload: () => load(), markRead, markAllRead, deleteItem }
 }
