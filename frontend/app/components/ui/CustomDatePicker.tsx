@@ -1,9 +1,9 @@
 import React, { useState } from "react"
 import { Popover, PopoverContent, PopoverTrigger } from "./popover"
-import { DayPicker, CaptionProps, useNavigation } from "react-day-picker"
+import { DayPicker } from "react-day-picker"
 import { vi } from "date-fns/locale"
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
-import { setMonth, setYear, getMonth, getYear } from "date-fns"
+import { setMonth, setYear, getMonth, getYear, addMonths } from "date-fns"
 
 function parseVNDate(s: string): Date | null {
   if (!s) return null
@@ -19,16 +19,15 @@ function formatVNDate(d: Date | undefined): string {
 
 const MONTHS = ["Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6","Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"]
 
-function CustomCaption({ displayMonth }: CaptionProps) {
-  const { goToMonth } = useNavigation()
+function CustomCaption({ month, onMonthChange }: { month: Date; onMonthChange: (m: Date) => void }) {
   const years = Array.from({ length: new Date().getFullYear() - 1990 + 31 }, (_, i) => 1990 + i)
 
   return (
     <div className="flex items-center justify-between gap-2 mb-1 px-1">
       <div className="flex items-center gap-1.5 flex-1">
         <select
-          value={getMonth(displayMonth)}
-          onChange={e => goToMonth(setMonth(displayMonth, Number(e.target.value)))}
+          value={getMonth(month)}
+          onChange={e => onMonthChange(setMonth(month, Number(e.target.value)))}
           className="flex-1 text-xs font-black text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#C62828]/40 cursor-pointer hover:bg-gray-100 transition-colors"
         >
           {MONTHS.map((m, i) => (
@@ -36,8 +35,8 @@ function CustomCaption({ displayMonth }: CaptionProps) {
           ))}
         </select>
         <select
-          value={getYear(displayMonth)}
-          onChange={e => goToMonth(setYear(displayMonth, Number(e.target.value)))}
+          value={getYear(month)}
+          onChange={e => onMonthChange(setYear(month, Number(e.target.value)))}
           className="w-20 text-xs font-black text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#C62828]/40 cursor-pointer hover:bg-gray-100 transition-colors"
         >
           {years.map(y => (
@@ -48,14 +47,14 @@ function CustomCaption({ displayMonth }: CaptionProps) {
       <div className="flex items-center gap-0.5">
         <button
           type="button"
-          onClick={() => goToMonth(setMonth(displayMonth, getMonth(displayMonth) - 1))}
+          onClick={() => onMonthChange(addMonths(month, -1))}
           className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700"
         >
           <ChevronLeft size={14} />
         </button>
         <button
           type="button"
-          onClick={() => goToMonth(setMonth(displayMonth, getMonth(displayMonth) + 1))}
+          onClick={() => onMonthChange(addMonths(month, 1))}
           className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700"
         >
           <ChevronRight size={14} />
@@ -84,6 +83,7 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
   const [isOpen, setIsOpen] = useState(false)
   const [hour, setHour] = useState(parsed.hour)
   const [minute, setMinute] = useState(parsed.minute)
+  const [month, setMonth] = useState<Date>(parsed.date || new Date())
 
   const hours   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"))
   const minutes = ["00","05","10","15","20","25","30","35","40","45","50","55"]
@@ -132,27 +132,33 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
           mode="single"
           selected={parsed.date || undefined}
           onSelect={handleSelectDate}
+          month={month}
+          onMonthChange={setMonth}
           locale={vi}
           showOutsideDays
-          components={{ Caption: CustomCaption }}
+          components={{
+            Nav: () => null,
+            MonthCaption: ({ calendarMonth }) => (
+              <CustomCaption month={calendarMonth.date} onMonthChange={setMonth} />
+            ),
+          }}
           classNames={{
             months: "flex flex-col",
             month: "p-4 pb-2 space-y-2",
-            caption: "",
+            month_caption: "",
             table: "w-full border-collapse",
-            head_row: "flex mb-1",
-            head_cell: "w-9 text-center text-[11px] font-bold text-gray-400",
-            row: "flex",
-            cell: "relative p-0 text-center",
-            day: "w-9 h-9 text-xs font-semibold rounded-xl hover:bg-gray-100 transition-colors text-gray-700 flex items-center justify-center mx-auto cursor-pointer",
-            day_selected: "!bg-[#C62828] !text-white hover:!bg-[#B71C1C] font-black",
-            day_today: "bg-[#C62828]/8 text-[#C62828] font-black",
-            day_outside: "text-gray-300 hover:bg-gray-50",
-            day_disabled: "text-gray-200 cursor-not-allowed hover:bg-transparent",
-            day_hidden: "invisible",
+            weekdays: "flex mb-1",
+            weekday: "w-9 text-center text-[11px] font-bold text-gray-400",
+            week: "flex",
+            day: "relative p-0 text-center",
+            day_button: "w-9 h-9 text-xs font-semibold rounded-xl hover:bg-gray-100 transition-colors text-gray-700 flex items-center justify-center mx-auto cursor-pointer",
+            selected: "!bg-[#C62828] !text-white hover:!bg-[#B71C1C] font-black rounded-xl",
+            today: "bg-[#C62828]/8 text-[#C62828] font-black rounded-xl",
+            outside: "text-gray-300",
+            disabled: "text-gray-200 cursor-not-allowed",
+            hidden: "invisible",
           }}
         />
-        {/* Time picker */}
         <div className="px-4 pb-4 border-t border-gray-100 pt-3">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-wide mb-2">Giờ</p>
           <div className="flex items-center gap-2">
@@ -190,8 +196,8 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
   placeholder?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
-
   const dateValue = React.useMemo(() => parseVNDate(value) || undefined, [value])
+  const [month, setMonth] = useState<Date>(dateValue || new Date())
 
   const handleSelect = (date: Date | undefined) => {
     if (date) {
@@ -219,24 +225,31 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
           mode="single"
           selected={dateValue}
           onSelect={handleSelect}
+          month={month}
+          onMonthChange={setMonth}
           locale={vi}
           showOutsideDays
-          components={{ Caption: CustomCaption }}
+          components={{
+            Nav: () => null,
+            MonthCaption: ({ calendarMonth }) => (
+              <CustomCaption month={calendarMonth.date} onMonthChange={setMonth} />
+            ),
+          }}
           classNames={{
             months: "flex flex-col",
             month: "p-4 space-y-2",
-            caption: "",
+            month_caption: "",
             table: "w-full border-collapse",
-            head_row: "flex mb-1",
-            head_cell: "w-9 text-center text-[11px] font-bold text-gray-400",
-            row: "flex",
-            cell: "relative p-0 text-center",
-            day: "w-9 h-9 text-xs font-semibold rounded-xl hover:bg-gray-100 transition-colors text-gray-700 flex items-center justify-center mx-auto cursor-pointer",
-            day_selected: "!bg-[#C62828] !text-white hover:!bg-[#B71C1C] font-black",
-            day_today: "bg-[#C62828]/8 text-[#C62828] font-black",
-            day_outside: "text-gray-300 hover:bg-gray-50",
-            day_disabled: "text-gray-200 cursor-not-allowed hover:bg-transparent",
-            day_hidden: "invisible",
+            weekdays: "flex mb-1",
+            weekday: "w-9 text-center text-[11px] font-bold text-gray-400",
+            week: "flex",
+            day: "relative p-0 text-center",
+            day_button: "w-9 h-9 text-xs font-semibold rounded-xl hover:bg-gray-100 transition-colors text-gray-700 flex items-center justify-center mx-auto cursor-pointer",
+            selected: "!bg-[#C62828] !text-white hover:!bg-[#B71C1C] font-black rounded-xl",
+            today: "bg-[#C62828]/8 text-[#C62828] font-black rounded-xl",
+            outside: "text-gray-300",
+            disabled: "text-gray-200 cursor-not-allowed",
+            hidden: "invisible",
           }}
         />
       </PopoverContent>

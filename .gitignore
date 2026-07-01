@@ -127,3 +127,6 @@ backup-local/
 temp_repo/
 src2/
 src copy/
+
+.vercel
+.env*.local
