@@ -258,6 +258,15 @@ export default function App() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
+  const [profileUpdates, setProfileUpdates] = useState<any[]>([])
+
+  const reloadProfileUpdates = () => {
+    if (isLoggedIn) {
+      api.profileUpdates.list().then(d => {
+        if (d && Array.isArray(d)) setProfileUpdates(d as any[])
+      }).catch(err => console.error("Lỗi tải profile updates:", err))
+    }
+  }
 
   const [selectedBranch, setSelectedBranch] = useState(() => {
     const saved = localStorage.getItem("dudi_user")
@@ -324,7 +333,10 @@ export default function App() {
         }),
         api.notifications.list().then(d => {
           if (d && Array.isArray(d)) setUnreadNotifCount((d as any[]).filter((n: any) => !n.read).length)
-        })
+        }),
+        api.profileUpdates.list().then(d => {
+          if (d && Array.isArray(d)) setProfileUpdates(d as any[])
+        }).catch(() => {})
       ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
     }
   }, [isLoggedIn])
@@ -530,6 +542,10 @@ export default function App() {
             selectedBranch={selectedBranch}
             onBranchChange={setSelectedBranch}
             branches={branches}
+            profileUpdates={profileUpdates}
+            onReloadProfileUpdates={reloadProfileUpdates}
+            employees={employees}
+            orgNodes={orgNodes}
           />
           <main className="flex-1 overflow-y-auto p-5 relative"
             style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
@@ -588,7 +604,10 @@ export default function App() {
   )
 }
 
-function Header({ onToggle, unread, onMarkAllRead, currentUser, onLogout, onNavigate, selectedBranch, onBranchChange, branches }: {
+function Header({
+  onToggle, unread, onMarkAllRead, currentUser, onLogout, onNavigate, selectedBranch, onBranchChange, branches,
+  profileUpdates = [], onReloadProfileUpdates, employees = [], orgNodes = []
+}: {
   onToggle: () => void; unread: number; onMarkAllRead?: () => void
   currentUser: { name: string; id: string; role: Role; position: string; department: string }
   onLogout: () => void
@@ -596,6 +615,10 @@ function Header({ onToggle, unread, onMarkAllRead, currentUser, onLogout, onNavi
   selectedBranch: string
   onBranchChange: (b: string) => void
   branches: { id: string; name: string }[]
+  profileUpdates?: any[]
+  onReloadProfileUpdates?: () => void
+  employees?: Employee[]
+  orgNodes?: OrgNode[]
 }) {
   const [showDrop, setShowDrop] = useState(false)
   const [showBranchDrop, setShowBranchDrop] = useState(false)
@@ -604,8 +627,26 @@ function Header({ onToggle, unread, onMarkAllRead, currentUser, onLogout, onNavi
   const [loadingNotifs, setLoadingNotifs] = useState(false)
   const shortName = currentUser.name.split(" ").slice(-2).join(" ")
 
+  const pendingUpdates = profileUpdates.filter(req => {
+    if (req.status !== "pending_approval") return false
+    if (currentUser.role !== "role-admin" && currentUser.role !== "role-super-admin") return false
+    
+    const matchedEmp = employees.find(e => e.id === currentUser.id)
+    if (matchedEmp) {
+      const adminBranchId = findBranchForNode(matchedEmp.orgNodeId, orgNodes)
+      if (!adminBranchId) return true
+      
+      const reqEmp = employees.find(e => e.id === req.employeeId)
+      if (!reqEmp) return true
+      const reqBranchId = findBranchForNode(reqEmp.orgNodeId, orgNodes)
+      return adminBranchId === reqBranchId
+    }
+    return true
+  })
+
   async function openNotifs() {
     setShowNotifDrop(v => !v)
+    onReloadProfileUpdates?.()
     if (!notifs.length) {
       setLoadingNotifs(true)
       try {
@@ -686,7 +727,11 @@ function Header({ onToggle, unread, onMarkAllRead, currentUser, onLogout, onNavi
         <div className="relative">
           <button onClick={openNotifs} className="relative p-2.5 hover:bg-gray-100 rounded-xl transition-colors text-gray-500">
             <Bell size={19} />
-            {unread > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#C62828] rounded-full animate-pulse" />}
+            {(unread > 0 || pendingUpdates.length > 0) && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-4 bg-[#C62828] text-white text-[9px] font-extrabold rounded-full flex items-center justify-center animate-pulse border border-white px-1 shadow-sm">
+                {unread + pendingUpdates.length}
+              </span>
+            )}
           </button>
           {showNotifDrop && (
             <>
@@ -697,6 +742,26 @@ function Header({ onToggle, unread, onMarkAllRead, currentUser, onLogout, onNavi
                   <button onClick={markAllRead} className="text-[11px] font-bold text-[#C62828] hover:underline">Đọc tất cả</button>
                 </div>
                 <div className="max-h-80 overflow-y-auto">
+                  {pendingUpdates.map((req: any) => {
+                    const reqEmp = employees.find(e => e.id === req.employeeId)
+                    const empName = reqEmp?.name || req.employeeId
+                    return (
+                      <button key={req.id} onClick={() => { onNavigate("nhan-su"); setShowNotifDrop(false) }}
+                        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-orange-50 bg-orange-50/20 transition-colors text-left border-b border-gray-50 last:border-0">
+                        <div className="relative flex h-2 w-2 mt-1.5 flex-shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs leading-relaxed font-bold text-gray-800">
+                            Hồ sơ cập nhật của <span className="text-orange-600 font-extrabold">{empName}</span> đang chờ duyệt
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">Nhấp để đi tới trang duyệt hồ sơ</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+
                   {loadingNotifs ? (
                     <div className="p-8 text-center">
                       <div className="w-6 h-6 rounded-full border-2 border-[#C62828]/30 border-t-[#C62828] animate-spin mx-auto" />
