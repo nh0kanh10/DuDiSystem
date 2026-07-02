@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   User, CalendarDays, ClipboardList, Settings,
-  X, CheckCircle2, Lock, Eye, EyeOff, Plus, ArrowLeft,
+  X, CheckCircle2, Lock, Eye, EyeOff, Plus, Home,
   Bell, CheckSquare, Search, Users, Phone, Mail,
   FileDown, Zap, FileText, Download, Send, Paperclip, Loader2, RefreshCw
 } from "lucide-react";
@@ -12,8 +12,9 @@ import { useNotifications } from "../../hooks/useNotifications";
 import { useEmployeeDirectory } from "../../hooks/useEmployeeDirectory";
 import { hasStaffModule, LIVE_STAFF_BUBBLES } from "../../utils/staffModules";
 import UserAttendance from "./UserAttendance";
+import UserTasks from "./UserTasks";
 import LeaveRequestPanel from "../nghi-phep/LeaveRequestPanel";
-import type { Employee, WorkHistoryEntry } from "../../types";
+import type { Announcement, Employee, WorkHistoryEntry } from "../../types";
 import { api } from "@/lib/api"
 import { CrmStaffPage } from "../crm/CrmStaffPage";
 
@@ -24,20 +25,12 @@ const BG = "#2a0a0f";          // even brighter warm ruby
 const GR = "rgba(232,35,26,0.28)";   // red glow
 const GG = "rgba(255,136,0,0.14)";   // gold glow
 
-const PANEL_BG: React.CSSProperties = {
-  background: "rgba(32,8,12,0.94)",
-  backdropFilter: "blur(36px)",
-  WebkitBackdropFilter: "blur(36px)",
-  border: `1px solid rgba(255,255,255,0.08)`,
-  borderRadius: 24,
-};
-
 const INPUT_S: React.CSSProperties = {
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.08)",
+  background: "#FFFFFF",
+  border: "1px solid rgba(36,20,22,0.12)",
   borderRadius: 12,
-  color: "#FFE8EC",
-  fontSize: 13,
+  color: "#241416",
+  fontSize: 14,
   padding: "10px 12px",
   width: "100%",
   outline: "none",
@@ -81,7 +74,7 @@ const TASK_STATUS_LABEL: Record<string, string> = {
 };
 
 const TASK_STATUS_COLOR: Record<string, { c: string; bg: string }> = {
-  todo: { c: "rgba(255,255,255,0.5)", bg: "rgba(255,255,255,0.06)" },
+  todo: { c: "#6f565a", bg: "#f3eeee" },
   "in-progress": { c: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
   done: { c: "#22c55e", bg: "rgba(34,197,94,0.08)" },
 };
@@ -181,16 +174,16 @@ const BUBBLES: {
   ];
 
 function SectionLabel({ children }: { children: string }) {
-  return <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(255,232,236,0.65)", marginBottom: 14 }}>{children}</p>;
+  return <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "#8b5f64", marginBottom: 14 }}>{children}</p>;
 }
 
 function FieldLabel({ children }: { children: string }) {
-  return <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,232,236,0.65)", marginBottom: 6 }}>{children}</p>;
+  return <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#8b5f64", marginBottom: 6 }}>{children}</p>;
 }
 
 function FieldBox({ children, mono }: { children: React.ReactNode; mono?: boolean }) {
   return (
-    <div style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 12, padding: "10px 12px", color: "#FFFFFF", fontSize: 13, fontFamily: mono ? "'JetBrains Mono', monospace" : "inherit" }}>
+    <div style={{ background: "#FFFFFF", border: "1px solid rgba(36,20,22,0.12)", borderRadius: 12, padding: "10px 12px", color: "#241416", fontSize: 14, fontFamily: mono ? "'JetBrains Mono', monospace" : "inherit" }}>
       {children}
     </div>
   );
@@ -199,14 +192,9 @@ function FieldBox({ children, mono }: { children: React.ReactNode; mono?: boolea
 function AmbientBg() {
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 0 }}>
-      {/* Large red glow bottom-left */}
-      <div style={{ position: "absolute", bottom: "-10%", left: "-15%", width: "80vw", height: "80vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(220,30,40,0.45) 0%, transparent 75%)` }} />
-      {/* Gold glow top-right */}
-      <div style={{ position: "absolute", top: "-15%", right: "-10%", width: "60vw", height: "60vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(255,120,0,0.3) 0%, transparent 70%)` }} />
-      {/* Massive Gold glow bottom-right to eliminate black spots */}
-      <div style={{ position: "absolute", bottom: "-20%", right: "-15%", width: "75vw", height: "75vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(255,140,0,0.25) 0%, transparent 75%)` }} />
-      {/* Subtle center glow */}
-      <div style={{ position: "absolute", top: "40%", left: "50%", transform: "translate(-50%,-50%)", width: "55vw", height: "55vw", borderRadius: "50%", background: `radial-gradient(circle, rgba(255,60,50,0.25) 0%, transparent 75%)` }} />
+      <div style={{ position: "absolute", top: "-22%", left: "-10%", width: "56vw", height: "56vw", borderRadius: "50%", background: "radial-gradient(circle, rgba(232,35,26,0.12) 0%, rgba(232,35,26,0.045) 38%, transparent 70%)" }} />
+      <div style={{ position: "absolute", right: "-20%", bottom: "-28%", width: "68vw", height: "68vw", borderRadius: "50%", background: "radial-gradient(circle, rgba(232,35,26,0.08) 0%, rgba(255,255,255,0) 68%)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,242,242,0.42) 45%, rgba(255,255,255,0.9))" }} />
     </div>
   );
 }
@@ -223,15 +211,15 @@ function FloatingClock() {
     tick(); const id = setInterval(tick, 1000); return () => clearInterval(id);
   }, []);
   return (
-    <div style={{ textAlign: "center", paddingTop: "5vh", position: "relative", zIndex: 1 }}>
-      <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.26em", textTransform: "uppercase", color: "rgba(255,232,236,0.25)", marginBottom: 10 }}>
+    <div style={{ textAlign: "center", paddingTop: 0, position: "relative", zIndex: 1, width: "100%" }}>
+      <p style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "#7f5f63", marginBottom: 12 }}>
         {dateLine}
       </p>
-      <div style={{ display: "inline-flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
-        <span style={{ fontSize: "clamp(48px, 8vw, 80px)", color: BRAND, textShadow: `0 0 40px ${GR}, 0 0 80px rgba(232,35,26,0.1)` }}>{hms.h}</span>
-        <span style={{ fontSize: "clamp(48px, 8vw, 80px)", color: BRAND, opacity: 0.3, animation: "colon-blink 1s step-end infinite" }}>:</span>
-        <span style={{ fontSize: "clamp(48px, 8vw, 80px)", color: BRAND, textShadow: `0 0 40px ${GR}, 0 0 80px rgba(232,35,26,0.1)` }}>{hms.m}</span>
-        <span style={{ fontSize: "clamp(16px, 2.6vw, 26px)", color: `rgba(232,35,26,0.5)`, marginLeft: "0.2em", alignSelf: "flex-start", marginTop: "0.3em" }}>{hms.s}</span>
+      <div style={{ display: "inline-flex", alignItems: "baseline", justifyContent: "center", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
+        <span style={{ fontSize: "clamp(56px, 7vw, 82px)", color: BRAND }}>{hms.h}</span>
+        <span style={{ fontSize: "clamp(56px, 7vw, 82px)", color: BRAND, opacity: 0.34, animation: "colon-blink 1s step-end infinite" }}>:</span>
+        <span style={{ fontSize: "clamp(56px, 7vw, 82px)", color: BRAND }}>{hms.m}</span>
+        <span style={{ fontSize: "clamp(18px, 2vw, 26px)", color: "#8f6f73", marginLeft: "0.25em", alignSelf: "flex-start", marginTop: "0.3em" }}>{hms.s}</span>
       </div>
     </div>
   );
@@ -336,7 +324,7 @@ function Panel({ activePage, onClose, onLogout, employee, embed = false }: {
   const [visible, setVisible] = useState(false);
   useEffect(() => { const id = requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true))); return () => cancelAnimationFrame(id); }, []);
 
-  const handleClose = () => { setVisible(false); setTimeout(onClose, 400); };
+  const handleClose = () => { setVisible(false); setTimeout(onClose, 240); };
 
   const bubble = BUBBLES.find(b => b.id === activePage)!;
 
@@ -355,87 +343,75 @@ function Panel({ activePage, onClose, onLogout, employee, embed = false }: {
 
   return (
     <div
+      className="portal-panel-root"
       style={{
-        position: "fixed",
+        position: "absolute",
         inset: 0,
-        zIndex: 50,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px",
-        background: "rgba(8,1,2,0.7)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
+        zIndex: 5,
+        overflowY: "auto",
+        padding: 0,
         opacity: visible ? 1 : 0,
-        transition: "opacity 0.4s ease",
+        transform: visible ? "translateX(0)" : "translateX(18px)",
+        transition: "opacity 0.24s ease, transform 0.24s ease",
+        scrollbarWidth: "thin",
+        scrollbarColor: "rgba(232,35,26,0.18) transparent",
       }}
-      onClick={e => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div
+        className="portal-panel-surface"
         style={{
-          ...PANEL_BG,
           width: "100%",
-          maxWidth: activePage === "leave" ? 920 : activePage === "directory" ? 720 : 640,
-          maxHeight: "86vh",
-          overflowY: "auto",
+          minHeight: "100vh",
           position: "relative",
-          transform: visible ? "scale(1) translateY(0)" : "scale(0.95) translateY(20px)",
-          transition: "transform 0.4s cubic-bezier(0.4,0,0.2,1)",
-          scrollbarWidth: "thin",
-          scrollbarColor: "rgba(232,35,26,0.18) transparent",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "20px 24px 16px", borderBottom: "1px solid rgba(255,255,255,0.05)", position: "sticky", top: 0, background: "rgba(12,1,4,0.9)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", borderRadius: "24px 24px 0 0", zIndex: 1 }}>
-          <button
-            onClick={handleClose}
-            style={{ width: 36, height: 36, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,232,236,0.5)", flexShrink: 0, transition: "all 0.2s" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(232,35,26,0.4)"; (e.currentTarget as HTMLElement).style.color = "#FFE8EC"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.1)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,232,236,0.5)"; }}
-          >
-            <ArrowLeft size={16} />
-          </button>
-          <span style={{ fontSize: 20, userSelect: "none" }}>{bubble.emoji}</span>
-          <div>
-            <p style={{ fontSize: 15, fontWeight: 800, color: "#FFE8EC", lineHeight: 1.2 }}>{title[activePage]}</p>
-            <p style={{ fontSize: 11, color: "rgba(255,232,236,0.38)", marginTop: 1 }}>{bubble.sub}</p>
+        <div className="portal-panel-header" style={{ padding: "24px clamp(112px, 12vw, 220px) 20px", position: "sticky", top: 0, background: "rgba(255,255,255,0.9)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", zIndex: 2, borderBottom: "1px solid rgba(36,20,22,0.1)", boxShadow: "0 10px 30px rgba(95,15,22,0.06)" }}>
+          <div className="portal-panel-header-inner" style={{ width: "100%", maxWidth: 1280, margin: "0 auto", display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) auto", alignItems: "center", gap: 16 }}>
+            <button
+              className="portal-home-button"
+              onClick={handleClose}
+              style={{ height: 42, borderRadius: 12, border: "1px solid rgba(232,35,26,0.18)", background: "#FFFFFF", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, color: "#7a1d22", flexShrink: 0, transition: "all 0.2s", padding: "0 15px", fontSize: 14, fontWeight: 800, fontFamily: "inherit", boxShadow: "0 8px 20px rgba(95,15,22,0.06)" }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = BRAND; (e.currentTarget as HTMLElement).style.color = BRAND; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "rgba(232,35,26,0.18)"; (e.currentTarget as HTMLElement).style.color = "#7a1d22"; }}
+            >
+              <Home size={16} />
+              <span>Trang chủ</span>
+            </button>
+            <div style={{ minWidth: 0, textAlign: "center" }}>
+              <p style={{ fontSize: "clamp(26px, 3.2vw, 38px)", fontWeight: 800, color: "#241416", lineHeight: 1.05, letterSpacing: 0 }}>{title[activePage]}</p>
+              <p style={{ fontSize: 15, fontWeight: 650, color: "#7f5f63", marginTop: 6 }}>{bubble.sub}</p>
+            </div>
+            <div className="portal-header-spacer" aria-hidden="true" style={{ width: 126 }} />
           </div>
-          <button
-            onClick={handleClose}
-            style={{ marginLeft: "auto", width: 32, height: 32, borderRadius: "50%", border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,232,236,0.4)", transition: "all 0.2s" }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "rgba(232,35,26,0.15)"; (e.currentTarget as HTMLElement).style.color = BRAND; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)"; (e.currentTarget as HTMLElement).style.color = "rgba(255,232,236,0.4)"; }}
-          >
-            <X size={14} />
-          </button>
         </div>
 
-        <div style={{ padding: "20px 24px 28px" }}>
-          {activePage === "checkin" && <UserAttendance variant="portal" />}
-          {activePage === "employee" && (
-            employee
-              ? <EmployeeContent employee={employee} />
-              : (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "40px 0", color: "rgba(255,232,236,0.5)" }}>
-                  <Loader2 size={20} className="animate-spin" />
-                  <span style={{ fontSize: 13 }}>Đang tải hồ sơ...</span>
-                </div>
-              )
-          )}
-          {activePage === "leave" && (
-            employee
-              ? <LeaveContent employee={employee} />
-              : (
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "40px 0", color: "rgba(255,232,236,0.5)" }}>
-                  <Loader2 size={20} className="animate-spin" />
-                  <span style={{ fontSize: 13 }}>Đang tải hồ sơ...</span>
-                </div>
-              )
-          )}
-          {activePage === "tasks" && <TasksContent employeeId={employee?.id} />}
-          {activePage === "directory" && <DirectoryContent />}
-          {activePage === "notifications" && <NotificationsContent />}
-          {activePage === "settings" && <SettingsContent onLogout={onLogout} embed={embed} />}
-          {activePage === "crm" && <CrmStaffContent />}
+        <div className="portal-panel-content" style={{ padding: "40px clamp(112px, 12vw, 220px) 56px", minHeight: "calc(100vh - 112px)", background: "linear-gradient(135deg, #fff5f5 0%, #fbf6f6 50%, #fff9f9 100%)", borderTop: "1px solid rgba(36,20,22,0.04)" }}>
+          <div className="portal-panel-inner" style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
+            {activePage === "checkin" && <UserAttendance variant="portal" />}
+            {activePage === "employee" && (
+              employee
+                ? <EmployeeContent employee={employee} />
+                : (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "40px 0", color: "#7f5f63" }}>
+                    <span style={{ fontSize: 13 }}>Đang tải hồ sơ...</span>
+                  </div>
+                )
+            )}
+            {activePage === "leave" && (
+              employee
+                ? <LeaveContent employee={employee} />
+                : (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "40px 0", color: "#7f5f63" }}>
+                    <span style={{ fontSize: 13 }}>Đang tải hồ sơ...</span>
+                  </div>
+                )
+            )}
+            {activePage === "tasks" && <UserTasks variant="portal" />}
+            {activePage === "directory" && <DirectoryContent />}
+            {activePage === "notifications" && <NotificationsContent />}
+            {activePage === "settings" && <SettingsContent onLogout={onLogout} embed={embed} />}
+            {activePage === "crm" && <CrmStaffContent />}
+          </div>
         </div>
       </div>
     </div>
@@ -455,45 +431,43 @@ function DirectoryContent() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <div style={{ position: "relative", flex: 1 }}>
-          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm tên nhân viên, phòng ban..." style={{ ...INPUT_S, paddingLeft: 40 }} />
-          <Search size={16} style={{ position: "absolute", left: 14, top: 11, color: "rgba(255,255,255,0.3)" }} />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm tên nhân viên, phòng ban..." style={{ ...INPUT_S, paddingLeft: 14 }} />
         </div>
-        <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)", padding: 8 }}>
-          <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+        <button onClick={reload} style={{ background: "#FFFFFF", border: "1px solid rgba(232,35,26,0.18)", borderRadius: 10, cursor: "pointer", color: "#7a1d22", padding: "10px 14px", fontSize: 13, fontWeight: 900 }}>
+          Tải lại
         </button>
       </div>
 
-      {error && <p style={{ fontSize: 12, color: "#ff8888" }}>{error}</p>}
+      {error && <p style={{ fontSize: 13, color: "#b91c1c" }}>{error}</p>}
 
       {loading && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 24, color: "rgba(255,232,236,0.4)" }}>
-          <Loader2 size={18} className="animate-spin" />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 24, color: "#7f5f63" }}>
           <span style={{ fontSize: 13 }}>Đang tải...</span>
         </div>
       )}
 
       {!loading && list.length === 0 && (
-        <p style={{ fontSize: 12, color: "rgba(255,232,236,0.35)", textAlign: "center", padding: 24 }}>Không tìm thấy nhân viên</p>
+        <p style={{ fontSize: 13, color: "#7f5f63", textAlign: "center", padding: 24 }}>Không tìm thấy nhân viên</p>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {list.map(emp => (
-          <div key={emp.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14 }}>
+          <div key={emp.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px", background: "#FFFFFF", border: "1px solid #efd7da", borderRadius: 14, boxShadow: "0 12px 30px rgba(95,15,22,0.06)" }}>
             <div style={{ width: 44, height: 44, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
               {empInitials(emp.name)}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: "#FFE8EC", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.name}</p>
-                <span style={{ fontSize: 10, padding: "2px 8px", background: "rgba(255,255,255,0.05)", borderRadius: 99, color: "rgba(255,255,255,0.4)", flexShrink: 0 }}>{emp.department}</span>
+                <p style={{ fontSize: 15, fontWeight: 800, color: "#241416", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.name}</p>
+                <span style={{ fontSize: 11, padding: "2px 8px", background: "#fff1f2", borderRadius: 99, color: "#7a1d22", flexShrink: 0, fontWeight: 750 }}>{emp.department}</span>
               </div>
-              <p style={{ fontSize: 12, color: "rgba(255,232,236,0.4)", marginTop: 2 }}>{emp.position}</p>
+              <p style={{ fontSize: 13, color: "#7f5f63", marginTop: 2 }}>{emp.position}</p>
               <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
                 {emp.phone && (
-                  <a href={`tel:${emp.phone}`} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: BRAND, textDecoration: "none", fontWeight: 600 }}><Phone size={12} /> {emp.phone}</a>
+                  <a href={`tel:${emp.phone}`} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: BRAND, textDecoration: "none", fontWeight: 600 }}>Tel {emp.phone}</a>
                 )}
                 {emp.email && (
-                  <a href={`mailto:${emp.email}`} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "rgba(255,232,236,0.5)", textDecoration: "none", fontWeight: 600 }}><Mail size={12} /> {emp.email}</a>
+                  <a href={`mailto:${emp.email}`} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: "#6f565a", textDecoration: "none", fontWeight: 700 }}>Email {emp.email}</a>
                 )}
               </div>
             </div>
@@ -519,19 +493,19 @@ function EmployeeContent({ employee }: { employee: Employee }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "18px 20px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 18, padding: "18px 20px", background: "#FFFFFF", border: "1px solid #efd7da", borderRadius: 18, boxShadow: "0 14px 36px rgba(95,15,22,0.07)" }}>
         <div style={{ position: "relative", flexShrink: 0 }}>
           <div style={{ width: 68, height: 68, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 900, color: "#fff", boxShadow: `0 0 24px ${GR}` }}>
             {empInitials(employee.name)}
           </div>
-          <div style={{ position: "absolute", bottom: 2, right: 2, width: 14, height: 14, borderRadius: "50%", background: employee.status === "inactive" ? "#6b7280" : "#22c55e", border: "2px solid #0C0102", boxShadow: "0 0 8px rgba(34,197,94,0.8)" }} />
+          <div style={{ position: "absolute", bottom: 2, right: 2, width: 14, height: 14, borderRadius: "50%", background: employee.status === "inactive" ? "#6b7280" : "#22c55e", border: "2px solid #FFFFFF", boxShadow: "0 0 8px rgba(34,197,94,0.35)" }} />
         </div>
         <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#FFE8EC", lineHeight: 1.2 }}>{employee.name}</h2>
-          <p style={{ fontSize: 12, color: "rgba(255,232,236,0.38)", marginTop: 3 }}>{employee.position}</p>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: "#241416", lineHeight: 1.2 }}>{employee.name}</h2>
+          <p style={{ fontSize: 13, color: "#7f5f63", marginTop: 3 }}>{employee.position}</p>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
             <span style={{ padding: "3px 10px", borderRadius: 99, fontSize: 11, fontWeight: 700, color: BRAND, background: "rgba(232,35,26,0.1)", border: `1px solid rgba(232,35,26,0.2)` }}>{employee.department}</span>
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "rgba(255,255,255,0.24)" }}>#{employee.id}</span>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#8b6b70" }}>#{employee.id}</span>
           </div>
         </div>
         <div style={{ flexShrink: 0, opacity: 0.35 }}>
@@ -539,7 +513,7 @@ function EmployeeContent({ employee }: { employee: Employee }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.08)", marginTop: 4 }}>
+      <div style={{ display: "flex", alignItems: "center", borderBottom: "1px solid rgba(36,20,22,0.1)", marginTop: 4 }}>
         {["Thông tin chung", "Công việc", "Liên hệ"].map((t, i) => (
           <button
             key={t}
@@ -552,7 +526,7 @@ function EmployeeContent({ employee }: { employee: Employee }) {
               cursor: "pointer",
               fontSize: 13,
               fontWeight: 700,
-              color: activeTab === i ? "#fff" : "rgba(255,232,236,0.4)",
+              color: activeTab === i ? "#241416" : "#8b6b70",
               borderBottom: activeTab === i ? `2px solid ${BRAND}` : "2px solid transparent",
               transition: "all 0.2s"
             }}
@@ -563,7 +537,7 @@ function EmployeeContent({ employee }: { employee: Employee }) {
       </div>
 
       {activeTab === 0 && (
-        <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16 }}>
+        <div style={{ padding: "16px 18px", background: "#FFFFFF", border: "1px solid #efd7da", borderRadius: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <FieldGroup l="Mã NV" v={employee.id} />
             <FieldGroup l="Họ tên" v={employee.name} />
@@ -579,7 +553,7 @@ function EmployeeContent({ employee }: { employee: Employee }) {
       )}
 
       {activeTab === 1 && (
-        <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16 }}>
+        <div style={{ padding: "16px 18px", background: "#FFFFFF", border: "1px solid #efd7da", borderRadius: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <FieldGroup l="Phòng ban" v={employee.department} />
             <FieldGroup l="Vị trí" v={employee.position} />
@@ -591,7 +565,7 @@ function EmployeeContent({ employee }: { employee: Employee }) {
       )}
 
       {activeTab === 2 && (
-        <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16 }}>
+        <div style={{ padding: "16px 18px", background: "#FFFFFF", border: "1px solid #efd7da", borderRadius: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <FieldGroup l="Email" v={employee.email} span={2} />
             <FieldGroup l="Số điện thoại" v={employee.phone} span={2} />
@@ -601,18 +575,18 @@ function EmployeeContent({ employee }: { employee: Employee }) {
         </div>
       )}
 
-      <div style={{ padding: "16px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16 }}>
+      <div style={{ padding: "16px 18px", background: "#FFFFFF", border: "1px solid #efd7da", borderRadius: 16 }}>
         <SectionLabel>Quá trình công tác</SectionLabel>
         {history.length === 0 ? (
-          <p style={{ fontSize: 12, color: "rgba(255,232,236,0.35)" }}>Chưa có dữ liệu</p>
+          <p style={{ fontSize: 13, color: "#7f5f63" }}>Chưa có dữ liệu</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {history.map((entry: WorkHistoryEntry, idx: number) => (
               <div key={entry.id} style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: idx === 0 ? BRAND : "rgba(255,255,255,0.2)", marginTop: 5, boxShadow: idx === 0 ? `0 0 8px ${BRAND}` : "none" }} />
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: idx === 0 ? 700 : 600, color: idx === 0 ? "#FFE8EC" : "rgba(255,232,236,0.7)" }}>{entry.title}</p>
-                  <p style={{ fontSize: 12, color: "rgba(255,232,236,0.4)", marginTop: 2 }}>
+                  <p style={{ fontSize: 14, fontWeight: idx === 0 ? 800 : 700, color: idx === 0 ? "#241416" : "#5f4246" }}>{entry.title}</p>
+                  <p style={{ fontSize: 12, color: "#7f5f63", marginTop: 2 }}>
                     {[entry.snapshot, entry.date, entry.toDate ? `– ${entry.toDate}` : "– Hiện tại"].filter(Boolean).join(" · ")}
                   </p>
                 </div>
@@ -645,7 +619,7 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
     return b.localeCompare(a);
   });
   const kpis = [
-    { l: "Chưa làm", v: stats.todo, c: "rgba(255,255,255,0.35)", g: "transparent" },
+    { l: "Chưa làm", v: stats.todo, c: "#6f565a", g: "transparent" },
     { l: "Đang làm", v: stats.inProgress, c: "#f59e0b", g: "rgba(245,158,11,0.2)" },
     { l: "Đã xong", v: stats.done, c: "#22c55e", g: "rgba(34,197,94,0.2)" },
   ];
@@ -653,40 +627,40 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <p style={{ fontSize: 12, color: "rgba(255,232,236,0.32)" }}>{today}</p>
-        <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
+        <p style={{ fontSize: 13, color: "#7f5f63", fontWeight: 700 }}>{today}</p>
+        <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "#7a1d22" }}>
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
 
-      {error && <p style={{ fontSize: 12, color: "#ff8888" }}>{error}</p>}
+      {error && <p style={{ fontSize: 13, color: "#b91c1c" }}>{error}</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10 }}>
         {kpis.map(({ l, v, c, g }) => (
-          <div key={l} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, padding: "14px", boxShadow: g !== "transparent" ? `0 0 16px ${g}` : "none" }}>
+          <div key={l} style={{ background: "#FFFFFF", border: "1px solid #efd7da", borderRadius: 14, padding: "14px", boxShadow: g !== "transparent" ? `0 12px 28px ${g}` : "0 12px 28px rgba(95,15,22,0.05)" }}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: c, lineHeight: 1, textShadow: g !== "transparent" ? `0 0 12px ${g}` : "none" }}>{loading ? "—" : v}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.32)", marginTop: 5 }}>{l}</div>
+            <div style={{ fontSize: 12, fontWeight: 750, color: "#7f5f63", marginTop: 5 }}>{l}</div>
           </div>
         ))}
       </div>
 
       {!loading && todayTasks.length === 0 && (
-        <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 14, padding: "20px 16px", textAlign: "center" }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>Hôm nay không có công việc</p>
-          <p style={{ fontSize: 11, color: "rgba(255,232,236,0.3)", marginTop: 3 }}>{today}</p>
+        <div style={{ background: "#FFFFFF", border: "1px solid #efd7da", borderRadius: 14, padding: "20px 16px", textAlign: "center" }}>
+          <p style={{ fontSize: 14, fontWeight: 800, color: "#241416" }}>Hôm nay không có công việc</p>
+          <p style={{ fontSize: 12, color: "#7f5f63", marginTop: 3 }}>{today}</p>
         </div>
       )}
 
       <div>
         <SectionLabel>Nhật ký công việc</SectionLabel>
         {loading && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 16, color: "rgba(255,232,236,0.4)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 16, color: "#7f5f63" }}>
             <Loader2 size={16} className="animate-spin" />
             <span style={{ fontSize: 12 }}>Đang tải...</span>
           </div>
         )}
         {!loading && groups.length === 0 && (
-          <p style={{ fontSize: 12, color: "rgba(255,232,236,0.35)", padding: "8px 0" }}>Chưa có công việc được giao</p>
+          <p style={{ fontSize: 13, color: "#7f5f63", padding: "8px 0" }}>Chưa có công việc được giao</p>
         )}
         {groups.map(([date, items], idx) => (
           <div key={date} style={{ display: "flex", gap: 14 }}>
@@ -696,17 +670,17 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
             </div>
             <div style={{ flex: 1, paddingBottom: idx < groups.length - 1 ? 18 : 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.45)" }}>{date}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: "#7f5f63" }}>{date}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
                 {items.map(item => {
                   const st = item.status || "todo";
                   const colors = TASK_STATUS_COLOR[st] ?? TASK_STATUS_COLOR.todo;
                   return (
-                    <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", borderRadius: 11, background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.04)" }}>
+                    <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 12px", borderRadius: 11, background: "#FFFFFF", border: "1px solid #efd7da" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                        <CheckCircle2 size={13} style={{ color: st === "done" ? "#22c55e" : "rgba(255,255,255,0.25)", filter: st === "done" ? "drop-shadow(0 0 4px rgba(34,197,94,0.6))" : "none", flexShrink: 0 }} />
-                        <span style={{ fontSize: 13, color: "#FFE8EC" }}>{item.title}</span>
+                        <CheckCircle2 size={13} style={{ color: st === "done" ? "#22c55e" : "#8b6b70", filter: st === "done" ? "drop-shadow(0 0 4px rgba(34,197,94,0.35))" : "none", flexShrink: 0 }} />
+                        <span style={{ fontSize: 14, color: "#241416", fontWeight: 700 }}>{item.title}</span>
                       </div>
                       <span style={{ padding: "3px 9px", borderRadius: 99, fontSize: 10, fontWeight: 700, color: colors.c, background: colors.bg, border: `1px solid ${colors.c}30`, flexShrink: 0, marginLeft: 8 }}>
                         {TASK_STATUS_LABEL[st] ?? st}
@@ -725,7 +699,7 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
 
 function CrmStaffContent() {
   return (
-    <div style={{ margin: "0 -24px -28px" }}>
+    <div style={{ width: "100%" }}>
       <CrmStaffPage />
     </div>
   );
@@ -743,12 +717,12 @@ function NotificationsContent() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <p style={{ fontSize: 12, color: "rgba(255,232,236,0.32)" }}>
+        <p style={{ fontSize: 14, color: "#6f565a", fontWeight: 700 }}>
           {unread > 0 ? `Bạn có ${unread} thông báo chưa đọc` : "Không có thông báo mới"}
         </p>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+          <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "#7a1d22", fontSize: 13, fontWeight: 800 }}>
+            Tải lại
           </button>
           {unread > 0 && (
             <button onClick={markAllRead} style={{ background: "none", border: "none", color: BRAND, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Đánh dấu đã đọc</button>
@@ -756,18 +730,17 @@ function NotificationsContent() {
         </div>
       </div>
 
-      {error && <p style={{ fontSize: 12, color: "#ff8888" }}>{error}</p>}
+      {error && <p style={{ fontSize: 13, color: "#b91c1c" }}>{error}</p>}
 
       {loading && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 16, color: "rgba(255,232,236,0.4)" }}>
-          <Loader2 size={16} className="animate-spin" />
-          <span style={{ fontSize: 12 }}>Đang tải...</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 16, color: "#7f5f63" }}>
+          <span style={{ fontSize: 13 }}>Đang tải...</span>
         </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {!loading && items.length === 0 && (
-          <p style={{ fontSize: 12, color: "rgba(255,232,236,0.35)", textAlign: "center", padding: 16 }}>Chưa có thông báo</p>
+          <p style={{ fontSize: 13, color: "#7f5f63", textAlign: "center", padding: 16 }}>Chưa có thông báo</p>
         )}
         {items.map((n) => {
           const clr = typeColor(n.type);
@@ -776,7 +749,7 @@ function NotificationsContent() {
             <div
               key={n.id}
               onClick={() => { if (isUnread) markRead(n.id); }}
-              style={{ display: "flex", gap: 14, padding: "14px", background: isUnread ? "rgba(255,255,255,0.03)" : "transparent", borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: isUnread ? "pointer" : "default", position: "relative" }}
+              style={{ display: "flex", gap: 14, padding: "14px", background: isUnread ? "#fff1f2" : "#FFFFFF", border: "1px solid #efd7da", borderRadius: 14, cursor: isUnread ? "pointer" : "default", position: "relative", boxShadow: "0 10px 26px rgba(95,15,22,0.05)" }}
             >
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: isUnread ? BRAND : "transparent", marginTop: 6, flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
@@ -784,16 +757,16 @@ function NotificationsContent() {
                   {n.type && (
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6, color: clr, background: `${clr}20` }}>{n.type}</span>
                   )}
-                  {n.time && <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>{n.time}</span>}
+                  {n.time && <span style={{ fontSize: 11, color: "#8b6b70" }}>{n.time}</span>}
                 </div>
-                <p style={{ fontSize: 13, color: isUnread ? "#FFE8EC" : "rgba(255,232,236,0.6)", fontWeight: isUnread ? 600 : 400 }}>{n.message}</p>
+                <p style={{ fontSize: 14, color: isUnread ? "#241416" : "#5f4246", fontWeight: isUnread ? 800 : 650 }}>{n.message}</p>
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); deleteItem(n.id); }}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.2)", padding: "2px 4px", borderRadius: 6, flexShrink: 0, alignSelf: "center" }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#8b6b70", padding: "2px 4px", borderRadius: 6, flexShrink: 0, alignSelf: "center", fontWeight: 750 }}
                 title="Xóa"
               >
-                <X size={13} />
+                Xóa
               </button>
             </div>
           );
@@ -813,10 +786,10 @@ function SettingsContent({ onLogout, embed = false }: { onLogout: () => void; em
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <div style={{ width: 60, height: 60, borderRadius: "50%", background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 900, color: "#fff" }}>TL</div>
-        <button style={{ ...BTN_S, width: "auto", padding: "8px 16px", fontSize: 12, display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "#FFE8EC", boxShadow: "none" }}><Plus size={14} /> Thay ảnh đại diện</button>
+        <button style={{ ...BTN_S, width: "auto", padding: "8px 16px", fontSize: 13, display: "flex", alignItems: "center", gap: 6, background: "#FFFFFF", border: "1px solid #efd7da", color: "#7a1d22", boxShadow: "0 10px 24px rgba(95,15,22,0.06)" }}>Thay ảnh đại diện</button>
       </div>
 
-      <div style={{ height: 1, background: "rgba(255,255,255,0.05)" }} />
+      <div style={{ height: 1, background: "rgba(36,20,22,0.1)" }} />
 
       <SectionLabel>Đổi mật khẩu</SectionLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -825,30 +798,30 @@ function SettingsContent({ onLogout, embed = false }: { onLogout: () => void; em
             <FieldLabel>{label}</FieldLabel>
             <div style={{ position: "relative" }}>
               <input type={shows[i] ? "text" : "password"} value={vals[i]} onChange={e => setVals(p => p.map((v, idx) => idx === i ? e.target.value : v))} placeholder="••••••••" style={{ ...INPUT_S, paddingRight: 40 }} />
-              <button type="button" onClick={() => setShows(p => p.map((v, idx) => idx === i ? !v : v))} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "rgba(255,255,255,0.25)", background: "none", border: "none", cursor: "pointer" }}>
-                {shows[i] ? <EyeOff size={14} /> : <Eye size={14} />}
+              <button type="button" onClick={() => setShows(p => p.map((v, idx) => idx === i ? !v : v))} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#7a1d22", background: "none", border: "none", cursor: "pointer", fontWeight: 750 }}>
+                {shows[i] ? "Ẩn" : "Hiện"}
               </button>
             </div>
           </div>
         ))}
-        {saved && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(34,197,94,0.09)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e", fontSize: 13, fontWeight: 600 }}><CheckCircle2 size={14} /> Đổi mật khẩu thành công!</div>}
+        {saved && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(34,197,94,0.09)", border: "1px solid rgba(34,197,94,0.2)", color: "#22c55e", fontSize: 13, fontWeight: 600 }}>Đổi mật khẩu thành công!</div>}
         <button onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 3000); }} style={BTN_S}>Cập nhật mật khẩu</button>
       </div>
 
-      <div style={{ height: 1, background: "rgba(255,255,255,0.05)", margin: "8px 0" }} />
+      <div style={{ height: 1, background: "rgba(36,20,22,0.1)", margin: "8px 0" }} />
       <SectionLabel>Quản lý phiên đăng nhập</SectionLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "rgba(255,255,255,0.02)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.05)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "#FFFFFF", borderRadius: 12, border: "1px solid #efd7da" }}>
           <div>
-            <p style={{ fontSize: 13, color: "#FFE8EC", fontWeight: 700 }}>Windows • Chrome</p>
-            <p style={{ fontSize: 11, color: "rgba(255,232,236,0.4)", marginTop: 2 }}>Đang hoạt động (Hiện tại)</p>
+            <p style={{ fontSize: 14, color: "#241416", fontWeight: 800 }}>Windows • Chrome</p>
+            <p style={{ fontSize: 12, color: "#7f5f63", marginTop: 2 }}>Đang hoạt động (Hiện tại)</p>
           </div>
           <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 8px rgba(34,197,94,0.6)" }} />
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "transparent", borderRadius: 12, border: "1px solid rgba(255,255,255,0.02)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px", background: "#FFFFFF", borderRadius: 12, border: "1px solid #efd7da" }}>
           <div>
-            <p style={{ fontSize: 13, color: "rgba(255,232,236,0.6)", fontWeight: 600 }}>iPhone 14 Pro • Safari</p>
-            <p style={{ fontSize: 11, color: "rgba(255,232,236,0.3)", marginTop: 2 }}>Đăng nhập 2 ngày trước</p>
+            <p style={{ fontSize: 14, color: "#5f4246", fontWeight: 750 }}>iPhone 14 Pro • Safari</p>
+            <p style={{ fontSize: 12, color: "#8b6b70", marginTop: 2 }}>Đăng nhập 2 ngày trước</p>
           </div>
           <button style={{ border: "none", color: "#ff5555", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "4px 8px", background: "rgba(255,85,85,0.1)", borderRadius: 6 }}>Đăng xuất</button>
         </div>
@@ -878,6 +851,8 @@ export default function UserPortalApp({ onLogout, modules = [], embed = false }:
   const [activePage, setActivePage] = useState<BubbleId | null>(null);
   const [hovId, setHovId] = useState<BubbleId | null>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
+  const [activeAnnouncements, setActiveAnnouncements] = useState<Announcement[]>([]);
+  const [defaultAnnouncement, setDefaultAnnouncement] = useState("");
   const { unread: notifUnread } = useNotifications();
 
   useEffect(() => {
@@ -926,6 +901,46 @@ export default function UserPortalApp({ onLogout, modules = [], embed = false }:
     loadEmployee();
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+
+    const loadActiveAnnouncement = async () => {
+      try {
+        const [data, config] = await Promise.all([
+          api.announcements.list() as Promise<Announcement[]>,
+          api.systemConfig.get(),
+        ]);
+        if (!alive) return;
+        const active = data
+          .filter(item => item.status === "active")
+          .sort((a, b) => {
+            const priorityRank = { high: 3, medium: 2, low: 1 } as Record<string, number>;
+            const diff = (priorityRank[b.priority] ?? 0) - (priorityRank[a.priority] ?? 0);
+            if (diff !== 0) return diff;
+            return new Date(b.createdAt || b.startTime).getTime() - new Date(a.createdAt || a.startTime).getTime();
+          });
+        setActiveAnnouncements(active);
+        setDefaultAnnouncement(
+          config?.defaultAnnouncementEnabled === false
+            ? ""
+            : String(config?.defaultAnnouncementContent || "")
+        );
+      } catch (err) {
+        if (alive) {
+          setActiveAnnouncements([]);
+          setDefaultAnnouncement("");
+        }
+      }
+    };
+
+    loadActiveAnnouncement();
+    const timer = setInterval(loadActiveAnnouncement, 30000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+
   const handleBubbleClick = (id: BubbleId) => setActivePage(id);
 
   const allowedBubbles = BUBBLES.filter(b => {
@@ -945,23 +960,29 @@ export default function UserPortalApp({ onLogout, modules = [], embed = false }:
 
   return (
     <div
+      className="user-portal-shell"
       style={{
         width: embed ? "100%" : "100vw",
         height: embed ? "100%" : "100vh",
         overflow: "hidden",
         background: `
-          radial-gradient(ellipse at 10% 90%, rgba(220,20,35,0.4) 0%, transparent 55%),
-          radial-gradient(ellipse at 90% 5%,  rgba(200,80,0,0.2) 0%, transparent 55%),
-          radial-gradient(ellipse at 50% 55%, rgba(140,20,30,0.15)  0%, transparent 50%),
-          linear-gradient(165deg, #2A040B 0%, #160205 60%, #0F0103 100%)`,
-        fontFamily: "'Outfit', sans-serif",
-        color: "#FFE8EC",
+          radial-gradient(ellipse at 14% 8%, rgba(232,35,26,0.12) 0%, transparent 42%),
+          radial-gradient(ellipse at 92% 84%, rgba(232,35,26,0.08) 0%, transparent 48%),
+          linear-gradient(135deg, #fff8f8 0%, #f7f1f1 48%, #ffffff 100%)`,
+        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif",
+        color: "#241416",
         position: embed ? "absolute" : "relative",
         inset: embed ? 0 : undefined,
       }}
     >
       <style>{`
         ${floatKeyframes}
+        .user-portal-shell {
+          font-synthesis-weight: none;
+          text-rendering: geometricPrecision;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
         @keyframes pulseRing {
           0%   { transform: scale(1);    opacity: 0.65; }
           100% { transform: scale(1.65); opacity: 0;    }
@@ -970,33 +991,419 @@ export default function UserPortalApp({ onLogout, modules = [], embed = false }:
           0%, 100% { opacity: 0.3; }
           50%       { opacity: 0.07; }
         }
-        ::placeholder { color: rgba(255,232,236,0.2); }
+        ::placeholder { color: rgba(36,20,22,0.38); }
         ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(232,35,26,0.2); border-radius: 99px; }
+        ::-webkit-scrollbar-thumb { background: rgba(232,35,26,0.35); border-radius: 99px; }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5) sepia(1) hue-rotate(310deg); }
-        select option { background: #180306; color: #FFE8EC; }
+        select option { background: #FFFFFF; color: #241416; }
+        @keyframes portalTileIn {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes portalTileFade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes orbitRingDrift {
+          from { transform: translate(-50%, -50%) rotate(0deg); }
+          to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        @keyframes orbitRingDriftReverse {
+          from { transform: translate(-50%, -50%) rotate(0deg); }
+          to { transform: translate(-50%, -50%) rotate(-360deg); }
+        }
+        @keyframes orbitRingBreathe {
+          0%, 100% {
+            opacity: var(--ring-opacity, 0.34);
+            box-shadow: 0 0 0 rgba(232,35,26,0);
+          }
+          50% {
+            opacity: calc(var(--ring-opacity, 0.34) + 0.22);
+            box-shadow: 0 0 32px rgba(232,35,26,0.12);
+          }
+        }
+        @keyframes orbitHaloBreathe {
+          0%, 100% {
+            opacity: 0.42;
+            filter: blur(12px);
+            transform: translate(-50%, -50%) scale(0.96);
+          }
+          50% {
+            opacity: 0.82;
+            filter: blur(17px);
+            transform: translate(-50%, -50%) scale(1.05);
+          }
+        }
+        @keyframes orbitStarTwinkle {
+          0%, 100% {
+            opacity: 0.32;
+            transform: translate(-50%, -50%) scale(0.78);
+          }
+          48% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.08);
+          }
+        }
+        @keyframes checkinSolarGlow {
+          0%, 100% {
+            box-shadow: 0 26px 70px rgba(232,35,26,0.24), 0 0 0 0 rgba(232,35,26,0.18);
+          }
+          50% {
+            box-shadow: 0 30px 86px rgba(232,35,26,0.34), 0 0 0 16px rgba(232,35,26,0.05);
+          }
+        }
+        @keyframes portalNoticeMarquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        .portal-notice-track {
+          animation: portalNoticeMarquee var(--notice-duration, 30s) linear infinite;
+        }
+        .portal-notice-bar:hover .portal-notice-track {
+          animation-play-state: paused;
+        }
+        .portal-orbit-canvas {
+          position: absolute;
+          inset: -12%;
+          width: 124%;
+          height: 124%;
+          pointer-events: none;
+          opacity: 0.96;
+        }
+        .portal-main-column {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+          min-height: calc(100vh - 158px);
+        }
+        .portal-orbit-wrap {
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        @media (max-width: 1024px) {
+          .user-portal-shell {
+            height: auto !important;
+            min-height: 100dvh !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+          }
+          .portal-dashboard {
+            grid-template-columns: 1fr !important;
+            grid-template-rows: auto !important;
+            gap: 22px !important;
+            padding: 24px 22px 34px !important;
+            min-height: 100dvh !important;
+          }
+          .portal-dashboard-aside {
+            min-height: auto !important;
+            border-right: none !important;
+            border-bottom: 1px solid rgba(36,20,22,0.12);
+            padding-right: 0 !important;
+            padding-bottom: 22px;
+          }
+          .portal-dashboard-aside h1 {
+            margin-top: 10px !important;
+            max-width: 760px !important;
+          }
+          .portal-dashboard-aside p {
+            max-width: 720px !important;
+          }
+          .portal-aside-hero {
+            text-align: center !important;
+            align-items: center !important;
+            margin: 0 auto !important;
+          }
+          .portal-aside-clock {
+            min-height: 220px !important;
+          }
+          .portal-logout-button {
+            align-self: center !important;
+          }
+          .portal-main-column {
+            min-height: auto !important;
+            gap: 16px !important;
+          }
+          .portal-orbit-wrap {
+            min-height: 480px !important;
+          }
+          .portal-module-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+          .portal-module-orbit {
+            width: min(680px, 100%) !important;
+            height: 480px !important;
+          }
+          .portal-panel-root {
+            position: relative !important;
+            min-height: 100dvh !important;
+            overflow-x: hidden !important;
+          }
+          .portal-panel-header {
+            padding: 20px 64px 18px !important;
+          }
+          .portal-panel-header-inner {
+            max-width: 100% !important;
+            grid-template-columns: auto minmax(0, 1fr) auto !important;
+          }
+          .portal-panel-content {
+            padding: 32px 64px 46px !important;
+            min-height: calc(100dvh - 96px) !important;
+          }
+          .portal-panel-inner {
+            max-width: 100% !important;
+          }
+        }
+        @media (max-width: 820px) {
+          .portal-dashboard {
+            padding: 20px 18px 30px !important;
+          }
+          .portal-notice-bar {
+            gap: 14px !important;
+            padding: 9px 14px !important;
+            border-radius: 16px !important;
+          }
+          .portal-notice-bar img {
+            width: 42px !important;
+            height: 42px !important;
+            border-radius: 12px !important;
+          }
+          .portal-notice-track {
+            gap: 56px !important;
+          }
+          .portal-notice-track span {
+            font-size: 14px !important;
+          }
+          .portal-orbit-wrap {
+            min-height: 430px !important;
+          }
+          .portal-module-orbit {
+            width: min(600px, 100%) !important;
+            height: 420px !important;
+          }
+          .portal-module-tile {
+            width: 110px !important;
+            height: 110px !important;
+            min-height: 110px !important;
+          }
+          .portal-module-tile p {
+            font-size: 16px !important;
+          }
+          .portal-module-tile[aria-label="Check-in"] {
+            width: 142px !important;
+            height: 142px !important;
+            min-height: 142px !important;
+          }
+          .portal-module-tile[aria-label="Check-in"] p {
+            font-size: 22px !important;
+          }
+          .portal-panel-header {
+            gap: 12px !important;
+            padding: 18px 36px !important;
+          }
+          .portal-panel-header-inner {
+            max-width: 100% !important;
+            gap: 12px !important;
+            grid-template-columns: auto minmax(0, 1fr) auto !important;
+          }
+          .portal-panel-header-inner > div:last-child {
+            min-width: 0 !important;
+          }
+          .portal-panel-header p:first-child {
+            font-size: 28px !important;
+            line-height: 1.08 !important;
+            white-space: normal !important;
+          }
+          .portal-panel-header p:last-child {
+            font-size: 14px !important;
+          }
+          .portal-panel-content {
+            padding: 24px 36px 36px !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .portal-dashboard {
+            padding: 14px 14px 24px !important;
+            gap: 18px !important;
+          }
+          .portal-notice-bar {
+            grid-template-columns: auto minmax(0, 1fr) !important;
+            min-height: 52px !important;
+            padding: 8px 12px !important;
+            text-align: left;
+          }
+          .portal-notice-bar > span {
+            display: none !important;
+          }
+          .portal-dashboard-aside {
+            padding-bottom: 18px !important;
+          }
+          .portal-aside-hero {
+            padding: 0 4px !important;
+          }
+          .portal-dashboard-aside h1 {
+            font-size: 40px !important;
+            line-height: 0.98 !important;
+          }
+          .portal-dashboard-aside p {
+            margin-top: 16px !important;
+            font-size: 16px !important;
+            line-height: 1.55 !important;
+          }
+          .portal-dashboard-aside button {
+            width: 100% !important;
+            justify-content: center !important;
+          }
+          .portal-orbit-wrap {
+            align-items: center !important;
+            min-height: 430px !important;
+            overflow: visible !important;
+          }
+          .portal-module-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .portal-module-orbit {
+            display: block !important;
+            width: min(100%, 390px) !important;
+            height: 410px !important;
+            min-height: 410px !important;
+            margin: 0 auto !important;
+          }
+          .portal-orbit-ring {
+            display: block !important;
+          }
+          .portal-orbit-canvas {
+            display: block !important;
+            inset: -8% !important;
+            width: 116% !important;
+            height: 116% !important;
+            opacity: 0.82 !important;
+          }
+          .portal-module-tile {
+            grid-column: auto !important;
+            position: absolute !important;
+            width: 82px !important;
+            height: 82px !important;
+            min-height: 82px !important;
+            border-radius: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            padding: 10px !important;
+          }
+          .portal-module-tile[aria-label="Check-in"] {
+            grid-column: auto !important;
+            width: 118px !important;
+            height: 118px !important;
+            min-height: 118px !important;
+            border-radius: 50% !important;
+          }
+          .portal-module-tile > div {
+            inset: 10px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+          }
+          .portal-module-tile p {
+            font-size: 13px !important;
+            line-height: 1.05 !important;
+          }
+          .portal-module-tile[aria-label="Check-in"] p {
+            font-size: 20px !important;
+          }
+          .portal-panel-header {
+            align-items: flex-start !important;
+            padding: 14px !important;
+            gap: 10px !important;
+          }
+          .portal-panel-header-inner {
+            gap: 10px !important;
+            grid-template-columns: auto minmax(0, 1fr) auto !important;
+          }
+          .portal-header-spacer {
+            width: 112px !important;
+          }
+          .portal-panel-header button {
+            height: 38px !important;
+            padding: 0 12px !important;
+            border-radius: 11px !important;
+          }
+          .portal-panel-header p:first-child {
+            font-size: 23px !important;
+          }
+          .portal-panel-header p:last-child {
+            margin-top: 3px !important;
+            font-size: 13px !important;
+          }
+          .portal-panel-content {
+            padding: 16px 14px 26px !important;
+            min-height: calc(100dvh - 76px) !important;
+          }
+          .portal-panel-content input,
+          .portal-panel-content select,
+          .portal-panel-content textarea,
+          .portal-panel-content button {
+            max-width: 100% !important;
+          }
+        }
+        @media (max-width: 420px) {
+          .portal-dashboard {
+            padding: 12px 10px 22px !important;
+          }
+          .portal-dashboard-aside h1 {
+            font-size: 34px !important;
+          }
+          .portal-dashboard-aside p {
+            font-size: 15px !important;
+          }
+          .portal-orbit-wrap {
+            min-height: 390px !important;
+          }
+          .portal-module-orbit {
+            width: min(100%, 350px) !important;
+            height: 370px !important;
+            min-height: 370px !important;
+          }
+          .portal-module-tile {
+            width: 72px !important;
+            height: 72px !important;
+            min-height: 72px !important;
+          }
+          .portal-module-tile[aria-label="Check-in"] {
+            width: 106px !important;
+            height: 106px !important;
+            min-height: 106px !important;
+          }
+          .portal-module-tile p {
+            font-size: 12px !important;
+          }
+          .portal-module-tile[aria-label="Check-in"] p {
+            font-size: 18px !important;
+          }
+          .portal-panel-header {
+            display: block !important;
+          }
+          .portal-panel-header-inner {
+            display: grid !important;
+            grid-template-columns: 1fr !important;
+          }
+          .portal-panel-header-inner button {
+            justify-self: start !important;
+          }
+          .portal-panel-header-inner > div:nth-child(2) {
+            text-align: left !important;
+          }
+          .portal-header-spacer {
+            display: none !important;
+          }
+        }
       `}</style>
 
       <AmbientBg />
 
-      <div style={{ position: "relative", width: "100%", height: "100%", zIndex: 1, filter: activePage ? "blur(2px) brightness(0.5)" : "none", transition: "filter 0.4s ease", pointerEvents: activePage ? "none" : "auto" }}>
-        <FloatingClock />
-
-        <div style={{ position: "absolute", bottom: 24, right: 24, opacity: 0.12 }}>
-          <ImageWithFallback src={dudiLogo} alt="DUDI Software" style={{ width: 56, height: 56, borderRadius: 12, objectFit: "cover" }} />
-        </div>
-
-        <div style={{ position: "absolute", inset: 0 }}>
-          {allowedBubbles.map(b => (
-            <Bubble key={b.id} b={b} hovId={hovId} setHovId={setHovId} onClick={handleBubbleClick} badge={b.id === "notifications" ? notifUnread : undefined} />
-          ))}
-        </div>
-
-
-      </div>
-
-      {activePage && (
+      {activePage ? (
         <Panel
           activePage={activePage}
           onClose={() => setActivePage(null)}
@@ -1004,7 +1411,452 @@ export default function UserPortalApp({ onLogout, modules = [], embed = false }:
           employee={employee}
           embed={embed}
         />
+      ) : (
+        <PortalDashboard allowedBubbles={allowedBubbles} onNavigate={handleBubbleClick} notifUnread={notifUnread} activeAnnouncements={activeAnnouncements} defaultAnnouncement={defaultAnnouncement} onLogout={onLogout} />
       )}
+    </div>
+  );
+}
+
+function ModuleTile(props: {
+  b: typeof BUBBLES[0];
+  index: number;
+  onClick: (id: BubbleId) => void;
+  badge?: number;
+  orbitStyle?: React.CSSProperties;
+}) {
+  const { b, index, onClick, badge, orbitStyle } = props;
+  const featured = b.id === "checkin";
+  const positioned = Boolean(orbitStyle);
+  const baseTransform = positioned ? "translate(-50%, -50%)" : "none";
+  return (
+    <button
+      className="portal-module-tile"
+      type="button"
+      onClick={() => onClick(b.id)}
+      style={{
+        width: positioned ? (featured ? 156 : 124) : undefined,
+        height: positioned ? (featured ? 156 : 124) : undefined,
+        minHeight: positioned ? (featured ? 156 : 124) : (featured ? 184 : 132),
+        gridColumn: positioned ? undefined : featured ? "span 2" : undefined,
+        borderRadius: positioned ? "50%" : featured ? 22 : 16,
+        border: featured ? "1px solid rgba(232,35,26,0.28)" : "1px solid rgba(36,20,22,0.1)",
+        background: featured
+          ? "linear-gradient(135deg, #E8231A 0%, #B91C1C 100%)"
+          : "rgba(255,255,255,0.9)",
+        color: featured ? "#fff7f7" : "#241416",
+        padding: positioned ? "18px" : featured ? "28px" : "24px",
+        textAlign: "left",
+        fontFamily: "inherit",
+        cursor: "pointer",
+        position: positioned ? "absolute" : "relative",
+        overflow: "hidden",
+        boxShadow: featured ? "0 24px 70px rgba(232,35,26,0.18)" : "0 16px 44px rgba(95,15,22,0.08)",
+        transition: "transform 0.22s ease, border-color 0.22s ease, background 0.22s ease, filter 0.22s ease",
+        animation: positioned
+          ? featured
+            ? `portalTileFade 420ms ease ${index * 45}ms both, checkinSolarGlow 5.8s ease-in-out ${index * 45 + 420}ms infinite`
+            : `portalTileFade 420ms ease ${index * 45}ms both`
+          : `portalTileIn 420ms ease ${index * 45}ms both`,
+        transform: baseTransform,
+        ...orbitStyle,
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = `${baseTransform} translateY(-3px)`;
+        e.currentTarget.style.borderColor = featured ? "rgba(232,35,26,0.5)" : "rgba(232,35,26,0.32)";
+        e.currentTarget.style.filter = featured ? "brightness(1.04)" : "none";
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = baseTransform;
+        e.currentTarget.style.borderColor = featured ? "rgba(232,35,26,0.28)" : "rgba(36,20,22,0.1)";
+        e.currentTarget.style.filter = "none";
+      }}
+    >
+      {b.id === "notifications" && badge != null && badge > 0 && (
+        <span style={{ position: "absolute", top: 20, right: 20, minWidth: 28, height: 28, padding: "0 8px", borderRadius: 999, background: BRAND, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900 }}>
+          {badge > 9 ? "9+" : badge}
+        </span>
+      )}
+      <div
+        style={{
+          position: "absolute",
+          left: positioned ? 14 : featured ? 28 : 24,
+          right: positioned ? 14 : 24,
+          top: positioned ? 14 : "auto",
+          bottom: positioned ? 14 : featured ? 28 : 24,
+          display: positioned ? "flex" : "block",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: positioned ? "center" : "left",
+        }}
+      >
+        <p style={{ fontSize: positioned ? (featured ? 24 : 17) : featured ? 34 : 24, lineHeight: 1.08, fontWeight: 800, color: featured ? "#fff7f7" : "#241416", margin: 0, letterSpacing: 0, whiteSpace: "normal", overflowWrap: "break-word" }}>{b.label}</p>
+      </div>
+    </button>
+  );
+}
+
+function SolarOrbitCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let raf = 0;
+    let width = 0;
+    let height = 0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      width = Math.max(1, rect.width);
+      height = Math.max(1, rect.height);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+    resize();
+
+    const rings = [
+      { rx: 0.39, ry: 0.30, speed: 0.16, color: "232,35,26", alpha: 0.24, dots: 3, phase: 0.2 },
+      { rx: 0.32, ry: 0.24, speed: -0.21, color: "255,122,122", alpha: 0.2, dots: 2, phase: 1.4 },
+      { rx: 0.25, ry: 0.18, speed: 0.28, color: "122,29,34", alpha: 0.16, dots: 2, phase: 2.2 },
+      { rx: 0.47, ry: 0.36, speed: -0.11, color: "232,35,26", alpha: 0.14, dots: 4, phase: 3.1 },
+    ];
+
+    const stars = Array.from({ length: 34 }, (_, i) => {
+      const angle = i * 2.399963 + 0.4;
+      const radius = 0.12 + ((i * 37) % 100) / 100 * 0.42;
+      return {
+        x: Math.cos(angle) * radius,
+        y: Math.sin(angle) * radius * 0.74,
+        size: 0.8 + ((i * 19) % 7) * 0.18,
+        phase: i * 0.63,
+      };
+    });
+
+    const draw = (timeMs: number) => {
+      const time = timeMs / 1000;
+      ctx.clearRect(0, 0, width, height);
+
+      const cx = width / 2;
+      const cy = height / 2;
+      const scale = Math.min(width, height);
+
+      const glow = ctx.createRadialGradient(cx, cy, scale * 0.08, cx, cy, scale * 0.34);
+      glow.addColorStop(0, "rgba(232,35,26,0.16)");
+      glow.addColorStop(0.42, "rgba(232,35,26,0.06)");
+      glow.addColorStop(1, "rgba(232,35,26,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.translate(cx, cy);
+
+      stars.forEach(star => {
+        const twinkle = 0.34 + Math.pow((Math.sin(time * 1.7 + star.phase) + 1) / 2, 2) * 0.48;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(232,35,26,${twinkle * 0.24})`;
+        ctx.arc(star.x * scale, star.y * scale, star.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      rings.forEach((ring, ringIndex) => {
+        const rx = ring.rx * width;
+        const ry = ring.ry * height;
+        const pulse = 0.72 + Math.sin(time * 0.75 + ring.phase) * 0.18;
+
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${ring.color},${ring.alpha * pulse})`;
+        ctx.lineWidth = ringIndex === 0 ? 1.15 : 0.85;
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = `rgba(${ring.color},0.12)`;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        for (let i = 0; i < ring.dots; i += 1) {
+          const angle = time * ring.speed + ring.phase + (Math.PI * 2 / ring.dots) * i;
+          const depth = (Math.sin(angle) + 1) / 2;
+          const x = Math.cos(angle) * rx;
+          const y = Math.sin(angle) * ry;
+          const dotSize = 2.2 + depth * 4.2 + (ringIndex === 0 ? 1.2 : 0);
+          const alpha = 0.45 + depth * 0.45;
+
+          ctx.beginPath();
+          ctx.fillStyle = `rgba(${ring.color},${alpha})`;
+          ctx.shadowBlur = 18 + depth * 12;
+          ctx.shadowColor = `rgba(${ring.color},0.52)`;
+          ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(${ring.color},${0.1 + depth * 0.1})`;
+          ctx.lineWidth = 1;
+          ctx.arc(x, y, dotSize + 6 + depth * 7, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        }
+      });
+
+      ctx.restore();
+      raf = requestAnimationFrame(draw);
+    };
+
+    raf = requestAnimationFrame(draw);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="portal-orbit-canvas" aria-hidden="true" />;
+}
+
+function PortalModuleOrbit({ allowedBubbles, onNavigate, notifUnread }: {
+  allowedBubbles: typeof BUBBLES;
+  onNavigate: (id: BubbleId) => void;
+  notifUnread: number;
+}) {
+  const [orbitSize, setOrbitSize] = useState<"desktop" | "tablet" | "mobile" | "small">("desktop");
+
+  useEffect(() => {
+    const update = () => {
+      const width = window.innerWidth;
+      setOrbitSize(width <= 420 ? "small" : width <= 640 ? "mobile" : width <= 820 ? "tablet" : "desktop");
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  const center = allowedBubbles.find(b => b.id === "checkin");
+  const orbitItems = allowedBubbles.filter(b => b.id !== "checkin");
+  const radiusBySize = {
+    desktop: { x: 42, y: 39 },
+    tablet: { x: 40, y: 37 },
+    mobile: { x: 35, y: 34 },
+    small: { x: 33, y: 32 },
+  }[orbitSize];
+  const radiusX = radiusBySize.x;
+  const radiusY = radiusBySize.y;
+  return (
+    <div className="portal-module-orbit" style={{ position: "relative", width: 720, height: 520, maxWidth: "100%", margin: "0 auto" }}>
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}>
+        <SolarOrbitCanvas />
+        <div
+          className="portal-orbit-ring"
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: "50%",
+            width: "56%",
+            height: "56%",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(232,35,26,0.12) 0%, rgba(232,35,26,0.05) 34%, transparent 68%)",
+            transform: "translate(-50%, -50%)",
+            animation: "orbitHaloBreathe 7.5s ease-in-out infinite",
+          }}
+        />
+      </div>
+      {center && (
+        <ModuleTile
+          b={center}
+          index={0}
+          onClick={onNavigate}
+          orbitStyle={{ left: "50%", top: "50%" }}
+        />
+      )}
+      {orbitItems.map((b, index) => {
+        const angle = (-90 + (360 / Math.max(orbitItems.length, 1)) * index) * Math.PI / 180;
+        const left = 50 + Math.cos(angle) * radiusX;
+        const top = 50 + Math.sin(angle) * radiusY;
+        return (
+          <ModuleTile
+            key={b.id}
+            b={b}
+            index={index + 1}
+            onClick={onNavigate}
+            badge={b.id === "notifications" ? notifUnread : undefined}
+            orbitStyle={{ left: `${left}%`, top: `${top}%` }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function PortalNoticeBar({ unread, announcements, defaultAnnouncement }: { unread: number; announcements: Announcement[]; defaultAnnouncement: string }) {
+  const notices = announcements.length > 0
+    ? announcements.map(item => ({
+      id: item.id,
+      text: `${item.title}${item.content ? ` - ${item.content}` : ""}`,
+      priority: item.priority,
+    }))
+    : defaultAnnouncement
+      ? [{ id: "default", text: defaultAnnouncement, priority: "low" as const }]
+      : [];
+  const repeatedNotices = notices.length > 0 ? [...notices, ...notices] : [];
+  const duration = Math.max(24, notices.reduce((sum, item) => sum + item.text.length, 0) * 0.28);
+
+  return (
+    <div
+      className="portal-notice-bar"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "auto minmax(0, 1fr) auto",
+        alignItems: "center",
+        gap: 18,
+        minHeight: 58,
+        padding: "4px 0",
+        background: "transparent",
+        border: "none",
+        boxShadow: "none",
+      }}
+    >
+      <ImageWithFallback src={dudiLogo} alt="DUDI Software" style={{ width: 48, height: 48, borderRadius: 14, objectFit: "cover" }} />
+      <div style={{ minWidth: 0, overflow: "hidden", position: "relative" }}>
+        {repeatedNotices.length > 0 && (
+          <div
+            className="portal-notice-track"
+            style={{ display: "inline-flex", alignItems: "center", gap: 72, whiteSpace: "nowrap", minWidth: "max-content", ["--notice-duration" as any]: `${duration}s` }}
+          >
+            {repeatedNotices.map((notice, index) => (
+              <div key={`${notice.id}-${index}`} style={{ display: "inline-flex", alignItems: "center", gap: 28 }}>
+                <span style={{ color: "#241416", fontSize: 15, fontWeight: 800, lineHeight: "20px" }}>{notice.text}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <span
+        style={{
+          minWidth: 42,
+          height: 34,
+          padding: "0 12px",
+          borderRadius: 999,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: announcements.length > 0 ? BRAND : "#fff1f2",
+          color: announcements.length > 0 ? "#FFFFFF" : "#7a1d22",
+          fontSize: 13,
+          fontWeight: 900,
+        }}
+      >
+        {announcements.length > 0 ? announcements.length : unread > 9 ? "9+" : unread}
+      </span>
+    </div>
+  );
+}
+
+function PortalDashboard({ allowedBubbles, onNavigate, notifUnread, activeAnnouncements, defaultAnnouncement, onLogout }: {
+  allowedBubbles: typeof BUBBLES;
+  onNavigate: (id: BubbleId) => void;
+  notifUnread: number;
+  activeAnnouncements: Announcement[];
+  defaultAnnouncement: string;
+  onLogout: () => void;
+}) {
+  return (
+    <div className="portal-dashboard" style={{ position: "relative", zIndex: 1, minHeight: "100%", display: "grid", gridTemplateColumns: "minmax(320px, 0.72fr) minmax(520px, 1.28fr)", gridTemplateRows: "auto minmax(0, 1fr)", gap: "28px 34px", padding: "28px 52px 44px", alignItems: "stretch" }}>
+      <div style={{ gridColumn: "1 / -1" }}>
+        <PortalNoticeBar unread={notifUnread} announcements={activeAnnouncements} defaultAnnouncement={defaultAnnouncement} />
+      </div>
+
+      <div className="portal-dashboard-aside" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: "calc(100vh - 158px)", borderRight: "1px solid rgba(36,20,22,0.1)", paddingRight: 34 }}>
+        <div
+          className="portal-aside-hero"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+            maxWidth: 560,
+            margin: "20px auto 0",
+          }}
+        >
+          <div style={{ width: 54, height: 3, borderRadius: 99, background: BRAND, marginBottom: 24, boxShadow: "0 10px 26px rgba(232,35,26,0.18)" }} />
+          <h1 style={{ margin: 0, fontSize: "clamp(40px, 5.2vw, 64px)", lineHeight: 1, fontWeight: 800, color: "#241416", letterSpacing: 0, maxWidth: 520 }}>
+            Không gian làm việc
+          </h1>
+          <p style={{ marginTop: 22, maxWidth: 500, fontSize: 18, lineHeight: 1.72, color: "#6f565a", fontWeight: 650 }}>
+            Truy cập nhanh chấm công, hồ sơ, công việc, nghỉ phép và các thông báo nội bộ.
+          </p>
+        </div>
+        <div
+          className="portal-aside-clock"
+          style={{
+            flex: "0 1 auto",
+            minHeight: 260,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "28px 0",
+          }}
+        >
+          <FloatingClock />
+        </div>
+        <div
+          className="portal-aside-actions"
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            paddingBottom: 8,
+          }}
+        >
+          <button
+            className="portal-logout-button"
+            type="button"
+            onClick={onLogout}
+            style={{
+              alignSelf: "center",
+              border: "1px solid rgba(232,35,26,0.18)",
+              background: "#FFFFFF",
+              color: "#7a1d22",
+              borderRadius: 999,
+              padding: "12px 22px",
+              fontSize: 14,
+              fontWeight: 800,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              boxShadow: "0 12px 28px rgba(95,15,22,0.07)",
+              transition: "border-color 0.2s ease, color 0.2s ease, transform 0.2s ease",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = BRAND;
+              e.currentTarget.style.color = BRAND;
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = "rgba(232,35,26,0.18)";
+              e.currentTarget.style.color = "#7a1d22";
+              e.currentTarget.style.transform = "translateY(0)";
+            }}
+          >
+            Đăng xuất
+          </button>
+        </div>
+      </div>
+
+      <div className="portal-main-column" style={{ display: "flex", flexDirection: "column", gap: 18, minHeight: "calc(100vh - 158px)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 24 }}>
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.12em", color: "#9a6a6f", margin: 0 }}>CHỨC NĂNG</p>
+          </div>
+        </div>
+
+        <div className="portal-orbit-wrap" style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <PortalModuleOrbit allowedBubbles={allowedBubbles} onNavigate={onNavigate} notifUnread={notifUnread} />
+        </div>
+      </div>
     </div>
   );
 }

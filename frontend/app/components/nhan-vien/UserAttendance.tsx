@@ -15,7 +15,7 @@ const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }>
 
 const PORTAL_BRAND = "#E8231A"
 const PORTAL_GOLD = "#FF8800"
-const PORTAL_GR = "rgba(232,35,26,0.28)"
+const PORTAL_GR = "rgba(232,35,26,0.18)"
 
 function StatusBadge({ status }: { status: string }) {
   const s = STATUS_STYLE[status] ?? { label: ATT_STATUS_LABEL[status] ?? status, color: "text-gray-600", bg: "bg-gray-100" }
@@ -28,7 +28,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function PortalSectionLabel({ children }: { children: string }) {
   return (
-    <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(255,232,236,0.65)", marginBottom: 14 }}>
+    <p style={{ fontSize: 11, fontWeight: 850, letterSpacing: "0.14em", textTransform: "uppercase", color: "#8b5f64", marginBottom: 14 }}>
       {children}
     </p>
   )
@@ -37,7 +37,7 @@ function PortalSectionLabel({ children }: { children: string }) {
 function WifiStatusBanner({ ipStatus, checking }: { ipStatus: { valid: boolean; ip: string; message: string } | null; checking?: boolean }) {
   if (checking && !ipStatus) {
     return (
-      <p style={{ fontSize: 11, color: "rgba(255,232,236,0.4)", textAlign: "center" }}>Đang kiểm tra WiFi...</p>
+      <p style={{ fontSize: 12, color: "#7f5f63", textAlign: "center" }}>Đang kiểm tra WiFi...</p>
     )
   }
   if (!ipStatus) return null
@@ -46,10 +46,9 @@ function WifiStatusBanner({ ipStatus, checking }: { ipStatus: { valid: boolean; 
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
         padding: "10px 14px", borderRadius: 12, width: "100%", maxWidth: 360,
-        background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.28)",
-        color: "#86efac", fontSize: 12, fontWeight: 600,
+        background: "#f0fdf4", border: "1px solid #bbf7d0",
+        color: "#166534", fontSize: 13, fontWeight: 750,
       }}>
-        <Wifi size={14} />
         <span>{ipStatus.message || `Đúng WiFi công ty · ${ipStatus.ip}`}</span>
       </div>
     )
@@ -58,10 +57,9 @@ function WifiStatusBanner({ ipStatus, checking }: { ipStatus: { valid: boolean; 
     <div style={{
       display: "flex", alignItems: "flex-start", justifyContent: "center", gap: 8,
       padding: "10px 14px", borderRadius: 12, width: "100%", maxWidth: 360,
-      background: "rgba(255,85,85,0.12)", border: "1px solid rgba(255,85,85,0.28)",
-      color: "#ffaaaa", fontSize: 12, fontWeight: 600, textAlign: "center",
+      background: "#fef2f2", border: "1px solid #fecaca",
+      color: "#b91c1c", fontSize: 13, fontWeight: 750, textAlign: "center",
     }}>
-      <Wifi size={14} style={{ flexShrink: 0, marginTop: 1 }} />
       <span>{ipStatus.message}</span>
     </div>
   )
@@ -121,7 +119,7 @@ function PortalAttendanceView() {
     if (status === "late" || status === "early" || status === "late_early") return { c: "#f59e0b", bg: "rgba(245,158,11,0.15)" }
     if (status === "absent") return { c: "#ff5555", bg: "rgba(255,85,85,0.15)" }
     if (status === "leave") return { c: "#a78bfa", bg: "rgba(167,139,250,0.15)" }
-    return { c: "rgba(255,232,236,0.6)", bg: "rgba(255,255,255,0.06)" }
+    return { c: "#6f565a", bg: "#f3eeee" }
   }
   const kpis = [
     { l: "Đúng giờ", v: monthStats.onTime, c: "#22c55e", g: "rgba(34,197,94,0.22)" },
@@ -137,25 +135,24 @@ function PortalAttendanceView() {
       {isSuperAdmin ? (
         <div style={{
           padding: "10px 14px", borderRadius: 12, width: "100%", maxWidth: 360,
-          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
-          color: "rgba(255,232,236,0.65)", fontSize: 12, fontWeight: 600, textAlign: "center",
+          background: "#ffffff", border: "1px solid #efd7da",
+          color: "#6f565a", fontSize: 13, fontWeight: 750, textAlign: "center",
           display: "flex", alignItems: "center", justifyContent: "center", gap: 6
         }}>
-          <AlertCircle size={15} style={{ marginTop: 1, flexShrink: 0 }} />
           <span>Tài khoản Quản trị hệ thống không cần chấm công</span>
         </div>
       ) : (
         <WifiStatusBanner ipStatus={ipStatus} checking={loading && !ipStatus} />
       )}
-      <p style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.45)", letterSpacing: "0.08em" }}>
+      <p style={{ fontSize: 13, fontWeight: 750, color: "#7f5f63", letterSpacing: "0.04em" }}>
         {isIntern ? `${EMPLOYEE_KIND.intern.label} · theo buổi` : `${EMPLOYEE_KIND.staff.label} · theo ngày`} · {isSuperAdmin ? "Miễn chấm công" : statusText}
       </p>
 
       <div style={{ display: "flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
-        <span style={{ fontSize: 48, color: PORTAL_BRAND, textShadow: `0 0 24px ${PORTAL_GR}` }}>{hms.h}</span>
+        <span style={{ fontSize: 56, color: PORTAL_BRAND, textShadow: `0 8px 22px ${PORTAL_GR}` }}>{hms.h}</span>
         <span style={{ fontSize: 48, color: PORTAL_BRAND, opacity: 0.3, animation: "colon-blink 1s step-end infinite" }}>:</span>
-        <span style={{ fontSize: 48, color: PORTAL_BRAND, textShadow: `0 0 24px ${PORTAL_GR}` }}>{hms.m}</span>
-        <span style={{ fontSize: 16, color: "rgba(232,35,26,0.5)", marginLeft: 6, alignSelf: "flex-start", marginTop: 6 }}>{hms.s}</span>
+        <span style={{ fontSize: 56, color: PORTAL_BRAND, textShadow: `0 8px 22px ${PORTAL_GR}` }}>{hms.m}</span>
+        <span style={{ fontSize: 18, color: "#8b6b70", marginLeft: 6, alignSelf: "flex-start", marginTop: 6 }}>{hms.s}</span>
       </div>
 
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -171,19 +168,18 @@ function PortalAttendanceView() {
           style={{
             width: 112, height: 112, borderRadius: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5,
             border: "none", cursor: (punchLabel.done || isSuperAdmin) ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 900, color: "#fff", opacity: (punchLabel.done || isSuperAdmin) ? 0.5 : 1,
-            background: isSuperAdmin ? "rgba(255,255,255,0.06)" : working ? "linear-gradient(135deg, #22c55e, #16a34a)" : `linear-gradient(135deg, ${PORTAL_BRAND}, ${PORTAL_GOLD})`,
-            boxShadow: isSuperAdmin ? "none" : working ? "0 0 30px rgba(34,197,94,0.55)" : `0 0 30px ${PORTAL_GR}, 0 0 60px rgba(232,35,26,0.12)`,
+            background: isSuperAdmin ? "#d6c6c9" : working ? "linear-gradient(135deg, #22c55e, #16a34a)" : `linear-gradient(135deg, ${PORTAL_BRAND}, #B91C1C)`,
+            boxShadow: isSuperAdmin ? "none" : working ? "0 18px 36px rgba(34,197,94,0.22)" : `0 18px 42px ${PORTAL_GR}`,
           }}
         >
-          {punching ? <Loader2 size={34} className="animate-spin" /> : <Fingerprint size={34} strokeWidth={1.5} style={{ color: isSuperAdmin ? "rgba(255,232,236,0.3)" : undefined }} />}
-          <span style={{ fontSize: 8, letterSpacing: "0.1em", textAlign: "center", padding: "0 6px", color: isSuperAdmin ? "rgba(255,232,236,0.3)" : undefined }}>
-            {isSuperAdmin ? "KHÓA" : punchLabel.label.toUpperCase()}
+          <span style={{ fontSize: 13, letterSpacing: "0.08em", textAlign: "center", padding: "0 10px", color: isSuperAdmin ? "#7f5f63" : undefined }}>
+            {punching ? "ĐANG GHI" : isSuperAdmin ? "KHÓA" : punchLabel.label.toUpperCase()}
           </span>
         </button>
       </div>
 
       {todayRecord && (
-        <div style={{ fontSize: 11, color: "rgba(255,232,236,0.5)", textAlign: "center", fontFamily: "monospace", lineHeight: 1.6 }}>
+        <div style={{ fontSize: 12, color: "#6f565a", textAlign: "center", fontFamily: "monospace", lineHeight: 1.6 }}>
           {isIntern ? (
             <>
               <div>{internSessionRange(todayRecord, "am")}</div>
@@ -196,50 +192,50 @@ function PortalAttendanceView() {
         </div>
       )}
 
-      <p style={{ fontSize: 12, color: "rgba(255,232,236,0.25)" }}>
+      <p style={{ fontSize: 13, color: "#7f5f63" }}>
         {punchLabel.done ? "Đã hoàn thành chấm công hôm nay" : working ? "Bấm khi tan ca" : "Bấm khi bắt đầu làm"}
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, width: "100%" }}>
         {kpis.map(({ l, v, c, g }) => (
-          <div key={l} style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 12px", textAlign: "center", boxShadow: `0 0 16px ${g}` }}>
+          <div key={l} style={{ background: "#ffffff", border: "1px solid #efd7da", borderRadius: 16, padding: "14px 12px", textAlign: "center", boxShadow: `0 12px 28px ${g}` }}>
             <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 28, fontWeight: 700, color: c, lineHeight: 1 }}>{loading ? "—" : v}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,232,236,0.38)", marginTop: 5 }}>{l}</div>
+            <div style={{ fontSize: 12, fontWeight: 750, color: "#7f5f63", marginTop: 5 }}>{l}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ width: "100%", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 16, padding: "14px 16px" }}>
+      <div style={{ width: "100%", background: "#ffffff", border: "1px solid #efd7da", borderRadius: 16, padding: "14px 16px", boxShadow: "0 14px 36px rgba(95,15,22,0.07)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
           <PortalSectionLabel>Lịch sử gần đây</PortalSectionLabel>
           <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={verifyWifi} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }} title="Kiểm tra WiFi">
-              <Wifi size={14} />
+            <button onClick={verifyWifi} style={{ background: "none", border: "none", cursor: "pointer", color: "#7a1d22", fontSize: 12, fontWeight: 850 }} title="Kiểm tra WiFi">
+              WiFi
             </button>
-            <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,232,236,0.35)" }}>
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "#7a1d22", fontSize: 12, fontWeight: 850 }}>
+              Tải lại
             </button>
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {history.length === 0 && !loading && (
-            <p style={{ fontSize: 12, color: "rgba(255,232,236,0.3)", textAlign: "center", padding: 12 }}>Chưa có lịch sử chấm công</p>
+            <p style={{ fontSize: 13, color: "#7f5f63", textAlign: "center", padding: 12 }}>Chưa có lịch sử chấm công</p>
           )}
           {history.slice(0, 10).map((item) => {
             const t = formatAttendanceTimes(item)
             const isToday = item.date === todayKey
             const st = statusColor(item.status)
             return (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 8, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+              <div key={item.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: 8, borderBottom: "1px solid rgba(36,20,22,0.08)" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: "#FFE8EC" }}>{fmtIsoDate(item.date)}</p>
+                    <p style={{ fontSize: 14, fontWeight: 800, color: "#241416" }}>{fmtIsoDate(item.date)}</p>
                     {isToday && (
                       <span style={{ fontSize: 9, fontWeight: 800, color: PORTAL_BRAND, padding: "2px 6px", background: "rgba(232,35,26,0.15)", borderRadius: 6 }}>HÔM NAY</span>
                     )}
                   </div>
-                  <p style={{ fontSize: 10, color: "rgba(255,232,236,0.35)", marginTop: 2 }}>{weekdayFromIso(item.date)}</p>
-                  <p style={{ fontSize: 11, color: "rgba(255,232,236,0.45)", marginTop: 4, fontFamily: "monospace" }}>
+                  <p style={{ fontSize: 11, color: "#8b6b70", marginTop: 2 }}>{weekdayFromIso(item.date)}</p>
+                  <p style={{ fontSize: 12, color: "#6f565a", marginTop: 4, fontFamily: "monospace" }}>
                     {isIntern ? `${t.primary} | ${t.secondary}` : t.combined}
                   </p>
                 </div>

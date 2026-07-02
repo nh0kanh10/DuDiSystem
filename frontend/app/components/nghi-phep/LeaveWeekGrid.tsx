@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from "react"
-import { Check, RotateCcw, Sun, Sunset } from "lucide-react"
 import {
   LEAVE_SESSION,
   formatVnDate,
@@ -128,7 +127,6 @@ export default function LeaveWeekGrid({ selected, onChange, blocked = [], varian
                   const key = `${isoKey(d)}-${session}`
                   const isSelected = selectedKeys.has(key)
                   const isBlocked = blockedKeys.has(key)
-                  const Icon = session === "sang" ? Sun : Sunset
                   const label = LEAVE_SESSION[session].short
                   const cellCls = isBlocked
                     ? portal ? "bg-white/5 border-white/10 text-white/30 cursor-not-allowed opacity-70" : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed opacity-70"
@@ -145,9 +143,8 @@ export default function LeaveWeekGrid({ selected, onChange, blocked = [], varian
                         onClick={() => toggle(d, session)}
                         className={`w-full min-h-[72px] rounded-xl border flex flex-col items-center justify-center gap-1 transition-all text-xs font-bold ${cellCls}`}
                       >
-                        <Icon size={14} />
                         {label}
-                        {isSelected && <Check size={12} />}
+                        {isSelected && <span className="text-[10px] font-black">Đã chọn</span>}
                         {isBlocked && <span className="text-[9px] font-medium">Đã đăng ký</span>}
                       </button>
                     </td>
@@ -172,7 +169,7 @@ export default function LeaveWeekGrid({ selected, onChange, blocked = [], varian
             onClick={() => onChange([])}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold ${portal ? "text-white/50 hover:text-[#FF8800]" : "text-gray-600 hover:text-[#C62828]"}`}
           >
-            <RotateCcw size={12} /> Đặt lại
+            Đặt lại
           </button>
         </div>
       )}
