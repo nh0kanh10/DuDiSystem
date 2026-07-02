@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useMemo, useState } from "react"
 import { getStoredUser } from "./types"
 import { useMyTasks } from "../../hooks/useMyTasks"
 import { api } from "@/lib/api"
@@ -18,25 +18,78 @@ const STATUS_MAP = {
     done: { label: "Hoàn thành", color: "text-green-700", bg: "bg-green-100" },
 }
 
+function parseVnDate(value?: string) {
+    if (!value) return null
+    const parts = value.split("/").map(Number)
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return null
+    return new Date(parts[2], parts[1] - 1, parts[0])
+}
+
 export default function UserTasks({ variant = "default" }: { variant?: "default" | "portal" }) {
     const portal = variant === "portal"
     const me = getStoredUser()
     const { tasks, loading, error, reload, stats } = useMyTasks(me.id)
     const [filter, setFilter] = useState<Status | "all">("all")
+    const [query, setQuery] = useState("")
     const [showAdd, setShowAdd] = useState(false)
     const [newTitle, setNewTitle] = useState("")
+    const [newDescription, setNewDescription] = useState("")
     const [newDate, setNewDate] = useState("")
+    const [noDeadline, setNoDeadline] = useState(false)
     const [newPriority, setNewPriority] = useState<Priority>("medium")
     const [actionLoading, setActionLoading] = useState(false)
+    const getTodayVn = () => {
+        const d = new Date()
+        return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+    }
 
-    const filtered = filter === "all" ? tasks : tasks.filter(t => (t.status || "todo") === filter)
+    const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase()
+        return tasks
+            .filter(t => filter === "all" ? true : (t.status || "todo") === filter)
+            .filter(t => {
+                if (!q) return true
+                return `${t.title || ""} ${t.description || ""}`.toLowerCase().includes(q)
+            })
+            .sort((a, b) => {
+                const aDone = (a.status || "todo") === "done"
+                const bDone = (b.status || "todo") === "done"
+                if (aDone !== bDone) return aDone ? 1 : -1
+                const aDate = parseVnDate(a.dueDate)
+                const bDate = parseVnDate(b.dueDate)
+                if (aDate && bDate) return aDate.getTime() - bDate.getTime()
+                if (aDate) return -1
+                if (bDate) return 1
+                return (a.title || "").localeCompare(b.title || "")
+            })
+    }, [tasks, filter, query])
+
+    const todayStr = useMemo(() => {
+        const d = new Date()
+        return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+    }, [])
+
+    const todayFocus = useMemo(
+        () => filtered.filter(t => (t.status || "todo") !== "done" && t.dueDate === todayStr),
+        [filtered, todayStr]
+    )
+
+    const overdueCount = useMemo(() => {
+        const now = new Date()
+        now.setHours(0, 0, 0, 0)
+        return tasks.filter(t => {
+            if ((t.status || "todo") === "done") return false
+            const due = parseVnDate(t.dueDate)
+            return !!due && due.getTime() < now.getTime()
+        }).length
+    }, [tasks])
+
     const surface = portal ? "bg-white border-[#efd7da] text-[#241416]" : "bg-white border-black/5 text-gray-800"
     const muted = portal ? "text-[#7f5f63]" : "text-gray-600"
 
-    const toggleDone = async (id: string, currentStatus?: string) => {
+    const setTaskStatus = async (id: string, nextStatus: Status) => {
         setActionLoading(true)
         try {
-            const nextStatus = currentStatus === "done" ? "todo" : "done"
             await api.tasks.update(id, { status: nextStatus })
             await reload()
         } catch (e) {
@@ -52,13 +105,14 @@ export default function UserTasks({ variant = "default" }: { variant?: "default"
         try {
             await api.tasks.create({
                 title: newTitle,
-                dueDate: newDate ? newDate.split("-").reverse().join("/") : "–",
+                description: newDescription.trim(),
+                dueDate: noDeadline ? "" : (newDate ? newDate.split("-").reverse().join("/") : getTodayVn()),
                 priority: newPriority,
                 status: "todo",
                 assigneeId: me.id,
                 assigneeName: me.name
             })
-            setNewTitle(""); setNewDate(""); setNewPriority("medium"); setShowAdd(false)
+            setNewTitle(""); setNewDescription(""); setNewDate(""); setNewPriority("medium"); setNoDeadline(false); setShowAdd(false)
             await reload()
         } catch (e) {
             alert(e instanceof Error ? e.message : "Không thể thêm công việc")
@@ -92,6 +146,23 @@ export default function UserTasks({ variant = "default" }: { variant?: "default"
                 ))}
             </div>
 
+            <div className={`${surface} rounded-2xl p-4 border shadow-sm flex flex-wrap items-center justify-between gap-3`}>
+                <div>
+                    <p className={`text-sm font-black ${portal ? "text-[#241416]" : "text-gray-800"}`}>Kế hoạch hôm nay</p>
+                    <p className={`text-xs ${muted} mt-1`}>
+                        {todayFocus.length > 0
+                            ? `Bạn có ${todayFocus.length} việc đến hạn hôm nay.`
+                            : "Không có việc đến hạn hôm nay."}
+                        {overdueCount > 0 ? ` Có ${overdueCount} việc đang trễ hạn.` : ""}
+                    </p>
+                </div>
+                <button onClick={reload}
+                    disabled={actionLoading || loading}
+                    className="px-4 py-2 bg-white border border-[#e7c8cc] rounded-xl text-xs font-black text-[#7a1d22] hover:bg-[#fff1f2] disabled:opacity-50">
+                    Làm mới danh sách
+                </button>
+            </div>
+
             {/* Actions row */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className={`flex gap-1 rounded-xl p-1 ${portal ? "bg-[#fff1f2] border border-[#efd7da]" : "bg-gray-100"}`}>
@@ -103,11 +174,19 @@ export default function UserTasks({ variant = "default" }: { variant?: "default"
                         </button>
                     ))}
                 </div>
+                <div className="flex items-center gap-2">
+                    <input
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder="Tìm việc theo tiêu đề..."
+                        className={`w-56 px-3 py-2 border rounded-xl text-sm focus:outline-none ${portal ? "bg-white border-[#e7c8cc] text-[#241416] placeholder:text-[#8b6b70] focus:border-[#E8231A]" : "border-gray-200 focus:border-[#C62828]/40"}`}
+                    />
                 <button onClick={() => setShowAdd(true)}
                     disabled={actionLoading || loading}
                     className="flex items-center gap-2 px-4 py-2 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-sm font-bold transition-colors shadow-sm disabled:opacity-50">
                     Thêm việc
                 </button>
+                </div>
             </div>
 
             {/* Add task form */}
@@ -121,21 +200,35 @@ export default function UserTasks({ variant = "default" }: { variant?: "default"
                         placeholder="Tên công việc..."
                         disabled={actionLoading}
                         className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none ${portal ? "bg-white border-[#e7c8cc] text-[#241416] placeholder:text-[#8b6b70] focus:border-[#E8231A]" : "border-gray-200 focus:border-[#C62828]/40"}`} />
+                    <textarea value={newDescription} onChange={e => setNewDescription(e.target.value)}
+                        placeholder="Mô tả ngắn mục tiêu cần làm..."
+                        rows={2}
+                        disabled={actionLoading}
+                        className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none resize-none ${portal ? "bg-white border-[#e7c8cc] text-[#241416] placeholder:text-[#8b6b70] focus:border-[#E8231A]" : "border-gray-200 focus:border-[#C62828]/40"}`} />
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className={`text-xs font-bold mb-1 block ${muted}`}>Hạn chót</label>
                             <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)}
-                                disabled={actionLoading}
+                                disabled={actionLoading || noDeadline}
                                 className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${portal ? "bg-white border-[#e7c8cc] text-[#241416] focus:border-[#E8231A]" : "border-gray-200 focus:border-[#C62828]/40"}`} />
+                            <label className={`mt-2 inline-flex items-center gap-2 text-xs font-semibold ${muted}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={noDeadline}
+                                    onChange={e => setNoDeadline(e.target.checked)}
+                                    className="w-4 h-4 accent-[#C62828]"
+                                />
+                                Không đặt deadline
+                            </label>
                         </div>
                         <div>
                             <label className={`text-xs font-bold mb-1 block ${muted}`}>Ưu tiên</label>
                             <select value={newPriority} onChange={e => setNewPriority(e.target.value as Priority)}
                                 disabled={actionLoading}
                                 className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${portal ? "bg-white border-[#e7c8cc] text-[#241416]" : "border-gray-200"}`}>
-                                <option value="high">Cao</option>
+                                <option value="high">Cao - làm trước</option>
                                 <option value="medium">Trung bình</option>
-                                <option value="low">Thấp</option>
+                                <option value="low">Thấp - làm sau</option>
                             </select>
                         </div>
                     </div>
@@ -170,15 +263,20 @@ export default function UserTasks({ variant = "default" }: { variant?: "default"
                         const statusKey = (task.status || "todo") as Status
                         const p = PRIORITY_MAP[priorityKey] ?? PRIORITY_MAP.medium
                         const s = STATUS_MAP[statusKey] ?? STATUS_MAP.todo
+                        const due = parseVnDate(task.dueDate)
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const isOverdue = !!due && statusKey !== "done" && due.getTime() < today.getTime()
+                        const isToday = task.dueDate === todayStr
                         return (
                             <div key={task.id}
                                 className={`${surface} rounded-2xl p-5 border shadow-sm flex items-start gap-4 transition-all
                     ${statusKey === "done" ? portal ? "opacity-75" : "border-green-100 opacity-70" : portal ? "hover:border-[#E8231A]/30" : "border-black/5 hover:border-[#C62828]/20"}`}>
-                                <button onClick={() => toggleDone(task.id, statusKey)} disabled={actionLoading} className="flex-shrink-0 mt-0.5 transition-transform hover:scale-110 disabled:opacity-50">
-                                    <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full border text-[10px] font-black ${statusKey === "done" ? "border-green-400 bg-green-50 text-green-600" : "border-gray-300 text-gray-400 hover:border-[#C62828] hover:text-[#C62828]"}`}>
-                                        {statusKey === "done" ? "OK" : ""}
+                                <div className="flex-shrink-0 mt-0.5">
+                                    <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-black ${statusKey === "done" ? "border-green-400 bg-green-50 text-green-600" : statusKey === "in-progress" ? "border-orange-300 bg-orange-50 text-orange-600" : "border-gray-300 text-gray-400"}`}>
+                                        {statusKey === "done" ? "OK" : statusKey === "in-progress" ? "▶" : "•"}
                                     </span>
-                                </button>
+                                </div>
                                 <div className="flex-1 min-w-0">
                                     <p className={`font-semibold text-sm ${statusKey === "done" ? portal ? "line-through text-[#8b6b70]" : "line-through text-gray-400" : portal ? "text-[#241416]" : "text-gray-800"}`}>
                                         {task.title}
@@ -196,7 +294,51 @@ export default function UserTasks({ variant = "default" }: { variant?: "default"
                                                 {task.dueDate}
                                             </span>
                                         )}
+                                        {!task.dueDate && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-50 text-gray-500 border border-gray-200">
+                                                Không deadline
+                                            </span>
+                                        )}
+                                        {isToday && statusKey !== "done" && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
+                                                Hôm nay
+                                            </span>
+                                        )}
+                                        {isOverdue && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600 border border-red-100">
+                                                Trễ hạn
+                                            </span>
+                                        )}
                                     </div>
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    {statusKey === "todo" && (
+                                        <button
+                                            onClick={() => setTaskStatus(task.id, "in-progress")}
+                                            disabled={actionLoading}
+                                            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 disabled:opacity-50"
+                                        >
+                                            Bắt đầu
+                                        </button>
+                                    )}
+                                    {statusKey !== "done" && (
+                                        <button
+                                            onClick={() => setTaskStatus(task.id, "done")}
+                                            disabled={actionLoading}
+                                            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+                                        >
+                                            Hoàn thành
+                                        </button>
+                                    )}
+                                    {statusKey === "done" && (
+                                        <button
+                                            onClick={() => setTaskStatus(task.id, "todo")}
+                                            disabled={actionLoading}
+                                            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 disabled:opacity-50"
+                                        >
+                                            Mở lại
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )

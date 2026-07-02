@@ -4,6 +4,7 @@ import { api } from "@/lib/api"
 export interface StaffNotification {
   id: string
   type?: string
+  title?: string
   message: string
   time?: string
   read?: boolean
@@ -20,7 +21,13 @@ export function useNotifications(pollInterval = 30000) {
     setError(null)
     try {
       const data = await api.notifications.list() as StaffNotification[]
-      setItems(data)
+      const all = (data ?? []).sort((a, b) => {
+        const ta = a.time ? new Date(a.time).getTime() : 0
+        const tb = b.time ? new Date(b.time).getTime() : 0
+        return tb - ta
+      })
+
+      setItems(all)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tải được thông báo")
     } finally {
@@ -37,18 +44,18 @@ export function useNotifications(pollInterval = 30000) {
   const unread = items.filter(n => !n.read).length
 
   const markRead = async (id: string) => {
-    await api.notifications.markRead(id)
     setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    await api.notifications.markRead(id)
   }
 
   const markAllRead = async () => {
-    await api.notifications.markAllRead()
     setItems(prev => prev.map(n => ({ ...n, read: true })))
+    await api.notifications.markAllRead()
   }
 
   const deleteItem = async (id: string) => {
-    await api.notifications.delete(id)
     setItems(prev => prev.filter(n => n.id !== id))
+    await api.notifications.delete(id)
   }
 
   return { items, loading, error, unread, reload: () => load(), markRead, markAllRead, deleteItem }

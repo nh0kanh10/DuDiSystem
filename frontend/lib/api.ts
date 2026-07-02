@@ -238,7 +238,7 @@ export const api = {
   },
   profileUpdates: {
     list: (params?: { employeeId?: string; status?: string }) => req<any[]>("GET", `/profile-updates${qs(params)}`),
-    request: (employeeId: string) => req<any>("POST", "/profile-updates/request", { employeeId }),
+    request: (employeeId: string, note?: string) => req<any>("POST", "/profile-updates/request", { employeeId, note }),
     submitDraft: (id: string, pendingData: any) => req<any>("PUT", `/profile-updates/${id}/submit`, { pendingData }),
     approve: (id: string) => req<any>("PUT", `/profile-updates/${id}/approve`),
     reject: (id: string, reworkReason: string) => req<any>("PUT", `/profile-updates/${id}/reject`, { reworkReason }),

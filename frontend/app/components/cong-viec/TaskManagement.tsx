@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { 
-  CheckSquare, Plus, Edit2, Trash2, RefreshCw, Briefcase
+  CheckSquare, Plus, Edit2, Trash2, RefreshCw, Briefcase, X
 } from "lucide-react"
 import { Employee, OrgNode } from "../../types"
 import { api } from "@/lib/api"
@@ -20,6 +20,8 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
   const [selectedDept, setSelectedDept] = useState("all")
   const [selectedEmp, setSelectedEmp] = useState("all")
+  const [selectedStatus, setSelectedStatus] = useState<"all" | "todo" | "in-progress" | "done" | "no-deadline">("all")
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   
   const getTodayVnStr = () => {
     const d = new Date()
@@ -38,7 +40,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     return `${day}/${month}/${year}`
   }
 
-  const [viewMode, setViewMode] = useState<"day" | "range">("day")
+  const [viewMode, setViewMode] = useState<"all" | "day" | "range">("day")
   const [selectedDate, setSelectedDate] = useState(getTodayVnStr())
   const [startDate, setStartDate] = useState(getTodayVnStr())
   const [endDate, setEndDate] = useState(getFutureVnStr(6))
@@ -61,7 +63,9 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   }
 
   const parseVnDate = (s: string) => {
+    if (!s) return null
     const parts = s.split("/").map(Number)
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return null
     return new Date(parts[2], parts[1] - 1, parts[0])
   }
 
@@ -69,6 +73,9 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     try {
       const da = parseVnDate(a)
       const db = parseVnDate(b)
+      if (!da && !db) return 0
+      if (!da) return 1
+      if (!db) return -1
       da.setHours(0, 0, 0, 0)
       db.setHours(0, 0, 0, 0)
       return da.getTime() - db.getTime()
@@ -96,6 +103,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
       const d = parseVnDate(dateStr)
       const start = parseVnDate(startStr)
       const end = parseVnDate(endStr)
+      if (!d || !start || !end) return false
       d.setHours(0, 0, 0, 0)
       start.setHours(0, 0, 0, 0)
       end.setHours(0, 0, 0, 0)
@@ -164,6 +172,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   const handleReloadWithReset = async () => {
     setSelectedDept("all")
     setSelectedEmp("all")
+    setSelectedStatus("all")
     if (viewMode === "day") {
       setSelectedDate(getTodayVnStr())
     } else {
@@ -171,6 +180,24 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
       setEndDate(getFutureVnStr(6))
     }
     await loadData()
+  }
+
+  const handleClearFiltersToToday = async () => {
+    setViewMode("day")
+    setSelectedDept("all")
+    setSelectedEmp("all")
+    setSelectedStatus("all")
+    setSelectedDate(getTodayVnStr())
+    setStartDate(getTodayVnStr())
+    setEndDate(getFutureVnStr(6))
+    await loadData()
+  }
+
+  const handleViewAllTasks = () => {
+    setViewMode("all")
+    setSelectedDept("all")
+    setSelectedEmp("all")
+    setSelectedStatus("all")
   }
 
   const getVnDayOfWeek = (dateStr: string) => {
@@ -203,8 +230,8 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
         {isFirstOfGroup && (
           <td rowSpan={dateGroupLength} className={`px-5 py-3 border-r border-gray-100 align-middle text-left ${bgClass}`}>
             <div className="flex flex-col text-xs font-bold gap-0.5">
-              <span className="text-gray-800 font-mono tracking-tight">{t.dueDate}</span>
-              <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(t.dueDate)}</span>
+              <span className="text-gray-800 font-mono tracking-tight">{t.dueDate || "Không deadline"}</span>
+              {t.dueDate && <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(t.dueDate)}</span>}
             </div>
           </td>
         )}
@@ -307,11 +334,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
       showToast("Vui lòng chọn người thực hiện", "error")
       return
     }
-    if (!form.dueDate) {
-      showToast("Vui lòng chọn ngày giao việc", "error")
-      return
-    }
-
     try {
       if (editingTask) {
         setProcessingId(editingTask.id)
@@ -377,41 +399,47 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
       </div>
 
       <div className="bg-white rounded-2xl p-5 border border-black/5 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 items-end">
-          <div>
-            <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Lọc theo phòng ban</label>
-            <CustomSelect
-              value={selectedDept}
-              onChange={(val) => {
-                setSelectedDept(val)
-                setSelectedEmp("all")
-              }}
-              options={departmentOptions}
-              heightClass="h-[42px]"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Chọn nhân viên</label>
-            <CustomSelect
-              value={selectedEmp}
-              onChange={setSelectedEmp}
-              options={employeeOptions}
-              heightClass="h-[42px]"
-              searchable={true}
-            />
-          </div>
-
-          {viewMode === "day" ? (
-            <div className="md:col-span-2 flex items-end gap-2">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+          {viewMode === "all" ? (
+            <div className="lg:col-span-8 flex items-end gap-2">
+              <div className="flex-1 h-[42px] px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-500 bg-gray-50 flex items-center">
+                Đang hiển thị tất cả công việc (không lọc theo ngày)
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewMode("day")}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Chuyển sang xem theo ngày cụ thể"
+              >
+                Theo ngày
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("range")}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Chuyển sang xem theo khoảng ngày"
+              >
+                Khoảng ngày
+              </button>
+            </div>
+          ) : viewMode === "day" ? (
+            <div className="lg:col-span-8 flex items-end gap-2">
               <div className="flex-1">
-                <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Chọn ngày</label>
+                <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Lọc theo hạn</label>
                 <CustomDatePicker
                   value={selectedDate}
                   onChange={setSelectedDate}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 bg-white h-[42px] focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50/50 transition-all"
                 />
               </div>
+              <button
+                type="button"
+                onClick={handleViewAllTasks}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Xem tất cả công việc"
+              >
+                All
+              </button>
               <button
                 type="button"
                 onClick={() => setViewMode("range")}
@@ -422,7 +450,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
               </button>
             </div>
           ) : (
-            <div className="md:col-span-2 flex items-end gap-2">
+            <div className="lg:col-span-8 flex items-end gap-2">
               <div className="flex-1">
                 <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Từ ngày</label>
                 <CustomDatePicker
@@ -441,6 +469,14 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
               </div>
               <button
                 type="button"
+                onClick={handleViewAllTasks}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Xem tất cả công việc"
+              >
+                All
+              </button>
+              <button
+                type="button"
                 onClick={() => setViewMode("day")}
                 className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
                 title="Chuyển sang xem theo ngày cụ thể"
@@ -450,17 +486,80 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="lg:col-span-4 flex items-center justify-end gap-2">
+            <button
+              onClick={() => setShowAdvancedFilters(v => !v)}
+              className={`h-[42px] px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer ${
+                showAdvancedFilters
+                  ? "border-[#C62828] bg-red-50 text-[#C62828]"
+                  : "border-gray-200 bg-white text-gray-650 hover:bg-gray-50"
+              }`}
+              title="Mở/đóng bộ lọc nâng cao"
+            >
+              {showAdvancedFilters ? "Ẩn lọc nâng cao" : "Lọc nâng cao"}
+            </button>
+            <button
+              onClick={handleClearFiltersToToday}
+              disabled={loading}
+              className="w-[42px] h-[42px] flex items-center justify-center border border-gray-200 hover:bg-gray-50 disabled:bg-gray-100 text-gray-600 rounded-xl transition-all active:scale-95 cursor-pointer shrink-0"
+              title="Xóa lọc, trở về hôm nay mặc định"
+            >
+              <X size={15} />
+            </button>
             <button
               onClick={handleReloadWithReset}
               disabled={loading}
               className="w-[42px] h-[42px] flex items-center justify-center bg-[#C62828] hover:bg-[#B71C1C] disabled:bg-gray-200 text-white rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer shrink-0"
-              title="Đặt lại bộ lọc & Làm mới"
+              title="Làm mới dữ liệu"
             >
               <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
             </button>
           </div>
         </div>
+
+        {showAdvancedFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Lọc theo phòng ban</label>
+              <CustomSelect
+                value={selectedDept}
+                onChange={(val) => {
+                  setSelectedDept(val)
+                  setSelectedEmp("all")
+                }}
+                options={departmentOptions}
+                heightClass="h-[42px]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Chọn nhân viên</label>
+              <CustomSelect
+                value={selectedEmp}
+                onChange={setSelectedEmp}
+                options={employeeOptions}
+                heightClass="h-[42px]"
+                searchable={true}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Lọc trạng thái</label>
+              <CustomSelect
+                value={selectedStatus}
+                onChange={(val) => setSelectedStatus(val as any)}
+                options={[
+                  { value: "all", label: "-- Tất cả trạng thái --" },
+                  { value: "todo", label: "Chưa làm" },
+                  { value: "in-progress", label: "Đang làm" },
+                  { value: "done", label: "Đã xong" },
+                  { value: "no-deadline", label: "Không deadline" },
+                ]}
+                heightClass="h-[42px]"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
@@ -471,7 +570,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                 <th className="px-5 py-3.5 text-left font-black w-16">STT</th>
                 <th className="px-5 py-3.5 text-left font-black w-28">Mã NV</th>
                 <th className="px-5 py-3.5 text-left font-black w-48">Họ Tên</th>
-                <th className="px-5 py-3.5 text-left font-black w-44">Ngày</th>
+                <th className="px-5 py-3.5 text-left font-black w-44">Hạn hoàn thành</th>
                 <th className="px-5 py-3.5 text-left font-black">Công việc</th>
                 <th className="px-5 py-3.5 text-left font-black w-40">Trạng thái</th>
                 <th className="px-5 py-3.5 text-center font-black w-36">Thao tác</th>
@@ -495,6 +594,13 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                 displayEmployees.flatMap((emp, index) => {
                   const empTasks = tasks.filter(t => {
                     if (t.assigneeId !== emp.id) return false
+                    if (selectedStatus === "no-deadline") {
+                      return !t.dueDate
+                    }
+                    if (selectedStatus !== "all" && (t.status || "todo") !== selectedStatus) return false
+                    if (viewMode === "all") {
+                      return true
+                    }
                     if (viewMode === "day") {
                       return t.dueDate === selectedDate
                     } else {
@@ -512,8 +618,10 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                         <td className="px-5 py-4 font-bold text-gray-800 border-r border-gray-100">{emp.name}</td>
                         <td className="px-5 py-4 text-gray-500 font-bold text-xs border-r border-gray-100">
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-gray-800 font-mono">{viewMode === "day" ? selectedDate : startDate}</span>
-                            <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(viewMode === "day" ? selectedDate : startDate)}</span>
+                            <span className="text-gray-800 font-mono">{viewMode === "all" ? "Tất cả" : (viewMode === "day" ? selectedDate : startDate)}</span>
+                            {viewMode !== "all" && (
+                              <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(viewMode === "day" ? selectedDate : startDate)}</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-5 py-4 border-r border-gray-100">
@@ -599,12 +707,21 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
               </div>
 
               <div>
-                <label className="text-xs font-black text-gray-500 mb-1.5 block uppercase tracking-wider">Ngày giao việc</label>
+                <label className="text-xs font-black text-gray-500 mb-1.5 block uppercase tracking-wider">Hạn hoàn thành (deadline)</label>
                 <CustomDatePicker
                   value={form.dueDate}
                   onChange={val => setForm(p => ({ ...p, dueDate: val }))}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-750 bg-white h-[42px] focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50/50 transition-all"
                 />
+                <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-gray-500 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!form.dueDate}
+                    onChange={e => setForm(p => ({ ...p, dueDate: e.target.checked ? "" : getTodayVnStr() }))}
+                    className="w-4 h-4 accent-[#C62828]"
+                  />
+                  Không đặt deadline cho việc này
+                </label>
               </div>
 
               <div>

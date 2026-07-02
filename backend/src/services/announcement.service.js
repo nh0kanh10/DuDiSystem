@@ -7,22 +7,32 @@ function todayVN() {
 
 function parseVNDateTime(s) {
   if (!s) return null
-  const [datePart, timePart] = s.split(" ")
+  const normalized = String(s).trim().replace(",", "").replace(/\s+/g, " ")
+
+  if (normalized.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(normalized)) {
+    const d = new Date(normalized)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+
+  const [datePart, timePart = "00:00"] = normalized.split(" ")
   if (!datePart) return null
   const [dd, mm, yyyy] = datePart.split("/").map(Number)
-  if (timePart) {
-    const [hh, min] = timePart.split(":").map(Number)
-    return new Date(yyyy, mm - 1, dd, hh, min)
-  }
-  return new Date(yyyy, mm - 1, dd)
+  if (!dd || !mm || !yyyy) return null
+
+  const [h, m] = timePart.split(":").map(Number)
+  const hh = Number.isFinite(h) ? h : 0
+  const min = Number.isFinite(m) ? m : 0
+
+  const utcMs = Date.UTC(yyyy, mm - 1, dd, hh - 7, min, 0)
+  return new Date(utcMs)
 }
 
 function computeStatus(a) {
-  const now = new Date()
+  const nowMs = Date.now()
   const start = parseVNDateTime(a.startTime)
   const end = parseVNDateTime(a.endTime)
-  if (end && now > end) return "expired"
-  if (start && now < start) return "scheduled"
+  if (end && nowMs > end.getTime()) return "expired"
+  if (start && nowMs < start.getTime()) return "scheduled"
   return "active"
 }
 

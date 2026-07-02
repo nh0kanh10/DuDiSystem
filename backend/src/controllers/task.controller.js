@@ -20,8 +20,18 @@ export function getOne(req, res) {
 }
 
 export function create(req, res) {
-  if (!canManageTasks(req.user)) return fail(res, "Không có quyền tạo công việc", 403)
-  created(res, svc.createTask(req.body))
+  if (canManageTasks(req.user)) {
+    created(res, svc.createTask(req.body))
+    return
+  }
+  const assigneeId = req.user?.employeeId || req.user?.id
+  if (!assigneeId) return fail(res, "Không xác định được nhân viên thực hiện", 400)
+  const payload = {
+    ...req.body,
+    assigneeId,
+    status: "todo",
+  }
+  created(res, svc.createTask(payload))
 }
 
 export function update(req, res) {

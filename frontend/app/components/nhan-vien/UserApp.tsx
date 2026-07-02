@@ -3,12 +3,12 @@ import {
   User, CalendarDays, ClipboardList, Settings,
   X, CheckCircle2, Lock, Eye, EyeOff, Plus, Home,
   Bell, CheckSquare, Search, Users, Phone, Mail,
-  FileDown, Zap, FileText, Download, Send, Paperclip, Loader2, RefreshCw
+  FileDown, Zap, FileText, Download, Send, Paperclip, Loader2, RefreshCw, Trash2
 } from "lucide-react";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import dudiLogo from "../../../imports/avatar.jpg";
 import { useMyTasks } from "../../hooks/useMyTasks";
-import { useNotifications } from "../../hooks/useNotifications";
+import { useNotifications, type StaffNotification } from "../../hooks/useNotifications";
 import { useEmployeeDirectory } from "../../hooks/useEmployeeDirectory";
 import { hasStaffModule, LIVE_STAFF_BUBBLES, getStaffPortalModules } from "../../utils/staffModules";
 import UserAttendance from "./UserAttendance";
@@ -17,6 +17,8 @@ import LeaveRequestPanel from "../nghi-phep/LeaveRequestPanel";
 import type { Announcement, Employee, WorkHistoryEntry } from "../../types";
 import { api } from "@/lib/api"
 import { CrmStaffPage } from "../crm/CrmStaffPage";
+import { Modal, ModalCancelButton } from "../ui/Modal";
+import { EmployeeModal } from "../nhan-su/EmployeeManagement";
 
 const BRAND = "#E8231A";          // exact DUDI red
 const CRIMSON = "#C01525";          // deeper variant for depth
@@ -408,7 +410,7 @@ function Panel({ activePage, onClose, onLogout, employee, embed = false }: {
             )}
             {activePage === "tasks" && <UserTasks variant="portal" />}
             {activePage === "directory" && <DirectoryContent />}
-            {activePage === "notifications" && <NotificationsContent />}
+            {activePage === "notifications" && <NotificationsContent employee={employee} />}
             {activePage === "settings" && <SettingsContent onLogout={onLogout} embed={embed} />}
             {activePage === "crm" && <CrmStaffContent />}
           </div>
@@ -705,73 +707,566 @@ function CrmStaffContent() {
   );
 }
 
-function NotificationsContent() {
-  const { items, loading, error, unread, markAllRead, markRead, deleteItem, reload } = useNotifications();
+function NotificationsContent({ employee }: { employee: Employee | null }) {
+  const { items, loading: loadingInbox, error: errorInbox, unread, markAllRead, markRead, deleteItem, reload: reloadInbox } = useNotifications();
+  const [activeSubTab, setActiveSubTab] = useState<"inbox" | "admin_req" | "broadcast">("inbox");
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+  const [adminRequests, setAdminRequests] = useState<any[]>([]);
+  const [loadingAdminRequests, setLoadingAdminRequests] = useState(false);
+  const [orgNodes, setOrgNodes] = useState<any[]>([]);
+  const [selectedReq, setSelectedReq] = useState<any | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const loadAnnouncements = () => {
+    setLoadingAnnouncements(true);
+    api.announcements.list()
+      .then((data: any) => {
+        const active = (data || []).filter((item: any) => item.status === "active");
+        setAnnouncements(active);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingAnnouncements(false));
+  };
+
+  const loadAdminRequests = () => {
+    if (!employee?.id) return;
+    setLoadingAdminRequests(true);
+    api.profileUpdates.list({ employeeId: employee.id })
+      .then((data: any) => {
+        const filtered = (data || []).filter((r: any) => ["sent", "rework_requested"].includes(r.status));
+        setAdminRequests(filtered);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingAdminRequests(false));
+  };
+
+  useEffect(() => {
+    api.orgNodes.list().then(setOrgNodes).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (activeSubTab === "broadcast") {
+      loadAnnouncements();
+    } else if (activeSubTab === "admin_req") {
+      loadAdminRequests();
+    }
+  }, [activeSubTab, employee?.id]);
+
+  const handleReload = () => {
+    if (activeSubTab === "inbox") {
+      reloadInbox();
+    } else if (activeSubTab === "admin_req") {
+      loadAdminRequests();
+    } else {
+      loadAnnouncements();
+    }
+  };
+
   const typeColor = (type?: string) => {
-    if (type === "leave" || type === "nghỉ phép") return "#22c55e";
-    if (type === "system" || type === "hệ thống") return "#f59e0b";
-    if (type === "hr" || type === "nhân sự") return "#8b5cf6";
+    const t = (type || "").toLowerCase();
+    if (t === "leave" || t === "nghỉ phép" || t === "event" || t === "sự kiện") return "#8b5cf6";
+    if (t === "system" || t === "hệ thống" || t === "warning" || t === "cảnh báo") return "#f59e0b";
+    if (t === "hr" || t === "nhân sự" || t === "urgent" || t === "khẩn cấp") return "#ef4444";
+    if (t === "info" || t === "thông tin") return "#3b82f6";
     return BRAND;
   };
 
+  const handleSaveProfile = async (form: any) => {
+    if (!selectedReq) return;
+    try {
+      await api.profileUpdates.submitDraft(selectedReq.id, form);
+      setSuccessMsg("Đã gửi hồ sơ cập nhật thành công cho Admin xét duyệt!");
+      setShowEditModal(false);
+      setSelectedReq(null);
+      loadAdminRequests();
+    } catch (err: any) {
+      setErrorMsg("Lỗi gửi hồ sơ: " + err.message);
+    }
+  };
+
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailItem, setDetailItem] = useState<any | null>(null)
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <p style={{ fontSize: 14, color: "#6f565a", fontWeight: 700 }}>
-          {unread > 0 ? `Bạn có ${unread} thông báo chưa đọc` : "Không có thông báo mới"}
+      <div className="flex border-b border-gray-100 mb-2">
+        <button
+          onClick={() => setActiveSubTab("inbox")}
+          className={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition-all ${
+            activeSubTab === "inbox" 
+              ? "border-red-500 text-red-600 font-extrabold" 
+              : "border-transparent text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Tin nhắn cá nhân {unread > 0 && (
+            <span className="ml-1 bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+              {unread}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveSubTab("admin_req")}
+          className={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition-all ${
+            activeSubTab === "admin_req" 
+              ? "border-red-500 text-red-600 font-extrabold" 
+              : "border-transparent text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Yêu cầu từ Admin {adminRequests.length > 0 && (
+            <span className="ml-1 bg-amber-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
+              {adminRequests.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveSubTab("broadcast")}
+          className={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition-all ${
+            activeSubTab === "broadcast" 
+              ? "border-red-500 text-red-600 font-extrabold" 
+              : "border-transparent text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          Bản tin công ty
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between w-full">
+        <p className="text-xs text-[#6f565a] font-bold">
+          {activeSubTab === "inbox" && (unread > 0 ? `Bạn có ${unread} thông báo chưa đọc` : "Không có thông báo mới")}
+          {activeSubTab === "admin_req" && (adminRequests.length > 0 ? `Bạn có ${adminRequests.length} yêu cầu chỉnh sửa thông tin cần xử lý` : "Không có yêu cầu nào từ Admin")}
+          {activeSubTab === "broadcast" && `Có ${announcements.length} bản tin đang hoạt động`}
         </p>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={reload} style={{ background: "none", border: "none", cursor: "pointer", color: "#7a1d22", fontSize: 13, fontWeight: 800 }}>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handleReload} 
+            className="text-xs font-bold text-[#7a1d22] hover:opacity-80 bg-transparent border-none cursor-pointer"
+          >
             Tải lại
           </button>
-          {unread > 0 && (
-            <button onClick={markAllRead} style={{ background: "none", border: "none", color: BRAND, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Đánh dấu đã đọc</button>
+          {activeSubTab === "inbox" && unread > 0 && (
+            <button 
+              onClick={markAllRead} 
+              className="text-xs font-bold text-[#E8231A] hover:opacity-80 bg-transparent border-none cursor-pointer"
+            >
+              Đánh dấu đã đọc
+            </button>
           )}
         </div>
       </div>
 
-      {error && <p style={{ fontSize: 13, color: "#b91c1c" }}>{error}</p>}
+      {activeSubTab === "inbox" && errorInbox && <p style={{ fontSize: 13, color: "#b91c1c" }}>{errorInbox}</p>}
 
-      {loading && (
+      {(activeSubTab === "inbox" ? loadingInbox : activeSubTab === "admin_req" ? loadingAdminRequests : loadingAnnouncements) && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 16, color: "#7f5f63" }}>
           <span style={{ fontSize: 13 }}>Đang tải...</span>
         </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {!loading && items.length === 0 && (
-          <p style={{ fontSize: 13, color: "#7f5f63", textAlign: "center", padding: 16 }}>Chưa có thông báo</p>
-        )}
-        {items.map((n) => {
-          const clr = typeColor(n.type);
-          const isUnread = !n.read;
-          return (
-            <div
-              key={n.id}
-              onClick={() => { if (isUnread) markRead(n.id); }}
-              style={{ display: "flex", gap: 14, padding: "14px", background: isUnread ? "#fff1f2" : "#FFFFFF", border: "1px solid #efd7da", borderRadius: 14, cursor: isUnread ? "pointer" : "default", position: "relative", boxShadow: "0 10px 26px rgba(95,15,22,0.05)" }}
-            >
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: isUnread ? BRAND : "transparent", marginTop: 6, flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  {n.type && (
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6, color: clr, background: `${clr}20` }}>{n.type}</span>
+        {activeSubTab === "inbox" && (
+          <>
+            {!loadingInbox && items.length === 0 && (
+              <p style={{ fontSize: 13, color: "#7f5f63", textAlign: "center", padding: 16 }}>Chưa có thông báo</p>
+            )}
+            {items.map((n) => {
+              const clr = typeColor(n.type);
+              const isUnread = !n.read;
+              return (
+                <div
+                  key={n.id}
+                  onClick={() => {
+                    if (isUnread) markRead(n.id);
+                    setDetailItem(n);
+                    setDetailOpen(true);
+                  }}
+                  className="relative p-5 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-gray-200 transition-all flex gap-4 overflow-hidden cursor-pointer"
+                  style={{
+                    borderLeft: `4px solid ${clr}`
+                  }}
+                >
+                  {isUnread && (
+                    <span className="absolute top-4 right-16 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                   )}
-                  {n.time && <span style={{ fontSize: 11, color: "#8b6b70" }}>{n.time}</span>}
+
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{ 
+                      color: clr, 
+                      background: `${clr}10` 
+                    }}
+                  >
+                    {(() => {
+                      const IconComp = (() => {
+                        const t = (n.type || "").toLowerCase();
+                        if (t === "leave" || t === "nghỉ phép") return CalendarDays;
+                        if (t === "system" || t === "hệ thống") return Zap;
+                        if (t === "hr" || t === "nhân sự") return Users;
+                        return Bell;
+                      })();
+                      return <IconComp size={18} />;
+                    })()}
+                  </div>
+
+                  <div className="flex-1 space-y-2 pr-16">
+                    <div className="flex items-center gap-2">
+                      {n.type && (
+                        <span 
+                          className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded"
+                          style={{ 
+                            color: clr, 
+                            background: `${clr}15`
+                          }}
+                        >
+                          {n.type}
+                        </span>
+                      )}
+                      {n.time && (
+                        <span className="text-[11px] text-gray-400 font-semibold">{n.time}</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      {n.title && (
+                        <h5 className={`text-sm ${isUnread ? 'font-black text-gray-900' : 'font-bold text-gray-800'}`}>
+                          {n.title}
+                        </h5>
+                      )}
+                      <p className={`text-xs leading-relaxed ${isUnread ? 'text-gray-700 font-medium' : 'text-gray-500'} line-clamp-2`}>
+                        {n.message}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="absolute top-4 right-4 flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isUnread) markRead(n.id);
+                        setDetailItem(n);
+                        setDetailOpen(true);
+                      }}
+                      className="p-1.5 hover:bg-gray-50 text-gray-400 hover:text-blue-500 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                      title="Xem chi tiết"
+                    >
+                      <Eye size={15} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteItem(n.id); }}
+                      className="p-1.5 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                      title="Xóa"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
-                <p style={{ fontSize: 14, color: isUnread ? "#241416" : "#5f4246", fontWeight: isUnread ? 800 : 650 }}>{n.message}</p>
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteItem(n.id); }}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#8b6b70", padding: "2px 4px", borderRadius: 6, flexShrink: 0, alignSelf: "center", fontWeight: 750 }}
-                title="Xóa"
-              >
-                Xóa
-              </button>
-            </div>
-          );
-        })}
+              );
+            })}
+          </>
+        )}
+
+        {activeSubTab === "admin_req" && (
+          <>
+            {!loadingAdminRequests && adminRequests.length === 0 && (
+              <p style={{ fontSize: 13, color: "#7f5f63", textAlign: "center", padding: 16 }}>Không có yêu cầu chỉnh sửa hồ sơ</p>
+            )}
+            {adminRequests.map((r) => {
+              const isRework = r.status === "rework_requested";
+              const clr = isRework ? "#ef4444" : "#f59e0b";
+              return (
+                <div
+                  key={r.id}
+                  onClick={() => {
+                    setSelectedReq(r);
+                    setShowEditModal(true);
+                  }}
+                  className="relative p-5 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-gray-200 transition-all flex gap-4 overflow-hidden cursor-pointer"
+                  style={{
+                    borderLeft: `4px solid ${clr}`
+                  }}
+                >
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{ 
+                      color: clr, 
+                      background: `${clr}10` 
+                    }}
+                  >
+                    <FileText size={18} />
+                  </div>
+
+                  <div className="flex-1 space-y-2 pr-12">
+                    <div className="flex items-center gap-2">
+                      <span 
+                        className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded"
+                        style={{ 
+                          color: clr, 
+                          background: `${clr}15`
+                        }}
+                      >
+                        {isRework ? "Yêu cầu chỉnh sửa lại" : "Yêu cầu cập nhật hồ sơ"}
+                      </span>
+                      {r.createdAt && (
+                        <span className="text-[11px] text-gray-400 font-semibold">{r.createdAt}</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <h5 className="text-sm font-bold text-gray-800">
+                        {isRework ? "Admin yêu cầu sửa đổi thông tin bổ sung" : "Admin yêu cầu cập nhật hồ sơ nhân sự"}
+                      </h5>
+                      {isRework && r.reworkReason && (
+                        <div className="bg-red-50/50 border border-red-100 rounded-xl p-3 mt-2">
+                          <span className="text-[10px] text-red-500 font-extrabold uppercase tracking-wider block mb-1">Lý do yêu cầu sửa lại:</span>
+                          <p className="text-xs text-red-700 font-medium leading-relaxed">{r.reworkReason}</p>
+                        </div>
+                      )}
+                      {!isRework && r.note && (
+                        <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-3 mt-2">
+                          <span className="text-[10px] text-amber-600 font-extrabold uppercase tracking-wider block mb-1">Ghi chú từ Admin:</span>
+                          <p className="text-xs text-amber-800 font-medium leading-relaxed">{r.note}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="absolute top-4 right-4 flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedReq(r);
+                        setShowEditModal(true);
+                      }}
+                      className="p-1.5 hover:bg-gray-50 text-gray-400 hover:text-blue-500 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                      title="Chỉnh sửa hồ sơ"
+                    >
+                      <Eye size={15} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
+
+        {activeSubTab === "broadcast" && (
+          <>
+            {!loadingAnnouncements && announcements.length === 0 && (
+              <p style={{ fontSize: 13, color: "#7f5f63", textAlign: "center", padding: 16 }}>Không có bản tin hoạt động</p>
+            )}
+            {announcements.map((a) => {
+              const clr = typeColor(a.type);
+              return (
+                <div
+                  key={a.id}
+                  onClick={() => {
+                    setDetailItem({
+                      id: a.id,
+                      type: a.type,
+                      title: a.title,
+                      message: a.content,
+                      time: a.createdAt || a.startTime,
+                    });
+                    setDetailOpen(true);
+                  }}
+                  className="relative p-5 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-md hover:border-gray-200 transition-all flex gap-4 overflow-hidden cursor-pointer"
+                  style={{
+                    borderLeft: `4px solid ${clr}`
+                  }}
+                >
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
+                    style={{ 
+                      color: clr, 
+                      background: `${clr}10` 
+                    }}
+                  >
+                    {(() => {
+                      const IconComp = (() => {
+                        const t = (a.type || "").toLowerCase();
+                        if (t === "event" || t === "sự kiện") return CalendarDays;
+                        if (t === "urgent" || t === "khẩn cấp" || t === "warning" || t === "cảnh báo") return Zap;
+                        return Bell;
+                      })();
+                      return <IconComp size={18} />;
+                    })()}
+                  </div>
+
+                  <div className="flex-1 space-y-2 pr-12">
+                    <div className="flex items-center gap-2">
+                      {a.type && (
+                        <span 
+                          className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded"
+                          style={{ 
+                            color: clr, 
+                            background: `${clr}15`
+                          }}
+                        >
+                          {a.type}
+                        </span>
+                      )}
+                      {(a.createdAt || a.startTime) && (
+                        <span className="text-[11px] text-gray-400 font-semibold">{a.createdAt || a.startTime}</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      {a.title && (
+                        <h5 className="text-sm font-bold text-gray-800">
+                          {a.title}
+                        </h5>
+                      )}
+                      <p className="text-xs leading-relaxed text-gray-500 line-clamp-2">
+                        {a.content}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="absolute top-4 right-4 flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDetailItem({
+                          id: a.id,
+                          type: a.type,
+                          title: a.title,
+                          message: a.content,
+                          time: a.createdAt || a.startTime,
+                        });
+                        setDetailOpen(true);
+                      }}
+                      className="p-1.5 hover:bg-gray-50 text-gray-400 hover:text-blue-500 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                      title="Xem chi tiết"
+                    >
+                      <Eye size={15} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
+
+      <Modal
+        open={detailOpen}
+        onClose={() => { setDetailOpen(false); setDetailItem(null); }}
+        title="Chi tiết thông báo"
+        icon={Bell}
+        width="xl"
+        bodyClassName="p-6 bg-gray-50/40"
+        footer={
+          <ModalCancelButton onClick={() => { setDetailOpen(false); setDetailItem(null); }} label="Đóng" />
+        }
+      >
+        {detailItem ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                {detailItem.type && (
+                  <span 
+                    className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg"
+                    style={{ 
+                      color: typeColor(detailItem.type), 
+                      background: `${typeColor(detailItem.type)}15`,
+                      border: `1px solid ${typeColor(detailItem.type)}25`
+                    }}
+                  >
+                    {detailItem.type}
+                  </span>
+                )}
+                {detailItem.time && (
+                  <span className="text-xs text-gray-400 font-medium">{detailItem.time}</span>
+                )}
+              </div>
+            </div>
+
+            {detailItem.title && (
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+                <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider block mb-1.5">Tiêu đề thông báo</span>
+                <h4 className="text-sm font-black text-gray-800 leading-snug">
+                  {detailItem.title}
+                </h4>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-2 border-b border-gray-50 pb-1.5">Nội dung chi tiết</span>
+              <p className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">
+                {detailItem.message}
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      {showEditModal && selectedReq && (
+        <EmployeeModal
+          editEmp={employee ? { ...employee, ...(selectedReq.pendingData || {}) } : null}
+          employees={[]}
+          orgNodes={orgNodes}
+          onClose={() => { setShowEditModal(false); setSelectedReq(null); }}
+          onSave={handleSaveProfile}
+        />
+      )}
+
+      {successMsg && (
+        <Modal
+          open={!!successMsg}
+          onClose={() => setSuccessMsg(null)}
+          title="Thành công"
+          icon={CheckCircle2}
+          width="sm"
+          bodyClassName="p-6"
+          footer={
+            <button
+              onClick={() => setSuccessMsg(null)}
+              className="px-6 py-2.5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl text-xs font-bold shadow-sm"
+            >
+              Đồng ý
+            </button>
+          }
+        >
+          <div className="flex flex-col items-center gap-3 py-4">
+            <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center text-green-500">
+              <CheckCircle2 size={28} />
+            </div>
+            <p className="text-sm text-gray-600 text-center font-medium leading-relaxed">
+              {successMsg}
+            </p>
+          </div>
+        </Modal>
+      )}
+
+      {errorMsg && (
+        <Modal
+          open={!!errorMsg}
+          onClose={() => setErrorMsg(null)}
+          title="Thông báo lỗi"
+          icon={X}
+          width="sm"
+          bodyClassName="p-6"
+          footer={
+            <button
+              onClick={() => setErrorMsg(null)}
+              className="px-6 py-2.5 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl text-xs font-bold shadow-sm"
+            >
+              Đóng
+            </button>
+          }
+        >
+          <div className="flex flex-col items-center gap-3 py-4">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-red-500">
+              <X size={28} />
+            </div>
+            <p className="text-sm text-gray-600 text-center font-medium leading-relaxed">
+              {errorMsg}
+            </p>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

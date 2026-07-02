@@ -8,7 +8,7 @@ export const getRequests = (req, res) => {
       status: req.query.status
     }
     const data = ProfileUpdateRequestRepo.getAll(filters)
-    res.json(data)
+    res.json({ data })
   } catch (error) {
     res.status(500).json({ message: "Lỗi lấy danh sách yêu cầu" })
   }
@@ -16,7 +16,7 @@ export const getRequests = (req, res) => {
 
 export const createRequest = (req, res) => {
   try {
-    const { employeeId } = req.body
+    const { employeeId, note } = req.body
     if (!employeeId) return res.status(400).json({ message: "Thiếu employeeId" })
 
     const existing = ProfileUpdateRequestRepo.getAll({ employeeId }).find(r => 
@@ -28,9 +28,10 @@ export const createRequest = (req, res) => {
 
     const newReq = ProfileUpdateRequestRepo.create({
       employeeId,
-      status: "sent"
+      status: "sent",
+      note
     })
-    res.status(201).json(newReq)
+    res.status(201).json({ data: newReq })
   } catch (error) {
     res.status(500).json({ message: "Lỗi tạo yêu cầu" })
   }
@@ -49,7 +50,7 @@ export const submitDraft = (req, res) => {
       pendingData,
       submittedAt: new Date().toLocaleDateString("en-GB")
     })
-    res.json(updated)
+    res.json({ data: updated })
   } catch (error) {
     res.status(500).json({ message: "Lỗi nộp bản nháp" })
   }
@@ -71,7 +72,7 @@ export const approveRequest = (req, res) => {
       status: "approved",
       approvedAt: new Date().toLocaleDateString("en-GB")
     })
-    res.json(updated)
+    res.json({ data: updated })
   } catch (error) {
     res.status(500).json({ message: "Lỗi phê duyệt yêu cầu" })
   }
@@ -89,7 +90,7 @@ export const rejectRequest = (req, res) => {
       status: "rework_requested",
       reworkReason
     })
-    res.json(updated)
+    res.json({ data: updated })
   } catch (error) {
     res.status(500).json({ message: "Lỗi từ chối yêu cầu" })
   }

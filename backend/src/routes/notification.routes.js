@@ -12,6 +12,6 @@ router.get("/", ctrl.list)
 router.post("/", requireAdminOrModule("thong-bao"), requireFields("type", "message"), ctrl.create)
 router.patch("/read-all", ctrl.markAllRead)
 router.patch("/:id/read", ctrl.markRead)
-router.delete("/:id", requireAdminOrModule("thong-bao"), ctrl.remove)
+router.delete("/:id", ctrl.remove)
 
 export default router
