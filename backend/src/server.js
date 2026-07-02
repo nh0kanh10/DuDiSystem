@@ -25,6 +25,7 @@ import roleRoutes from "./routes/role.routes.js"
 import crmRoutes from "./routes/crm.routes.js"
 import allowedIPRoutes from "./routes/allowedIP.routes.js"
 import timeOffSlotRoutes from "./routes/timeOffSlot.routes.js"
+import profileUpdateRoutes from "./routes/profileUpdate.routes.js"
 
 const app = express()
 
@@ -61,6 +62,7 @@ app.use("/api/roles", roleRoutes)
 app.use("/api/crm", crmRoutes)
 app.use("/api/allowed-ips", allowedIPRoutes)
 app.use("/api/time-off-slots", timeOffSlotRoutes)
+app.use("/api/profile-updates", profileUpdateRoutes)
 
 app.use(notFoundHandler)
 app.use(errorHandler)

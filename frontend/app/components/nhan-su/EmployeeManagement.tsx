@@ -887,6 +887,44 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [deleteEmpId, setDeleteEmpId] = useState<string | null>(null)
+  const [profileUpdates, setProfileUpdates] = useState<any[]>([])
+  const [previewReq, setPreviewReq] = useState<any | null>(null)
+
+  useEffect(() => {
+    api.profileUpdates.list().then(setProfileUpdates).catch(() => {})
+  }, [])
+
+  const handleRequestUpdate = async (empId: string) => {
+    try {
+      const res = await api.profileUpdates.request(empId)
+      setProfileUpdates(prev => [...prev, res])
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
+  const handleApproveUpdate = async (id: string) => {
+    try {
+      await api.profileUpdates.approve(id)
+      setProfileUpdates(prev => prev.map(p => p.id === id ? { ...p, status: "approved" } : p))
+      if (previewReq) {
+        setEmployees(prev => prev.map(e => e.id === previewReq.employeeId ? { ...e, ...previewReq.pendingData } : e))
+      }
+      setPreviewReq(null)
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
+  const handleRejectUpdate = async (id: string, reason: string) => {
+    try {
+      await api.profileUpdates.reject(id, reason)
+      setProfileUpdates(prev => prev.map(p => p.id === id ? { ...p, status: "rework_requested", reworkReason: reason } : p))
+      setPreviewReq(null)
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
 
   const branches = useMemo(() => orgNodes.filter(n => n.type === "branch"), [orgNodes])
 
@@ -1083,26 +1121,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/[0.06] space-y-3">
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => onBranchChange?.("all")}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold border transition-all ${selectedBranch === "all" ? "bg-[#C62828] text-white border-[#C62828] shadow-sm" : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"}`}>
-            <Building2 size={14} />
-            Tất cả
-            <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${selectedBranch === "all" ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"}`}>
-              {employees.length}
-            </span>
-          </button>
-          {branches.map(b => (
-            <button key={b.id} onClick={() => onBranchChange?.(b.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold border transition-all ${selectedBranch === b.id ? "bg-[#C62828] text-white border-[#C62828] shadow-sm" : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"}`}>
-              <Building2 size={14} />
-              {b.name}
-              <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${selectedBranch === b.id ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"}`}>
-                {branchCount[b.id] || 0}
-              </span>
-            </button>
-          ))}
-        </div>
+        {/* Removed local branch filters to avoid conflict with global header */}
 
         <div className="flex gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
@@ -1339,6 +1358,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
             {(() => {
               const emp = filtered.find(e => e.id === openMenu)
               if (!emp) return null
+              const updateReq = profileUpdates.find(p => p.employeeId === emp.id && ["sent", "pending_approval", "rework_requested"].includes(p.status))
               return (
                 <>
                   <button onClick={() => { setViewEmp(emp); setOpenMenu(null); setMenuPos(null) }}
@@ -1350,6 +1370,28 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                     <Edit2 size={15} className="text-gray-400" /> Sửa hồ sơ
                   </button>
                   <div className="h-px bg-gray-100 my-1" />
+                  
+                  {/* Profile Update Action */}
+                  {!updateReq && (
+                    <button onClick={() => { handleRequestUpdate(emp.id); setOpenMenu(null); setMenuPos(null) }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 text-sm text-blue-600 transition-colors text-left">
+                      <ClipboardList size={15} className="text-blue-400" /> Yêu cầu cập nhật
+                    </button>
+                  )}
+                  {(updateReq?.status === "sent" || updateReq?.status === "rework_requested") && (
+                    <button disabled
+                      className="w-full flex items-center gap-3 px-4 py-2.5 bg-gray-50 text-sm text-gray-400 transition-colors text-left cursor-not-allowed">
+                      <ClipboardList size={15} /> Đã gửi yêu cầu
+                    </button>
+                  )}
+                  {updateReq?.status === "pending_approval" && (
+                    <button onClick={() => { setPreviewReq(updateReq); setOpenMenu(null); setMenuPos(null) }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50 text-sm text-orange-600 font-bold transition-colors text-left">
+                      <ClipboardList size={15} className="text-orange-400" /> Chờ duyệt hồ sơ
+                    </button>
+                  )}
+                  <div className="h-px bg-gray-100 my-1" />
+
                   <button onClick={() => { handleDelete(emp.id); setOpenMenu(null); setMenuPos(null) }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 text-sm text-red-600 font-medium transition-colors text-left">
                     <Trash2 size={15} className="text-red-400" /> Xóa
@@ -1372,6 +1414,53 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
         cancelText="Hủy"
         type="danger"
       />
+
+      {/* Preview Modal for Profile Update */}
+      {previewReq && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-orange-50/50">
+              <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
+                <ClipboardList className="text-orange-500" size={20} />
+                Duyệt hồ sơ cập nhật
+              </h3>
+              <button onClick={() => setPreviewReq(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-bold text-gray-700 mb-4 text-sm uppercase tracking-wider">Thông tin hiện tại</h4>
+                  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm opacity-70">
+                    <pre className="text-xs text-gray-600 whitespace-pre-wrap font-mono">
+                      {JSON.stringify(employees.find(e => e.id === previewReq.employeeId) || {}, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-bold text-orange-600 mb-4 text-sm uppercase tracking-wider">Thông tin cập nhật</h4>
+                  <div className="bg-white p-4 rounded-xl border border-orange-100 shadow-sm">
+                    <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono">
+                      {JSON.stringify(previewReq.pendingData, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-100 bg-white flex justify-end gap-3">
+              <button onClick={() => handleRejectUpdate(previewReq.id, prompt("Nhập lý do cần sửa lại:") || "Cần sửa lại")}
+                className="px-6 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl text-sm transition-colors">
+                Yêu cầu sửa lại
+              </button>
+              <button onClick={() => handleApproveUpdate(previewReq.id)}
+                className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl text-sm hover:opacity-90 transition-opacity shadow-sm">
+                Duyệt & Lưu hồ sơ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -48,7 +48,8 @@ interface AttendanceRecord {
   department?: string
 }
 
-export default function StatisticsPage({ selectedBranch = "all", currentUserEmail = "", currentUserRole = "user" }: { selectedBranch?: string; currentUserEmail?: string; currentUserRole?: string }) {
+export default function StatisticsPage({ selectedBranch = "all", currentUserEmail = "", currentUserRole = "user", modules = [] as string[] }: { selectedBranch?: string; currentUserEmail?: string; currentUserRole?: string; modules?: string[] }) {
+  const canSelectEmployee = modules.includes("all") || modules.includes("thong-ke")
   const now = useMemo(() => new Date(), [])
   const currentYearStr = useMemo(() => String(now.getFullYear()), [now])
   const currentMonthStr = useMemo(() => String(now.getMonth() + 1).padStart(2, "0"), [now])
@@ -471,7 +472,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
 
   const personalStats = useMemo(() => {
-    const isManagerOrAdmin = currentUserRole === "role-admin" || currentUserRole === "role-super-admin" || currentUserRole === "role-manager"
+    const isManagerOrAdmin = canSelectEmployee
     const empId = isManagerOrAdmin ? personalEmployeeId : (personalEmployeeId || currentEmployeeId)
     if (!empId) return null
     const emp = employees.find(e => e.id === empId)
@@ -769,7 +770,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         )}
 
-        {(currentUserRole === "role-admin" || currentUserRole === "role-super-admin" || currentUserRole === "role-manager") && (
+        {canSelectEmployee && (
           <div className="flex flex-col gap-1.5 min-w-[150px] flex-1 lg:flex-none">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Phòng ban</span>
             <CustomSelect
@@ -783,7 +784,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         )}
 
-        {activeTab === "personal" && (currentUserRole === "role-admin" || currentUserRole === "role-super-admin" || currentUserRole === "role-manager") && (
+        {activeTab === "personal" && canSelectEmployee && (
           <div className="flex flex-col gap-1.5 min-w-[250px] flex-1 lg:flex-none">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Chọn nhân sự</span>
             <CustomCombobox
@@ -951,7 +952,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         ) : (
           <div className="py-12 bg-white rounded-3xl border border-gray-150 text-center text-gray-400 text-sm font-medium">
-            {currentUserRole === "role-admin" || currentUserRole === "role-super-admin" || currentUserRole === "role-manager"
+            {canSelectEmployee
               ? "Vui lòng chọn nhân sự để xem báo cáo chi tiết."
               : "Không tìm thấy thông tin tài khoản nhân sự kết nối với email của bạn."}
           </div>

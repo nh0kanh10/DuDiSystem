@@ -9,7 +9,7 @@ import {
 import UserPortalApp from "./components/nhan-vien/UserApp"
 import UserDashboard from "./components/nhan-vien/UserDashboard"
 import { StaffPortalFab } from "./components/nhan-vien/StaffPortalFab"
-import { canOpenStaffPortal } from "./utils/staffModules"
+import { canOpenStaffPortal, isStaffTypeRole, hasPageAccess } from "./utils/staffModules"
 import ApprovalManagement from "@/app/components/duyet-don/ApprovalManagement"
 import OrgStructure from "./components/co-cau/OrgStructure"
 import UserProfile from "./components/nhan-vien/UserProfile"
@@ -132,6 +132,14 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [rolesList, setRolesList] = useState<RoleDefinition[]>([])
   const [isPageLoading, setIsPageLoading] = useState(false)
+  const [effectivePermissions, setEffectivePermissions] = useState<string[]>(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("dudi_user") || "{}")
+      return Array.isArray(u.effectivePermissions) ? u.effectivePermissions : []
+    } catch {
+      return []
+    }
+  })
 
   useEffect(() => {
     setIsPageLoading(true)
@@ -140,77 +148,11 @@ export default function App() {
   }, [activePage])
 
   const activeRolePermissions = useMemo(() => {
-    const saved = localStorage.getItem("dudi_user")
-    const staffModules = [
-      "user-profile", "user-attendance", "user-timeoff", 
-      "user-directory", "user-chat", "user-workflow", "user-settings", "user-crm"
-    ]
-
-    if (saved) {
-      try {
-        const u = JSON.parse(saved)
-        if (u.permissions && Array.isArray(u.permissions) && u.permissions.length > 0) {
-          if (u.permissions.includes("all")) {
-            return [
-              "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-              "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm", "staff-portal",
-              ...staffModules
-            ]
-          }
-          const userPerms = [...u.permissions]
-          if (!userPerms.includes("staff-portal")) userPerms.push("staff-portal")
-          staffModules.forEach(m => {
-            if (!userPerms.includes(m)) userPerms.push(m)
-          })
-          return userPerms
-        }
-      } catch {}
-    }
-
-    if (role === "role-super-admin") {
-      return [
-        "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm", "staff-portal",
-        ...staffModules
-      ]
-    }
-
+    if (effectivePermissions.length > 0) return effectivePermissions
     const currentRole = rolesList.find(r => r.id === role)
-    if (currentRole) {
-      if (currentRole.modules.includes("all")) {
-        return [
-          "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-          "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "staff-portal",
-          ...staffModules
-        ]
-      }
-      const rolePerms = [...currentRole.modules]
-      if (!rolePerms.includes("staff-portal")) rolePerms.push("staff-portal")
-      staffModules.forEach(m => {
-        if (!rolePerms.includes(m)) rolePerms.push(m)
-      })
-      return rolePerms
-    }
-    if (role === "role-admin") {
-      return [
-        "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "crm", "staff-portal",
-        ...staffModules
-      ]
-    }
-    if (role === "role-manager") {
-      return [
-        "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich", "staff-portal",
-        ...staffModules
-      ]
-    }
-    // Default to role-user:
-    return [
-      "dashboard", "user-profile", "user-attendance", "user-timeoff", 
-      "user-directory", "user-chat", "user-workflow", "cong-viec", "thong-bao", "user-settings", "user-crm", "staff-portal"
-    ]
-  }, [role, rolesList, isLoggedIn])
+    if (currentRole?.modules?.length) return [...currentRole.modules]
+    return []
+  }, [effectivePermissions, rolesList, role])
 
   const roleName = useMemo(() => {
     const currentRole = rolesList.find(r => r.id === role)
@@ -223,33 +165,25 @@ export default function App() {
 
   const isStaffRole = useMemo(() => {
     if (role === "role-user" || role === "user") return true
-    if (role === "role-admin" || role === "role-manager" || role === "role-super-admin" || role === "admin" || role === "manager") return false
-    const currentRole = rolesList.find(r => r.id === role)
-    if (currentRole) {
-      return (currentRole as any).roleType === "staff" || currentRole.scopeType === "self"
-    }
-    return false
+    return isStaffTypeRole(rolesList.find(r => r.id === role))
   }, [role, rolesList])
 
   useEffect(() => {
-    if (isLoggedIn && activeRolePermissions.length > 0 && activePage !== "dashboard" && activePage !== "staff-portal") {
-      if (!activeRolePermissions.includes(activePage)) {
-        setActivePage("dashboard")
-      }
+    if (isLoggedIn && activeRolePermissions.length > 0 && !hasPageAccess(activeRolePermissions, activePage)) {
+      setActivePage(isStaffRole ? "staff-portal" : "dashboard")
     }
-  }, [activePage, activeRolePermissions, isLoggedIn])
+  }, [activePage, activeRolePermissions, isLoggedIn, isStaffRole])
 
   useEffect(() => {
     if (!isLoggedIn) {
       if (location.pathname !== "/login") {
         navigate("/login")
       }
-    } else {
-      if (location.pathname === "/login" || location.pathname === "/") {
-        navigate("/dashboard")
-      }
+    } else if (location.pathname === "/login" || location.pathname === "/") {
+      const target = hasPageAccess(activeRolePermissions, "dashboard") ? "/dashboard" : "/staff-portal"
+      navigate(target)
     }
-  }, [isLoggedIn, location.pathname, navigate])
+  }, [isLoggedIn, location.pathname, navigate, activeRolePermissions])
 
   // ─── LẮNG NGHE SỰ KIỆN HẾT HẠN TOKEN TOÀN CỤC (401) ───
   useEffect(() => {
@@ -324,7 +258,7 @@ export default function App() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
-  
+
   const [selectedBranch, setSelectedBranch] = useState(() => {
     const saved = localStorage.getItem("dudi_user")
     if (saved) {
@@ -337,7 +271,7 @@ export default function App() {
     }
     return "all"
   })
-  
+
   const branches = orgNodes.filter(n => n.type === "branch")
 
   const fetchRequests = () => {
@@ -358,6 +292,9 @@ export default function App() {
         localStorage.setItem("dudi_user", JSON.stringify(user))
         setRole(user.roleId || "role-admin")
         setLoggedEmail(user.employeeId || user.email || "")
+        if (Array.isArray((user as any).effectivePermissions)) {
+          setEffectivePermissions((user as any).effectivePermissions)
+        }
       }
     }).catch(err => console.error("Lỗi tải thông tin tài khoản:", err))
   }
@@ -404,7 +341,7 @@ export default function App() {
 
   useEffect(() => {
     if (isLoggedIn && role === "role-manager" && orgNodes.length > 0) {
-      const emp = employees.find(e => 
+      const emp = employees.find(e =>
         (e.email || "").toLowerCase() === (loggedEmail || "").toLowerCase() ||
         (e.id || "").toLowerCase() === (loggedEmail || "").toLowerCase()
       )
@@ -427,18 +364,23 @@ export default function App() {
         setRole(r)
         setLoggedEmail(user.employeeId || user.email || email)
         setSelectedBranch(user.branchId || "all")
+        if (Array.isArray(user.effectivePermissions)) {
+          setEffectivePermissions(user.effectivePermissions)
+        }
         setIsLoggedIn(true)
         resetSessionTouchClock()
         touchSession()
+        const perms = Array.isArray(user.effectivePermissions) ? user.effectivePermissions : []
+        navigate(hasPageAccess(perms, "dashboard") ? "/dashboard" : "/staff-portal")
       }
     } catch (e) {
       console.error("Backend login failed:", e)
       const isConnectionError = e instanceof Error && (
-        e.message.includes("Failed to fetch") || 
-        e.message.includes("fetch failed") || 
+        e.message.includes("Failed to fetch") ||
+        e.message.includes("fetch failed") ||
         e.message.includes("NetworkError")
       )
-      const errorMsg = isConnectionError 
+      const errorMsg = isConnectionError
         ? "Không thể kết nối tới backend. Hãy chắc chắn backend đang chạy tại http://localhost:3001"
         : (e instanceof Error ? e.message : "Đăng nhập thất bại")
       setLoginError(errorMsg)
@@ -453,6 +395,7 @@ export default function App() {
     setIsLoggedIn(false)
     setRole("role-admin")
     setLoggedEmail("")
+    setEffectivePermissions([])
     setSelectedBranch("all")
     // Chuyển hướng sẽ do useEffect tự động xử lý khi isLoggedIn chuyển sang false
   }
@@ -478,17 +421,22 @@ export default function App() {
     )
   }
 
-  const matchedEmp = employees.find(e => 
-    (e.id || "").toLowerCase() === (loggedEmail || "").toLowerCase() || 
+  const matchedEmp = employees.find(e =>
+    (e.id || "").toLowerCase() === (loggedEmail || "").toLowerCase() ||
     (e.email || "").toLowerCase() === (loggedEmail || "").toLowerCase()
   )
+  let profileUser: { name?: string; email?: string; employeeId?: string; position?: string; department?: string } = {}
+  try {
+    profileUser = JSON.parse(localStorage.getItem("dudi_user") || "{}")
+  } catch { /* ignore */ }
+  const isAdminRole = role === "role-admin" || role === "role-super-admin"
   const currentEmp: Employee = matchedEmp || {
-    id: loggedEmail || "—",
-    name: role === "admin" ? "Quản trị viên" : "Nhân viên",
-    email: loggedEmail || "—",
+    id: loggedEmail || profileUser.employeeId || "—",
+    name: profileUser.name || (isAdminRole ? "Quản trị viên" : "Nhân viên"),
+    email: loggedEmail || profileUser.email || "—",
     phone: "—",
-    department: "Ban điều hành",
-    position: role === "admin" ? "System Admin" : "Nhân sự",
+    department: profileUser.department || "Ban điều hành",
+    position: profileUser.position || (isAdminRole ? "System Admin" : "Nhân sự"),
     joinDate: "—",
     status: "active" as "active" | "inactive" | "intern",
     contractType: "Chính thức",
@@ -503,30 +451,30 @@ export default function App() {
   }
 
   const renderPage = () => {
-    if (activePage !== "dashboard" && activePage !== "staff-portal" && activeRolePermissions.length > 0 && !activeRolePermissions.includes(activePage)) {
+    if (!hasPageAccess(activeRolePermissions, activePage)) {
       return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
     }
     switch (activePage) {
       case "dashboard": return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
       case "nhan-su": return <EmployeeManagement employees={employees} setEmployees={setEmployees} orgNodes={orgNodes} selectedBranch={selectedBranch} onBranchChange={setSelectedBranch} />
       case "co-cau": return (
-        <OrgStructure 
-          employees={employees} 
-          setEmployees={setEmployees} 
+        <OrgStructure
+          employees={employees}
+          setEmployees={setEmployees}
           assignments={assignments}
           setAssignments={setAssignments}
-          orgNodes={orgNodes} 
-          setOrgNodes={setOrgNodes} 
-          selectedNodeId={selectedNodeId} 
-          setSelectedNodeId={setSelectedNodeId} 
-          selectedBranch={selectedBranch} 
-          currentUserEmail={loggedEmail} 
+          orgNodes={orgNodes}
+          setOrgNodes={setOrgNodes}
+          selectedNodeId={selectedNodeId}
+          setSelectedNodeId={setSelectedNodeId}
+          selectedBranch={selectedBranch}
+          currentUserEmail={loggedEmail}
           currentUserRole={role}
           onAddEmployee={() => setGlobalAddEmpOpen(true)}
         />
       )
       case "cham-cong": return <AttendanceManagement selectedBranch={selectedBranch} />
-      case "thong-ke": return <StatisticsPage selectedBranch={selectedBranch} currentUserEmail={loggedEmail} currentUserRole={role} />
+      case "thong-ke": return <StatisticsPage selectedBranch={selectedBranch} currentUserEmail={loggedEmail} currentUserRole={role} modules={activeRolePermissions} />
       case "thong-bao": return <NotificationManagement />
       case "duyet-don": return <ApprovalManagement selectedBranch={selectedBranch} onRequestsUpdated={fetchRequests} />
       case "tai-khoan": return <AccountManagement selectedBranch={selectedBranch} currentUserEmail={loggedEmail} currentUserRole={role} mode="accounts" />
@@ -564,78 +512,78 @@ export default function App() {
 
   return (
     <>
-    {sessionAlertMsg && (
-      <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
-    )}
-    <div className="flex h-screen bg-[#F5F1EF] overflow-hidden" onClick={() => { }}>
-      <UserAwareSidebar active={activePage} onNavigate={setActivePage}
-        collapsed={sidebarCollapsed} role={role} roleName={roleName} modules={activeRolePermissions} onLogout={handleLogout}
-        pendingRequestsCount={pendingRequestsCount} />
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <Header
-          onToggle={() => setSidebarCollapsed(p => !p)}
-          unread={unreadNotifs}
-          onMarkAllRead={() => setUnreadNotifCount(0)}
-          currentUser={currentUserInfo}
-          onLogout={handleLogout}
-          onNavigate={setActivePage}
-          selectedBranch={selectedBranch}
-          onBranchChange={setSelectedBranch}
-          branches={branches}
-        />
-        <main className="flex-1 overflow-y-auto p-5 relative"
-          style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
-          {isPageLoading && (
-            <div className="absolute top-0 left-0 right-0 h-0.5 z-[100] overflow-hidden pointer-events-none">
-              <div className="h-full bg-gradient-to-r from-[#C62828] to-[#E64A19] animate-[loadingBar_0.4s_ease-out_forwards]" />
+      {sessionAlertMsg && (
+        <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
+      )}
+      <div className="flex h-screen bg-[#F5F1EF] overflow-hidden" onClick={() => { }}>
+        <UserAwareSidebar active={activePage} onNavigate={setActivePage}
+          collapsed={sidebarCollapsed} role={role} roleName={roleName} modules={activeRolePermissions} onLogout={handleLogout}
+          pendingRequestsCount={pendingRequestsCount} />
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <Header
+            onToggle={() => setSidebarCollapsed(p => !p)}
+            unread={unreadNotifs}
+            onMarkAllRead={() => setUnreadNotifCount(0)}
+            currentUser={currentUserInfo}
+            onLogout={handleLogout}
+            onNavigate={setActivePage}
+            selectedBranch={selectedBranch}
+            onBranchChange={setSelectedBranch}
+            branches={branches}
+          />
+          <main className="flex-1 overflow-y-auto p-5 relative"
+            style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
+            {isPageLoading && (
+              <div className="absolute top-0 left-0 right-0 h-0.5 z-[100] overflow-hidden pointer-events-none">
+                <div className="h-full bg-gradient-to-r from-[#C62828] to-[#E64A19] animate-[loadingBar_0.4s_ease-out_forwards]" />
+              </div>
+            )}
+            <div key={activePage} className="page-enter-active">
+              {renderPage()}
             </div>
-          )}
-          <div key={activePage} className="page-enter-active">
-            {renderPage()}
-          </div>
-          {globalAddEmpOpen && (
-            <EmployeeModal
-              editEmp={null}
-              employees={employees}
-              orgNodes={orgNodes}
-              onClose={() => setGlobalAddEmpOpen(false)}
-              onSave={async (form) => {
-                const snapshotDate = new Date().toISOString().split("T")[0].split("-").reverse().join("/")
-                const path = []
-                let curr = orgNodes.find(n => n.id === form.orgNodeId)
-                while (curr) {
-                  path.push(curr.name)
-                  const pId = curr.parentId
-                  curr = pId ? orgNodes.find(n => n.id === pId) : undefined
-                }
-                const snapshot = path.reverse().join(" · ")
+            {globalAddEmpOpen && (
+              <EmployeeModal
+                editEmp={null}
+                employees={employees}
+                orgNodes={orgNodes}
+                onClose={() => setGlobalAddEmpOpen(false)}
+                onSave={async (form) => {
+                  const snapshotDate = new Date().toISOString().split("T")[0].split("-").reverse().join("/")
+                  const path = []
+                  let curr = orgNodes.find(n => n.id === form.orgNodeId)
+                  while (curr) {
+                    path.push(curr.name)
+                    const pId = curr.parentId
+                    curr = pId ? orgNodes.find(n => n.id === pId) : undefined
+                  }
+                  const snapshot = path.reverse().join(" · ")
 
-                const joinEntry = {
-                  id: 1,
-                  type: "join" as const,
-                  date: form.joinDate || snapshotDate,
-                  toDate: "",
-                  title: form.position || "Nhân viên",
-                  orgNodeId: form.orgNodeId,
-                  snapshot: snapshot,
-                  note: "Tiếp nhận nhân sự mới"
-                }
-                const finalForm = { ...form, workHistory: [joinEntry] }
+                  const joinEntry = {
+                    id: 1,
+                    type: "join" as const,
+                    date: form.joinDate || snapshotDate,
+                    toDate: "",
+                    title: form.position || "Nhân viên",
+                    orgNodeId: form.orgNodeId,
+                    snapshot: snapshot,
+                    note: "Tiếp nhận nhân sự mới"
+                  }
+                  const finalForm = { ...form, workHistory: [joinEntry] }
 
-                try {
-                  const created = await api.employees.create(finalForm) as Employee
-                  setEmployees(prev => [...prev, created])
-                } catch {
-                  const newId = `NV${String(employees.length + 1).padStart(3, "0")}`
-                  setEmployees(prev => [...prev, { id: newId, ...finalForm } as Employee])
-                }
-                setGlobalAddEmpOpen(false)
-              }}
-            />
-          )}
-        </main>
+                  try {
+                    const created = await api.employees.create(finalForm) as Employee
+                    setEmployees(prev => [...prev, created])
+                  } catch {
+                    const newId = `NV${String(employees.length + 1).padStart(3, "0")}`
+                    setEmployees(prev => [...prev, { id: newId, ...finalForm } as Employee])
+                  }
+                  setGlobalAddEmpOpen(false)
+                }}
+              />
+            )}
+          </main>
+        </div>
       </div>
-    </div>
     </>
   )
 }
@@ -766,7 +714,7 @@ function Header({ onToggle, unread, onMarkAllRead, currentUser, onLogout, onNavi
                     </button>
                   ))}
                 </div>
-                {currentUser.role === "role-admin" && (
+                {(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") && (
                   <div className="border-t border-gray-100 p-2">
                     <button onClick={() => { setShowNotifDrop(false); onNavigate("thong-bao") }}
                       className="w-full text-center text-xs font-bold text-[#C62828] py-2 hover:bg-red-50 rounded-xl transition-colors">
@@ -900,7 +848,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
   const [expanded, setExpanded] = useState<string[]>(["nhan-su"])
   const toggle = (k: string) => setExpanded(p => p.includes(k) ? p.filter(x => x !== k) : [...p, k])
 
-  const hasAccess = (moduleKey: string) => modules.includes(moduleKey)
+  const hasAccess = (moduleKey: string) => hasPageAccess(modules, moduleKey)
 
   return (
     <aside className={`${collapsed ? "w-16" : "w-60"} bg-[#160606] flex flex-col transition-all duration-300 flex-shrink-0 overflow-hidden relative z-40`}>

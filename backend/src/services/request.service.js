@@ -147,7 +147,13 @@ function withEmployee(req) {
 
 export function listRequests(filter) {
   autoCancelExpiredRequests()
-  return repo.getAll(filter).map(withEmployee)
+  let rows = repo.getAll(filter)
+  if (filter.branchId && filter.branchId !== "all") {
+    const employees = empRepo.getAll({ branchId: filter.branchId })
+    const empIds = new Set(employees.map(e => e.id))
+    rows = rows.filter(r => empIds.has(r.employeeId))
+  }
+  return rows.map(withEmployee)
 }
 
 export function getRequest(id) {

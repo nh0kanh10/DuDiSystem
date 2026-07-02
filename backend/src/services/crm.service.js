@@ -201,12 +201,29 @@ export function getAdminDashboard() {
     if (["Trả lời"].includes(r.status)) empMap[r.assignedTo].converted++
   })
 
+  const employeeStats = Object.values(empMap).sort((a, b) => b.total - a.total)
+  const employeeProgress = employeeStats.map(emp => ({
+    employeeId: emp.employeeId,
+    employeeName: emp.employeeName,
+    // Frontend expects: totalAssigned / completedCount / processingCount
+    totalAssigned: emp.total,
+    completedCount: emp.converted,
+    processingCount: Math.max(emp.total - emp.converted, 0),
+  }))
+
   return {
     totalData: all.length,
+    // Old keys (kept for backward compatibility)
     assigned,
     unassigned: all.length - assigned,
     statusBreakdown,
-    employeeStats: Object.values(empMap).sort((a, b) => b.total - a.total)
+    employeeStats,
+
+    // Client contract (CrmAdminPage)
+    assignedData: assigned,
+    unassignedData: all.length - assigned,
+    statusCounts: statusBreakdown,
+    employeeProgress,
   }
 }
 
@@ -215,7 +232,24 @@ export function getEmployeeDashboard(employeeId) {
   const statusBreakdown = {}
   CRM_STATUSES.forEach(s => { statusBreakdown[s] = 0 })
   myRecords.forEach(r => { if (statusBreakdown[r.status] !== undefined) statusBreakdown[r.status]++ })
-  return { total: myRecords.length, statusBreakdown }
+  const totalAssigned = myRecords.length
+  const untreatedCount = statusBreakdown["Chưa xử lý"] ?? 0
+  const completedCount = statusBreakdown["Trả lời"] ?? 0
+  // "Đã gửi" here means: processed but not replied yet.
+  const processingCount = Math.max(totalAssigned - untreatedCount - completedCount, 0)
+
+  return {
+    // Old keys (kept for backward compatibility)
+    total: totalAssigned,
+    statusBreakdown,
+
+    // Client contract (CrmStaffPage)
+    totalAssigned,
+    untreatedCount,
+    processingCount,
+    completedCount,
+    statusCounts: statusBreakdown,
+  }
 }
 
 export function listMyRecords(employeeId, { status, search, page = 0, size = 20 } = {}) {

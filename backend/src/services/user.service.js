@@ -4,6 +4,7 @@ import * as raRepo from "../repositories/roleAssignment.repository.js"
 import * as orgRepo from "../repositories/orgNode.repository.js"
 import * as roleRepo from "../repositories/role.repository.js"
 import bcrypt from "bcryptjs"
+import { resolveClientPermissions, bumpPermissionsVersion } from "../utils/access.js"
 
 export function resolveBranchId(userId) {
   if (!userId) return "all"
@@ -115,6 +116,10 @@ export function updateUser(id, patch) {
   const updated = repo.update(id, safePatch)
   if (!updated) throw new Error("Không tìm thấy tài khoản")
 
+  if ("permissions" in safePatch || "roleId" in safePatch || patch.scopeId !== undefined) {
+    bumpPermissionsVersion(id)
+  }
+
   if (safePatch.roleId || patch.scopeId !== undefined) {
     const roleId = safePatch.roleId || updated.roleId
     const roleObj = roleRepo.getById(roleId)
@@ -197,6 +202,7 @@ export function enrichUserProfile(user) {
     branchId,
     branchName,
     assignments,
+    effectivePermissions: resolveClientPermissions(user),
   }
 }
 

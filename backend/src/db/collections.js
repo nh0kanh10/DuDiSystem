@@ -19,4 +19,5 @@ export const COLLECTIONS = [
   "jobPostings",
   "candidates",
   "timeOffSlots",
+  "profileUpdateRequests"
 ]

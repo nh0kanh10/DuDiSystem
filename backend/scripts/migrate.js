@@ -26,6 +26,12 @@ async function migrateCollection(collection) {
   if (data.length > 0) {
     await Model.insertMany(data)
   }
+  try {
+    const indexes = await Model.collection.indexes()
+    const idIdx = indexes.find(i => i.name === "id_1")
+    if (idIdx && !idIdx.unique) await Model.collection.dropIndex("id_1")
+  } catch { /* first run or already unique */ }
+  await Model.collection.createIndex({ id: 1 }, { unique: true, sparse: true })
 
   console.log(`  ${collection}: ${data.length} documents`)
   return data.length

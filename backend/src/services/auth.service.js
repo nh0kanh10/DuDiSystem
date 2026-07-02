@@ -17,6 +17,7 @@ function tokenPayload(user, branchId) {
     roleId: user.roleId,
     branchId,
     permissions: user.permissions || null,
+    permissionsVersion: user.permissionsVersion ?? 0,
   }
 }
 

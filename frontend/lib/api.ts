@@ -236,6 +236,13 @@ export const api = {
     update: (id: string, data: any) => req<any>("PUT", `/positions/${id}`, data),
     delete: (id: string) => req<any>("DELETE", `/positions/${id}`),
   },
+  profileUpdates: {
+    list: (params?: { employeeId?: string; status?: string }) => req<any[]>("GET", `/profile-updates${qs(params)}`),
+    request: (employeeId: string) => req<any>("POST", "/profile-updates/request", { employeeId }),
+    submitDraft: (id: string, pendingData: any) => req<any>("PUT", `/profile-updates/${id}/submit`, { pendingData }),
+    approve: (id: string) => req<any>("PUT", `/profile-updates/${id}/approve`),
+    reject: (id: string, reworkReason: string) => req<any>("PUT", `/profile-updates/${id}/reject`, { reworkReason }),
+  },
 }
 
 export function saveToken(t: string) {

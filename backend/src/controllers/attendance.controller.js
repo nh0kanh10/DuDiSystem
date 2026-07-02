@@ -1,6 +1,6 @@
 import * as svc from "../services/attendance.service.js"
 import { ok, created, notFound, fail } from "../utils/response.js"
-import { canViewAllAttendance } from "../utils/access.js"
+import { canViewAllAttendance, enforceBranchQuery, assertEmployeeInScope } from "../utils/access.js"
 
 function assertRecordAccess(user, record) {
   if (!record) return null
@@ -17,17 +17,21 @@ function employeeIdFromRecordId(id, record) {
 }
 
 export function list(req, res) {
-  const filter = { ...req.query }
+  let filter = { ...req.query }
   if (!canViewAllAttendance(req.user)) {
     filter.employeeId = req.user.employeeId
+  } else {
+    filter = enforceBranchQuery(req.user, filter)
   }
   ok(res, svc.listAttendance(filter))
 }
 
 export function stats(req, res) {
-  const filter = { ...req.query }
+  let filter = { ...req.query }
   if (!canViewAllAttendance(req.user)) {
     filter.employeeId = req.user.employeeId
+  } else {
+    filter = enforceBranchQuery(req.user, filter)
   }
   ok(res, svc.getAttendanceStats(filter))
 }
@@ -62,6 +66,9 @@ export function create(req, res) {
   const body = { ...req.body, ip, reqUser: req.user }
   if (!canViewAllAttendance(req.user)) {
     body.employeeId = req.user.employeeId
+  } else if (body.employeeId) {
+    const denied = assertEmployeeInScope(req.user, body.employeeId)
+    if (denied) return fail(res, denied.error, denied.status)
   }
 
   const result = svc.createAttendance(body)

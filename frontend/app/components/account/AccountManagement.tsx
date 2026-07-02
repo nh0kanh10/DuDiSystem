@@ -28,7 +28,19 @@ interface RoleDefinition {
   name: string
   isSystem: boolean
   scopeType: "company" | "branch" | "self"
+  roleType?: "management" | "staff" | "admin" | "manager"
   modules: string[]
+}
+
+import { isStaffTypeRole } from "../../utils/staffModules"
+
+const ADMIN_MODULE_IDS = new Set([
+  "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don",
+  "tai-khoan", "phan-quyen", "ip", "thong-ke", "du-an", "tien-ich", "crm",
+])
+
+function stripAdminModules(modules: string[]): string[] {
+  return modules.filter(id => !ADMIN_MODULE_IDS.has(id))
 }
 
 const MODULE_TREE = [
@@ -236,6 +248,8 @@ export default function AccountManagement({
           setSelectedCustomUser(activeUser)
           setRolePermissions(activeUser.permissions)
           setSelectedRole(null)
+          const userRole = rList.find((r: any) => r.id === activeUser.roleId)
+          setPermTab(isStaffTypeRole(userRole) ? "staff" : "management")
           return
         }
       }
@@ -246,6 +260,7 @@ export default function AccountManagement({
         setSelectedRole(target)
         setSelectedCustomUser(null)
         setRolePermissions(target.modules || [])
+        setPermTab(isStaffTypeRole(target) ? "staff" : "management")
       }
     } catch (err: any) {
       showToast(err.message || "Lỗi tải dữ liệu", "error")
@@ -266,22 +281,15 @@ export default function AccountManagement({
     setSelectedRole(roleItem)
     setSelectedCustomUser(null)
     setRolePermissions(roleItem.modules || [])
-    if (roleItem.id === "role-admin" || roleItem.id === "role-manager") {
-      setPermTab("management")
-    } else if (roleItem.id === "role-user") {
-      setPermTab("staff")
-    }
+    setPermTab(isStaffTypeRole(roleItem) ? "staff" : "management")
   }
 
   const handleCustomUserSelect = (userItem: UserRecord) => {
     setSelectedCustomUser(userItem)
     setSelectedRole(null)
     setRolePermissions(userItem.permissions || [])
-    if (userItem.roleId === "role-admin" || userItem.roleId === "role-manager") {
-      setPermTab("management")
-    } else if (userItem.roleId === "role-user") {
-      setPermTab("staff")
-    }
+    const userRole = rolesList.find(r => r.id === userItem.roleId)
+    setPermTab(isStaffTypeRole(userRole) ? "staff" : "management")
   }
 
   const customAccounts = useMemo(() => {
@@ -291,6 +299,32 @@ export default function AccountManagement({
   const accountsWithoutCustom = useMemo(() => {
     return accounts.filter(a => !a.permissions || a.permissions.length === 0)
   }, [accounts])
+
+  const isSelectedRoleOrUserStaff = useMemo(() => {
+    if (selectedRole) return isStaffTypeRole(selectedRole)
+    if (selectedCustomUser) {
+      const userRole = rolesList.find(r => r.id === selectedCustomUser.roleId)
+      return isStaffTypeRole(userRole)
+    }
+    return false
+  }, [selectedRole, selectedCustomUser, rolesList])
+
+  const effectivePermTab = isSelectedRoleOrUserStaff ? "staff" : permTab
+
+  const isModalRoleStaff = useMemo(() => {
+    const r = rolesList.find(x => x.id === form.roleId)
+    return isStaffTypeRole(r)
+  }, [form.roleId, rolesList])
+
+  const effectiveModalPermTab = isModalRoleStaff ? "staff" : modalPermTab
+
+  useEffect(() => {
+    if (isSelectedRoleOrUserStaff) setPermTab("staff")
+  }, [isSelectedRoleOrUserStaff, selectedRole?.id, selectedCustomUser?.id])
+
+  useEffect(() => {
+    if (isModalRoleStaff) setModalPermTab("staff")
+  }, [isModalRoleStaff, form.roleId])
 
   const filteredAccountsToAdd = useMemo(() => {
     return accountsWithoutCustom.filter(acc => {
@@ -351,7 +385,19 @@ export default function AccountManagement({
   const handleSavePermissions = async () => {
     if (!selectedRole && !selectedCustomUser) return
     try {
-      const finalPermissions = rolePermissions.includes("user-settings") ? rolePermissions : [...rolePermissions, "user-settings"]
+      let finalPermissions = rolePermissions.includes("user-settings")
+        ? rolePermissions
+        : [...rolePermissions, "user-settings"]
+
+      if (selectedRole && isStaffTypeRole(selectedRole)) {
+        finalPermissions = stripAdminModules(finalPermissions)
+      } else if (selectedCustomUser) {
+        const userRole = rolesList.find(r => r.id === selectedCustomUser.roleId)
+        if (isStaffTypeRole(userRole)) {
+          finalPermissions = stripAdminModules(finalPermissions)
+        }
+      }
+
       if (selectedRole) {
         await api.roles.update(selectedRole.id, {
           name: selectedRole.name,
@@ -445,6 +491,7 @@ export default function AccountManagement({
       loadData()
       setSelectedRole(created)
       setRolePermissions(created.modules)
+      setPermTab(isStaffTypeRole(created) ? "staff" : "management")
     } catch (err: any) {
       showToast(err.message || "Lỗi tạo vai trò", "error")
     }
@@ -542,10 +589,11 @@ export default function AccountManagement({
     if (roleObj) {
       setCustomPermissions(roleObj.modules || [])
     }
-    if (targetRole === "role-admin" || targetRole === "role-manager") {
-      setModalPermTab("management")
-    } else if (targetRole === "role-user") {
+    const isStaff = isStaffTypeRole(roleObj)
+    if (isStaff) {
       setModalPermTab("staff")
+    } else {
+      setModalPermTab("management")
     }
   }
 
@@ -1170,16 +1218,18 @@ export default function AccountManagement({
 
                 {/* Tab Switcher */}
                 <div className="flex gap-2 border-b border-gray-100 pb-3">
-                  <button
-                    type="button"
-                    onClick={() => setPermTab("management")}
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${permTab === "management"
-                        ? "bg-[#C62828] text-white shadow-xs"
-                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                      }`}
-                  >
-                    Quyền Quản lý / Admin
-                  </button>
+                  {!isSelectedRoleOrUserStaff && (
+                    <button
+                      type="button"
+                      onClick={() => setPermTab("management")}
+                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${permTab === "management"
+                          ? "bg-[#C62828] text-white shadow-xs"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        }`}
+                    >
+                      Quyền Quản lý / Admin
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setPermTab("staff")}
@@ -1193,7 +1243,7 @@ export default function AccountManagement({
                 </div>
 
                 <div className="border border-gray-150 rounded-2xl overflow-hidden divide-y divide-gray-100">
-                  {(permTab === "management" ? MODULE_TREE : STAFF_MODULE_TREE).map(group => {
+                  {(effectivePermTab === "management" ? MODULE_TREE : STAFF_MODULE_TREE).map(group => {
                     const isExpanded = expandedGroups.includes(group.id)
                     const groupChildIds = group.children.map(c => c.id)
 
@@ -1333,10 +1383,11 @@ export default function AccountManagement({
                       if (roleObj) {
                         setCustomPermissions(roleObj.modules || [])
                       }
-                      if (nextRole === "role-admin" || nextRole === "role-manager") {
-                        setModalPermTab("management")
-                      } else if (nextRole === "role-user") {
+                      const isStaff = isStaffTypeRole(roleObj)
+                      if (isStaff) {
                         setModalPermTab("staff")
+                      } else {
+                        setModalPermTab("management")
                       }
                     }}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-600 bg-gray-50/50"
@@ -1409,16 +1460,18 @@ export default function AccountManagement({
 
                   {/* Modal Perm Tab Switcher */}
                   <div className="flex gap-1.5 border-b border-gray-150 pb-2 mb-3">
-                    <button
-                      type="button"
-                      onClick={() => setModalPermTab("management")}
-                      className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all text-center cursor-pointer ${modalPermTab === "management"
-                          ? "bg-[#C62828] text-white shadow-xs"
-                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                        }`}
-                    >
-                      Quản lý
-                    </button>
+                    {!isModalRoleStaff && (
+                      <button
+                        type="button"
+                        onClick={() => setModalPermTab("management")}
+                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all text-center cursor-pointer ${modalPermTab === "management"
+                            ? "bg-[#C62828] text-white shadow-xs"
+                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                          }`}
+                      >
+                        Quản lý
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setModalPermTab("staff")}
@@ -1432,7 +1485,7 @@ export default function AccountManagement({
                   </div>
 
                   <div className="flex-1 overflow-y-auto max-h-[380px] pr-1 space-y-3.5" style={{ scrollbarWidth: "thin" }}>
-                    {(modalPermTab === "management" ? MODULE_TREE : STAFF_MODULE_TREE).map(group => {
+                    {(effectiveModalPermTab === "management" ? MODULE_TREE : STAFF_MODULE_TREE).map(group => {
                       const groupChildIds = group.children.map(c => c.id)
                       const checkedChildrenCount = groupChildIds.filter(id => customPermissions.includes(id)).length
                       const isAllChecked = checkedChildrenCount === groupChildIds.length

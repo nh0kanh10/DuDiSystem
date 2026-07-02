@@ -10,7 +10,7 @@ import dudiLogo from "../../../imports/avatar.jpg";
 import { useMyTasks } from "../../hooks/useMyTasks";
 import { useNotifications } from "../../hooks/useNotifications";
 import { useEmployeeDirectory } from "../../hooks/useEmployeeDirectory";
-import { hasStaffModule, LIVE_STAFF_BUBBLES } from "../../utils/staffModules";
+import { hasStaffModule, LIVE_STAFF_BUBBLES, getStaffPortalModules } from "../../utils/staffModules";
 import UserAttendance from "./UserAttendance";
 import UserTasks from "./UserTasks";
 import LeaveRequestPanel from "../nghi-phep/LeaveRequestPanel";
@@ -943,10 +943,12 @@ export default function UserPortalApp({ onLogout, modules = [], embed = false }:
 
   const handleBubbleClick = (id: BubbleId) => setActivePage(id);
 
+  const staffModules = getStaffPortalModules(modules)
+
   const allowedBubbles = BUBBLES.filter(b => {
     if (!LIVE_STAFF_BUBBLES.has(b.id)) return false;
     const moduleKey = BUBBLE_MODULE_MAP[b.id];
-    return hasStaffModule(modules, moduleKey);
+    return hasStaffModule(staffModules, moduleKey);
   });
 
   // Individual float keyframe values per bubble for organic feel

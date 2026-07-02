@@ -3,12 +3,13 @@ import * as empRepo from "../repositories/employee.repository.js"
 import * as requestRepo from "../repositories/request.repository.js"
 import * as allowedIPRepo from "../repositories/allowedIP.repository.js"
 import { getSystemConfig } from "./systemConfig.service.js"
+import { isAdminUser } from "../utils/access.js"
 
 export function validateClientIP(employeeId, clientIP, reqUser) {
   const config = getSystemConfig()
   if (!config.requireIP) return { valid: true }
 
-  if (reqUser && (reqUser.roleId === "role-admin" || reqUser.permissions?.includes("cham-cong"))) {
+  if (reqUser && (isAdminUser(reqUser) || reqUser.permissions?.includes("cham-cong"))) {
     return { valid: true }
   }
 
