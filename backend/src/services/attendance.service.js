@@ -4,6 +4,7 @@ import * as requestRepo from "../repositories/request.repository.js"
 import * as allowedIPRepo from "../repositories/allowedIP.repository.js"
 import { getSystemConfig } from "./systemConfig.service.js"
 import { isAdminUser } from "../utils/access.js"
+import { getApprovedLeaveForDate } from "../utils/leaveRequestSlots.js"
 
 export function validateClientIP(employeeId, clientIP, reqUser) {
   const config = getSystemConfig()
@@ -116,18 +117,23 @@ export function calcStaffWorkingHours(checkIn, checkOut, config) {
   return res || "0s"
 }
 
-export function calculateStaffAttendanceStatus(checkIn, checkOut, config) {
+export function calculateStaffAttendanceStatus(checkIn, checkOut, config, date) {
   if (!checkIn || checkIn === "--") {
     return { status: "absent", note: "Vắng" }
   }
+
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
+  const isPastDate = date && date < todayStr
+  const suffix = isPastDate ? "quên check-out" : "chưa check-out"
+
   if (!checkOut || checkOut === "--") {
     const inSec = parseToSeconds(checkIn)
     const staffStartSec = parseToSeconds(config?.employeeStart || "09:00")
     if (inSec !== -1 && inSec > staffStartSec) {
       const diffSec = inSec - staffStartSec
-      return { status: "late", note: `Đi trễ ${formatDiffTimeShort(diffSec)}, chưa check-out` }
+      return { status: "late", note: `Đi trễ ${formatDiffTimeShort(diffSec)}, ${suffix}` }
     }
-    return { status: "on-time", note: "Chưa check-out" }
+    return { status: "on-time", note: isPastDate ? "Quên check-out" : "Chưa check-out" }
   }
 
   const inSec = parseToSeconds(checkIn)
@@ -165,6 +171,59 @@ export function calculateStaffAttendanceStatus(checkIn, checkOut, config) {
     status,
     note: noteParts.length > 0 ? noteParts.join(", ") : "Đúng giờ"
   }
+}
+
+const WORK_STATUSES = new Set(["on-time", "late", "early", "late_early"])
+const STATUS_PRIORITY = ["late_early", "late", "early", "on-time"]
+
+export function deriveInternDayStatus(statusAm, statusPm) {
+  const am = statusAm || "absent"
+  const pm = statusPm || "absent"
+
+  if (am === "leave" && pm === "leave") return "leave"
+  if (am === "absent" && pm === "absent") return "absent"
+
+  const amWorked = WORK_STATUSES.has(am)
+  const pmWorked = WORK_STATUSES.has(pm)
+
+  if (amWorked && pmWorked) {
+    for (const s of STATUS_PRIORITY) {
+      if (am === s || pm === s) return s
+    }
+    return "on-time"
+  }
+
+  if (amWorked) return am
+  if (pmWorked) return pm
+
+  if (am === "leave" || pm === "leave") return "leave"
+  return "absent"
+}
+
+export function buildInternDayNote(statusAm, statusPm, noteAm, notePm) {
+  const parts = []
+
+  const push = (status, note, absentFallback, leaveFallback) => {
+    if (status === "leave") {
+      parts.push(note || leaveFallback)
+    } else if (status === "absent") {
+      parts.push(note || absentFallback)
+    } else if (note && note !== "Đúng giờ") {
+      parts.push(note)
+    }
+  }
+
+  push(statusAm || "absent", noteAm, "Vắng sáng", "Nghỉ phép sáng")
+  push(statusPm || "absent", notePm, "Vắng chiều", "Nghỉ phép chiều")
+
+  if (parts.length === 0) {
+    const am = statusAm || "absent"
+    const pm = statusPm || "absent"
+    if (WORK_STATUSES.has(am) && WORK_STATUSES.has(pm)) return "Đúng giờ"
+    return ""
+  }
+
+  return parts.join(" · ")
 }
 
 export function calculateSessionStatus(checkIn, checkOut, session, config) {
@@ -255,40 +314,31 @@ function isoToRequestDate(isoStr) {
 function withEmployee(record) {
   const emp = empRepo.getById(record.employeeId)
   const sysConfig = getSystemConfig()
-  const isIntern = emp?.status === "intern"
+  const isIntern = emp?.contractType === "intern"
 
   const checkIn = record.checkIn ?? "--"
   const checkOut = record.checkOut ?? "--"
 
   const reqDate = isoToRequestDate(record.date)
-  const approvedRequests = requestRepo.getAll({ employeeId: record.employeeId, status: "approved" })
-    .filter(req => {
-      if (!req.startDate || !req.endDate) return false
-      const [d, m, y] = reqDate.split("/").map(Number)
-      const targetTime = new Date(y, m - 1, d).getTime()
-      
-      const [sd, sm, sy] = req.startDate.split("/").map(Number)
-      const startTime = new Date(sy, sm - 1, sd).getTime()
-      
-      const [ed, em, ey] = req.endDate.split("/").map(Number)
-      const endTime = new Date(ey, em - 1, ed).getTime()
-      
-      return targetTime >= startTime && targetTime <= endTime && (req.category === "leave" || req.category === "timeoff")
-    })
+  const allEmployeeRequests = requestRepo.getAll({ employeeId: record.employeeId })
+  const leaveForDate = getApprovedLeaveForDate(record.employeeId, reqDate, allEmployeeRequests)
 
   if (!isIntern) {
     let status = record.status ?? "absent"
     let note = record.note ?? ""
 
     if (status !== "leave" && status !== "absent") {
-      const calc = calculateStaffAttendanceStatus(checkIn, checkOut, sysConfig)
+      const calc = calculateStaffAttendanceStatus(checkIn, checkOut, sysConfig, record.date)
       status = calc.status
       note = calc.note
     }
 
-    if (approvedRequests.length > 0 && (checkIn === "--" || !checkIn)) {
+    if ((leaveForDate.sang || leaveForDate.chieu) && (checkIn === "--" || !checkIn)) {
       status = "leave"
-      note = approvedRequests[0].reason || "Nghỉ phép"
+      const noteParts = []
+      if (leaveForDate.sang) noteParts.push(leaveForDate.sang)
+      if (leaveForDate.chieu && leaveForDate.chieu !== leaveForDate.sang) noteParts.push(leaveForDate.chieu)
+      note = noteParts.join(" · ") || "Nghỉ phép"
     }
 
     const workingHours = calcStaffWorkingHours(checkIn, checkOut, sysConfig)
@@ -297,7 +347,7 @@ function withEmployee(record) {
       ...record,
       employeeName: emp?.name ?? "—",
       department: emp?.department ?? "—",
-      employeeStatus: emp?.status ?? "active",
+      employeeStatus: "staff",
       workingHours,
       checkIn,
       checkOut,
@@ -347,47 +397,26 @@ function withEmployee(record) {
     }
   }
 
-  const hasApprovedAm = approvedRequests.some(req => {
-    const session = req.session ? req.session.toLowerCase() : "all"
-    return session === "all" || session === "sang" || session === "morning"
-  })
+  const hasApprovedAm = !!leaveForDate.sang
   if (statusAm === "leave" && !hasApprovedAm) {
     statusAm = "absent"
     noteAm = ""
   }
 
-  const hasApprovedPm = approvedRequests.some(req => {
-    const session = req.session ? req.session.toLowerCase() : "all"
-    return session === "all" || session === "chieu" || session === "afternoon"
-  })
+  const hasApprovedPm = !!leaveForDate.chieu
   if (statusPm === "leave" && !hasApprovedPm) {
     statusPm = "absent"
     notePm = ""
   }
 
-  approvedRequests.forEach(req => {
-    const session = req.session ? req.session.toLowerCase() : "all"
-    if (session === "all") {
-      if (morningIn === "--" || !morningIn) {
-        statusAm = "leave"
-        noteAm = req.reason || "Nghỉ phép"
-      }
-      if (afternoonIn === "--" || !afternoonIn) {
-        statusPm = "leave"
-        notePm = req.reason || "Nghỉ phép"
-      }
-    } else if (session === "sang" || session === "morning") {
-      if (morningIn === "--" || !morningIn) {
-        statusAm = "leave"
-        noteAm = req.reason || "Nghỉ phép"
-      }
-    } else if (session === "chieu" || session === "afternoon") {
-      if (afternoonIn === "--" || !afternoonIn) {
-        statusPm = "leave"
-        notePm = req.reason || "Nghỉ phép"
-      }
-    }
-  })
+  if (leaveForDate.sang && (morningIn === "--" || !morningIn)) {
+    statusAm = "leave"
+    noteAm = leaveForDate.sang
+  }
+  if (leaveForDate.chieu && (afternoonIn === "--" || !afternoonIn)) {
+    statusPm = "leave"
+    notePm = leaveForDate.chieu
+  }
 
   if (statusAm !== "leave" && statusAm !== "absent") {
     const morningStart = sysConfig.morningStart || "09:00"
@@ -415,25 +444,13 @@ function withEmployee(record) {
     notePm = "Vắng chiều"
   }
 
-  let finalNoteParts = []
-  if (morningIn !== "--" && noteAm && noteAm !== "Đúng giờ") finalNoteParts.push(noteAm)
-  if (afternoonIn !== "--" && notePm && notePm !== "Đúng giờ") finalNoteParts.push(notePm)
-  
-  let finalNote = finalNoteParts.join(", ")
-  if (!finalNote) {
-    if (morningIn === "--" && afternoonIn === "--") {
-      finalNote = "Vắng"
-    } else if (morningIn !== "--" && afternoonIn === "--") {
-      finalNote = "Nửa ngày sáng"
-    } else if (morningIn === "--" && afternoonIn !== "--") {
-      finalNote = "Nửa ngày chiều"
-    } else {
-      finalNote = "Đúng giờ"
-    }
+  let finalNote = buildInternDayNote(statusAm, statusPm, noteAm, notePm)
+  if (!finalNote && morningIn === "--" && afternoonIn === "--") {
+    finalNote = "Vắng"
   }
 
   if (record.autoFilled) {
-    finalNote = "Làm cả ngày (tự ghi giờ trưa)" + (finalNoteParts.length > 0 ? ` · ${finalNote}` : "")
+    finalNote = "Làm cả ngày (tự ghi giờ trưa)" + (finalNote ? ` · ${finalNote}` : "")
   }
 
   const workingHours = calcInternWorkingHours(morningIn, morningOut, afternoonIn, afternoonOut)
@@ -442,7 +459,7 @@ function withEmployee(record) {
     ...record,
     employeeName: emp?.name ?? "—",
     department: emp?.department ?? "—",
-    employeeStatus: emp?.status ?? "intern",
+    employeeStatus: "intern",
     workingHours,
     checkIn: morningIn !== "--" ? morningIn : afternoonIn,
     checkOut: afternoonOut !== "--" ? afternoonOut : morningOut,
@@ -454,12 +471,7 @@ function withEmployee(record) {
     statusPm,
     noteAm,
     notePm,
-    status: (statusAm === "leave" || statusPm === "leave") ? "leave" :
-      (statusAm === "absent" && statusPm === "absent") ? "absent" :
-        (statusAm === "absent" || statusPm === "absent") ? "absent" :
-          (statusAm === "late_early" || statusPm === "late_early") ? "late_early" :
-            (statusAm === "late" || statusPm === "late") ? "late" :
-              (statusAm === "early" || statusPm === "early") ? "early" : "on-time",
+    status: deriveInternDayStatus(statusAm, statusPm),
     note: finalNote
   }
 }
@@ -574,7 +586,7 @@ export function createAttendance(data) {
   if (existing) return { error: "Đã có bản ghi chấm công cho nhân viên này hôm nay", status: 409 }
 
   const emp = empRepo.getById(data.employeeId)
-  const isIntern = emp?.status === "intern"
+  const isIntern = emp?.contractType === "intern"
   const sysConfig = getSystemConfig()
   const noonBoundary = sysConfig.noonBoundary || "14:00"
 
@@ -638,7 +650,7 @@ export function updateAttendance(id, patch) {
   }
 
   const emp = employeeId ? empRepo.getById(employeeId) : null
-  const isIntern = emp?.status === "intern"
+  const isIntern = emp?.contractType === "intern"
   const sysConfig = getSystemConfig()
 
   if (id.startsWith("TEMP_")) {

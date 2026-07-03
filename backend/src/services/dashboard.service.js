@@ -13,7 +13,7 @@ export function getDashboardStats() {
   return {
     totalEmployees: employees.length,
     activeEmployees: employees.filter(e => e.status === "active").length,
-    internEmployees: employees.filter(e => e.status === "intern").length,
+    internEmployees: employees.filter(e => e.contractType === "intern").length,
     attendance: {
       onTime: todayAtt.filter(r => r.status === "on-time").length,
       late: todayAtt.filter(r => r.status === "late").length,

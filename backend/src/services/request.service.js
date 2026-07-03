@@ -1,5 +1,7 @@
 import * as repo from "../repositories/request.repository.js"
 import * as empRepo from "../repositories/employee.repository.js"
+import { expandRequestToSlots, findSlotConflict } from "../utils/leaveRequestSlots.js"
+import { notifyRequestApproved, notifyRequestRejected, notifyRequestUpdated } from "../utils/requestNotifications.js"
 
 function getNowFormatted() {
   const now = new Date()
@@ -37,7 +39,8 @@ const VALID_SESSIONS = ["sang", "chieu"]
 const VALID_CATEGORIES = ["leave", "timeoff"]
 const VALID_LEAVE_TYPES = ["annual", "sick", "personal", "unpaid", "timeoff"]
 
-function validateCreateData(data) {
+function validateCreateData(data, options = {}) {
+  const skipPastDate = options.skipPastDate === true
   const { employeeId, category, scope, reason } = data
   if (!employeeId) return "Thiếu mã nhân viên"
   if (!VALID_CATEGORIES.includes(category)) return "Loại đơn không hợp lệ"
@@ -52,24 +55,24 @@ function validateCreateData(data) {
   switch (scope) {
     case "full_day":
       if (!data.startDate) return "Vui lòng chọn ngày nghỉ"
-      if (isDateInPast(data.startDate)) return "Không thể đăng ký ngày đã qua"
+      if (!skipPastDate && isDateInPast(data.startDate)) return "Không thể đăng ký ngày đã qua"
       break
     case "date_range":
       if (!data.startDate || !data.endDate) return "Vui lòng chọn đủ ngày bắt đầu và kết thúc"
       if (parseVnDate(data.endDate) < parseVnDate(data.startDate)) return "Ngày kết thúc phải sau ngày bắt đầu"
-      if (isDateInPast(data.startDate)) return "Không thể đăng ký ngày đã qua"
+      if (!skipPastDate && isDateInPast(data.startDate)) return "Không thể đăng ký ngày đã qua"
       break
     case "half_session":
       if (!data.startDate) return "Vui lòng chọn ngày nghỉ"
       if (!VALID_SESSIONS.includes(data.session)) return "Vui lòng chọn buổi sáng hoặc chiều"
-      if (isDateInPast(data.startDate)) return "Không thể đăng ký ngày đã qua"
+      if (!skipPastDate && isDateInPast(data.startDate)) return "Không thể đăng ký ngày đã qua"
       break
     case "multi_session": {
       const sessions = data.sessions
       if (!Array.isArray(sessions) || sessions.length === 0) return "Vui lòng chọn ít nhất một buổi nghỉ"
       for (const slot of sessions) {
         if (!slot.date || !VALID_SESSIONS.includes(slot.session)) return "Dữ liệu buổi nghỉ không hợp lệ"
-        if (isDateInPast(slot.date)) return "Không thể chọn buổi đã qua"
+        if (!skipPastDate && isDateInPast(slot.date)) return "Không thể chọn buổi đã qua"
       }
       break
     }
@@ -117,25 +120,9 @@ function getEarliestDate(req) {
 }
 
 function autoCancelExpiredRequests() {
-  const all = repo.getAll()
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  for (const req of all) {
-    if (req.status === "pending") {
-      try {
-        const start = getEarliestDate(req)
-        if (!start) continue
-        start.setHours(0, 0, 0, 0)
-        if (start < today) {
-          repo.update(req.id, { status: "cancelled" })
-        }
-      } catch {
-      }
-    }
-  }
+  // Giữ đơn pending quá hạn để admin vẫn duyệt được (UI gắn nhãn "Quá hạn").
+  // Nhân viên có thể hủy thủ công hoặc nộp đơn mới cho cùng buổi (rejected/cancelled không chặn).
 }
-
 function withEmployee(req) {
   const emp = empRepo.getById(req.employeeId)
   return {
@@ -171,6 +158,16 @@ export function createRequest(data) {
   if (err) return { error: err, status: 400 }
 
   const normalized = normalizeCreateData(data)
+  const newSlots = expandRequestToSlots(normalized)
+  const conflict = findSlotConflict(normalized.employeeId, newSlots, repo.getAll())
+  if (conflict) {
+    const sessionLabel = conflict.slot.session === "sang" ? "sáng" : "chiều"
+    return {
+      error: `Đã có đơn ${conflict.existing.status === "approved" ? "đã duyệt" : "chờ duyệt"} (${conflict.existing.id}) trùng ${conflict.slot.date} buổi ${sessionLabel}`,
+      status: 409,
+    }
+  }
+
   const prefix = normalized.category === "timeoff" ? "TO" : "XN"
   const count = repo.countByPrefix(prefix)
   const newId = `${prefix}${String(count + 1).padStart(5, "0")}`
@@ -189,14 +186,77 @@ export function approveRequest(id) {
   const req = repo.getById(id)
   if (!req) return null
   if (req.status !== "pending") return { error: "Chỉ duyệt được đơn đang chờ xử lý", status: 400 }
-  return withEmployee(repo.update(id, { status: "approved" }))
+  const updated = withEmployee(repo.update(id, { status: "approved" }))
+  notifyRequestApproved(updated)
+  return updated
 }
 
 export function rejectRequest(id) {
   const req = repo.getById(id)
   if (!req) return null
   if (req.status !== "pending") return { error: "Chỉ từ chối được đơn đang chờ xử lý", status: 400 }
-  return withEmployee(repo.update(id, { status: "rejected" }))
+  const updated = withEmployee(repo.update(id, { status: "rejected" }))
+  notifyRequestRejected(updated)
+  return updated
+}
+
+export function updateRequest(id, data, options = {}) {
+  const existing = repo.getById(id)
+  if (!existing) return null
+  if (existing.status !== "pending") {
+    return { error: "Chỉ sửa được đơn đang chờ duyệt", status: 400 }
+  }
+
+  const merged = {
+    employeeId: existing.employeeId,
+    category: existing.category,
+    leaveType: existing.leaveType,
+    scope: existing.scope,
+    reason: data.reason !== undefined ? String(data.reason).trim() : existing.reason,
+    startDate: data.startDate !== undefined ? data.startDate : existing.startDate,
+    endDate: data.endDate !== undefined ? data.endDate : existing.endDate,
+    session: data.session !== undefined ? data.session : existing.session,
+    sessions: data.sessions !== undefined ? data.sessions : existing.sessions,
+  }
+
+  const err = validateCreateData(merged, { skipPastDate: options.adminEdit === true })
+  if (err) return { error: err, status: 400 }
+
+  const normalized = normalizeCreateData(merged)
+  const newSlots = expandRequestToSlots(normalized)
+  const conflict = findSlotConflict(normalized.employeeId, newSlots, repo.getAll(), id)
+  if (conflict) {
+    const sessionLabel = conflict.slot.session === "sang" ? "sáng" : "chiều"
+    return {
+      error: `Trùng ${conflict.slot.date} buổi ${sessionLabel} với đơn ${conflict.existing.id}`,
+      status: 409,
+    }
+  }
+
+  const patch = { ...normalized }
+  if (existing.scope !== "date_range") delete patch.endDate
+  if (existing.scope !== "half_session") delete patch.session
+  if (existing.scope !== "multi_session") delete patch.sessions
+  if (existing.scope === "date_range" && !patch.endDate) patch.endDate = patch.startDate
+
+  const updated = withEmployee(repo.update(id, patch))
+  notifyRequestUpdated(updated, existing)
+  return updated
+}
+
+export function approveRequestsBulk(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return { error: "Danh sách đơn trống", status: 400 }
+  }
+  const approved = []
+  const failed = []
+  for (const id of ids) {
+    const result = approveRequest(id)
+    if (!result) failed.push({ id, error: "Không tìm thấy đơn" })
+    else if (result.error) failed.push({ id, error: result.error })
+    else approved.push(result)
+  }
+  return { approved, failed, count: approved.length }
 }
 
 export function cancelRequest(id, employeeId) {

@@ -534,7 +534,7 @@ export default function AccountManagement({
   }, [employees, branchFilter])
 
   const totalEmployeesCount = branchFilteredEmployees.length
-  const activeEmployeesCount = branchFilteredEmployees.filter(e => e.status === "active" || e.status === "intern").length
+  const activeEmployeesCount = branchFilteredEmployees.filter(e => e.status === "active" || e.status === "suspended").length
   const resignedEmployeesCount = branchFilteredEmployees.filter(e => e.status === "inactive").length
 
   const lockedAccountsCount = useMemo(() => {
@@ -565,7 +565,7 @@ export default function AccountManagement({
       }
       if (statusFilter !== "all") {
         if (statusFilter === "active") {
-          if (e.status !== "active" && e.status !== "intern") return false
+          if (e.status !== "active" && e.status !== "suspended") return false
         } else if (statusFilter === "inactive") {
           if (e.status !== "inactive") return false
         }

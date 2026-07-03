@@ -1,26 +1,19 @@
-import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, ArrowLeft, Send, Search } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { MessageCircle, X, ArrowLeft, Send, Search, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { useStaffChat } from "@/app/hooks/useStaffChat";
 
 const BRAND = "#E8231A";
 const GOLD = "#FF8800";
 const GR = "rgba(232,35,26,0.28)";
 
-interface ChatMessage {
-  id: string;
-  from: "me" | "them";
-  text: string;
-  time: string;
-}
-
-interface OnlineEmployee {
-  id: string;
-  name: string;
-  department: string;
-  position: string;
-  online: boolean;
-  unread: number;
-  lastMessage: string;
-  lastTime: string;
+function branchLabel(branchId: string) {
+  if (!branchId) return "";
+  const map: Record<string, string> = {
+    "branch-hcm": "HCM",
+    "branch-hn": "HN",
+    "branch-dn": "ĐN",
+  };
+  return map[branchId] ?? branchId.replace("branch-", "").toUpperCase();
 }
 
 function empInitials(name: string) {
@@ -29,71 +22,99 @@ function empInitials(name: string) {
   return name.slice(0, 2).toUpperCase();
 }
 
-// ==== DATA MẪU (thay bằng API sau này: GET /api/staff-chat/online, GET /api/staff-chat/thread/:id) ====
-const MOCK_EMPLOYEES: OnlineEmployee[] = [
-  { id: "nv001", name: "Nguyễn Văn An", department: "Kỹ thuật", position: "Lập trình viên", online: true, unread: 2, lastMessage: "Anh check giúp em PR mới nhé", lastTime: "09:41" },
-  { id: "nv002", name: "Trần Thị Bích", department: "Nhân sự", position: "Chuyên viên nhân sự", online: true, unread: 0, lastMessage: "Ok em cảm ơn ạ", lastTime: "09:15" },
-  { id: "nv003", name: "Lê Hoàng Cường", department: "Kinh doanh", position: "Trưởng nhóm KD", online: true, unread: 1, lastMessage: "Deal khách A xong chưa?", lastTime: "08:58" },
-  { id: "nv004", name: "Phạm Minh Đức", department: "Kỹ thuật", position: "Tester", online: false, unread: 0, lastMessage: "Để em test lại bug này", lastTime: "Hôm qua" },
-  { id: "nv005", name: "Hoàng Thu Hà", department: "Kế toán", position: "Kế toán viên", online: true, unread: 0, lastMessage: "Đã gửi hóa đơn qua mail", lastTime: "08:20" },
-  { id: "nv006", name: "Vũ Thị Lan", department: "Marketing", position: "Content Creator", online: false, unread: 0, lastMessage: "Bài viết tuần này em gửi rồi ạ", lastTime: "2 ngày trước" },
-  { id: "nv007", name: "Đặng Quốc Bảo", department: "Kỹ thuật", position: "DevOps", online: true, unread: 0, lastMessage: "Server đã deploy xong", lastTime: "07:50" },
-  { id: "nv008", name: "Ngô Thị Kim Chi", department: "Kinh doanh", position: "Nhân viên KD", online: false, unread: 0, lastMessage: "Em gửi báo giá rồi ạ", lastTime: "Hôm qua" },
-  { id: "nv009", name: "Bùi Văn Được", department: "Kế toán", position: "Trưởng phòng KT", online: true, unread: 3, lastMessage: "Anh duyệt phiếu chi giúp em", lastTime: "10:02" },
-  { id: "nv010", name: "Phan Thị Giang", department: "Nhân sự", position: "Trưởng phòng NS", online: false, unread: 0, lastMessage: "Đã cập nhật chính sách mới", lastTime: "3 ngày trước" },
-];
-
-const MOCK_THREADS: Record<string, ChatMessage[]> = {
-  nv001: [
-    { id: "m1", from: "them", text: "Chào anh, em vừa tạo PR sửa lỗi chấm công rồi ạ", time: "09:30" },
-    { id: "m2", from: "me", text: "Ok để anh xem qua", time: "09:35" },
-    { id: "m3", from: "them", text: "Anh check giúp em PR mới nhé", time: "09:41" },
-  ],
-  nv002: [
-    { id: "m1", from: "them", text: "Anh ơi hồ sơ nhân viên mới em đã cập nhật xong", time: "09:10" },
-    { id: "m2", from: "me", text: "Cảm ơn em nhé", time: "09:12" },
-    { id: "m3", from: "them", text: "Ok em cảm ơn ạ", time: "09:15" },
-  ],
-  nv003: [{ id: "m1", from: "them", text: "Deal khách A xong chưa?", time: "08:58" }],
-  nv004: [{ id: "m1", from: "them", text: "Để em test lại bug này", time: "Hôm qua" }],
-  nv005: [{ id: "m1", from: "them", text: "Đã gửi hóa đơn qua mail", time: "08:20" }],
-  nv006: [{ id: "m1", from: "them", text: "Bài viết tuần này em gửi rồi ạ", time: "2 ngày trước" }],
-  nv007: [{ id: "m1", from: "them", text: "Server đã deploy xong", time: "07:50" }],
-  nv008: [{ id: "m1", from: "them", text: "Em gửi báo giá rồi ạ", time: "Hôm qua" }],
-  nv009: [{ id: "m1", from: "them", text: "Anh duyệt phiếu chi giúp em", time: "10:02" }],
-  nv010: [{ id: "m1", from: "them", text: "Đã cập nhật chính sách mới", time: "3 ngày trước" }],
-};
-
-const AUTO_REPLIES = [
-  "Ok em nhận được rồi ạ",
-  "Dạ để em kiểm tra lại",
-  "Vâng anh/chị, em sẽ phản hồi sớm",
-  "Em cảm ơn ạ",
-];
-// ==== HẾT DATA MẪU ====
-
 export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showSuggest, setShowSuggest] = useState(false);
-  const [employees, setEmployees] = useState(MOCK_EMPLOYEES);
-  const [threads, setThreads] = useState(MOCK_THREADS);
   const [draft, setDraft] = useState("");
+  const [showOnlinePanel, setShowOnlinePanel] = useState(false);
+
+  const {
+    employees,
+    searchResults,
+    searching,
+    rosterScope,
+    onlineCount,
+    onlineEmployees,
+    totalUnread,
+    threads,
+    loading,
+    error,
+    sending,
+    socketConnected,
+    peerTyping,
+    threadHasMore,
+    loadingMore,
+    loadRoster,
+    searchRoster,
+    openChat,
+    sendMessage,
+    retryMessage,
+    loadMoreMessages,
+    setActivePeer,
+    notifyTyping,
+    clearError,
+  } = useStaffChat({ panelOpen: open });
+
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const bubbleRef = useRef<HTMLButtonElement | null>(null);
   const searchWrapRef = useRef<HTMLDivElement | null>(null);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stickBottomRef = useRef(true);
+  const loadingMoreRef = useRef(false);
 
-  const totalUnread = employees.reduce((sum, e) => sum + e.unread, 0);
-  const active = employees.find(e => e.id === activeId) || null;
+  const active = employees.find(e => e.id === activeId)
+    || searchResults.find(e => e.id === activeId)
+    || (() => {
+      const o = onlineEmployees.find(e => e.id === activeId);
+      if (!o) return null;
+      return {
+        id: o.id,
+        name: o.name,
+        department: o.department,
+        position: o.position,
+        photos: [] as string[],
+        online: true,
+        unread: 0,
+        lastMessage: "",
+        lastTime: "",
+      };
+    })();
+
+  const searchPlaceholder = rosterScope === "company"
+    ? "Tìm nhân viên (mọi chi nhánh)..."
+    : "Tìm nhân viên trong chi nhánh...";
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [activeId, threads]);
+    stickBottomRef.current = true;
+  }, [activeId]);
 
-  // Bấm ra ngoài khung -> đóng khung tin nhắn nội bộ
+  useEffect(() => {
+    if (stickBottomRef.current && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [activeId, threads, active?.id]);
+
+  const handleThreadScroll = useCallback(async () => {
+    const el = scrollRef.current;
+    if (!el || !activeId) return;
+    stickBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (el.scrollTop > 48 || loadingMoreRef.current || !threadHasMore[activeId]) return;
+
+    loadingMoreRef.current = true;
+    const prevHeight = el.scrollHeight;
+    await loadMoreMessages(activeId);
+    requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight - prevHeight;
+      }
+      loadingMoreRef.current = false;
+    });
+  }, [activeId, threadHasMore, loadMoreMessages]);
+
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
@@ -102,33 +123,35 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
       if (bubbleRef.current?.contains(target)) return;
       setOpen(false);
       setActiveId(null);
+      setActivePeer(null);
       setShowSuggest(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  }, [open, setActivePeer]);
 
-  // Danh sách cố định để duyệt (không đổi theo ô tìm kiếm), online lên trước
-  const rosterList = [...employees].sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0) || b.unread - a.unread);
+  useEffect(() => {
+    if (!open) return;
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => {
+      searchRoster(search.trim());
+    }, 300);
+    return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
+  }, [search, open, searchRoster]);
 
-  // Gợi ý dropdown: fetch toàn bộ nhân viên, lọc dần theo chữ đang gõ
-  const suggestList = employees
-    .filter(e => {
-      const q = search.trim().toLowerCase();
-      if (!q) return true;
-      return e.name.toLowerCase().includes(q) || e.department.toLowerCase().includes(q) || e.position.toLowerCase().includes(q);
-    })
-    .sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
+  const rosterList = employees;
 
-  const handleOpenChat = (id: string) => {
+  const suggestList = search.trim() ? searchResults : [];
+
+  const handleOpenChat = useCallback(async (id: string) => {
     setActiveId(id);
-    setEmployees(prev => prev.map(e => (e.id === id ? { ...e, unread: 0 } : e)));
+    setActivePeer(id);
     setShowSuggest(false);
     setSearch("");
-  };
+    await openChat(id);
+  }, [openChat, setActivePeer]);
 
   const handleInputBlur = () => {
-    // Trễ 150ms để onClick trong dropdown kịp bắn trước khi input mất focus đóng dropdown
     blurTimer.current = setTimeout(() => setShowSuggest(false), 150);
   };
 
@@ -137,34 +160,35 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
     setShowSuggest(true);
   };
 
-  const handleSend = () => {
-    if (!draft.trim() || !active) return;
-    const now = new Date();
-    const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    const myMsg: ChatMessage = { id: `m${Date.now()}`, from: "me", text: draft.trim(), time };
-    setThreads(prev => ({ ...prev, [active.id]: [...(prev[active.id] || []), myMsg] }));
-    setEmployees(prev => prev.map(e => (e.id === active.id ? { ...e, lastMessage: draft.trim(), lastTime: time } : e)));
+  const handleSend = async () => {
+    if (!draft.trim() || !active || sending) return;
+    const text = draft.trim();
     setDraft("");
+    const ok = await sendMessage(active.id, text);
+    if (!ok) setDraft(text);
+  };
 
-    // Giả lập nhân viên trả lời (chỉ để demo UI khi chưa có API)
-    if (active.online) {
-      setTimeout(() => {
-        const reply = AUTO_REPLIES[Math.floor(Math.random() * AUTO_REPLIES.length)];
-        const rNow = new Date();
-        const rt = `${String(rNow.getHours()).padStart(2, "0")}:${String(rNow.getMinutes()).padStart(2, "0")}`;
-        const theirMsg: ChatMessage = { id: `m${Date.now() + 1}`, from: "them", text: reply, time: rt };
-        setThreads(prev => ({ ...prev, [active.id]: [...(prev[active.id] || []), theirMsg] }));
-        setEmployees(prev => prev.map(e => (e.id === active.id ? { ...e, lastMessage: reply, lastTime: rt } : e)));
-      }, 1200 + Math.random() * 900);
-    }
+  const handleDraftChange = (value: string) => {
+    setDraft(value);
+    if (activeId && value.trim()) notifyTyping(activeId);
+  };
+
+  const handleToggleOpen = () => {
+    setOpen(o => {
+      if (o) {
+        setActiveId(null);
+        setActivePeer(null);
+        setShowSuggest(false);
+      }
+      return !o;
+    });
   };
 
   return (
     <>
-      {/* Bong bóng chat nổi góc phải màn hình */}
       <button
         ref={bubbleRef}
-        onClick={() => { setOpen(o => !o); if (open) { setActiveId(null); setShowSuggest(false); } }}
+        onClick={handleToggleOpen}
         style={{
           position: embed ? "absolute" : "fixed",
           right: 24,
@@ -201,7 +225,6 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
         )}
       </button>
 
-      {/* Panel chat: danh sách online -> cửa sổ chat */}
       {open && (
         <div
           ref={panelRef}
@@ -211,7 +234,6 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
             bottom: 96,
             width: 360,
             maxWidth: "calc(100vw - 32px)",
-            // Chiều cao panel LUÔN cố định, không phình ra dù danh sách nhân viên dài bao nhiêu
             height: 520,
             maxHeight: "calc(100vh - 140px)",
             background: "#FFFFFF",
@@ -225,15 +247,101 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
             fontFamily: "inherit",
           }}
         >
+          {error && (
+            <div style={{
+              padding: "8px 14px", background: "#fff0f0", borderBottom: "1px solid #f5d0d0",
+              fontSize: 12, color: "#b42318", display: "flex", justifyContent: "space-between", gap: 8,
+            }}>
+              <span>{error}</span>
+              <button onClick={clearError} style={{ border: "none", background: "none", cursor: "pointer", color: "#b42318", fontWeight: 700 }}>✕</button>
+            </div>
+          )}
+
           {!active ? (
             <>
               <div style={{ padding: "16px 18px", borderBottom: "1px solid rgba(36,20,22,0.08)", flexShrink: 0, position: "relative", overflow: "visible" }}>
                 <p style={{ fontSize: 16, fontWeight: 800, color: "#241416" }}>Tin nhắn nội bộ</p>
-                <p style={{ fontSize: 12, color: "#7f5f63", marginTop: 2 }}>
-                  {employees.filter(e => e.online).length} nhân viên đang online
-                </p>
+                {rosterScope === "company" ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowOnlinePanel(v => !v)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4, marginTop: 2,
+                      border: "none", background: "none", padding: 0, cursor: "pointer",
+                      fontSize: 12, color: "#7f5f63", fontFamily: "inherit", textAlign: "left",
+                    }}
+                  >
+                    <span>
+                      {onlineCount} nhân viên đang online
+                      {socketConnected && (
+                        <span style={{ marginLeft: 6, color: "#16a34a", fontWeight: 600 }}>· Live</span>
+                      )}
+                    </span>
+                    {showOnlinePanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </button>
+                ) : (
+                  <p style={{ fontSize: 12, color: "#7f5f63", marginTop: 2 }}>
+                    {onlineCount} nhân viên đang online
+                    {socketConnected && (
+                      <span style={{ marginLeft: 6, color: "#16a34a", fontWeight: 600 }}>· Live</span>
+                    )}
+                  </p>
+                )}
 
-                {/* Ô tìm kiếm + dropdown gợi ý (chỉ để gợi ý nhanh, không thay danh sách chính bên dưới) */}
+                {rosterScope === "company" && showOnlinePanel && (
+                  <div
+                    style={{
+                      marginTop: 8, maxHeight: 140, overflowY: "auto",
+                      border: "1px solid rgba(36,20,22,0.08)", borderRadius: 12,
+                      background: "#fffafa", padding: "4px 6px",
+                    }}
+                  >
+                    {onlineEmployees.length === 0 ? (
+                      <p style={{ fontSize: 12, color: "#a98488", textAlign: "center", padding: "10px 4px" }}>
+                        Không có ai online
+                      </p>
+                    ) : onlineEmployees.map(emp => (
+                      <div
+                        key={emp.id}
+                        onClick={() => { setShowOnlinePanel(false); handleOpenChat(emp.id); }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8, padding: "7px 6px",
+                          borderRadius: 8, cursor: "pointer",
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#fff0f0"; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; }}
+                      >
+                        <div style={{ position: "relative", flexShrink: 0 }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: "50%",
+                            background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 10, fontWeight: 900, color: "#fff",
+                          }}>
+                            {empInitials(emp.name)}
+                          </div>
+                          <span style={{
+                            position: "absolute", bottom: -1, right: -1, width: 8, height: 8,
+                            borderRadius: "50%", background: "#22c55e", border: "2px solid #fff",
+                          }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: "#241416", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {emp.name}
+                          </p>
+                          <p style={{ fontSize: 10, color: "#8b6b70" }}>{emp.department}</p>
+                        </div>
+                        <span style={{
+                          fontSize: 9, fontWeight: 800, color: "#7a1d22", background: "#fde8e8",
+                          padding: "2px 6px", borderRadius: 999, flexShrink: 0,
+                        }}>
+                          {branchLabel(emp.branchId)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <div ref={searchWrapRef} style={{ position: "relative", marginTop: 10 }}>
                   <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#a98488" }} />
                   <input
@@ -241,7 +349,7 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
                     onChange={e => { setSearch(e.target.value); setShowSuggest(true); }}
                     onFocus={handleInputFocus}
                     onBlur={handleInputBlur}
-                    placeholder="Tìm nhân viên..."
+                    placeholder={searchPlaceholder}
                     style={{
                       width: "100%", padding: "8px 10px 8px 30px", borderRadius: 10,
                       border: "1px solid rgba(36,20,22,0.12)", fontSize: 13, outline: "none",
@@ -266,7 +374,19 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
                         padding: 6,
                       }}
                     >
-                      {suggestList.length === 0 && (
+                      {!search.trim() && (
+                        <p style={{ fontSize: 12, color: "#7f5f63", textAlign: "center", padding: "12px 8px" }}>
+                          {rosterScope === "company"
+                            ? "Nhập tên để tìm nhân viên mọi chi nhánh"
+                            : "Nhập tên để tìm nhân viên cùng chi nhánh"}
+                        </p>
+                      )}
+                      {search.trim() && searching && (
+                        <div style={{ display: "flex", justifyContent: "center", padding: 12 }}>
+                          <Loader2 size={16} className="animate-spin" color="#a98488" />
+                        </div>
+                      )}
+                      {search.trim() && !searching && suggestList.length === 0 && (
                         <p style={{ fontSize: 12, color: "#7f5f63", textAlign: "center", padding: "12px 0" }}>Không tìm thấy nhân viên phù hợp</p>
                       )}
                       {suggestList.map(emp => (
@@ -308,9 +428,17 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
                 </div>
               </div>
 
-              {/* Danh sách nhân viên chính: luôn cuộn trong khung, không đẩy panel dài ra */}
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "6px 8px" }}>
-                {rosterList.map(emp => (
+                {loading && rosterList.length === 0 ? (
+                  <div style={{ display: "flex", justifyContent: "center", padding: 32, color: "#a98488" }}>
+                    <Loader2 size={22} className="animate-spin" />
+                  </div>
+                ) : rosterList.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "#7f5f63", textAlign: "center", padding: "24px 12px", lineHeight: 1.5 }}>
+                    Chưa có hội thoại nào.<br />
+                    <span style={{ fontSize: 12 }}>Dùng ô tìm kiếm phía trên để nhắn nhân viên mới.</span>
+                  </p>
+                ) : rosterList.map(emp => (
                   <div
                     key={emp.id}
                     onClick={() => handleOpenChat(emp.id)}
@@ -343,7 +471,9 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
                         <span style={{ fontSize: 11, color: "#a98488", flexShrink: 0 }}>{emp.lastTime}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                        <p style={{ fontSize: 12, color: "#8b6b70", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emp.lastMessage}</p>
+                        <p style={{ fontSize: 12, color: "#8b6b70", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {emp.lastMessage || "Chưa có tin nhắn"}
+                        </p>
                         {emp.unread > 0 && (
                           <span
                             style={{
@@ -364,7 +494,10 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
           ) : (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: "1px solid rgba(36,20,22,0.08)", flexShrink: 0 }}>
-                <button onClick={() => setActiveId(null)} style={{ border: "none", background: "none", cursor: "pointer", color: "#7a1d22", padding: 4 }}>
+                <button
+                  onClick={() => { setActiveId(null); setActivePeer(null); }}
+                  style={{ border: "none", background: "none", cursor: "pointer", color: "#7a1d22", padding: 4 }}
+                >
                   <ArrowLeft size={18} />
                 </button>
                 <div style={{ position: "relative", flexShrink: 0 }}>
@@ -389,23 +522,43 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 14, fontWeight: 800, color: "#241416" }}>{active.name}</p>
                   <p style={{ fontSize: 11, color: "#7f5f63" }}>
-                    {active.online ? "Đang hoạt động" : "Ngoại tuyến"} · {active.position}
+                    {peerTyping === active.id
+                      ? "Đang nhập..."
+                      : `${active.online ? "Đang hoạt động" : "Ngoại tuyến"} · ${active.position}`}
                   </p>
                 </div>
               </div>
 
-              {/* Khung tin nhắn: cuộn riêng, header/footer luôn cố định */}
-              <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 14px", display: "flex", flexDirection: "column", gap: 8, background: "#fffafa" }}>
+              <div
+                ref={scrollRef}
+                onScroll={handleThreadScroll}
+                style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 14px", display: "flex", flexDirection: "column", gap: 8, background: "#fffafa" }}
+              >
+                {loadingMore && (
+                  <div style={{ display: "flex", justifyContent: "center", padding: "4px 0 8px" }}>
+                    <Loader2 size={16} className="animate-spin" color="#a98488" />
+                  </div>
+                )}
+                {threadHasMore[active.id] && !loadingMore && (threads[active.id]?.length ?? 0) > 0 && (
+                  <p style={{ fontSize: 11, color: "#a98488", textAlign: "center", marginBottom: 4 }}>Cuộn lên để xem tin cũ hơn</p>
+                )}
+                {(threads[active.id] || []).length === 0 && !loading && (
+                  <p style={{ fontSize: 12, color: "#a98488", textAlign: "center", marginTop: 24 }}>Bắt đầu cuộc trò chuyện</p>
+                )}
                 {(threads[active.id] || []).map(msg => (
-                  <div key={msg.id} style={{ display: "flex", justifyContent: msg.from === "me" ? "flex-end" : "flex-start" }}>
+                  <div key={msg.id} style={{ display: "flex", flexDirection: "column", alignItems: msg.from === "me" ? "flex-end" : "flex-start", gap: 4 }}>
                     <div
                       style={{
                         maxWidth: "78%",
                         padding: "8px 12px",
                         borderRadius: msg.from === "me" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
-                        background: msg.from === "me" ? `linear-gradient(135deg, ${BRAND}, ${GOLD})` : "#FFFFFF",
-                        color: msg.from === "me" ? "#fff" : "#241416",
-                        border: msg.from === "me" ? "none" : "1px solid #efd7da",
+                        background: msg.failed
+                          ? "#fee2e2"
+                          : msg.from === "me"
+                            ? `linear-gradient(135deg, ${BRAND}, ${GOLD})`
+                            : "#FFFFFF",
+                        color: msg.failed ? "#b42318" : msg.from === "me" ? "#fff" : "#241416",
+                        border: msg.failed ? "1px solid #fecaca" : msg.from === "me" ? "none" : "1px solid #efd7da",
                         fontSize: 13.5,
                         lineHeight: 1.4,
                       }}
@@ -413,6 +566,19 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
                       {msg.text}
                       <div style={{ fontSize: 10, marginTop: 4, opacity: 0.7, textAlign: "right" }}>{msg.time}</div>
                     </div>
+                    {msg.failed && (
+                      <button
+                        type="button"
+                        onClick={() => retryMessage(active.id, msg.id, msg.text)}
+                        disabled={sending}
+                        style={{
+                          fontSize: 11, color: BRAND, background: "none", border: "none",
+                          cursor: sending ? "default" : "pointer", fontWeight: 700, padding: "0 4px",
+                        }}
+                      >
+                        Gửi lại
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -420,9 +586,10 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderTop: "1px solid rgba(36,20,22,0.08)", flexShrink: 0 }}>
                 <input
                   value={draft}
-                  onChange={e => setDraft(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") handleSend(); }}
+                  onChange={e => handleDraftChange(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                   placeholder="Nhập tin nhắn..."
+                  disabled={sending}
                   style={{
                     flex: 1, padding: "9px 12px", borderRadius: 999,
                     border: "1px solid rgba(36,20,22,0.12)", fontSize: 13, outline: "none",
@@ -431,15 +598,15 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={!draft.trim()}
+                  disabled={!draft.trim() || sending}
                   style={{
                     width: 36, height: 36, borderRadius: "50%", border: "none",
-                    background: draft.trim() ? `linear-gradient(135deg, ${BRAND}, ${GOLD})` : "#eee",
+                    background: draft.trim() && !sending ? `linear-gradient(135deg, ${BRAND}, ${GOLD})` : "#eee",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    cursor: draft.trim() ? "pointer" : "default", flexShrink: 0,
+                    cursor: draft.trim() && !sending ? "pointer" : "default", flexShrink: 0,
                   }}
                 >
-                  <Send size={15} color={draft.trim() ? "#fff" : "#a98488"} />
+                  {sending ? <Loader2 size={15} className="animate-spin" color="#a98488" /> : <Send size={15} color={draft.trim() ? "#fff" : "#a98488"} />}
                 </button>
               </div>
             </>

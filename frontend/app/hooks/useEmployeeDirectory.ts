@@ -12,7 +12,7 @@ export function useEmployeeDirectory() {
     setError(null)
     try {
       const data = await api.employees.list() as Employee[]
-      setEmployees(data.filter(e => e.status === "active" || e.status === "intern"))
+      setEmployees(data.filter(e => e.status === "active" || e.status === "suspended"))
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tải được danh bạ")
     } finally {

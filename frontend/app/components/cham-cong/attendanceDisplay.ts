@@ -1,6 +1,15 @@
 import type { AttendanceRecord } from "../../types"
 import { INTERN_SESSION, isInternRecord } from "./attendanceModel"
 
+export const ATT_STATUS_STYLE: Record<string, { label: string; bg: string; text: string; dot: string }> = {
+  "on-time": { label: "Đúng giờ", bg: "bg-green-100", text: "text-green-700", dot: "bg-green-500" },
+  late: { label: "Đi trễ", bg: "bg-orange-100", text: "text-orange-700", dot: "bg-orange-500" },
+  early: { label: "Về sớm", bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
+  late_early: { label: "Trễ & sớm", bg: "bg-orange-100", text: "text-orange-800", dot: "bg-orange-600" },
+  absent: { label: "Vắng", bg: "bg-red-100", text: "text-red-700", dot: "bg-red-500" },
+  leave: { label: "Nghỉ phép", bg: "bg-violet-100", text: "text-violet-700", dot: "bg-violet-500" },
+}
+
 const VN_DAYS = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"]
 
 export function fmtIsoDate(iso: string) {
@@ -72,4 +81,26 @@ export const ATT_STATUS_LABEL: Record<string, string> = {
   late_early: "Trễ & sớm",
   absent: "Vắng",
   leave: "Nghỉ phép",
+}
+
+export function internPunchClass(status?: string, time?: string): string {
+  if (!time || time === "--") return "text-gray-300"
+  if (status === "late" || status === "late_early") return "text-orange-600 font-bold"
+  if (status === "early") return "text-amber-600 font-bold"
+  if (status === "absent" || status === "leave") return "text-gray-300"
+  return "text-gray-700 font-bold"
+}
+
+export function recordMatchesStatusFilter(record: AttendanceRecord, filterStatus: string): boolean {
+  if (filterStatus === "all") return true
+  if (isInternRecord(record)) {
+    return record.statusAm === filterStatus || record.statusPm === filterStatus
+  }
+  return record.status === filterStatus
+}
+
+export function internSessionStatusForRow(record: AttendanceRecord, session?: "am" | "pm"): string | undefined {
+  if (session === "am") return record.statusAm
+  if (session === "pm") return record.statusPm
+  return record.status
 }

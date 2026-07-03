@@ -25,6 +25,7 @@ import {
   parseVnDate,
   requestCoversDate,
   LEAVE_TYPE,
+  LEAVE_SESSION,
 } from "../nghi-phep/leaveRequestModel"
 import { EMPLOYEE_KIND, isInternEmployee } from "../cham-cong/attendanceModel"
 
@@ -486,6 +487,52 @@ export default function ApprovalManagement({
   const [leaveSearchFilter, setLeaveSearchFilter] = useState("")
   const [selectedSlot, setSelectedSlot] = useState<TimeOffSlot | null>(null)
   const [selectedRequest, setSelectedRequest] = useState<RequestRecord | null>(null)
+  const [requestEditMode, setRequestEditMode] = useState(false)
+  const [requestEditForm, setRequestEditForm] = useState({
+    startDate: "",
+    endDate: "",
+    session: "sang" as "sang" | "chieu",
+    reason: "",
+  })
+  const [savingRequestEdit, setSavingRequestEdit] = useState(false)
+
+  const openRequestDetail = (req: RequestRecord) => {
+    setRequestEditMode(false)
+    setRequestEditForm({
+      startDate: req.startDate || "",
+      endDate: req.endDate || req.startDate || "",
+      session: (req.session as "sang" | "chieu") || "sang",
+      reason: req.reason || "",
+    })
+    setSelectedRequest(req)
+  }
+
+  const saveRequestEdit = async () => {
+    if (!selectedRequest) return
+    setSavingRequestEdit(true)
+    try {
+      const payload: Record<string, unknown> = { reason: requestEditForm.reason.trim() }
+      if (selectedRequest.scope === "full_day" || selectedRequest.scope === "half_session") {
+        payload.startDate = requestEditForm.startDate
+      }
+      if (selectedRequest.scope === "date_range") {
+        payload.startDate = requestEditForm.startDate
+        payload.endDate = requestEditForm.endDate
+      }
+      if (selectedRequest.scope === "half_session") {
+        payload.session = requestEditForm.session
+      }
+      const updated = await api.requests.update(selectedRequest.id, payload) as RequestRecord
+      setRequests(prev => prev.map(r => r.id === updated.id ? updated : r))
+      setSelectedRequest(updated)
+      setRequestEditMode(false)
+      showToast("Đã cập nhật đơn — nhân viên sẽ nhận thông báo")
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Lỗi cập nhật đơn", "error")
+    } finally {
+      setSavingRequestEdit(false)
+    }
+  }
   const [adminNote, setAdminNote] = useState("")
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [toastType, setToastType] = useState<"success" | "error">("success")
@@ -771,6 +818,25 @@ export default function ApprovalManagement({
       showToast(e instanceof Error ? e.message : "Lỗi duyệt hàng loạt", "error")
     } finally {
       removeProcessing("bulk-req")
+    }
+  }
+
+  const approveAllExpiredReqs = async () => {
+    const pendingExpired = filteredReqs.filter(r => r.status === "pending" && isRequestExpired(r))
+    if (pendingExpired.length === 0) return
+    addProcessing("bulk-req-expired")
+    try {
+      const res = await api.requests.approveBulk(pendingExpired.map(r => r.id)) as { count?: number; failed?: { id: string; error: string }[] }
+      const okIds = new Set(pendingExpired.map(r => r.id).filter(id => !(res.failed || []).some(f => f.id === id)))
+      setRequests(p => p.map(r => okIds.has(r.id) ? { ...r, status: "approved" as const } : r))
+      const failCount = res.failed?.length ?? 0
+      showToast(failCount > 0
+        ? `Đã duyệt ${res.count ?? 0} đơn quá hạn, ${failCount} đơn lỗi`
+        : `Đã duyệt ${res.count ?? pendingExpired.length} đơn quá hạn!`)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Lỗi duyệt đơn quá hạn", "error")
+    } finally {
+      removeProcessing("bulk-req-expired")
     }
   }
 
@@ -1649,6 +1715,21 @@ export default function ApprovalManagement({
                   Từ chối tất cả ({filteredReqs.filter(r => r.status === "pending").length})
                 </button>
                 <button
+                  onClick={() => setConfirmAction({
+                    label: "Duyệt tất cả đơn quá hạn trong danh sách lọc?",
+                    count: filteredReqs.filter(r => r.status === "pending" && isRequestExpired(r)).length,
+                    variant: "approve",
+                    summary: "Các đơn quá hạn vẫn được ghi nhận nghỉ phép và nhân viên nhận thông báo.",
+                    onConfirm: approveAllExpiredReqs,
+                  })}
+                  disabled={processingIds.includes("bulk-req-expired") || processingIds.includes("bulk-req") || filteredReqs.filter(r => r.status === "pending" && isRequestExpired(r)).length === 0}
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black transition-all shadow-sm active:scale-95">
+                  {processingIds.includes("bulk-req-expired")
+                    ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    : <Clock size={11} />}
+                  Duyệt quá hạn ({filteredReqs.filter(r => r.status === "pending" && isRequestExpired(r)).length})
+                </button>
+                <button
                   onClick={() => setConfirmAction({ label: "Duyệt các đơn xin nghỉ còn hạn?", count: filteredReqs.filter(r => r.status === "pending" && !isRequestExpired(r)).length, variant: "approve", onConfirm: approveAllReqs })}
                   disabled={processingIds.includes("bulk-req") || processingIds.includes("bulk-req-reject") || filteredReqs.filter(r => r.status === "pending" && !isRequestExpired(r)).length === 0}
                   className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:from-[#B71C1C] hover:to-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black transition-all shadow-sm active:scale-95">
@@ -1711,13 +1792,13 @@ export default function ApprovalManagement({
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="inline-flex gap-1.5 justify-end items-center">
                         <button
-                          onClick={() => setSelectedRequest(req)}
+                          onClick={() => openRequestDetail(req)}
                           className="p-2 hover:bg-gray-100 text-gray-600 hover:text-gray-900 rounded-xl text-xs font-bold transition-all border border-gray-200 hover:border-gray-300 active:scale-95"
                           title="Chi tiết"
                         >
                           <Eye size={17} className="stroke-[2.5px]" />
                         </button>
-                        {req.status === "pending" && !isRequestExpired(req) && (
+                        {req.status === "pending" && (
                           <>
                             <button
                               onClick={() => rejectReq(req.id)}
@@ -1730,8 +1811,10 @@ export default function ApprovalManagement({
                             <button
                               onClick={() => approveReq(req.id)}
                               disabled={processingIds.includes(req.id)}
-                              className="p-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all active:scale-95 shadow-sm"
-                              title="Duyệt"
+                              className={`p-2 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all active:scale-95 shadow-sm ${
+                                isRequestExpired(req) ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-500 hover:bg-emerald-600"
+                              }`}
+                              title={isRequestExpired(req) ? "Duyệt đơn quá hạn" : "Duyệt"}
                             >
                               {processingIds.includes(req.id) ? (
                                 <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -2257,7 +2340,7 @@ export default function ApprovalManagement({
       )}
 
       {selectedRequest && createPortal(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedRequest(null)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => { setSelectedRequest(null); setRequestEditMode(false) }}>
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
               <div className="flex items-center gap-2.5">
@@ -2265,16 +2348,60 @@ export default function ApprovalManagement({
                   <FileText size={16} className="text-[#C62828]" />
                 </div>
                 <div>
-                  <h3 className="font-black text-gray-800 text-base">Chi tiết đơn xin nghỉ</h3>
+                  <h3 className="font-black text-gray-800 text-base">{requestEditMode ? "Sửa đơn chờ duyệt" : "Chi tiết đơn xin nghỉ"}</h3>
                   <p className="text-xs text-gray-400">Mã đơn: <span className="font-mono font-bold text-gray-600">{selectedRequest.id}</span></p>
                 </div>
               </div>
-              <button onClick={() => setSelectedRequest(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+              <button onClick={() => { setSelectedRequest(null); setRequestEditMode(false) }} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
                 <X size={16} />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
+              {requestEditMode ? (
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-500">
+                    {selectedRequest.employeeName} · {getScopeSessionLabel(selectedRequest)}
+                  </p>
+                  {(selectedRequest.scope === "full_day" || selectedRequest.scope === "half_session" || selectedRequest.scope === "date_range") && (
+                    <div className={selectedRequest.scope === "date_range" ? "grid grid-cols-2 gap-3" : ""}>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1 block">Ngày{selectedRequest.scope === "date_range" ? " bắt đầu" : ""}</label>
+                        <CustomDatePicker value={requestEditForm.startDate} onChange={v => setRequestEditForm(f => ({ ...f, startDate: v }))} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm" />
+                      </div>
+                      {selectedRequest.scope === "date_range" && (
+                        <div>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1 block">Ngày kết thúc</label>
+                          <CustomDatePicker value={requestEditForm.endDate} onChange={v => setRequestEditForm(f => ({ ...f, endDate: v }))} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {selectedRequest.scope === "half_session" && (
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1 block">Buổi</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(["sang", "chieu"] as const).map(s => (
+                          <button key={s} type="button" onClick={() => setRequestEditForm(f => ({ ...f, session: s }))}
+                            className={`py-2.5 rounded-xl text-sm font-bold border ${requestEditForm.session === s ? "bg-[#C62828] text-white border-[#C62828]" : "bg-gray-50 border-gray-200 text-gray-600"}`}>
+                            {LEAVE_SESSION[s].label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedRequest.scope === "multi_session" && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                      Đơn nhiều buổi: chỉ sửa lý do tại đây. Đổi buổi cần từ chối để nhân viên nộp lại.
+                    </p>
+                  )}
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1 block">Lý do</label>
+                    <textarea value={requestEditForm.reason} onChange={e => setRequestEditForm(f => ({ ...f, reason: e.target.value }))} rows={3}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-[#C62828]/40" />
+                  </div>
+                </div>
+              ) : (
               <div className="bg-gray-50 rounded-2xl p-5 space-y-3.5 border border-gray-100">
                 <div className="flex items-start gap-3">
                   <AvatarCircle name={selectedRequest.employeeName ?? selectedRequest.employeeId} photo={employees.find(e => e.id === selectedRequest.employeeId)?.photos?.[0]} size="md" />
@@ -2305,14 +2432,33 @@ export default function ApprovalManagement({
                   <StatusPill status={selectedRequest.status as TOStatus} />
                 </div>
               </div>
+              )}
             </div>
 
-            <div className="px-6 pb-6 flex gap-2">
-              {selectedRequest.status === "pending" && !isRequestExpired(selectedRequest) && (
+            <div className="px-6 pb-6 flex flex-wrap gap-2">
+              {selectedRequest.status === "pending" && requestEditMode && (
                 <>
+                  <button onClick={saveRequestEdit} disabled={savingRequestEdit}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#C62828] hover:bg-[#B71C1C] disabled:opacity-50 text-white rounded-2xl text-sm font-black transition-all">
+                    {savingRequestEdit ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Check size={16} />}
+                    Lưu thay đổi
+                  </button>
+                  <button onClick={() => setRequestEditMode(false)} className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl text-sm font-bold">
+                    Hủy sửa
+                  </button>
+                </>
+              )}
+              {selectedRequest.status === "pending" && !requestEditMode && (
+                <>
+                  <button onClick={() => setRequestEditMode(true)}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-200 hover:border-[#C62828]/30 text-gray-700 rounded-2xl text-sm font-bold transition-all">
+                    <PenLine size={15} /> Sửa đơn
+                  </button>
                   <button onClick={() => { approveReq(selectedRequest.id); setSelectedRequest(null) }}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-sm">
-                    <Check size={16} className="stroke-[3px]" /> Phê duyệt
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-sm ${
+                      isRequestExpired(selectedRequest) ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-500 hover:bg-emerald-600"
+                    }`}>
+                    <Check size={16} className="stroke-[3px]" /> {isRequestExpired(selectedRequest) ? "Duyệt (quá hạn)" : "Phê duyệt"}
                   </button>
                   <button onClick={() => { rejectReq(selectedRequest.id); setSelectedRequest(null) }}
                     className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-500 hover:bg-red-600 text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-sm">
@@ -2320,8 +2466,8 @@ export default function ApprovalManagement({
                   </button>
                 </>
               )}
-              <button onClick={() => setSelectedRequest(null)}
-                className={`py-3 bg-gray-150 hover:bg-gray-200 text-gray-700 rounded-2xl text-sm font-bold transition-all ${selectedRequest.status === "pending" && !isRequestExpired(selectedRequest) ? "px-5" : "flex-1"}`}>
+              <button onClick={() => { setSelectedRequest(null); setRequestEditMode(false) }}
+                className={`py-3 bg-gray-150 hover:bg-gray-200 text-gray-700 rounded-2xl text-sm font-bold transition-all ${selectedRequest.status === "pending" && !requestEditMode ? "px-5" : "flex-1"}`}>
                 Đóng
               </button>
             </div>

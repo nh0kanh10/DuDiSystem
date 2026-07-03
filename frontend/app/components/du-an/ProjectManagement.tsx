@@ -6,7 +6,11 @@ import {
   CheckSquare, TrendingUp, Clock, CheckCircle2, PauseCircle,
   AlertCircle, File, Trash, ExternalLink, Check,
   CircleDot, PlayCircle, User, Eye, Bell, Users2, Crown,
+  Lock, Bug
 } from "lucide-react"
+import { ProjectRequirementsTab } from "./ProjectRequirementsTab"
+import { ProjectVaultTab } from "./ProjectVaultTab"
+import { ProjectTestingTab } from "./ProjectTestingTab"
 import { api } from "@/lib/api"
 import { Project, ProjectTeam, ProjectStatus, Employee, Group, OrgNode, Role } from "../../types"
 import { initials } from "../../utils"
@@ -129,7 +133,10 @@ export function ProjectManagement({
   const [teamProjectFilter, setTeamProjectFilter] = useState("all")
 
   const [detail, setDetail] = useState<Project | null>(null)
-  const [detailTab, setDetailTab] = useState<"overview" | "tasks" | "attachments">("overview")
+  const [detailTab, setDetailTab] = useState<"overview" | "tasks" | "attachments" | "requirements" | "vault" | "testing">("overview")
+      // Mock state for new fields (will be replaced with API later)
+      const [localVaultItems, setLocalVaultItems] = useState<any[]>([])
+      const [localBugs, setLocalBugs] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
 
@@ -288,12 +295,20 @@ export function ProjectManagement({
   }
 
   async function openDetail(p: Project) {
-    setDetail(p)
-    setDetailTab("overview")
-    setShowTaskForm(false)
-    setTaskForm({ ...EMPTY_TASK_FORM })
-    loadTasksFor(p.id)
-  }
+        setDetail(p)
+        setDetailTab("overview")
+        setShowTaskForm(false)
+        setTaskForm({ ...EMPTY_TASK_FORM })
+        loadTasksFor(p.id)
+        // Initialize mock data
+        setLocalVaultItems([
+          { id: "1", category: "hosting", name: "Server Hosting", url: "https://example.com", description: "Main production server", createdAt: new Date().toISOString() },
+          { id: "2", category: "contract", name: "Service Agreement", description: "Signed contract with client", createdAt: new Date().toISOString() },
+        ])
+        setLocalBugs([
+          { id: "1", title: "Login button not responsive", description: "Button doesn't work on mobile", severity: "high", status: "open", createdAt: new Date().toISOString() },
+        ])
+      }
 
   async function loadTasksFor(projectId: string) {
     setLoadingTasks(true)
@@ -974,17 +989,20 @@ export function ProjectManagement({
               </div>
             </div>
 
-            <div className="flex border-b border-gray-100 flex-shrink-0">
-              {(["overview", "tasks", "attachments"] as const).map(tab => (
+            <div className="flex border-b border-gray-100 flex-shrink-0 overflow-x-auto">
+              {(["overview", "tasks", "requirements", "vault", "testing", "attachments"] as const).map(tab => (
                 <button key={tab} onClick={() => setDetailTab(tab)}
-                  className={`px-5 py-3 text-xs font-bold transition-colors border-b-2 ${detailTab === tab ? "border-[#C62828] text-[#C62828]" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
+                  className={`px-4 py-3 text-xs font-bold transition-colors border-b-2 whitespace-nowrap ${detailTab === tab ? "border-[#C62828] text-[#C62828]" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
                   {tab === "overview" ? "Tổng quan"
                     : tab === "tasks" ? `Công việc (${tasks.length})`
+                    : tab === "requirements" ? "Yêu cầu"
+                    : tab === "vault" ? <span className="flex items-center gap-1"><Lock size={12} /> Vault</span>
+                    : tab === "testing" ? <span className="flex items-center gap-1"><Bug size={12} /> Testing</span>
                     : `Tài liệu (${detail.attachments.length})`}
                 </button>
               ))}
               <button onClick={() => { setDetail(null); setMainTab("teams"); setTeamProjectFilter(detail.id) }}
-                className="px-5 py-3 text-xs font-bold transition-colors border-b-2 border-transparent text-gray-400 hover:text-gray-600 ml-auto flex items-center gap-1">
+                className="px-4 py-3 text-xs font-bold transition-colors border-b-2 border-transparent text-gray-400 hover:text-gray-600 ml-auto flex items-center gap-1 whitespace-nowrap">
                 <Users2 size={12} /> Nhóm →
               </button>
             </div>
@@ -1168,6 +1186,44 @@ export function ProjectManagement({
                     })
                   )}
                 </div>
+              )}
+
+              {detailTab === "requirements" && (
+                <ProjectRequirementsTab
+                  requirementForm={{
+                    id: "req-1",
+                    leadId: "lead-1",
+                    code: "REQ-001",
+                    title: "Yêu cầu dự án " + detail.name,
+                    isLocked: true,
+                    projectType: "Website",
+                    colorScheme: "Red & White",
+                    features: ["Đăng nhập", "Quản lý đơn hàng", "Báo cáo thống kê"],
+                    references: ["https://example.com/ref1"],
+                    additionalNotes: "Yêu cầu hoàn thành trong 2 tháng",
+                    createdAt: new Date().toISOString(),
+                    attachments: [],
+                  }}
+                />
+              )}
+
+              {detailTab === "vault" && (
+                <ProjectVaultTab
+                  vaultItems={localVaultItems}
+                  onAddItem={(item) => setLocalVaultItems(prev => [...prev, { ...item, id: Date.now().toString() }])}
+                  onEditItem={(id, item) => setLocalVaultItems(prev => prev.map(x => x.id === id ? { ...x, ...item } : x))}
+                  onDeleteItem={(id) => setLocalVaultItems(prev => prev.filter(x => x.id !== id))}
+                />
+              )}
+
+              {detailTab === "testing" && (
+                <ProjectTestingTab
+                  bugs={localBugs}
+                  employees={employees}
+                  onAddBug={(bug) => setLocalBugs(prev => [...prev, { ...bug, id: Date.now().toString() }])}
+                  onEditBug={(id, bug) => setLocalBugs(prev => prev.map(x => x.id === id ? { ...x, ...bug } : x))}
+                  onDeleteBug={(id) => setLocalBugs(prev => prev.filter(x => x.id !== id))}
+                />
               )}
 
               {detailTab === "attachments" && (

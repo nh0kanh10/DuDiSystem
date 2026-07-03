@@ -47,8 +47,8 @@ export function isInternStatus(status?: string) {
   return status === "intern"
 }
 
-export function isInternEmployee(emp: Pick<Employee, "status">) {
-  return isInternStatus(emp.status)
+export function isInternEmployee(emp: Pick<Employee, "contractType">) {
+  return emp.contractType === "intern"
 }
 
 export function isInternRecord(rec: Pick<AttendanceRecord, "employeeStatus">) {
@@ -60,7 +60,7 @@ export function employeeKindMeta(status?: string) {
 }
 
 export function enrichAttendanceRecord(rec: AttendanceRecord, emp: Employee): AttendanceRecord {
-  return { ...rec, employeeStatus: rec.employeeStatus ?? emp.status }
+  return { ...rec, employeeStatus: rec.employeeStatus ?? (emp.contractType === "intern" ? "intern" : "staff") }
 }
 
 export function monthRowsForEmployee(emp: Employee): MonthTimeRow[] {
@@ -98,7 +98,7 @@ export function sessionLabel(session?: InternSession) {
 }
 
 export function internLegendText() {
-  return monthRowsForEmployee({ status: "intern" } as Employee).map(r => r.label).join(" / ")
+  return monthRowsForEmployee({ contractType: "intern" } as Employee).map(r => r.label).join(" / ")
 }
 
 export function emptyTimeFormValue(value?: string) {

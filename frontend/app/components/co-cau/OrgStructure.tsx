@@ -927,8 +927,9 @@ export default function OrgStructure({
                               —
                             </td>
                             <td className="px-6 py-3.5">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${emp.status === "active" ? "bg-green-100 text-green-700" : emp.status === "intern" ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-500"}`}>
-                                {emp.status === "active" ? "Đang làm" : emp.status === "intern" ? "Thực tập" : "Nghỉ việc"}
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${emp.status === "active" ? "bg-green-100 text-green-700" : emp.status === "suspended" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-500"}`}>
+                                {emp.status === "active" ? "Đang làm" : emp.status === "suspended" ? "Tạm nghỉ" : "Nghỉ việc"}
+                                {emp.contractType === "intern" && <span className="ml-1 text-purple-500">(TT)</span>}
                               </span>
                             </td>
                             <td className="px-6 py-3.5">

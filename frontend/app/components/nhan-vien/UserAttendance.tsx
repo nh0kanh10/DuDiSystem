@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react"
 import { Fingerprint, CheckCircle, Clock, AlertCircle, Calendar, Loader2, RefreshCw, Wifi } from "lucide-react"
 import { useEmployeeAttendance, todayISO } from "../../hooks/useEmployeeAttendance"
-import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL } from "../cham-cong/attendanceDisplay"
+import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL, ATT_STATUS_STYLE } from "../cham-cong/attendanceDisplay"
 import { EMPLOYEE_KIND, INTERN_SESSION, internSessionRange } from "../cham-cong/attendanceModel"
 
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
@@ -23,6 +23,22 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.color}`}>
       {s.label}
     </span>
+  )
+}
+
+function InternSessionStatusBadges({ statusAm, statusPm }: { statusAm?: string; statusPm?: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      {([["S", statusAm], ["C", statusPm]] as const).map(([label, status]) => {
+        const s = ATT_STATUS_STYLE[status ?? "absent"] ?? ATT_STATUS_STYLE.absent
+        return (
+          <span key={label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${s.bg} ${s.text}`}>
+            <span className="text-gray-500 font-black">{label}:</span>
+            {s.label}
+          </span>
+        )
+      })}
+    </div>
   )
 }
 
@@ -396,7 +412,11 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
                       </>
                     )}
                     <td className="px-5 py-3.5 font-mono text-xs font-medium">{r.workingHours ?? "--"}</td>
-                    <td className="px-5 py-3.5"><StatusBadge status={r.status} /></td>
+                    <td className="px-5 py-3.5">
+                      {isIntern
+                        ? <InternSessionStatusBadges statusAm={r.statusAm} statusPm={r.statusPm} />
+                        : <StatusBadge status={r.status} />}
+                    </td>
                   </tr>
                 )
               })}

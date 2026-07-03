@@ -7,7 +7,7 @@ import {
 import { api } from "@/lib/api"
 import { AttendanceRecord, Employee } from "../../types"
 import { CustomDatePicker } from "../ui/CustomDatePicker"
-import { formatAttendanceTimes, formatAttendanceNote, formatDurationHms, formatCheckTime } from "./attendanceDisplay"
+import { formatAttendanceTimes, formatAttendanceNote, formatDurationHms, formatCheckTime, ATT_STATUS_STYLE, internPunchClass, recordMatchesStatusFilter, internSessionStatusForRow } from "./attendanceDisplay"
 import {
   EMPLOYEE_KIND,
   createAddAttendanceForm,
@@ -132,11 +132,27 @@ function exportCSV(rows: AttendanceRecord[], label: string) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_MAP[status as AttStatus] ?? { label: status, bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" }
+  const s = ATT_STATUS_STYLE[status] ?? { label: status, bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" }
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${s.bg} ${s.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
     </span>
+  )
+}
+
+function InternSessionBadges({ record }: { record: AttendanceRecord }) {
+  return (
+    <div className="flex flex-col gap-1">
+      {([["S", record.statusAm], ["C", record.statusPm]] as const).map(([label, status]) => {
+        const s = ATT_STATUS_STYLE[status ?? "absent"] ?? ATT_STATUS_STYLE.absent
+        return (
+          <span key={label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${s.bg} ${s.text}`}>
+            <span className="text-gray-500 font-black">{label}:</span>
+            {s.label}
+          </span>
+        )
+      })}
+    </div>
   )
 }
 
@@ -286,7 +302,7 @@ function AddModal({ date, employees, onClose, onSave }: {
     () => employees.find(e => e.id === form.employeeId),
     [employees, form.employeeId],
   )
-  const isIntern = isInternEmployee(selectedEmp ?? { status: "active" })
+  const isIntern = isInternEmployee(selectedEmp ?? { contractType: "" })
 
   const handleSave = async () => {
     if (!form.employeeId) return
@@ -521,7 +537,7 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
     const q = search.toLowerCase()
     return (!q || r.employeeName.toLowerCase().includes(q) || r.employeeId.toLowerCase().includes(q))
       && (filterDept === "all" || r.department === filterDept)
-      && (filterStatus === "all" || r.status === filterStatus)
+      && recordMatchesStatusFilter(r, filterStatus)
       && (filterType === "all"
         || (filterType === "intern" ? isInternRecord(r) : !isInternRecord(r)))
   }), [enrichedRecords, search, filterDept, filterStatus, filterType])
@@ -678,8 +694,14 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
                       <td className="py-3 px-4 font-mono text-xs text-gray-700">
                         {isInternRecord(r) ? (
                           <div className="space-y-0.5 text-[10px]">
-                            <div><span className="text-gray-400">{INTERN_SESSION.am.short}:</span> {formatCheckTime(r.checkInAm)}</div>
-                            <div><span className="text-gray-400">{INTERN_SESSION.pm.short}:</span> {formatCheckTime(r.checkInPm)}</div>
+                            <div>
+                              <span className="text-gray-400">{INTERN_SESSION.am.short}:</span>{" "}
+                              <span className={internPunchClass(r.statusAm, r.checkInAm)}>{formatCheckTime(r.checkInAm)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">{INTERN_SESSION.pm.short}:</span>{" "}
+                              <span className={internPunchClass(r.statusPm, r.checkInPm)}>{formatCheckTime(r.checkInPm)}</span>
+                            </div>
                           </div>
                         ) : (
                           <span className={r.status === "late" ? "text-orange-600 font-bold" : "font-bold"}>{formatCheckTime(r.checkIn)}</span>
@@ -688,8 +710,14 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
                       <td className="py-3 px-4 font-mono text-xs text-gray-500">
                         {isInternRecord(r) ? (
                           <div className="space-y-0.5 text-[10px]">
-                            <div><span className="text-gray-400">{INTERN_SESSION.am.short}:</span> {formatCheckTime(r.checkOutAm)}</div>
-                            <div><span className="text-gray-400">{INTERN_SESSION.pm.short}:</span> {formatCheckTime(r.checkOutPm)}</div>
+                            <div>
+                              <span className="text-gray-400">{INTERN_SESSION.am.short}:</span>{" "}
+                              <span className={internPunchClass(r.statusAm, r.checkOutAm)}>{formatCheckTime(r.checkOutAm)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">{INTERN_SESSION.pm.short}:</span>{" "}
+                              <span className={internPunchClass(r.statusPm, r.checkOutPm)}>{formatCheckTime(r.checkOutPm)}</span>
+                            </div>
                           </div>
                         ) : (
                           formatCheckTime(r.checkOut)
@@ -700,8 +728,10 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
                           ? formatDurationHms(r.workingHours ?? "--")
                           : formatDurationHms(r.workingHours ?? calcHours(r.checkIn, r.checkOut))}
                       </td>
-                      <td className="py-3 px-4"><StatusBadge status={r.status} /></td>
-                      <td className="py-3 px-4 text-xs text-gray-500 max-w-[160px] truncate" title={r.note}>{formatAttendanceNote(r.note)}</td>
+                      <td className="py-3 px-4">
+                        {isInternRecord(r) ? <InternSessionBadges record={r} /> : <StatusBadge status={r.status} />}
+                      </td>
+                      <td className="py-3 px-4 text-xs text-gray-500 max-w-[220px] truncate" title={r.note}>{formatAttendanceNote(r.note)}</td>
                       <td className="py-3 px-4">
                         <button onClick={() => setEditRecord(r)}
                           className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-[#C62828] transition-all">
@@ -829,21 +859,33 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
       )
     }
 
-    const heat = heatForStatus(rec.status)
+    const sessionStatus = internSessionStatusForRow(rec, row.session) ?? rec.status
+    const heat = heatForStatus(sessionStatus)
     const time = monthRowTime(rec, row)
     const tipSession = sessionLabel(row.session)
     const kindLabel = row.kind === "in" ? "Vào" : "Ra"
-    const label = STATUS_MAP[rec.status as AttStatus]?.label ?? rec.status
+    const sessionNote = row.session === "am" ? rec.noteAm : row.session === "pm" ? rec.notePm : rec.note
+    const label = STATUS_MAP[sessionStatus as AttStatus]?.label ?? sessionStatus
     const tip = [
       tipSession && `${tipSession} · ${kindLabel}`,
       !tipSession && kindLabel,
       time || label,
-      rec.note && formatAttendanceNote(rec.note),
+      sessionNote && formatAttendanceNote(sessionNote),
+      !sessionNote && rec.note && formatAttendanceNote(rec.note),
     ].filter(Boolean).join(" · ")
 
     const inStyle = { borderColor: "#10b981", bg: "#ecfdf5", text: "#047857" }
     const outStyle = { borderColor: "#64748b", bg: "#f8fafc", text: "#475569" }
     const style = row.kind === "in" ? inStyle : outStyle
+
+    const sessionEmptyLabel = (status?: string) => {
+      if (status === "leave") return <span className="text-[10px] font-bold text-violet-600">Phép</span>
+      if (status === "absent") return <span className="text-[10px] font-bold text-red-400">Vắng</span>
+      if (status === "late") return <span className="text-[10px] font-bold text-orange-500">Trễ</span>
+      if (status === "early") return <span className="text-[10px] font-bold text-amber-500">Sớm</span>
+      if (status === "late_early") return <span className="text-[10px] font-bold text-orange-600">T&amp;S</span>
+      return null
+    }
 
     return (
       <td key={`${d}-${row.id}`} className={baseTd} style={{ height: MONTH_SUB_ROW_H }}>
@@ -860,14 +902,10 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
           }}>
           {time ? (
             <span className="text-xs font-bold tabular-nums px-1" style={{ color: style.text }}>{time}</span>
-          ) : row.kind === "in" && !row.session && rec.status === "absent" ? (
-            <span className="text-[10px] font-bold text-red-500">Vắng</span>
-          ) : row.kind === "in" && !row.session && rec.status === "leave" ? (
-            <span className="text-[10px] font-bold text-violet-600">Phép</span>
-          ) : row.kind === "in" && row.session === "am" && (rec.statusAm === "absent" || rec.status === "absent") ? (
-            <span className="text-[10px] font-bold text-red-400">Vắng</span>
-          ) : row.kind === "in" && row.session === "pm" && (rec.statusPm === "absent" || rec.status === "absent") ? (
-            <span className="text-[10px] font-bold text-red-400">Vắng</span>
+          ) : row.kind === "in" && !row.session ? (
+            sessionEmptyLabel(rec.status) ?? <span className="text-gray-300 text-sm">—</span>
+          ) : row.kind === "in" && row.session ? (
+            sessionEmptyLabel(sessionStatus) ?? <span className="text-gray-300 text-sm">—</span>
           ) : (
             <span className="text-gray-300 text-sm">—</span>
           )}

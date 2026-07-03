@@ -182,14 +182,14 @@ export function getScopeSessionLabel(req: LeaveRequestRecord): string {
   }
 }
 
-export function scopesForEmployee(emp: Pick<Employee, "status">): LeaveScope[] {
+export function scopesForEmployee(emp: Pick<Employee, "contractType">): LeaveScope[] {
   if (isInternEmployee(emp)) {
     return ["half_session", "full_day", "multi_session"]
   }
   return ["full_day", "date_range", "half_session"]
 }
 
-export function leaveTypesForEmployee(emp: Pick<Employee, "status">, category: LeaveCategory): LeaveType[] {
+export function leaveTypesForEmployee(emp: Pick<Employee, "contractType">, category: LeaveCategory): LeaveType[] {
   if (category === "timeoff") return ["timeoff"]
   if (isInternEmployee(emp)) return ["personal", "sick", "unpaid"]
   return ["annual", "sick", "personal", "unpaid"]
@@ -214,7 +214,7 @@ export interface LeaveFormState {
   reason: string
 }
 
-export function createLeaveForm(emp: Pick<Employee, "status">): LeaveFormState {
+export function createLeaveForm(emp: Pick<Employee, "contractType">): LeaveFormState {
   const intern = isInternEmployee(emp)
   return {
     category: "leave",
@@ -287,4 +287,35 @@ export function countLeaveDays(req: LeaveRequestRecord): number {
     default:
       return 0
   }
+}
+
+export function isActiveLeaveRequest(req: LeaveRequestRecord): boolean {
+  return req.status === "pending" || req.status === "approved"
+}
+
+export function expandFormToSlots(form: LeaveFormState): LeaveSessionSlot[] {
+  const mock = buildCreatePayload("", form) as LeaveRequestRecord
+  return expandRequestToSlots(mock).map(s => ({
+    date: `${String(s.date.getDate()).padStart(2, "0")}/${String(s.date.getMonth() + 1).padStart(2, "0")}/${s.date.getFullYear()}`,
+    session: s.session,
+  }))
+}
+
+export function findSlotConflict(
+  newSlots: LeaveSessionSlot[],
+  requests: LeaveRequestRecord[],
+): { slot: LeaveSessionSlot; existing: LeaveRequestRecord } | null {
+  const occupied = new Map<string, LeaveRequestRecord>()
+  for (const req of requests) {
+    if (!isActiveLeaveRequest(req)) continue
+    for (const slot of expandRequestToSlots(req)) {
+      occupied.set(`${slot.date}|${slot.session}`, req)
+    }
+  }
+  for (const slot of newSlots) {
+    const key = `${slot.date}|${slot.session}`
+    const existing = occupied.get(key)
+    if (existing) return { slot, existing }
+  }
+  return null
 }

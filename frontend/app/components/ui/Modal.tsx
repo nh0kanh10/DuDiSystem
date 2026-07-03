@@ -7,10 +7,11 @@ interface ModalProps {
   onClose: () => void
   title: string
   icon?: React.ElementType
-  width?: "sm" | "md" | "lg" | "xl"
+  width?: "sm" | "md" | "lg" | "xl" | "3xl"
   children: React.ReactNode
   footer?: React.ReactNode
   bodyClassName?: string
+  noFooter?: boolean
 }
 
 const WIDTH = {
@@ -18,9 +19,10 @@ const WIDTH = {
   md:  "max-w-md",
   lg:  "max-w-lg",
   xl:  "max-w-2xl",
+  "3xl": "max-w-3xl",
 }
 
-export function Modal({ open, onClose, title, icon: Icon, width = "xl", children, footer, bodyClassName = "" }: ModalProps) {
+export function Modal({ open, onClose, title, icon: Icon, width = "xl", children, footer, bodyClassName = "", noFooter = false }: ModalProps) {
   if (!open) return null
   return createPortal(
     <div
@@ -56,7 +58,7 @@ export function Modal({ open, onClose, title, icon: Icon, width = "xl", children
         </div>
 
         {/* Footer */}
-        {footer && (
+        {footer && !noFooter && (
           <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
             {footer}
           </div>

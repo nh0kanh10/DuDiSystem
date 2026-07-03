@@ -19,7 +19,13 @@ import ConfirmModal from "../ui/ConfirmModal"
 
 type EditTab = "personal" | "work" | "files" | "history"
 
-const CONTRACT_TYPES = ["Chính thức", "Thực tập", "Part-time", "CTV", "Cộng tác viên"]
+const CONTRACT_TYPES = [
+  { value: "staff", label: "Chính thức" },
+  { value: "intern", label: "Thực tập" },
+  { value: "probation", label: "Thử việc" },
+  { value: "parttime", label: "Part-time" },
+  { value: "ctv", label: "Cộng tác viên" },
+]
 
 const WH_CONFIG: Record<WorkHistoryType, { label: string; color: string; bg: string; Icon: React.ElementType }> = {
   join:      { label: "Bắt đầu làm việc", color: "#22c55e", bg: "#f0fdf4", Icon: UserPlus },
@@ -835,7 +841,7 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
               value={form.contractType}
               onChange={val => !readonly && sf("contractType", val)}
               disabled={readonly}
-              options={CONTRACT_TYPES.map(t => ({ value: t, label: t }))}
+              options={CONTRACT_TYPES.map(t => ({ value: t.value, label: t.label }))}
               className="w-full"
               heightClass="h-[42px]"
             />
@@ -847,7 +853,7 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
               disabled={readonly}
               options={[
                 { value: "active", label: "Đang làm" },
-                { value: "intern", label: "Thực tập" },
+                { value: "suspended", label: "Tạm nghỉ" },
                 { value: "inactive", label: "Nghỉ việc" }
               ]}
               className="w-full"
@@ -855,7 +861,7 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
             />
           </div>
           <div><label className={lbl}>Ngày bắt đầu làm việc</label><DateInput disabled={readonly} value={form.joinDate} onChange={val => !readonly && sf("joinDate", val)} className={inp} /></div>
-          {form.status === "intern" && (
+          {form.contractType === "intern" && (
             <div><label className={lbl}>Ngày kết thúc thực tập</label><DateInput disabled={readonly} value={form.internEndDate} onChange={val => !readonly && sf("internEndDate", val)} className={inp} /></div>
           )}
           {form.status === "inactive" && (
@@ -904,7 +910,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
   }, [])
 
   useEffect(() => {
-    if (form.status === "intern" && !form.internEndDate && form.joinDate) {
+    if (form.contractType === "intern" && !form.internEndDate && form.joinDate) {
       sf("internEndDate", addMonthsToVNDate(form.joinDate, internshipMonths))
     }
   }, [form.status, form.joinDate, internshipMonths, form.internEndDate, sf])
@@ -993,12 +999,14 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
   )
 }
 
-export function EmployeeManagement({ employees, setEmployees, orgNodes = [], selectedBranch = "all", onBranchChange }: {
+export function EmployeeManagement({ employees, setEmployees, orgNodes = [], selectedBranch = "all", onBranchChange, autoOpenUpdateReqId, onClearAutoOpenReq }: {
   employees: Employee[]
   setEmployees: React.Dispatch<React.SetStateAction<Employee[]>>
   orgNodes?: { id: string; name: string; type?: string; parentId?: string }[]
   selectedBranch?: string
   onBranchChange?: (b: string) => void
+  autoOpenUpdateReqId?: string | null
+  onClearAutoOpenReq?: () => void
 }) {
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -1028,8 +1036,39 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
   } | null>(null)
 
   useEffect(() => {
-    api.profileUpdates.list().then(setProfileUpdates).catch(() => {})
+    console.log("EmployeeManagement mounted, fetching profileUpdates...");
+    api.profileUpdates.list().then(d => {
+      console.log("EmployeeManagement list fetched on mount:", d);
+      setProfileUpdates(d);
+    }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    console.log("autoOpenUpdateReqId changed:", autoOpenUpdateReqId);
+    if (autoOpenUpdateReqId) {
+      console.log("Fetching profileUpdates due to autoOpenUpdateReqId...");
+      api.profileUpdates.list().then(d => {
+        console.log("Fetched profileUpdates due to autoOpenUpdateReqId:", d);
+        setProfileUpdates(d);
+      }).catch(() => {})
+    }
+  }, [autoOpenUpdateReqId])
+
+  useEffect(() => {
+    console.log("Checking autoOpenUpdateReqId condition:", { autoOpenUpdateReqId, updatesCount: profileUpdates.length });
+    if (autoOpenUpdateReqId && profileUpdates.length > 0) {
+      const req = profileUpdates.find(r => r.id === autoOpenUpdateReqId)
+      console.log("Search request result:", req);
+      if (req) {
+        console.log("Setting previewReq to:", req);
+        setPreviewReq(req)
+      } else {
+        console.warn("Could not find request with ID:", autoOpenUpdateReqId, "in updates:", profileUpdates);
+      }
+      console.log("Clearing auto-open request ID...");
+      onClearAutoOpenReq?.()
+    }
+  }, [autoOpenUpdateReqId, profileUpdates])
 
   const handleRequestUpdate = async (empId: string, note?: string) => {
     try {
@@ -1159,15 +1198,15 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       let defaultNote = ""
 
       if (isStatusChanged) {
-        if (editEmp.status === "inactive" && (form.status === "active" || form.status === "intern")) {
+        if (editEmp.status === "inactive" && (form.status === "active" || form.status === "suspended")) {
           detectedType = "rehire"
           defaultNote = "Tái tuyển dụng"
-        } else if ((editEmp.status === "active" || editEmp.status === "intern") && form.status === "inactive") {
+        } else if ((editEmp.status === "active" || editEmp.status === "suspended") && form.status === "inactive") {
           detectedType = "resign"
           defaultNote = "Nghỉ việc"
-        } else if (editEmp.status === "intern" && form.status === "active") {
+        } else if ((editEmp.status === "active" && form.status === "suspended") || (editEmp.status === "suspended" && form.status === "active")) {
           detectedType = "promotion"
-          defaultNote = "Chuyển chính thức"
+          defaultNote = "Thay đổi trạng thái"
         }
       }
 
@@ -1227,7 +1266,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
 
   const stats = useMemo(() => ({
     active: employees.filter(e => e.status === "active").length,
-    intern: employees.filter(e => e.status === "intern").length,
+    intern: employees.filter(e => e.contractType === "intern").length,
     inactive: employees.filter(e => e.status === "inactive").length,
   }), [employees])
 

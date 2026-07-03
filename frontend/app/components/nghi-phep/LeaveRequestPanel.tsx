@@ -19,6 +19,10 @@ import {
   leaveTypesForEmployee,
   scopesForEmployee,
   validateLeaveForm,
+  expandFormToSlots,
+  findSlotConflict,
+  isActiveLeaveRequest,
+  isRequestExpired,
   type LeaveCategory,
   type LeaveFormState,
   type LeaveRequestRecord,
@@ -38,6 +42,7 @@ const portalInputClass = "w-full px-4 py-3 rounded-xl text-base focus:outline-no
 export default function LeaveRequestPanel({ employee, variant = "default" }: Props) {
   const portal = variant === "portal"
   const [tab, setTab] = useState<"register" | "history">("register")
+  const [historyFilter, setHistoryFilter] = useState<"active" | "all">("active")
   const [form, setForm] = useState<LeaveFormState>(() => createLeaveForm(employee))
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -52,13 +57,18 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
   const blockedSlots = useMemo(() => {
     const slots: { date: string; session: LeaveSession }[] = []
     for (const r of requests) {
-      if (r.status === "rejected" || r.status === "cancelled") continue
+      if (!isActiveLeaveRequest(r)) continue
       for (const s of expandRequestToSlots(r)) {
         slots.push({ date: `${String(s.date.getDate()).padStart(2, "0")}/${String(s.date.getMonth() + 1).padStart(2, "0")}/${s.date.getFullYear()}`, session: s.session })
       }
     }
     return slots
   }, [requests])
+
+  const displayedRequests = useMemo(() => {
+    if (historyFilter === "all") return requests
+    return requests.filter(isActiveLeaveRequest)
+  }, [requests, historyFilter])
 
   const leaveTypeOptions = useMemo(() => {
     return leaveTypesForEmployee(employee, form.category).map(t => ({
@@ -85,6 +95,12 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
     const err = validateLeaveForm(form)
     if (err) {
       setFormError(err)
+      return
+    }
+    const conflict = findSlotConflict(expandFormToSlots(form), requests)
+    if (conflict) {
+      const sessionLabel = LEAVE_SESSION[conflict.slot.session].short
+      setFormError(`Trùng ${conflict.slot.date} buổi ${sessionLabel} với đơn ${conflict.existing.id} (${LEAVE_STATUS[conflict.existing.status].label.toLowerCase()})`)
       return
     }
     setSubmitting(true)
@@ -297,6 +313,27 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
 
       {tab === "history" && (
         <div className="space-y-3">
+          <div className={`flex items-center justify-between gap-3 flex-wrap ${portal ? "px-1" : ""}`}>
+            <div className={`flex gap-1 rounded-xl p-1 ${portal ? "bg-[#fff0f1] border border-[#efd7da]" : "bg-gray-100"}`}>
+              {([["active", "Đang hiệu lực"], ["all", "Tất cả"]] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setHistoryFilter(key)}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold transition-all ${
+                    historyFilter === key
+                      ? portal ? "bg-white text-[#E8231A] shadow-sm" : "bg-white text-[#C62828] shadow-sm"
+                      : portal ? "text-[#8b6b70]" : "text-gray-500"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <span className={`text-xs font-semibold ${portal ? "text-[#8b6b70]" : "text-gray-400"}`}>
+              {displayedRequests.length}/{requests.length} đơn
+            </span>
+          </div>
           {loading && (
             <div className={`flex justify-center py-10 ${portal ? "text-[#7f5f63]" : "text-gray-400"}`}>
               <span className="text-sm font-bold">Đang tải đơn...</span>
@@ -308,12 +345,19 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
               <button type="button" onClick={reload} className="ml-2 font-bold underline">Thử lại</button>
             </div>
           )}
-          {!loading && requests.length === 0 && (
+          {!loading && displayedRequests.length === 0 && (
             <div className={`rounded-2xl p-10 text-center border ${portal ? "bg-white border-[#efd7da] text-[#7f5f63]" : "bg-white text-gray-400 border-black/5"}`}>
-              <p className="text-base font-bold">Chưa có đơn xin nghỉ</p>
+              <p className="text-base font-bold">
+                {historyFilter === "active" ? "Không có đơn đang chờ hoặc đã duyệt" : "Chưa có đơn xin nghỉ"}
+              </p>
+              {historyFilter === "active" && requests.length > 0 && (
+                <button type="button" onClick={() => setHistoryFilter("all")} className="mt-3 text-sm font-bold text-[#C62828] underline">
+                  Xem đơn đã hủy / từ chối ({requests.length - displayedRequests.length})
+                </button>
+              )}
             </div>
           )}
-          {requests.map(r => (
+          {displayedRequests.map(r => (
             <RequestHistoryCard key={r.id} req={r} onCancel={() => setCancelId(r.id)} portal={portal} />
           ))}
         </div>
@@ -344,16 +388,23 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
 
 function RequestHistoryCard({ req, onCancel, portal = false }: { req: LeaveRequestRecord; onCancel: () => void; portal?: boolean }) {
   const st = LEAVE_STATUS[req.status]
-  const statusPrefix = req.status === "approved" ? "Đã duyệt" : req.status === "pending" ? "Chờ duyệt" : "Đã hủy"
+  const expiredPending = req.status === "pending" && isRequestExpired(req)
+  const statusLabel =
+    req.status === "approved" ? "Đã duyệt"
+    : req.status === "pending" ? (expiredPending ? "Quá hạn · chờ duyệt" : "Chờ duyệt")
+    : req.status === "rejected" ? "Từ chối"
+    : req.status === "cancelled" ? "Đã hủy"
+    : st.label
+  const canResubmitHint = req.status === "cancelled" || req.status === "rejected" || expiredPending
   return (
-    <div className={`rounded-2xl p-6 border ${portal ? "bg-white border-[#efd7da] shadow-[0_14px_40px_rgba(95,15,22,0.08)]" : "bg-white border-black/5 shadow-sm"}`}>
+    <div className={`rounded-2xl p-6 border ${portal ? "bg-white border-[#efd7da] shadow-[0_14px_40px_rgba(95,15,22,0.08)]" : "bg-white border-black/5 shadow-sm"} ${canResubmitHint ? "opacity-80" : ""}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2.5 flex-wrap mb-3">
             <span className={`font-black text-lg ${portal ? "text-[#241416]" : "text-gray-800"}`}>{LEAVE_TYPE[req.leaveType]?.label ?? req.leaveType}</span>
             <span className={`text-xs font-black font-mono ${portal ? "text-[#8b6b70]" : "text-gray-400"}`}>{req.id}</span>
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-black ${st.bg} ${st.color}`}>
-              {statusPrefix || st.label}
+              {statusLabel}
             </span>
           </div>
           <p className={`text-base mb-2 ${portal ? "text-[#6f565a]" : "text-gray-500"}`}>
@@ -363,8 +414,13 @@ function RequestHistoryCard({ req, onCancel, portal = false }: { req: LeaveReque
           </p>
           <p className={`text-base leading-6 ${portal ? "text-[#241416]" : "text-gray-600"}`}>{req.reason}</p>
           <p className={`text-sm mt-3 ${portal ? "text-[#8b6b70]" : "text-gray-400"}`}>Gửi lúc {req.submittedAt}</p>
+          {canResubmitHint && (
+            <p className={`text-xs mt-2 font-semibold ${portal ? "text-[#8b6b70]" : "text-gray-500"}`}>
+              Có thể nộp đơn mới cho cùng ngày/buổi — đơn này không chặn lịch đăng ký.
+            </p>
+          )}
         </div>
-        {req.status === "pending" && (
+        {req.status === "pending" && !expiredPending && (
           <button
             type="button"
             onClick={onCancel}

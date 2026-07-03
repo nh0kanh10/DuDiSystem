@@ -71,6 +71,26 @@ export function reject(req, res) {
   ok(res, result)
 }
 
+export function update(req, res) {
+  if (!canManageRequests(req.user)) return fail(res, "Không có quyền sửa đơn", 403)
+  const req_ = svc.getRequest(req.params.id)
+  if (!req_) return notFound(res, "Không tìm thấy đơn")
+  const denied = assertEmployeeInScope(req.user, req_.employeeId)
+  if (denied) return fail(res, denied.error, denied.status)
+  const result = svc.updateRequest(req.params.id, req.body, { adminEdit: true })
+  if (!result) return notFound(res, "Không tìm thấy đơn")
+  if (result.error) return fail(res, result.error, result.status)
+  ok(res, result)
+}
+
+export function approveBulk(req, res) {
+  if (!canManageRequests(req.user)) return fail(res, "Không có quyền duyệt đơn", 403)
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : []
+  const result = svc.approveRequestsBulk(ids)
+  if (result?.error) return fail(res, result.error, result.status)
+  ok(res, result)
+}
+
 export function remove(req, res) {
   if (!canManageRequests(req.user)) return fail(res, "Không có quyền xóa đơn", 403)
   const deleted = svc.deleteRequest(req.params.id)

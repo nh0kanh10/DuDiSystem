@@ -1033,5 +1033,89 @@
     "date": "2026-07-01",
     "status": "on-time",
     "note": ""
+  },
+  {
+    "id": "ATT108",
+    "employeeId": "NV002",
+    "checkIn": "09:15",
+    "checkOut": "--",
+    "date": "2026-07-01",
+    "status": "late",
+    "note": ""
+  },
+  {
+    "id": "ATT109",
+    "employeeId": "NV003",
+    "checkIn": "08:45",
+    "checkOut": "--",
+    "date": "2026-07-01",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT110",
+    "employeeId": "NV004",
+    "checkIn": "08:30",
+    "checkOut": "17:15",
+    "date": "2026-07-01",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT111",
+    "employeeId": "NV005",
+    "checkIn": "09:10",
+    "checkOut": "16:30",
+    "date": "2026-07-01",
+    "status": "late_early",
+    "note": ""
+  },
+  {
+    "id": "ATT112",
+    "employeeId": "NV006",
+    "checkInAm": "08:50",
+    "checkOutAm": "12:00",
+    "checkInPm": "13:30",
+    "checkOutPm": "--",
+    "statusAm": "on-time",
+    "statusPm": "absent",
+    "noteAm": "",
+    "notePm": "Vắng chiều",
+    "date": "2026-07-01",
+    "status": "absent",
+    "note": ""
+  },
+  {
+    "id": "ATT113",
+    "employeeId": "NV007",
+    "checkInAm": "09:20",
+    "checkOutAm": "12:00",
+    "checkInPm": "--",
+    "checkOutPm": "--",
+    "statusAm": "late",
+    "statusPm": "absent",
+    "noteAm": "",
+    "notePm": "Vắng chiều",
+    "date": "2026-07-01",
+    "status": "absent",
+    "note": ""
+  },
+  {
+    "id": "ATT114",
+    "employeeId": "NV009",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-01",
+    "status": "leave",
+    "note": "Nghỉ phép năm"
+  },
+  {
+    "id": "ATT115",
+    "employeeId": "NV011",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-01",
+    "status": "absent",
+    "note": "Vắng"
   }
 ]

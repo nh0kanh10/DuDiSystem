@@ -11,14 +11,6 @@ export interface RoleDefinition {
   roleType?: "management" | "staff" | "admin" | "manager"
 }
 
-export type Page =
-  | "dashboard" | "nhan-su" | "cham-cong" | "thong-ke"
-  | "duyet-don" | "thong-bao" | "cong-viec" | "du-an"
-  | "tai-khoan" | "phan-quyen" | "ip" | "tien-ich" | "co-cau"
-  | "crm" | "staff-portal"
-  | "user-profile" | "user-attendance" | "user-timeoff" | "user-directory"
-  | "user-chat" | "user-workflow" | "user-settings" | "user-crm"
-
 export type WorkHistoryType = "join" | "resign" | "rehire" | "transfer" | "promotion"
 
 export interface WorkHistoryEntry {
@@ -48,7 +40,7 @@ export interface Employee {
   department: string
   position: string
   joinDate: string
-  status: "active" | "inactive" | "intern"
+  status: "active" | "inactive" | "suspended"
   contractType: string
   branchId?: string
   orgNodeId?: string
@@ -109,7 +101,7 @@ export interface EmpExtForm {
   position: string
   positionId?: string
   joinDate: string
-  status: "active" | "inactive" | "intern"
+  status: "active" | "inactive" | "suspended"
   contractType: string
   branchId: string
   orgNodeId: string
@@ -142,7 +134,7 @@ export interface AttendanceRecord {
   employeeId: string
   employeeName: string
   department: string
-  employeeStatus?: "active" | "inactive" | "intern"
+  employeeStatus?: "staff" | "intern"
   checkIn: string
   checkOut: string
   checkInAm?: string
@@ -151,6 +143,8 @@ export interface AttendanceRecord {
   checkOutPm?: string
   statusAm?: string
   statusPm?: string
+  noteAm?: string
+  notePm?: string
   workingHours?: string
   autoFilled?: boolean
   date: string
@@ -175,16 +169,6 @@ export interface LeaveRequest {
   submittedAt: string
 }
 
-export interface TaskItem {
-  id: string
-  title: string
-  description?: string
-  assignee: string
-  dueDate: string
-  priority: "high" | "medium" | "low"
-  status: "todo" | "in-progress" | "done"
-}
-
 export type ProjectStatus = "planning" | "active" | "on-hold" | "completed"
 
 export interface ProjectAttachment {
@@ -202,25 +186,6 @@ export interface ProjectTeam {
   leaderId: string
   memberIds: string[]
   description?: string
-  createdAt: string
-}
-
-export interface Project {
-  id: string
-  name: string
-  code: string
-  description: string
-  status: ProjectStatus
-  startDate: string
-  endDate: string
-  managerId: string
-  managerName?: string
-  memberIds: string[]
-  progress: number
-  taskCount?: number
-  doneCount?: number
-  attachments: ProjectAttachment[]
-  teams: ProjectTeam[]
   createdAt: string
 }
 
@@ -268,3 +233,114 @@ export interface TimeOffSlot {
   adminNote: string
   processedAt: string
 }
+
+
+export type LeadStatus = "new" | "contacted" | "requirement-gathering" | "requirement-done" | "converted" | "lost"
+export type TaskCategory = "CODE" | "CONTENT" | "OPS" | "DESIGN" | "TEST" | "ADMIN"
+
+export interface Lead {
+  id: string
+  code: string
+  name: string
+  status: LeadStatus
+  sourceCrmId?: string 
+  contactName?: string
+  contactPhone?: string
+  contactEmail?: string
+  budgetEstimate?: string
+  roughNotes?: string
+  assignedToId?: string
+  assignedToName?: string
+  requirementFormId?: string
+  convertedProjectId?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RequirementForm {
+  id: string
+  leadId: string
+  code: string
+  title: string
+  isLocked: boolean 
+  publicLink?: string
+  projectType?: string 
+  colorScheme?: string
+  features?: string[]
+  references?: string[] 
+  additionalNotes?: string
+  attachments?: ProjectAttachment[]
+  createdAt: string
+  lockedAt?: string
+}
+
+export interface ProjectVaultItem {
+  id: string
+  projectId: string
+  category: "contract" | "hosting" | "domain" | "credentials" | "assets" | "other"
+  name: string
+  value?: string 
+  url?: string
+  description?: string
+  attachments?: ProjectAttachment[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Bug {
+  id: string
+  projectId: string
+  title: string
+  description?: string
+  severity: "critical" | "high" | "medium" | "low"
+  status: "open" | "in-progress" | "fixed" | "verified" | "closed"
+  reportedById?: string
+  reportedByName?: string
+  assignedToId?: string
+  attachments?: ProjectAttachment[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Project {
+  id: string
+  name: string
+  code: string
+  description: string
+  status: ProjectStatus
+  startDate: string
+  endDate: string
+  managerId: string
+  managerName?: string
+  memberIds: string[]
+  progress: number
+  taskCount?: number
+  doneCount?: number
+  attachments: ProjectAttachment[]
+  teams: ProjectTeam[]
+  createdAt: string
+  leadId?: string
+  requirementForm?: RequirementForm
+  vaultItems?: ProjectVaultItem[]
+  bugs?: Bug[]
+}
+
+export interface TaskItem {
+  id: string
+  title: string
+  description?: string
+  assignee: string
+  dueDate: string
+  priority: "high" | "medium" | "low"
+  status: "todo" | "in-progress" | "done"
+  category?: TaskCategory 
+  projectId?: string
+}
+
+export type Page =
+  | "dashboard" | "nhan-su" | "cham-cong" | "thong-ke"
+  | "duyet-don" | "thong-bao" | "cong-viec" | "du-an" | "lead" 
+  | "tai-khoan" | "phan-quyen" | "ip" | "tien-ich" | "co-cau"
+  | "crm" | "staff-portal"
+  | "user-profile" | "user-attendance" | "user-timeoff" | "user-directory"
+  | "user-chat" | "user-workflow" | "user-settings" | "user-crm"

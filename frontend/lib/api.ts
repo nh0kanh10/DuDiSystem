@@ -37,6 +37,74 @@ function qs(params?: Record<string, string | undefined>) {
   return p ? `?${p}` : ""
 }
 
+export interface ChatMessageDto {
+  id: string
+  conversationId?: string
+  senderId?: string
+  from: "me" | "them"
+  body: string
+  type?: string
+  createdAt: string
+}
+
+export interface ChatRosterItem {
+  id: string
+  name: string
+  department: string
+  position: string
+  photos?: string[]
+  online: boolean
+  unread: number
+  lastMessage: string
+  lastMessageAt: string | null
+  conversationId: string | null
+}
+
+export interface StaffChatRosterResponse {
+  items: ChatRosterItem[]
+  onlineCount: number
+  total: number
+  rosterScope?: "branch" | "company"
+}
+
+export interface StaffChatConversationItem {
+  id: string
+  peerId: string
+  peer: ChatRosterItem | null
+  lastMessage: string
+  lastMessageAt: string | null
+  unreadCount: number
+}
+
+export interface StaffChatConversationsResponse {
+  items: StaffChatConversationItem[]
+  totalUnread: number
+}
+
+export interface StaffChatThreadResponse {
+  conversationId: string | null
+  peerId: string
+  peer: ChatRosterItem | null
+  messages: ChatMessageDto[]
+  hasMore: boolean
+}
+
+export interface ChatOnlineEmployee {
+  id: string
+  name: string
+  department: string
+  position: string
+  branchId: string
+  online: boolean
+}
+
+export interface StaffChatOnlineResponse {
+  onlineCount: number
+  onlineIds: string[]
+  onlineEmployees: ChatOnlineEmployee[]
+  rosterScope?: "branch" | "company"
+}
+
 export const api = {
   auth: {
     login: (email: string, password: string) =>
@@ -119,7 +187,9 @@ export const api = {
     list: (params?: { status?: string; category?: string; employeeId?: string }) =>
       req<unknown[]>("GET", `/requests${qs(params)}`),
     create: (data: unknown) => req<unknown>("POST", "/requests", data),
+    update: (id: string, data: unknown) => req<unknown>("PUT", `/requests/${id}`, data),
     approve: (id: string) => req<unknown>("PATCH", `/requests/${id}/approve`),
+    approveBulk: (ids: string[]) => req<unknown>("POST", "/requests/approve-bulk", { ids }),
     reject: (id: string) => req<unknown>("PATCH", `/requests/${id}/reject`),
     cancel: (id: string, employeeId?: string) =>
       req<unknown>("PATCH", `/requests/${id}/cancel`, employeeId ? { employeeId } : undefined),
@@ -242,6 +312,27 @@ export const api = {
     submitDraft: (id: string, pendingData: any) => req<any>("PUT", `/profile-updates/${id}/submit`, { pendingData }),
     approve: (id: string) => req<any>("PUT", `/profile-updates/${id}/approve`),
     reject: (id: string, reworkReason: string) => req<any>("PUT", `/profile-updates/${id}/reject`, { reworkReason }),
+  },
+
+  staffChat: {
+    roster: (q?: string, scope?: "conversations" | "all") =>
+      req<StaffChatRosterResponse>("GET", `/staff-chat/roster${qs({ q, scope: scope === "all" ? "all" : undefined })}`),
+    conversations: () =>
+      req<StaffChatConversationsResponse>("GET", "/staff-chat/conversations"),
+    openConversation: (peerId: string) =>
+      req<StaffChatConversationItem>("POST", "/staff-chat/conversations", { peerId }),
+    getThread: (peerId: string, params?: { before?: string; limit?: string }) =>
+      req<StaffChatThreadResponse>("GET", `/staff-chat/thread/${peerId}/messages${qs(params)}`),
+    sendMessage: (peerId: string, body: string) =>
+      req<{ conversationId: string; message: ChatMessageDto }>("POST", `/staff-chat/thread/${peerId}/messages`, { body }),
+    markRead: (peerId: string) =>
+      req<{ conversationId: string | null; unreadCount: number }>("PATCH", `/staff-chat/thread/${peerId}/read`),
+    unreadCount: () =>
+      req<{ totalUnread: number }>("GET", "/staff-chat/unread-count"),
+    heartbeat: () =>
+      req<{ employeeId: string; online: boolean }>("POST", "/staff-chat/presence"),
+    online: () =>
+      req<StaffChatOnlineResponse>("GET", "/staff-chat/online"),
   },
 }
 

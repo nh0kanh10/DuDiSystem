@@ -18,7 +18,7 @@ export function list(req, res) {
     return
   }
   ok(res, rows
-    .filter(e => e.status === "active" || e.status === "intern")
+    .filter(e => e.status === "active" || e.status === "suspended")
     .map(toDirectory))
 }
 

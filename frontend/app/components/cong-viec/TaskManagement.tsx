@@ -200,9 +200,12 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     setSelectedStatus("all")
   }
 
+  const isPendingTask = (status?: string) => status === "todo" || status === "in-progress" || !status
+
   const getVnDayOfWeek = (dateStr: string) => {
     try {
       const d = parseVnDate(dateStr)
+      if (!d) return ""
       const days = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"]
       return days[d.getDay()]
     } catch {
@@ -213,6 +216,10 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   const renderTaskCells = (t: any, tIdx: number, allTasks: any[], empId: string, bgClass: string) => {
     const isDone = t.status === "done"
     const isInProgress = t.status === "in-progress"
+    const dueDate = parseVnDate(t.dueDate)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const isOverdue = !!dueDate && !isDone && dueDate.getTime() < today.getTime()
     const isFirstOfGroup = tIdx === 0 || allTasks[tIdx - 1].dueDate !== t.dueDate
     let dateGroupLength = 0
     if (isFirstOfGroup) {
@@ -239,7 +246,8 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
         <td className="px-5 py-3 border-r border-gray-100 align-middle">
           <div
             className={`h-[38px] px-3 flex items-center border rounded-xl text-xs font-bold w-full truncate transition-all ${
-              isDone ? "bg-emerald-50/25 hover:bg-emerald-50/45 border-emerald-200 text-emerald-800"
+              isOverdue ? "bg-red-50/60 hover:bg-red-50 border-red-200 text-red-800"
+              : isDone ? "bg-emerald-50/25 hover:bg-emerald-50/45 border-emerald-200 text-emerald-800"
               : isInProgress ? "bg-orange-50/20 hover:bg-orange-50/40 border-orange-200 text-orange-850"
               : "bg-gray-50/45 hover:bg-gray-50/80 border-gray-200 text-gray-700"
             }`}
@@ -261,11 +269,12 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
         <td className="px-5 py-3 border-r border-gray-100 align-middle text-left">
           <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-            isDone ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+            isOverdue ? "bg-red-50 text-red-700 border-red-100"
+            : isDone ? "bg-emerald-50 text-emerald-700 border-emerald-100"
             : isInProgress ? "bg-orange-50 text-orange-600 border-orange-100"
             : "bg-gray-150 text-gray-650 border-gray-200"
           }`}>
-            {isDone ? "Đã xong" : isInProgress ? "Đang làm" : "Chưa làm"}
+            {isOverdue ? "Quá hạn" : isDone ? "Đã xong" : isInProgress ? "Đang làm" : "Chưa làm"}
           </span>
         </td>
 
@@ -602,7 +611,9 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                       return true
                     }
                     if (viewMode === "day") {
-                      return t.dueDate === selectedDate
+                      // Daily operation board: default to actionable work (not done), not strict by deadline date.
+                      if (selectedStatus === "all") return isPendingTask(t.status)
+                      return true
                     } else {
                       return isDateBetween(t.dueDate, startDate, endDate)
                     }

@@ -29,6 +29,7 @@ import { SystemConfigPage } from "./components/giao-dien/SystemConfigPage"
 import { ProjectManagement } from "./components/du-an/ProjectManagement"
 import { CrmAdminPage } from "./components/crm/CrmAdminPage"
 import { CrmStaffPage } from "./components/crm/CrmStaffPage"
+import { LeadManagement } from "./components/lead/LeadManagement"
 
 // Imported user portal components
 import { UserHome } from "./components/nhan-vien/UserHome"
@@ -115,13 +116,13 @@ export default function App() {
       return "dashboard"
     }
     const validPages: Page[] = [
-      "dashboard", "nhan-su", "cham-cong", "thong-ke",
-      "duyet-don", "thong-bao", "cong-viec", "du-an",
-      "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
-      "crm", "staff-portal",
-      "user-profile", "user-attendance", "user-timeoff", "user-directory",
-      "user-chat", "user-workflow", "user-settings", "user-crm"
-    ]
+        "dashboard", "nhan-su", "cham-cong", "thong-ke",
+        "duyet-don", "thong-bao", "cong-viec", "du-an", "lead",
+        "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
+        "crm", "staff-portal",
+        "user-profile", "user-attendance", "user-timeoff", "user-directory",
+        "user-chat", "user-workflow", "user-settings", "user-crm"
+      ]
     if (validPages.includes(rawPath as Page)) {
       return rawPath as Page
     }
@@ -259,12 +260,21 @@ export default function App() {
   const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
   const [unreadNotifCount, setUnreadNotifCount] = useState(0)
   const [profileUpdates, setProfileUpdates] = useState<any[]>([])
+  const [autoOpenUpdateReqId, setAutoOpenUpdateReqId] = useState<string | null>(null)
 
   const reloadProfileUpdates = () => {
     if (isLoggedIn) {
       api.profileUpdates.list().then(d => {
         if (d && Array.isArray(d)) setProfileUpdates(d as any[])
       }).catch(err => console.error("Lỗi tải profile updates:", err))
+    }
+  }
+
+  const reloadNotificationsCount = () => {
+    if (isLoggedIn) {
+      api.notifications.list().then(d => {
+        if (d && Array.isArray(d)) setUnreadNotifCount((d as any[]).filter((n: any) => !n.read).length)
+      }).catch(err => console.error("Lỗi tải số lượng thông báo:", err))
     }
   }
 
@@ -338,6 +348,14 @@ export default function App() {
           if (d && Array.isArray(d)) setProfileUpdates(d as any[])
         }).catch(() => {})
       ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
+    }
+  }, [isLoggedIn])
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      reloadNotificationsCount()
+      const timer = setInterval(reloadNotificationsCount, 30000)
+      return () => clearInterval(timer)
     }
   }, [isLoggedIn])
 
@@ -450,7 +468,7 @@ export default function App() {
     department: profileUser.department || "Ban điều hành",
     position: profileUser.position || (isAdminRole ? "System Admin" : "Nhân sự"),
     joinDate: "—",
-    status: "active" as "active" | "inactive" | "intern",
+    status: "active" as "active" | "inactive" | "suspended",
     contractType: "Chính thức",
     orgNodeId: "branch-hcm"
   }
@@ -468,7 +486,17 @@ export default function App() {
     }
     switch (activePage) {
       case "dashboard": return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
-      case "nhan-su": return <EmployeeManagement employees={employees} setEmployees={setEmployees} orgNodes={orgNodes} selectedBranch={selectedBranch} onBranchChange={setSelectedBranch} />
+      case "nhan-su": return (
+        <EmployeeManagement
+          employees={employees}
+          setEmployees={setEmployees}
+          orgNodes={orgNodes}
+          selectedBranch={selectedBranch}
+          onBranchChange={setSelectedBranch}
+          autoOpenUpdateReqId={autoOpenUpdateReqId}
+          onClearAutoOpenReq={() => setAutoOpenUpdateReqId(null)}
+        />
+      )
       case "co-cau": return (
         <OrgStructure
           employees={employees}
@@ -514,8 +542,9 @@ export default function App() {
       case "user-workflow": return <UserWorkflow />
       case "user-settings": return <UserSettings onLogout={handleLogout} />
       case "user-crm": return <CrmStaffPage />
-      default: return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
-    }
+        case "lead": return <LeadManagement currentUserId={currentEmp.id} employees={employees} />
+        default: return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
+      }
   }
 
 
@@ -546,6 +575,8 @@ export default function App() {
             onReloadProfileUpdates={reloadProfileUpdates}
             employees={employees}
             orgNodes={orgNodes}
+            onSelectUpdateReq={setAutoOpenUpdateReqId}
+            onReloadNotifCount={reloadNotificationsCount}
           />
           <main className="flex-1 overflow-y-auto p-5 relative"
             style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
@@ -606,7 +637,7 @@ export default function App() {
 
 function Header({
   onToggle, unread, onMarkAllRead, currentUser, onLogout, onNavigate, selectedBranch, onBranchChange, branches,
-  profileUpdates = [], onReloadProfileUpdates, employees = [], orgNodes = []
+  profileUpdates = [], onReloadProfileUpdates, employees = [], orgNodes = [], onSelectUpdateReq, onReloadNotifCount
 }: {
   onToggle: () => void; unread: number; onMarkAllRead?: () => void
   currentUser: { name: string; id: string; role: Role; position: string; department: string }
@@ -619,6 +650,8 @@ function Header({
   onReloadProfileUpdates?: () => void
   employees?: Employee[]
   orgNodes?: OrgNode[]
+  onSelectUpdateReq?: (id: string | null) => void
+  onReloadNotifCount?: () => void
 }) {
   const [showDrop, setShowDrop] = useState(false)
   const [showBranchDrop, setShowBranchDrop] = useState(false)
@@ -633,12 +666,12 @@ function Header({
     
     const matchedEmp = employees.find(e => e.id === currentUser.id)
     if (matchedEmp) {
-      const adminBranchId = findBranchForNode(matchedEmp.orgNodeId, orgNodes)
+      const adminBranchId = findBranchForNode(matchedEmp.orgNodeId ?? "", orgNodes)
       if (!adminBranchId) return true
       
       const reqEmp = employees.find(e => e.id === req.employeeId)
       if (!reqEmp) return true
-      const reqBranchId = findBranchForNode(reqEmp.orgNodeId, orgNodes)
+      const reqBranchId = findBranchForNode(reqEmp.orgNodeId ?? "", orgNodes)
       return adminBranchId === reqBranchId
     }
     return true
@@ -647,21 +680,21 @@ function Header({
   async function openNotifs() {
     setShowNotifDrop(v => !v)
     onReloadProfileUpdates?.()
-    if (!notifs.length) {
-      setLoadingNotifs(true)
-      try {
-        const data = await api.notifications.list() as any[]
-        setNotifs(data)
-      } finally {
-        setLoadingNotifs(false)
-      }
+    setLoadingNotifs(true)
+    try {
+      const data = await api.notifications.list({ read: "false" }) as any[]
+      setNotifs(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingNotifs(false)
     }
   }
 
   async function markAllRead() {
     await api.notifications.markAllRead()
-    setNotifs(ns => ns.map(n => ({ ...n, read: true })))
-    onMarkAllRead?.()
+    setNotifs([])
+    onReloadNotifCount?.()
   }
   return (
     <header className="bg-white border-b border-black/5 px-5 py-3 flex items-center gap-4 flex-shrink-0 relative">
@@ -746,7 +779,11 @@ function Header({
                     const reqEmp = employees.find(e => e.id === req.employeeId)
                     const empName = reqEmp?.name || req.employeeId
                     return (
-                      <button key={req.id} onClick={() => { onNavigate("nhan-su"); setShowNotifDrop(false) }}
+                      <button key={req.id} onClick={() => { 
+                        onSelectUpdateReq?.(req.id);
+                        onNavigate("nhan-su"); 
+                        setShowNotifDrop(false);
+                      }}
                         className="w-full flex items-start gap-3 px-4 py-3 hover:bg-orange-50 bg-orange-50/20 transition-colors text-left border-b border-gray-50 last:border-0">
                         <div className="relative flex h-2 w-2 mt-1.5 flex-shrink-0">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
@@ -769,11 +806,15 @@ function Header({
                   ) : notifs.length === 0 ? (
                     <div className="p-8 text-center text-xs text-gray-400">Không có thông báo nào</div>
                   ) : notifs.map((n: any) => (
-                    <button key={n.id} onClick={async () => { await api.notifications.markRead(n.id); setNotifs(ns => ns.map(x => x.id === n.id ? { ...x, read: true } : x)) }}
-                      className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0 ${!n.read ? "bg-red-50/30" : ""}`}>
-                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!n.read ? "bg-[#C62828]" : "bg-gray-200"}`} />
+                    <button key={n.id} onClick={async () => { 
+                      await api.notifications.markRead(n.id); 
+                      setNotifs(ns => ns.filter(x => x.id !== n.id));
+                      onReloadNotifCount?.();
+                    }}
+                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0 bg-red-50/30">
+                      <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-[#C62828]" />
                       <div className="flex-1 min-w-0">
-                        <p className={`text-xs leading-relaxed ${!n.read ? "font-bold text-gray-800" : "text-gray-500"}`}>{n.message}</p>
+                        <p className="text-xs leading-relaxed font-bold text-gray-800">{n.message}</p>
                         <p className="text-[10px] text-gray-400 mt-0.5">{n.time}</p>
                       </div>
                     </button>
@@ -970,6 +1011,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
         {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Thông báo" badge={2} active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("lead") && <NavItem page="lead" icon={User} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý khách hàng" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>

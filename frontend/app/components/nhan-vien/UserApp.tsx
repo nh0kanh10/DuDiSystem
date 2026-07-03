@@ -42,21 +42,19 @@ import {
 } from "../../utils/staffModules";
 import UserAttendance from "./UserAttendance";
 import UserTasks from "./UserTasks";
-import UserChatWidget from "./Userchatwidget";
+import UserChatWidget from "./UserChatWidget";
 import LeaveRequestPanel from "../nghi-phep/LeaveRequestPanel";
 import type { Announcement, Employee, WorkHistoryEntry } from "../../types";
 import { api } from "@/lib/api";
 import { CrmStaffPage } from "../crm/CrmStaffPage";
 import { Modal, ModalCancelButton } from "../ui/Modal";
 import { EmployeeModal } from "../nhan-su/EmployeeManagement";
-
-const BRAND = "#E8231A"; // exact DUDI red
-const CRIMSON = "#C01525"; // deeper variant for depth
-const GOLD = "#FF8800"; // ember gold complement
-const BG = "#2a0a0f"; // even brighter warm ruby
-const GR = "rgba(232,35,26,0.28)"; // red glow
-const GG = "rgba(255,136,0,0.14)"; // gold glow
-
+const BRAND = "#E8231A"; 
+const CRIMSON = "#C01525"; 
+const GOLD = "#FF8800"; 
+const BG = "#2a0a0f"; 
+const GR = "rgba(232,35,26,0.28)"; 
+const GG = "rgba(255,136,0,0.14)"; 
 const INPUT_S: React.CSSProperties = {
   background: "#FFFFFF",
   border: "1px solid rgba(36,20,22,0.12)",
@@ -68,7 +66,6 @@ const INPUT_S: React.CSSProperties = {
   outline: "none",
   fontFamily: "inherit",
 };
-
 const BTN_S: React.CSSProperties = {
   width: "100%",
   padding: "13px",
@@ -82,7 +79,6 @@ const BTN_S: React.CSSProperties = {
   boxShadow: `0 0 24px ${GR}`,
   fontFamily: "inherit",
 };
-
 function empInitials(name: string) {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2)
@@ -91,29 +87,24 @@ function empInitials(name: string) {
     ).toUpperCase();
   return name.slice(0, 2).toUpperCase();
 }
-
 function fmtAddr(...parts: (string | undefined)[]) {
   return parts.filter(Boolean).join(", ") || "—";
 }
-
 const EMP_STATUS_LABEL: Record<string, string> = {
   active: "Đang làm việc",
   inactive: "Đã nghỉ",
   intern: "Thực tập",
 };
-
 const TASK_STATUS_LABEL: Record<string, string> = {
   todo: "Chưa làm",
   "in-progress": "Đang làm",
   done: "Đã xong",
 };
-
 const TASK_STATUS_COLOR: Record<string, { c: string; bg: string }> = {
   todo: { c: "#6f565a", bg: "#f3eeee" },
   "in-progress": { c: "#f59e0b", bg: "rgba(245,158,11,0.1)" },
   done: { c: "#22c55e", bg: "rgba(34,197,94,0.08)" },
 };
-
 type BubbleId =
   | "checkin"
   | "employee"
@@ -125,7 +116,6 @@ type BubbleId =
   | "workflow"
   | "notifications"
   | "crm";
-
 const BUBBLES: {
   id: BubbleId;
   label: string;
@@ -386,7 +376,6 @@ const BUBBLES: {
     delay: 0.9,
   },
 ];
-
 function SectionLabel({ children }: { children: string }) {
   return (
     <p
@@ -403,7 +392,6 @@ function SectionLabel({ children }: { children: string }) {
     </p>
   );
 }
-
 function FieldLabel({ children }: { children: string }) {
   return (
     <p
@@ -420,7 +408,6 @@ function FieldLabel({ children }: { children: string }) {
     </p>
   );
 }
-
 function FieldBox({
   children,
   mono,
@@ -444,7 +431,6 @@ function FieldBox({
     </div>
   );
 }
-
 function AmbientBg() {
   return (
     <div
@@ -491,7 +477,6 @@ function AmbientBg() {
     </div>
   );
 }
-
 function FloatingClock() {
   const [hms, setHms] = useState({ h: "00", m: "00", s: "00" });
   const [dateLine, setDateLine] = useState("");
@@ -580,7 +565,6 @@ function FloatingClock() {
     </div>
   );
 }
-
 function Bubble({
   b,
   hovId,
@@ -596,15 +580,12 @@ function Bubble({
 }) {
   const isHov = hovId === b.id;
   const floatName = `floatBubble${b.id}`;
-
   const baseGlow = b.isCenter
     ? `0 0 60px rgba(232,35,26,0.35), 0 0 100px rgba(232,35,26,0.12), 0 12px 40px rgba(0,0,0,0.6)`
     : `0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(232,35,26,0.08)`;
-
   const hovGlow = b.isCenter
     ? `0 0 80px rgba(232,35,26,0.55), 0 0 120px rgba(255,136,0,0.18), 0 12px 40px rgba(0,0,0,0.7)`
     : `0 0 50px rgba(232,35,26,0.28), 0 0 70px rgba(255,136,0,0.1), 0 12px 40px rgba(0,0,0,0.6)`;
-
   return (
     <div
       style={{
@@ -739,7 +720,6 @@ function Bubble({
     </div>
   );
 }
-
 function Panel({
   activePage,
   onClose,
@@ -760,14 +740,11 @@ function Panel({
     );
     return () => cancelAnimationFrame(id);
   }, []);
-
   const handleClose = () => {
     setVisible(false);
     setTimeout(onClose, 240);
   };
-
   const bubble = BUBBLES.find((b) => b.id === activePage)!;
-
   const title: Record<BubbleId, string> = {
     checkin: "Tổng quan & Chấm công",
     employee: "Thông tin nhân viên",
@@ -780,7 +757,6 @@ function Panel({
     notifications: "Thông báo hệ thống",
     crm: "Quản lý khách hàng",
   };
-
   return (
     <div
       className="portal-panel-root"
@@ -896,7 +872,6 @@ function Panel({
             />
           </div>
         </div>
-
         <div
           className="portal-panel-content"
           style={{
@@ -961,7 +936,6 @@ function Panel({
     </div>
   );
 }
-
 function DirectoryContent() {
   const [search, setSearch] = useState("");
   const { employees, loading, error, reload } = useEmployeeDirectory();
@@ -975,7 +949,6 @@ function DirectoryContent() {
       (e.email || "").toLowerCase().includes(q)
     );
   });
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -1004,9 +977,7 @@ function DirectoryContent() {
           Tải lại
         </button>
       </div>
-
       {error && <p style={{ fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-
       {loading && (
         <div
           style={{
@@ -1021,7 +992,6 @@ function DirectoryContent() {
           <span style={{ fontSize: 13 }}>Đang tải...</span>
         </div>
       )}
-
       {!loading && list.length === 0 && (
         <p
           style={{
@@ -1034,7 +1004,6 @@ function DirectoryContent() {
           Không tìm thấy nhân viên
         </p>
       )}
-
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {list.map((emp) => (
           <div
@@ -1153,7 +1122,6 @@ function DirectoryContent() {
     </div>
   );
 }
-
 function EmployeeContent({ employee }: { employee: Employee }) {
   const [activeTab, setActiveTab] = useState(0);
   const hometown = fmtAddr(
@@ -1169,7 +1137,6 @@ function EmployeeContent({ employee }: { employee: Employee }) {
     employee.curProvince,
   );
   const history = employee.workHistory ?? [];
-
   const FieldGroup = ({
     l,
     v,
@@ -1184,7 +1151,6 @@ function EmployeeContent({ employee }: { employee: Employee }) {
       <FieldBox>{v || "—"}</FieldBox>
     </div>
   );
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div
@@ -1291,7 +1257,6 @@ function EmployeeContent({ employee }: { employee: Employee }) {
           />
         </div>
       </div>
-
       <div
         style={{
           display: "flex",
@@ -1324,7 +1289,6 @@ function EmployeeContent({ employee }: { employee: Employee }) {
           </button>
         ))}
       </div>
-
       {activeTab === 0 && (
         <div
           style={{
@@ -1349,7 +1313,6 @@ function EmployeeContent({ employee }: { employee: Employee }) {
           </div>
         </div>
       )}
-
       {activeTab === 1 && (
         <div
           style={{
@@ -1374,7 +1337,6 @@ function EmployeeContent({ employee }: { employee: Employee }) {
           </div>
         </div>
       )}
-
       {activeTab === 2 && (
         <div
           style={{
@@ -1394,7 +1356,6 @@ function EmployeeContent({ employee }: { employee: Employee }) {
           </div>
         </div>
       )}
-
       <div
         style={{
           padding: "16px 18px",
@@ -1451,11 +1412,9 @@ function EmployeeContent({ employee }: { employee: Employee }) {
     </div>
   );
 }
-
 function LeaveContent({ employee }: { employee: Employee }) {
   return <LeaveRequestPanel employee={employee} variant="portal" />;
 }
-
 function TasksContent({ employeeId }: { employeeId?: string }) {
   const { tasks, loading, error, reload, stats } = useMyTasks(employeeId);
   const today = new Date().toLocaleDateString("vi-VN");
@@ -1484,7 +1443,6 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
     },
     { l: "Đã xong", v: stats.done, c: "#22c55e", g: "rgba(34,197,94,0.2)" },
   ];
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div
@@ -1509,9 +1467,7 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
           <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
-
       {error && <p style={{ fontSize: 13, color: "#b91c1c" }}>{error}</p>}
-
       <div
         style={{
           display: "grid",
@@ -1558,7 +1514,6 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
           </div>
         ))}
       </div>
-
       {!loading && todayTasks.length === 0 && (
         <div
           style={{
@@ -1577,7 +1532,6 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
           </p>
         </div>
       )}
-
       <div>
         <SectionLabel>Nhật ký công việc</SectionLabel>
         {loading && (
@@ -1723,7 +1677,6 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
     </div>
   );
 }
-
 function CrmStaffContent() {
   return (
     <div style={{ width: "100%" }}>
@@ -1731,7 +1684,6 @@ function CrmStaffContent() {
     </div>
   );
 }
-
 function NotificationsContent({ employee }: { employee: Employee | null }) {
   const {
     items,
@@ -1755,7 +1707,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
   const loadAnnouncements = () => {
     setLoadingAnnouncements(true);
     api.announcements
@@ -1769,7 +1720,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
       .catch(() => {})
       .finally(() => setLoadingAnnouncements(false));
   };
-
   const loadAdminRequests = () => {
     if (!employee?.id) return;
     setLoadingAdminRequests(true);
@@ -1784,14 +1734,12 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
       .catch(() => {})
       .finally(() => setLoadingAdminRequests(false));
   };
-
   useEffect(() => {
     api.orgNodes
       .list()
       .then(setOrgNodes)
       .catch(() => {});
   }, []);
-
   useEffect(() => {
     if (activeSubTab === "broadcast") {
       loadAnnouncements();
@@ -1799,7 +1747,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
       loadAdminRequests();
     }
   }, [activeSubTab, employee?.id]);
-
   const handleReload = () => {
     if (activeSubTab === "inbox") {
       reloadInbox();
@@ -1809,7 +1756,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
       loadAnnouncements();
     }
   };
-
   const typeColor = (type?: string) => {
     const t = (type || "").toLowerCase();
     if (t === "leave" || t === "nghỉ phép" || t === "event" || t === "sự kiện")
@@ -1826,7 +1772,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
     if (t === "info" || t === "thông tin") return "#3b82f6";
     return BRAND;
   };
-
   const handleSaveProfile = async (form: any) => {
     if (!selectedReq) return;
     try {
@@ -1839,10 +1784,8 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
       setErrorMsg("Lỗi gửi hồ sơ: " + err.message);
     }
   };
-
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<any | null>(null);
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="flex border-b border-gray-100 mb-2">
@@ -1884,10 +1827,9 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
               : "border-transparent text-gray-500 hover:text-gray-700"
           }`}
         >
-          Bản tin công ty
+          Thông báo hệ thống
         </button>
       </div>
-
       <div className="flex items-center justify-between w-full">
         <p className="text-xs text-[#6f565a] font-bold">
           {activeSubTab === "inbox" &&
@@ -1899,7 +1841,7 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
               ? `Bạn có ${adminRequests.length} yêu cầu chỉnh sửa thông tin cần xử lý`
               : "Không có yêu cầu nào từ Admin")}
           {activeSubTab === "broadcast" &&
-            `Có ${announcements.length} bản tin đang hoạt động`}
+            `Có ${announcements.length} thông báo hệ thống đang hoạt động`}
         </p>
         <div className="flex items-center gap-3">
           <button
@@ -1913,16 +1855,14 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
               onClick={markAllRead}
               className="text-xs font-bold text-[#E8231A] hover:opacity-80 bg-transparent border-none cursor-pointer"
             >
-              Đánh dấu đã đọc
+              Đọc tất cả
             </button>
           )}
         </div>
       </div>
-
       {activeSubTab === "inbox" && errorInbox && (
         <p style={{ fontSize: 13, color: "#b91c1c" }}>{errorInbox}</p>
       )}
-
       {(activeSubTab === "inbox"
         ? loadingInbox
         : activeSubTab === "admin_req"
@@ -1940,7 +1880,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
           <span style={{ fontSize: 13 }}>Đang tải...</span>
         </div>
       )}
-
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {activeSubTab === "inbox" && (
           <>
@@ -1975,7 +1914,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                   {isUnread && (
                     <span className="absolute top-4 right-16 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                   )}
-
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5"
                     style={{
@@ -1995,7 +1933,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                       return <IconComp size={18} />;
                     })()}
                   </div>
-
                   <div className="flex-1 space-y-2 pr-16">
                     <div className="flex items-center gap-2">
                       {n.type && (
@@ -2015,7 +1952,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                         </span>
                       )}
                     </div>
-
                     <div className="space-y-1">
                       {n.title && (
                         <h5
@@ -2031,7 +1967,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                       </p>
                     </div>
                   </div>
-
                   <div className="absolute top-4 right-4 flex items-center gap-1">
                     <button
                       onClick={(e) => {
@@ -2061,7 +1996,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
             })}
           </>
         )}
-
         {activeSubTab === "admin_req" && (
           <>
             {!loadingAdminRequests && adminRequests.length === 0 && (
@@ -2100,7 +2034,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                   >
                     <FileText size={18} />
                   </div>
-
                   <div className="flex-1 space-y-2 pr-12">
                     <div className="flex items-center gap-2">
                       <span
@@ -2120,7 +2053,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                         </span>
                       )}
                     </div>
-
                     <div className="space-y-1">
                       <h5 className="text-sm font-bold text-gray-800">
                         {isRework
@@ -2149,7 +2081,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                       )}
                     </div>
                   </div>
-
                   <div className="absolute top-4 right-4 flex items-center gap-1">
                     <button
                       onClick={(e) => {
@@ -2168,7 +2099,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
             })}
           </>
         )}
-
         {activeSubTab === "broadcast" && (
           <>
             {!loadingAnnouncements && announcements.length === 0 && (
@@ -2180,7 +2110,7 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                   padding: 16,
                 }}
               >
-                Không có bản tin hoạt động
+                Không có thông báo hệ thống hoạt động
               </p>
             )}
             {announcements.map((a) => {
@@ -2227,7 +2157,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                       return <IconComp size={18} />;
                     })()}
                   </div>
-
                   <div className="flex-1 space-y-2 pr-12">
                     <div className="flex items-center gap-2">
                       {a.type && (
@@ -2247,7 +2176,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                         </span>
                       )}
                     </div>
-
                     <div className="space-y-1">
                       {a.title && (
                         <h5 className="text-sm font-bold text-gray-800">
@@ -2259,7 +2187,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                       </p>
                     </div>
                   </div>
-
                   <div className="absolute top-4 right-4 flex items-center gap-1">
                     <button
                       onClick={(e) => {
@@ -2285,7 +2212,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
           </>
         )}
       </div>
-
       <Modal
         open={detailOpen}
         onClose={() => {
@@ -2329,7 +2255,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                 )}
               </div>
             </div>
-
             {detailItem.title && (
               <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
                 <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider block mb-1.5">
@@ -2340,7 +2265,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                 </h4>
               </div>
             )}
-
             <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-2 border-b border-gray-50 pb-1.5">
                 Nội dung chi tiết
@@ -2352,7 +2276,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
           </div>
         ) : null}
       </Modal>
-
       {showEditModal && selectedReq && (
         <EmployeeModal
           editEmp={
@@ -2369,7 +2292,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
           onSave={handleSaveProfile}
         />
       )}
-
       {successMsg && (
         <Modal
           open={!!successMsg}
@@ -2397,7 +2319,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
           </div>
         </Modal>
       )}
-
       {errorMsg && (
         <Modal
           open={!!errorMsg}
@@ -2428,7 +2349,6 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
     </div>
   );
 }
-
 function SettingsContent({
   onLogout,
   embed = false,
@@ -2440,7 +2360,6 @@ function SettingsContent({
   const [shows, setShows] = useState([false, false, false]);
   const [saved, setSaved] = useState(false);
   const labels = ["Mật khẩu cũ", "Mật khẩu mới", "Xác nhận mật khẩu mới"];
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -2478,9 +2397,7 @@ function SettingsContent({
           Thay ảnh đại diện
         </button>
       </div>
-
       <div style={{ height: 1, background: "rgba(36,20,22,0.1)" }} />
-
       <SectionLabel>Đổi mật khẩu</SectionLabel>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {labels.map((label, i) => (
@@ -2548,7 +2465,6 @@ function SettingsContent({
           Cập nhật mật khẩu
         </button>
       </div>
-
       <div
         style={{ height: 1, background: "rgba(36,20,22,0.1)", margin: "8px 0" }}
       />
@@ -2618,7 +2534,6 @@ function SettingsContent({
           </button>
         </div>
       </div>
-
       <div style={{ marginTop: 20 }}>
         <button
           onClick={onLogout}
@@ -2635,7 +2550,6 @@ function SettingsContent({
     </div>
   );
 }
-
 const BUBBLE_MODULE_MAP: Record<BubbleId, string> = {
   checkin: "user-attendance",
   employee: "user-profile",
@@ -2648,7 +2562,6 @@ const BUBBLE_MODULE_MAP: Record<BubbleId, string> = {
   notifications: "thong-bao",
   crm: "user-crm",
 };
-
 export default function UserPortalApp({
   onLogout,
   modules = [],
@@ -2666,7 +2579,6 @@ export default function UserPortalApp({
   >([]);
   const [defaultAnnouncement, setDefaultAnnouncement] = useState("");
   const { unread: notifUnread } = useNotifications();
-
   useEffect(() => {
     const loadEmployee = async () => {
       let userObj: any = null;
@@ -2693,7 +2605,6 @@ export default function UserPortalApp({
       } catch (err) {
         console.warn("Failed to fetch employee record, using fallback:", err);
       }
-
       if (userObj) {
         const fallback: Employee = {
           id: userObj.id || userObj.employeeId || "admin",
@@ -2712,10 +2623,8 @@ export default function UserPortalApp({
     };
     loadEmployee();
   }, []);
-
   useEffect(() => {
     let alive = true;
-
     const loadActiveAnnouncement = async () => {
       try {
         const [data, config] = await Promise.all([
@@ -2751,7 +2660,6 @@ export default function UserPortalApp({
         }
       }
     };
-
     loadActiveAnnouncement();
     const timer = setInterval(loadActiveAnnouncement, 30000);
     return () => {
@@ -2759,18 +2667,13 @@ export default function UserPortalApp({
       clearInterval(timer);
     };
   }, []);
-
   const handleBubbleClick = (id: BubbleId) => setActivePage(id);
-
   const staffModules = getStaffPortalModules(modules);
-
   const allowedBubbles = BUBBLES.filter((b) => {
     if (!LIVE_STAFF_BUBBLES.has(b.id)) return false;
     const moduleKey = BUBBLE_MODULE_MAP[b.id];
     return hasStaffModule(staffModules, moduleKey);
   });
-
-  // Individual float keyframe values per bubble for organic feel
   const floatKeyframes = allowedBubbles
     .map(
       (b) => `
@@ -2782,7 +2685,6 @@ export default function UserPortalApp({
   `,
     )
     .join("\n");
-
   return (
     <div
       className="user-portal-shell"
@@ -3226,9 +3128,7 @@ export default function UserPortalApp({
           }
         }
       `}</style>
-
       <AmbientBg />
-
       {activePage ? (
         <Panel
           activePage={activePage}
@@ -3251,7 +3151,6 @@ export default function UserPortalApp({
     </div>
   );
 }
-
 function ModuleTile(props: {
   b: (typeof BUBBLES)[0];
   index: number;
@@ -3368,21 +3267,17 @@ function ModuleTile(props: {
     </button>
   );
 }
-
 function SolarOrbitCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
     let raf = 0;
     let width = 0;
     let height = 0;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
       width = Math.max(1, rect.width);
@@ -3391,11 +3286,9 @@ function SolarOrbitCanvas() {
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
-
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
     resize();
-
     const rings = [
       {
         rx: 0.39,
@@ -3434,7 +3327,6 @@ function SolarOrbitCanvas() {
         phase: 3.1,
       },
     ];
-
     const stars = Array.from({ length: 34 }, (_, i) => {
       const angle = i * 2.399963 + 0.4;
       const radius = 0.12 + (((i * 37) % 100) / 100) * 0.42;
@@ -3445,15 +3337,12 @@ function SolarOrbitCanvas() {
         phase: i * 0.63,
       };
     });
-
     const draw = (timeMs: number) => {
       const time = timeMs / 1000;
       ctx.clearRect(0, 0, width, height);
-
       const cx = width / 2;
       const cy = height / 2;
       const scale = Math.min(width, height);
-
       const glow = ctx.createRadialGradient(
         cx,
         cy,
@@ -3467,10 +3356,8 @@ function SolarOrbitCanvas() {
       glow.addColorStop(1, "rgba(232,35,26,0)");
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, width, height);
-
       ctx.save();
       ctx.translate(cx, cy);
-
       stars.forEach((star) => {
         const twinkle =
           0.34 +
@@ -3480,12 +3367,10 @@ function SolarOrbitCanvas() {
         ctx.arc(star.x * scale, star.y * scale, star.size, 0, Math.PI * 2);
         ctx.fill();
       });
-
       rings.forEach((ring, ringIndex) => {
         const rx = ring.rx * width;
         const ry = ring.ry * height;
         const pulse = 0.72 + Math.sin(time * 0.75 + ring.phase) * 0.18;
-
         ctx.beginPath();
         ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(${ring.color},${ring.alpha * pulse})`;
@@ -3494,7 +3379,6 @@ function SolarOrbitCanvas() {
         ctx.shadowColor = `rgba(${ring.color},0.12)`;
         ctx.stroke();
         ctx.shadowBlur = 0;
-
         for (let i = 0; i < ring.dots; i += 1) {
           const angle =
             time * ring.speed + ring.phase + ((Math.PI * 2) / ring.dots) * i;
@@ -3503,14 +3387,12 @@ function SolarOrbitCanvas() {
           const y = Math.sin(angle) * ry;
           const dotSize = 2.2 + depth * 4.2 + (ringIndex === 0 ? 1.2 : 0);
           const alpha = 0.45 + depth * 0.45;
-
           ctx.beginPath();
           ctx.fillStyle = `rgba(${ring.color},${alpha})`;
           ctx.shadowBlur = 18 + depth * 12;
           ctx.shadowColor = `rgba(${ring.color},0.52)`;
           ctx.arc(x, y, dotSize, 0, Math.PI * 2);
           ctx.fill();
-
           ctx.beginPath();
           ctx.strokeStyle = `rgba(${ring.color},${0.1 + depth * 0.1})`;
           ctx.lineWidth = 1;
@@ -3519,19 +3401,15 @@ function SolarOrbitCanvas() {
           ctx.shadowBlur = 0;
         }
       });
-
       ctx.restore();
       raf = requestAnimationFrame(draw);
     };
-
     raf = requestAnimationFrame(draw);
-
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
   }, []);
-
   return (
     <canvas
       ref={canvasRef}
@@ -3540,7 +3418,6 @@ function SolarOrbitCanvas() {
     />
   );
 }
-
 function PortalModuleOrbit({
   allowedBubbles,
   onNavigate,
@@ -3553,7 +3430,6 @@ function PortalModuleOrbit({
   const [orbitSize, setOrbitSize] = useState<
     "desktop" | "tablet" | "mobile" | "small"
   >("desktop");
-
   useEffect(() => {
     const update = () => {
       const width = window.innerWidth;
@@ -3571,7 +3447,6 @@ function PortalModuleOrbit({
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
-
   const center = allowedBubbles.find((b) => b.id === "checkin");
   const orbitItems = allowedBubbles.filter((b) => b.id !== "checkin");
   const radiusBySize = {
@@ -3646,7 +3521,6 @@ function PortalModuleOrbit({
     </div>
   );
 }
-
 function PortalNoticeBar({
   unread,
   announcements,
@@ -3677,7 +3551,6 @@ function PortalNoticeBar({
     24,
     notices.reduce((sum, item) => sum + item.text.length, 0) * 0.28,
   );
-
   return (
     <div
       className="portal-notice-bar"
@@ -3759,7 +3632,6 @@ function PortalNoticeBar({
     </div>
   );
 }
-
 function PortalDashboard({
   allowedBubbles,
   onNavigate,
@@ -3797,7 +3669,6 @@ function PortalDashboard({
           defaultAnnouncement={defaultAnnouncement}
         />
       </div>
-
       <div
         className="portal-dashboard-aside"
         style={{
@@ -3912,7 +3783,6 @@ function PortalDashboard({
           </button>
         </div>
       </div>
-
       <div
         className="portal-main-column"
         style={{
@@ -3944,7 +3814,6 @@ function PortalDashboard({
             </p>
           </div>
         </div>
-
         <div
           className="portal-orbit-wrap"
           style={{
