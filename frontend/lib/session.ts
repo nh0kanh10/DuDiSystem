@@ -1,4 +1,6 @@
-const BASE = import.meta.env.VITE_API_URL ?? "http://localhost:3001/api"
+import { resolveApiBase } from "./apiBase"
+
+const BASE = resolveApiBase()
 
 let lastRefreshAt = 0
 const REFRESH_EVERY_MS = 4 * 60 * 1000

@@ -1,6 +1,7 @@
 import { io, type Socket } from "socket.io-client"
+import { resolveSocketBase } from "./apiBase"
 
-const SOCKET_BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:3001/api").replace(/\/api\/?$/, "")
+const SOCKET_BASE = resolveSocketBase()
 
 let socket: Socket | null = null
 let refCount = 0
