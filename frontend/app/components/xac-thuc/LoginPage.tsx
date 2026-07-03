@@ -1,5 +1,6 @@
 import React, { useState } from "react"
-import { Lock, User, ArrowRight, Building2 } from "lucide-react"
+import { Lock, User, ArrowRight } from "lucide-react"
+import { BrandLogo } from "../ui/BrandLogo"
 
 export function LoginPage({ onLogin, loginError }: {
   onLogin: (id: string, pass: string) => void
@@ -28,15 +29,14 @@ export function LoginPage({ onLogin, loginError }: {
           <div className="absolute bottom-0 left-0 w-80 h-80 bg-[#E64A19]/15 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4" />
         </div>
         <div className="relative z-10 max-w-md">
-          <div className="flex items-center gap-4 mb-10">
-            <div className="w-14 h-14 bg-[#C62828] rounded-2xl flex items-center justify-center shadow-lg">
-              <span className="text-white text-2xl font-black">D</span>
-            </div>
-            <div>
-              <div className="text-white text-3xl font-black tracking-wide">DUDI</div>
-              <div className="text-white/50 font-medium">software</div>
-            </div>
-          </div>
+          <BrandLogo
+            size={56}
+            withText
+            textLight
+            variant="hero"
+            imageClassName="rounded-2xl object-contain shadow-lg"
+            className="mb-10"
+          />
           <h1 className="text-4xl font-bold text-white leading-tight mb-4">
             Hệ thống quản lý<br />
             <span className="text-[#FF8A65]">nhân sự & chấm công</span>
@@ -57,12 +57,7 @@ export function LoginPage({ onLogin, loginError }: {
 
       <div className="w-full lg:w-[420px] flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-sm">
-          <div className="flex items-center gap-3 mb-10 lg:hidden">
-            <div className="w-10 h-10 bg-[#C62828] rounded-xl flex items-center justify-center">
-              <span className="text-white font-black">D</span>
-            </div>
-            <div className="font-bold text-gray-800">DUDI software</div>
-          </div>
+          <BrandLogo size={40} withText className="mb-10 lg:hidden" />
 
           <h2 className="text-2xl font-bold text-gray-800 mb-1">Đăng nhập</h2>
           <p className="text-gray-400 text-sm mb-8">Nhập mã nhân viên để truy cập hệ thống</p>

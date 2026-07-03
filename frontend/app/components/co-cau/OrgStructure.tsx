@@ -10,6 +10,7 @@ import ViewMembersModal from "./ViewMembersModal"
 import PositionManagement from "../vi-tri/PositionManagement"
 import { api } from "@/lib/api"
 import { CustomSelect } from "../ui/CustomSelect"
+import { applyOrgFieldsToEmployee, buildOrgSnapshot, findBranchForNode } from "../../utils/orgUtils"
 
 type RowItem = 
   | { type: "node"; data: OrgNode }
@@ -49,6 +50,18 @@ export default function OrgStructure({
   }, [rawEmployees])
 
   const isSuperAdmin = currentUserRole === "role-admin" || currentUserRole === "role-super-admin"
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null)
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  const branchScopedEmployees = useMemo(() => {
+    if (!selectedBranch || selectedBranch === "all") return employees
+    return employees.filter(e =>
+      (e.branchId || findBranchForNode(e.orgNodeId || "", orgNodes)) === selectedBranch
+    )
+  }, [employees, selectedBranch, orgNodes])
   const [viewMode, setViewMode] = useState<"diagram" | "list" | "catalog">("diagram")
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
@@ -221,21 +234,33 @@ export default function OrgStructure({
 
   const handleSaveNode = (nodeData: Omit<OrgNode, "id"> & { id?: string }) => {
     if (editNode) {
+      const prevSnapshot = { ...editNode }
       setOrgNodes(prev =>
         prev.map(n => (n.id === editNode.id ? { ...n, ...nodeData } : n))
       )
-      api.orgNodes.update(editNode.id, nodeData).catch((err: any) => {
-        console.error("Lỗi cập nhật đơn vị:", err)
-      })
+      api.orgNodes.update(editNode.id, nodeData)
+        .then(updated => {
+          if (updated) {
+            setOrgNodes(prev => prev.map(n => (n.id === editNode.id ? (updated as OrgNode) : n)))
+            showToast("Đã cập nhật đơn vị")
+          }
+        })
+        .catch((err: unknown) => {
+          console.error("Lỗi cập nhật đơn vị:", err)
+          setOrgNodes(prev => prev.map(n => (n.id === editNode.id ? prevSnapshot : n)))
+          showToast(err instanceof Error ? err.message : "Không thể cập nhật đơn vị", "error")
+        })
     } else {
       api.orgNodes.create(nodeData)
         .then(created => {
           if (created) {
             setOrgNodes(prev => [...prev, created as OrgNode])
+            showToast("Đã thêm đơn vị mới")
           }
         })
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           console.error("Lỗi tạo đơn vị:", err)
+          showToast(err instanceof Error ? err.message : "Không thể tạo đơn vị", "error")
         })
     }
   }
@@ -244,16 +269,18 @@ export default function OrgStructure({
     const descendants = getDescendants(id, orgNodes)
     const descendantIds = descendants.map(d => d.id)
     const idsToDelete = [id, ...descendantIds]
-    
+
     api.orgNodes.delete(id)
       .then(() => {
         setOrgNodes(prev => prev.filter(n => !idsToDelete.includes(n.id)))
         if (selectedNodeId === id || (selectedNodeId && descendantIds.includes(selectedNodeId))) {
           setSelectedNodeId(null)
         }
+        showToast("Đã xóa đơn vị")
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.error("Lỗi xóa đơn vị:", err)
+        showToast(err instanceof Error ? err.message : "Không thể xóa đơn vị", "error")
       })
   }
 
@@ -274,12 +301,15 @@ export default function OrgStructure({
       prev.map(n => (allAffectedIds.includes(n.id) ? { ...n, status } : n))
     )
 
-    api.orgNodes.changeStatus(id, status).catch((err: any) => {
-      console.error("Lỗi cập nhật trạng thái đơn vị:", err)
-      setOrgNodes(prev =>
-        prev.map(n => (allAffectedIds.includes(n.id) ? { ...n, status: status === "active" ? "inactive" : "active" } : n))
-      )
-    })
+    api.orgNodes.changeStatus(id, status)
+      .then(() => showToast("Đã cập nhật trạng thái đơn vị"))
+      .catch((err: unknown) => {
+        console.error("Lỗi cập nhật trạng thái đơn vị:", err)
+        setOrgNodes(prev =>
+          prev.map(n => (allAffectedIds.includes(n.id) ? { ...n, status: status === "active" ? "inactive" : "active" } : n))
+        )
+        showToast(err instanceof Error ? err.message : "Không thể cập nhật trạng thái", "error")
+      })
   }
 
   const executeAssignMember = (
@@ -299,14 +329,7 @@ export default function OrgStructure({
         let updatedWorkHistory = emp.workHistory || []
 
         if (writeHistory) {
-          const path = []
-          let curr = orgNodes.find(n => n.id === targetNode.id)
-          while (curr) {
-            path.push(curr.name)
-            const pId = curr.parentId
-            curr = pId ? orgNodes.find(n => n.id === pId) : undefined
-          }
-          const snapshot = path.reverse().join(" · ")
+          const snapshot = buildOrgSnapshot(targetNode.id, orgNodes)
 
           if (updatedWorkHistory.length === 0) {
             const joinEntry = {
@@ -322,12 +345,13 @@ export default function OrgStructure({
             updatedWorkHistory.push(joinEntry)
           }
 
+          const derived = applyOrgFieldsToEmployee({ orgNodeId: targetNode.id }, targetNode.id, orgNodes)
           const newHistoryEntry = {
             id: updatedWorkHistory.length + 1,
             type: historyType,
             date: new Date().toISOString().split("T")[0].split("-").reverse().join("/"),
             toDate: "",
-            title: targetNode.type === "position" ? targetNode.name : emp.position,
+            title: derived.position || targetNode.name || emp.position,
             orgNodeId: targetNode.id,
             snapshot: snapshot,
             note: historyNote || "Thuyên chuyển từ sơ đồ cơ cấu"
@@ -335,23 +359,22 @@ export default function OrgStructure({
           updatedWorkHistory = [...updatedWorkHistory, newHistoryEntry]
         }
 
-        const updatedEmpData = {
-          ...emp,
-          orgNodeId: targetNode.id,
-          department: targetNode.type === "department" ? targetNode.name : emp.department,
-          position: targetNode.type === "position" ? targetNode.name : emp.position,
-          workHistory: updatedWorkHistory
-        }
+        const updatedEmpData = applyOrgFieldsToEmployee(
+          { ...emp, workHistory: updatedWorkHistory },
+          targetNode.id,
+          orgNodes
+        )
 
         api.employees.update(employeeId, updatedEmpData)
           .then(updated => {
             if (updated) {
               setEmployees(prev => prev.map(e => e.id === employeeId ? (updated as Employee) : e))
+              showToast("Đã cập nhật vị trí nhân sự")
             }
           })
           .catch(err => {
             console.error("Lỗi cập nhật nhân viên:", err)
-            setEmployees(prev => prev.map(e => e.id === employeeId ? (updatedEmpData as Employee) : e))
+            showToast(err instanceof Error ? err.message : "Không thể cập nhật nhân viên", "error")
           })
 
         const newAsPayload = {
@@ -359,7 +382,6 @@ export default function OrgStructure({
           nodeId: targetNode.id,
           type: "permanent" as const,
           startDate: new Date().toISOString().split("T")[0],
-          status: "active" as const
         }
 
         api.assignments.create(newAsPayload)
@@ -382,6 +404,7 @@ export default function OrgStructure({
           })
           .catch(err => {
             console.error("Lỗi tạo assignment:", err)
+            showToast(err instanceof Error ? err.message : "Không thể ghi nhận phân công", "error")
           })
       }
     } else if (type === "temporary" && tempDates) {
@@ -398,20 +421,12 @@ export default function OrgStructure({
         .then(created => {
           if (created) {
             setAssignments(prev => [...prev, created as Assignment])
+            showToast("Đã ghi nhận biệt phái")
           }
         })
         .catch(err => {
           console.error("Lỗi tạo temporary assignment:", err)
-          const newAs: Assignment = {
-            id: `as-${Date.now()}`,
-            employeeId,
-            nodeId: targetNode.id,
-            type: "temporary",
-            startDate: tempDates.startDate,
-            endDate: tempDates.endDate,
-            status: "active"
-          }
-          setAssignments(prev => [...prev, newAs])
+          showToast(err instanceof Error ? err.message : "Không thể tạo biệt phái", "error")
         })
     }
   }
@@ -525,22 +540,17 @@ export default function OrgStructure({
 
     if (type === "permanent") {
       const emp = employees.find(e => e.id === employeeId)
-      if (emp) {
-        const isDeptChanged = targetNode.type === "department" && targetNode.name !== emp.department
-        const isPosChanged = targetNode.type === "position" && targetNode.name !== emp.position
-
-        if (isDeptChanged || isPosChanged) {
-          setHistoryConfirm({
-            employeeId,
-            type,
-            tempDates,
-            targetNode,
-            defaultNote: "Thuyên chuyển từ sơ đồ cơ cấu",
-            customNote: "Thuyên chuyển từ sơ đồ cơ cấu",
-            historyType: "transfer"
-          })
-          return
-        }
+      if (emp && emp.orgNodeId !== targetNode.id) {
+        setHistoryConfirm({
+          employeeId,
+          type,
+          tempDates,
+          targetNode,
+          defaultNote: "Thuyên chuyển từ sơ đồ cơ cấu",
+          customNote: "Thuyên chuyển từ sơ đồ cơ cấu",
+          historyType: "transfer"
+        })
+        return
       }
     }
 
@@ -682,7 +692,7 @@ export default function OrgStructure({
       {!selectedNodeId && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {[
-            { label: "Tổng nhân sự", value: stats.totalEmployees, sub: "+12% so với tháng trước", color: "text-[#C62828]", bg: "bg-red-50/50" },
+            { label: "Tổng nhân sự", value: stats.totalEmployees, sub: "Trong phạm vi đang xem", color: "text-[#C62828]", bg: "bg-red-50/50" },
             { label: "Chi nhánh", value: stats.branches, sub: "Đang hoạt động", color: "text-purple-600", bg: "bg-purple-50/30" },
             { label: "Phòng ban", value: stats.departments, sub: "Đơn vị trực thuộc", color: "text-orange-600", bg: "bg-orange-50/30" },
             { label: "Bộ phận / Vị trí", value: stats.positions, sub: "Cơ cấu chuyên môn", color: "text-green-600", bg: "bg-green-50/30" }
@@ -710,7 +720,9 @@ export default function OrgStructure({
           node={selectedNode}
           orgNodes={nodesToRender}
           employees={employees}
+          branchScopedEmployees={branchScopedEmployees}
           assignments={assignments}
+          isSuperAdmin={isSuperAdmin}
           onBack={() => setSelectedNodeId(null)}
           onEdit={() => handleOpenEdit(selectedNode)}
           onAddChild={() => handleOpenAddChild(selectedNode.id)}
@@ -742,7 +754,8 @@ export default function OrgStructure({
                     { value: "branch", label: "Chi nhánh" },
                     { value: "department", label: "Phòng ban" },
                     { value: "sub-department", label: "Bộ phận" },
-                    { value: "position", label: "Vị trí" }
+                    { value: "position", label: "Vị trí" },
+                    { value: "team", label: "Nhóm" }
                   ]}
                   className="w-44"
                 />
@@ -1067,6 +1080,15 @@ export default function OrgStructure({
           </div>
         </div>
       , document.body)}
+
+      {toast && createPortal(
+        <div className={`fixed bottom-5 right-5 z-[200] flex items-center px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold ${
+          toast.type === "error" ? "bg-red-50 text-red-800 border-red-100" : "bg-emerald-50 text-emerald-800 border-emerald-100"
+        }`}>
+          {toast.msg}
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

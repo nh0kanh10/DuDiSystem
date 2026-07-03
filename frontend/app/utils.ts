@@ -12,12 +12,4 @@ export function initials(name: string): string {
   return name.split(" ").pop()?.charAt(0) ?? "?"
 }
 
-export function findBranchForNode(nodeId: string, nodes: any[]): string {
-  const node = nodes.find(n => n.id === nodeId)
-  if (!node) return "all"
-  if (node.type === "branch") return node.id
-  if (node.parentId) {
-    return findBranchForNode(node.parentId, nodes)
-  }
-  return "all"
-}
+export { findBranchForNode } from "./utils/orgUtils"

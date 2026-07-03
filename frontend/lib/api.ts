@@ -107,8 +107,8 @@ export interface StaffChatOnlineResponse {
 
 export const api = {
   auth: {
-    login: (email: string, password: string) =>
-      req<{ token: string; user: Record<string, unknown> }>("POST", "/auth/login", { email, password }),
+    login: (loginId: string, password: string) =>
+      req<{ token: string; user: Record<string, unknown> }>("POST", "/auth/login", { loginKey: loginId, password }),
     me: () => req<any>("GET", "/auth/me"),
     refresh: () => req<{ token: string }>("POST", "/auth/refresh"),
   },

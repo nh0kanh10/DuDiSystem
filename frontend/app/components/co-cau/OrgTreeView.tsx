@@ -118,6 +118,13 @@ export default function OrgTreeView({
           dot: "bg-blue-500",
           icon: <Briefcase size={16} />
         }
+      case "team":
+        return {
+          border: "border-pink-400 hover:border-pink-600 shadow-sm hover:shadow-pink-100/50",
+          iconBg: "bg-pink-100 text-pink-700",
+          dot: "bg-pink-500",
+          icon: <Users size={16} />
+        }
     }
   }
 
@@ -257,7 +264,7 @@ export default function OrgTreeView({
                 ) : (
                   <p className="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-wider leading-none">Quản lý</p>
                 )}
-                <p className="text-[10px] font-semibold text-gray-500 mt-0.5 truncate">{managerName || "Võ Bá Thành Nhân"}</p>
+                <p className="text-[10px] font-semibold text-gray-500 mt-0.5 truncate">{managerName || "Chưa có quản lý"}</p>
               </div>
               <button
                 type="button"
@@ -290,6 +297,7 @@ export default function OrgTreeView({
             >
               <Edit2 size={12} />
             </button>
+            {!(node.type === "branch" && !isSuperAdmin) && (
             <button
               type="button"
               onClick={() => onDeleteNode(node.id)}
@@ -298,6 +306,7 @@ export default function OrgTreeView({
             >
               <Trash2 size={12} />
             </button>
+            )}
             <button
               type="button"
               onClick={() => onStatusChange?.(node.id, node.status === "active" ? "inactive" : "active")}
@@ -384,7 +393,9 @@ export default function OrgTreeView({
               </div>
             ))
           ) : (
-            <div className="text-gray-400 text-sm">Đang tải dữ liệu...</div>
+            <div className="text-gray-400 text-sm text-center">
+              <p>Chưa có cơ cấu tổ chức trong phạm vi này</p>
+            </div>
           )}
         </div>
       </div>

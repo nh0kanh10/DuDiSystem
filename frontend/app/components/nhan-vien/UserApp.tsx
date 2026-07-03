@@ -28,7 +28,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
-import dudiLogo from "../../../imports/avatar.jpg";
+import { dudiLogo } from "../ui/BrandLogo";
 import { useMyTasks } from "../../hooks/useMyTasks";
 import {
   useNotifications,
@@ -1252,7 +1252,7 @@ function EmployeeContent({ employee }: { employee: Employee }) {
               width: 40,
               height: 40,
               borderRadius: 8,
-              objectFit: "cover",
+              objectFit: "contain",
             }}
           />
         </div>
@@ -3569,7 +3569,7 @@ function PortalNoticeBar({
       <ImageWithFallback
         src={dudiLogo}
         alt="DUDI Software"
-        style={{ width: 48, height: 48, borderRadius: 14, objectFit: "cover" }}
+        style={{ width: 48, height: 48, borderRadius: 14, objectFit: "contain" }}
       />
       <div style={{ minWidth: 0, overflow: "hidden", position: "relative" }}>
         {repeatedNotices.length > 0 && (

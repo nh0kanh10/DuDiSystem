@@ -30,7 +30,7 @@ export function CustomSelect({
   searchable = false,
   placeholder = "Chọn...",
   menuClassName = "",
-  portal = false,
+  portal = true,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
@@ -106,9 +106,11 @@ export function CustomSelect({
       rafId = requestAnimationFrame(updateMenuRect)
     }
     window.addEventListener("resize", onResize)
+    window.addEventListener("scroll", onResize, true)
     return () => {
       if (rafId) cancelAnimationFrame(rafId)
       window.removeEventListener("resize", onResize)
+      window.removeEventListener("scroll", onResize, true)
     }
   }, [isOpen, searchable, portal])
 
@@ -187,7 +189,7 @@ export function CustomSelect({
           {portal ? (
             menuRect ? createPortal(
               <div
-                className="fixed z-50"
+                className="fixed z-[60]"
                 style={{ top: menuRect.top, left: menuRect.left, width: menuRect.width }}
               >
                 {menuContent}

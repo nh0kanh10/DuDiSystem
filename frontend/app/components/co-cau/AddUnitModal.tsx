@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { X, Building2, Clipboard, Settings, Briefcase } from "lucide-react"
+import { X, Building2, Clipboard, Settings, Briefcase, Users } from "lucide-react"
 import { OrgNode, OrgNodeType, Employee } from "../../types"
 
 interface AddUnitModalProps {
@@ -51,6 +51,7 @@ export default function AddUnitModal({
         if (parentNode.type === "branch") setType("department")
         else if (parentNode.type === "department") setType("sub-department")
         else if (parentNode.type === "sub-department") setType("position")
+        else if (parentNode.type === "position") setType("team")
       }
       setName("")
       setCode("")
@@ -86,11 +87,12 @@ export default function AddUnitModal({
     if (type === "department") return n.type === "branch"
     if (type === "sub-department") return n.type === "department"
     if (type === "position") return n.type === "sub-department"
+    if (type === "team") return n.type === "position"
     return false
   })
 
   const handleNext = () => {
-    if (step === 2 && (type === "position")) {
+    if (step === 2 && (type === "position" || type === "team")) {
       onSave({
         name,
         code,
@@ -170,6 +172,7 @@ export default function AddUnitModal({
                   { key: "department", label: "Phòng ban", desc: "Đơn vị trực thuộc chi nhánh", color: "border-orange-200 hover:border-orange-500", iconBg: "bg-orange-50", iconCol: "text-orange-600", icon: Clipboard },
                   { key: "sub-department", label: "Bộ phận", desc: "Đơn vị trực thuộc phòng ban chuyên môn", color: "border-green-200 hover:border-green-500", iconBg: "bg-green-50", iconCol: "text-green-600", icon: Settings },
                   { key: "position", label: "Vị trí", desc: "Vị trí chuyên môn thuộc bộ phận", color: "border-blue-200 hover:border-blue-500", iconBg: "bg-blue-50", iconCol: "text-blue-600", icon: Briefcase },
+                  { key: "team", label: "Nhóm", desc: "Nhóm làm việc trực thuộc vị trí", color: "border-pink-200 hover:border-pink-500", iconBg: "bg-pink-50", iconCol: "text-pink-600", icon: Users },
                 ].map(opt => (
                   <button
                     key={opt.key}

@@ -1,25 +1,21 @@
 import * as repo from "../repositories/employee.repository.js"
+import * as userRepo from "../repositories/user.repository.js"
+import * as orgNodeRepo from "../repositories/orgNode.repository.js"
 import { createUser } from "./user.service.js"
-
-function generateId(existing) {
-  const d = new Date()
-  const yy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, "0")
-  const dd = String(d.getDate()).padStart(2, "0")
-  const min = String(d.getMinutes()).padStart(2, "0")
-  const baseId = `${yy}${mm}${dd}${min}`
-  let candidate = baseId
-  let count = 1
-  while (existing.some(e => e.id === candidate)) {
-    candidate = `${baseId}-${count}`
-    count++
-  }
-  return candidate
-}
+import { syncEmployeeOrgFields } from "../utils/orgUtils.js"
+import { generateEmployeeId, collectTakenEmployeeIds } from "../utils/employeeId.js"
 
 function todayVN() {
   const d = new Date()
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+}
+
+function applyOrgSync(patch) {
+  if (!patch.orgNodeId) return patch
+  const nodes = orgNodeRepo.getAll()
+  const node = nodes.find(n => n.id === patch.orgNodeId)
+  if (!node) throw new Error("Đơn vị tổ chức không tồn tại")
+  return syncEmployeeOrgFields(patch, patch.orgNodeId, nodes)
 }
 
 export function listEmployees(filter = {}) {
@@ -36,17 +32,18 @@ export function getEmployee(id) {
 }
 
 export async function createEmployee(data) {
-  const existing = repo.getAll()
-  const employee = repo.create({
-    id: generateId(existing),
+  const takenIds = collectTakenEmployeeIds(repo, userRepo)
+  let fields = {
+    id: generateEmployeeId(takenIds),
     name: data.name || "",
     email: data.email || "",
     phone: data.phone || "",
     department: data.department || "",
     position: data.position || "",
+    positionId: data.positionId || "",
     joinDate: data.joinDate || todayVN(),
     status: data.status || "active",
-    contractType: data.contractType || "Chính thức",
+    contractType: data.contractType || "staff",
     branchId: data.branchId || "",
     orgNodeId: data.orgNodeId || "",
     cccd: data.cccd || "",
@@ -71,14 +68,20 @@ export async function createEmployee(data) {
     university: data.university || "",
     notes: data.notes || "",
     resignDate: data.resignDate || "",
-  })
+  }
+
+  if (fields.orgNodeId) {
+    fields = applyOrgSync(fields)
+  }
+
+  const employee = repo.create(fields)
 
   try {
     await createUser({
-      email: employee.id,
+      loginId: employee.id,
       roleId: "role-user",
       employeeId: employee.id,
-      status: "active"
+      status: "active",
     })
   } catch (err) {
     console.error("Lỗi tự động tạo tài khoản khi thêm nhân sự:", err)
@@ -88,7 +91,11 @@ export async function createEmployee(data) {
 }
 
 export function updateEmployee(id, patch) {
-  return repo.update(id, patch)
+  let safe = { ...patch }
+  if (safe.orgNodeId !== undefined) {
+    safe = applyOrgSync(safe)
+  }
+  return repo.update(id, safe)
 }
 
 export function deleteEmployee(id) {

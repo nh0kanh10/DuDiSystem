@@ -5,6 +5,7 @@ import {
 } from "lucide-react"
 import { Employee, OrgNode } from "../../types"
 import { api } from "@/lib/api"
+import { mergeTaskList, subscribeTaskSocket } from "@/lib/taskSocket"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomDatePicker } from "../ui/CustomDatePicker"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
@@ -133,6 +134,15 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
   useEffect(() => {
     loadData()
+  }, [])
+
+  useEffect(() => {
+    const unsub = subscribeTaskSocket({
+      onChange: ({ action, task }) => {
+        setTasks(prev => mergeTaskList(prev, { action, task }))
+      },
+    })
+    return () => { unsub() }
   }, [])
 
   const departments = useMemo(() => {

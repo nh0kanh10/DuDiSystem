@@ -655,9 +655,9 @@ export default function AccountManagement({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const loginIdentifier = form.employeeId ? form.employeeId : form.email
-    if (!loginIdentifier.trim()) {
-      showToast("Tài khoản đăng nhập là bắt buộc", "error")
+    const loginId = form.employeeId || form.email
+    if (!loginId.trim()) {
+      showToast("Mã đăng nhập là bắt buộc", "error")
       return
     }
     try {
@@ -665,7 +665,7 @@ export default function AccountManagement({
         ? (customPermissions.includes("user-settings") ? customPermissions : [...customPermissions, "user-settings"])
         : null
       const payload = {
-        email: loginIdentifier,
+        loginId,
         roleId: form.roleId,
         employeeId: form.employeeId || null,
         scopeId: showBranchSelect ? form.scopeId : null,
@@ -1359,16 +1359,14 @@ export default function AccountManagement({
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-black text-gray-500 mb-1.5 block">
-                    {form.employeeId ? "Mã đăng nhập (Mã nhân viên)" : "Tài khoản đăng nhập (Email)"}
-                  </label>
+                  <label className="text-xs font-black text-gray-500 mb-1.5 block">Mã đăng nhập</label>
                   <input
-                    value={form.employeeId ? form.employeeId : form.email}
+                    value={form.employeeId || form.email}
                     onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                    type={form.employeeId ? "text" : "email"}
+                    type="text"
                     required
                     disabled={!!form.employeeId}
-                    placeholder={form.employeeId ? form.employeeId : "email@dudi.vn"}
+                    placeholder={form.employeeId || "VD: 2026070333"}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-700 bg-gray-50/50 disabled:text-gray-400"
                   />
                 </div>

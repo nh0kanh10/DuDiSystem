@@ -10,13 +10,22 @@ function todayVN() {
 function withMeta(project) {
   const manager = empRepo.getById(project.managerId)
   const allTasks = taskRepo.getAll({ projectId: project.id })
-  const doneTasks = allTasks.filter(t => t.status === "done").length
-  const progress = allTasks.length > 0 ? Math.round((doneTasks / allTasks.length) * 100) : project.progress ?? 0
+  const parentIdsWithChildren = new Set(
+    allTasks.filter(t => t.parentId).map(t => t.parentId),
+  )
+  const leafTasks = allTasks.filter(t => {
+    if (t.parentId) return true
+    return !parentIdsWithChildren.has(t.id)
+  })
+  const doneTasks = leafTasks.filter(t => t.status === "done").length
+  const progress = leafTasks.length > 0 ? Math.round((doneTasks / leafTasks.length) * 100) : project.progress ?? 0
+  const workCount = allTasks.filter(t => !t.parentId).length
   return {
     ...project,
     managerName: manager?.name ?? "—",
-    taskCount: allTasks.length,
+    taskCount: leafTasks.length,
     doneCount: doneTasks,
+    workCount,
     progress,
   }
 }

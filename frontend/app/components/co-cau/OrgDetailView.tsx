@@ -140,7 +140,9 @@ interface OrgDetailViewProps {
   node: OrgNode
   orgNodes: OrgNode[]
   employees: Employee[]
+  branchScopedEmployees?: Employee[]
   assignments: Assignment[]
+  isSuperAdmin?: boolean
   onBack: () => void
   onEdit: () => void
   onAddChild: () => void
@@ -157,10 +159,12 @@ interface OrgDetailViewProps {
 
 
 export default function OrgDetailView({
-  node, orgNodes, employees, assignments,
+  node, orgNodes, employees, branchScopedEmployees, assignments,
+  isSuperAdmin = false,
   onBack, onEdit, onAddChild, onStatusChange, onDeleteNode,
   onSelectNode, onAssignMember, onAssignManager
 }: OrgDetailViewProps) {
+  const scopedEmployees = branchScopedEmployees ?? employees
   const theme = THEME[node.type]
   const tabs = LEVEL_TABS[node.type]
   const defaultTab: TabId = node.type === "position" ? "personnel" : "children"
@@ -219,10 +223,12 @@ export default function OrgDetailView({
       case "sub-department":
         return [
           { label: "vị trí", count: positions },
+          { label: "nhóm", count: teams },
           { label: "nhân sự", count: total },
         ]
       case "position":
         return [
+          { label: "nhóm", count: teams },
           { label: "nhân sự", count: total },
         ]
       case "team":
@@ -343,13 +349,14 @@ export default function OrgDetailView({
                     const posDescIds = collectDescendantIds(pos.id, orgNodes)
                     return e.orgNodeId && posDescIds.includes(e.orgNodeId)
                   }).length
+                  const teamCount = orgNodes.filter(n => n.parentId === pos.id && n.type === "team").length
                   return (
                     <div key={pos.id} onClick={() => onSelectNode(pos.id)}
                       className="group cursor-pointer bg-blue-50 border border-blue-100 rounded-xl p-3 hover:border-blue-300 hover:bg-blue-100/60 transition-all">
                       <p className="font-bold text-blue-800 text-xs truncate group-hover:text-blue-600">{pos.name}</p>
                       <p className="text-[10px] font-mono text-blue-400 mt-0.5">{pos.code}</p>
                       <div className="flex items-center justify-between mt-2">
-                        <span className="text-xs font-semibold text-blue-700">{empCount} nhân sự</span>
+                        <span className="text-xs font-semibold text-blue-700">{empCount} nhân sự{teamCount > 0 ? ` · ${teamCount} nhóm` : ""}</span>
                         <ChevronRight size={11} className="text-blue-300 group-hover:text-blue-500" />
                       </div>
                     </div>
@@ -358,6 +365,57 @@ export default function OrgDetailView({
               </div>
             </div>
           )}
+          {teams.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5 px-0.5">
+                Nhóm ({teams.length})
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {teams.map(team => {
+                  const empCount = employees.filter(e => e.orgNodeId === team.id).length
+                  return (
+                    <div key={team.id} onClick={() => onSelectNode(team.id)}
+                      className="group cursor-pointer bg-pink-50 border border-pink-100 rounded-xl p-3 hover:border-pink-300 hover:bg-pink-100/60 transition-all">
+                      <p className="font-bold text-pink-800 text-xs truncate group-hover:text-pink-600">{team.name}</p>
+                      <p className="text-[10px] font-mono text-pink-400 mt-0.5">{team.code}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs font-semibold text-pink-700">{empCount} nhân sự</span>
+                        <ChevronRight size={11} className="text-pink-300 group-hover:text-pink-500" />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    if (node.type === "position") {
+      const teams = childNodes.filter(n => n.type === "team")
+      if (teams.length === 0) return (
+        <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+          <Users size={36} className="opacity-25 mb-3" />
+          <p className="text-sm">Chưa có nhóm trực thuộc vị trí này</p>
+          <button onClick={onAddChild} className="mt-3 text-[#C62828] text-xs font-bold hover:underline flex items-center gap-1">
+            <Plus size={12} /> Thêm nhóm
+          </button>
+        </div>
+      )
+      return (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          {teams.map(team => {
+            const empCount = employees.filter(e => e.orgNodeId === team.id).length
+            return (
+              <div key={team.id} onClick={() => onSelectNode(team.id)}
+                className="group cursor-pointer bg-pink-50 border border-pink-100 rounded-xl p-3 hover:border-pink-300 transition-all">
+                <p className="font-bold text-pink-800 text-xs truncate">{team.name}</p>
+                <p className="text-[10px] font-mono text-pink-400">{team.code}</p>
+                <p className="text-xs font-semibold text-pink-700 mt-2">{empCount} nhân sự</p>
+              </div>
+            )
+          })}
         </div>
       )
     }
@@ -654,12 +712,14 @@ export default function OrgDetailView({
                   >
                     {node.status === "active" ? "Tạm ngưng hoạt động" : "Kích hoạt lại"}
                   </button>
+                  {(node.type !== "branch" || isSuperAdmin) && (
                   <button
                     onClick={() => { onDeleteNode(node.id); setShowMenu(false) }}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                   >
                     Xóa đơn vị này
                   </button>
+                  )}
                 </div>
               </>,
               document.body
@@ -702,14 +762,14 @@ export default function OrgDetailView({
         isOpen={isAssignOpen}
         onClose={() => setIsAssignOpen(false)}
         onAssign={onAssignMember}
-        employees={employees}
+        employees={scopedEmployees}
         orgNodes={orgNodes}
         currentNode={node}
       />
       <SetManagerModal
         isOpen={isSetManagerOpen}
         onClose={() => setIsSetManagerOpen(false)}
-        employees={employees}
+        employees={scopedEmployees}
         currentNode={node}
         currentManagerId={node.managerId}
         currentManagerTitle={node.managerTitle}

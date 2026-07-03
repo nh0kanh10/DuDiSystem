@@ -1,260 +1,302 @@
 import React, { useState } from "react"
-import { Bug, Plus, Search, Filter, AlertCircle, AlertTriangle, Info, CheckCircle2, XCircle, Clock, PlayCircle, User } from "lucide-react"
-import { Bug as BugType, Employee } from "../../types"
+import { Bug, Plus, Edit2, Trash2 } from "lucide-react"
+import { Employee, TestSession } from "../../types"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 import { CustomCombobox } from "../ui/CustomCombobox"
+import { CustomSelect } from "../ui/CustomSelect"
+import { CustomDatePicker as DateInput } from "../ui/CustomDatePicker"
 import ConfirmModal from "../ui/ConfirmModal"
+import {
+  ProjectDetailTabShell, ProjectTabEmptyState, ProjectTabSection, tabDashedAddBtn, tabPrimaryBtn,
+} from "./ProjectDetailTabShell"
+import {
+  BUG_HANDLING_STATUS_OPTIONS, TEST_TYPE_OPTIONS, handlingStatusLabel, testTypeLabel,
+} from "./projectTaskUtils"
 
-const SEVERITY_CONFIG: Record<BugType["severity"], { label: string; cls: string; icon: React.ElementType }> = {
-  critical: { label: "Nghiêm trọng", cls: "bg-red-100 text-red-700 border-red-200", icon: AlertCircle },
-  high: { label: "Cao", cls: "bg-orange-100 text-orange-700 border-orange-200", icon: AlertTriangle },
-  medium: { label: "Trung bình", cls: "bg-amber-100 text-amber-700 border-amber-200", icon: Info },
-  low: { label: "Thấp", cls: "bg-blue-100 text-blue-700 border-blue-200", icon: Info },
+const EMPTY_FORM = {
+  version: "",
+  testDate: "",
+  testerId: "",
+  testType: "regression",
+  bugsFound: 0,
+  bugsPassed: 0,
+  bugsRejected: 0,
+  bugsReviewing: 0,
+  bugsBillable: 0,
+  confirmedById: "",
+  confirmedAt: "",
+  handlingStatus: "pending",
 }
 
-const STATUS_CONFIG: Record<BugType["status"], { label: string; cls: string; icon: React.ElementType }> = {
-  open: { label: "Mở", cls: "bg-gray-100 text-gray-700 border-gray-200", icon: Clock },
-  "in-progress": { label: "Đang fix", cls: "bg-blue-100 text-blue-700 border-blue-200", icon: PlayCircle },
-  fixed: { label: "Đã fix", cls: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: CheckCircle2 },
-  verified: { label: "Đã xác nhận", cls: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle2 },
-  closed: { label: "Đóng", cls: "bg-gray-100 text-gray-500 border-gray-200", icon: XCircle },
+function empName(employees: Employee[], id?: string) {
+  return employees.find(e => e.id === id)?.name ?? "—"
 }
 
-const EMPTY_BUG_FORM = {
-  title: "",
-  description: "",
-  severity: "medium" as BugType["severity"],
-  status: "open" as BugType["status"],
-  assignedToId: "",
-}
-
-export function ProjectTestingTab({ bugs, employees, onAddBug, onEditBug, onDeleteBug }: { bugs?: BugType[]; employees?: Employee[]; onAddBug?: (bug: any) => void; onEditBug?: (id: string, bug: any) => void; onDeleteBug?: (id: string) => void }) {
-  const [search, setSearch] = useState("")
-  const [filterSeverity, setFilterSeverity] = useState<string>("all")
-  const [filterStatus, setFilterStatus] = useState<string>("all")
-
+export function ProjectTestingTab({
+  projectId,
+  sessions,
+  employees,
+  onAdd,
+  onEdit,
+  onDelete,
+}: {
+  projectId: string
+  sessions: TestSession[]
+  employees: Employee[]
+  onAdd: (data: Omit<TestSession, "id" | "createdAt" | "updatedAt">) => void
+  onEdit: (id: string, session: Partial<TestSession>) => void
+  onDelete: (id: string) => void
+}) {
   const [showForm, setShowForm] = useState(false)
-  const [editTarget, setEditTarget] = useState<BugType | null>(null)
-  const [form, setForm] = useState({ ...EMPTY_BUG_FORM })
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [editTarget, setEditTarget] = useState<TestSession | null>(null)
+  const [form, setForm] = useState({ ...EMPTY_FORM })
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  const filteredBugs = (bugs || []).filter(bug => {
-    const matchSearch = !search || bug.title.toLowerCase().includes(search.toLowerCase()) || (bug.description?.toLowerCase().includes(search.toLowerCase()))
-    const matchSeverity = filterSeverity === "all" || bug.severity === filterSeverity
-    const matchStatus = filterStatus === "all" || bug.status === filterStatus
-    return matchSearch && matchSeverity && matchStatus
-  })
+  const totals = sessions.reduce(
+    (acc, s) => ({
+      found: acc.found + (s.bugsFound || 0),
+      passed: acc.passed + (s.bugsPassed || 0),
+      rejected: acc.rejected + (s.bugsRejected || 0),
+      billable: acc.billable + (s.bugsBillable || 0),
+    }),
+    { found: 0, passed: 0, rejected: 0, billable: 0 },
+  )
 
-  function openAdd() {
+  function openCreate() {
     setEditTarget(null)
-    setForm({ ...EMPTY_BUG_FORM })
+    setForm({ ...EMPTY_FORM })
     setShowForm(true)
   }
 
-  function openEdit(bug: BugType) {
-    setEditTarget(bug)
+  function openEdit(session: TestSession) {
+    setEditTarget(session)
     setForm({
-      title: bug.title,
-      description: bug.description || "",
-      severity: bug.severity,
-      status: bug.status,
-      assignedToId: bug.assignedToId || "",
+      version: session.version,
+      testDate: session.testDate,
+      testerId: session.testerId || "",
+      testType: session.testType,
+      bugsFound: session.bugsFound,
+      bugsPassed: session.bugsPassed,
+      bugsRejected: session.bugsRejected,
+      bugsReviewing: session.bugsReviewing,
+      bugsBillable: session.bugsBillable,
+      confirmedById: session.confirmedById || "",
+      confirmedAt: session.confirmedAt || "",
+      handlingStatus: session.handlingStatus,
     })
     setShowForm(true)
   }
 
   function handleSave() {
-    if (!form.title.trim()) return
-    if (editTarget && onEditBug) onEditBug(editTarget.id, form)
-    else if (onAddBug) onAddBug({ ...form, id: Date.now().toString(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
+    if (!form.version.trim() || !form.testDate) return
+    const now = new Date().toISOString()
+    const tester = employees.find(e => e.id === form.testerId)
+    const confirmer = employees.find(e => e.id === form.confirmedById)
+    const payload = {
+      version: form.version.trim(),
+      testDate: form.testDate,
+      testerId: form.testerId || undefined,
+      testerName: tester?.name,
+      testType: form.testType,
+      bugsFound: Number(form.bugsFound) || 0,
+      bugsPassed: Number(form.bugsPassed) || 0,
+      bugsRejected: Number(form.bugsRejected) || 0,
+      bugsReviewing: Number(form.bugsReviewing) || 0,
+      bugsBillable: Number(form.bugsBillable) || 0,
+      confirmedById: form.confirmedById || undefined,
+      confirmedByName: confirmer?.name,
+      confirmedAt: form.confirmedAt || undefined,
+      handlingStatus: form.handlingStatus,
+      projectId: editTarget?.projectId || "",
+    }
+    if (editTarget) {
+      onEdit(editTarget.id, { ...payload, updatedAt: now })
+    } else {
+      onAdd({
+        ...payload,
+        projectId,
+      })
+    }
     setShowForm(false)
   }
 
-  function cycleStatus(bug: BugType) {
-    const nextStatus: Record<BugType["status"], BugType["status"]> = {
-      open: "in-progress",
-      "in-progress": "fixed",
-      fixed: "verified",
-      verified: "closed",
-      closed: "open",
-    }
-    if (onEditBug) onEditBug(bug.id, { ...bug, status: nextStatus[bug.status] })
-  }
+  const thCls = "px-3 py-2.5 text-left text-[10px] font-black text-gray-400 uppercase tracking-wider whitespace-nowrap bg-gray-50/90"
+  const tdCls = "px-3 py-3 text-xs text-gray-700 border-t border-gray-100 align-top text-center"
+  const tdTextCls = "px-3 py-3 text-xs text-gray-700 border-t border-gray-100 align-top"
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-          <Bug size={16} className="text-[#C62828]" /> Testing & Bug Tracking
-        </h3>
-        <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#C62828] text-white text-xs font-bold rounded-lg hover:bg-[#B71C1C] transition">
-          <Plus size={14} /> Báo bug mới
-        </button>
-      </div>
-
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Tìm bug..."
-            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20"
-          />
-        </div>
-        <CustomCombobox
-          value={filterSeverity}
-          onChange={setFilterSeverity}
-          placeholder="Mức độ"
-          options={[
-            { value: "all", label: "Tất cả mức độ" },
-            ...Object.entries(SEVERITY_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label }))
-          ]}
+    <ProjectDetailTabShell
+      icon={Bug}
+      title="Testing & Báo cáo kiểm thử"
+      description="Theo dõi phiên test theo phiên bản, người test và thống kê bug"
+      action={
+        sessions.length > 0 ? (
+          <button type="button" onClick={openCreate} className={tabPrimaryBtn}>
+            <Plus size={14} /> Thêm phiên test
+          </button>
+        ) : undefined
+      }
+      stats={sessions.length > 0 ? [
+        { label: "Phiên test", value: sessions.length },
+        { label: "Bug phát hiện", value: totals.found, cls: "text-red-600" },
+        { label: "Bug thông qua", value: totals.passed, cls: "text-emerald-600" },
+        { label: "Bug tính tiền", value: totals.billable, cls: "text-amber-600" },
+      ] : undefined}
+    >
+      {sessions.length === 0 ? (
+        <ProjectTabEmptyState
+          icon={Bug}
+          title="Chưa có phiên test"
+          description="Ghi nhận kết quả kiểm thử theo phiên bản với đầy đủ thống kê bug"
+          action={
+            <button type="button" onClick={openCreate} className={tabDashedAddBtn}>
+              <Plus size={15} /> Thêm phiên test đầu tiên
+            </button>
+          }
         />
-        <CustomCombobox
-          value={filterStatus}
-          onChange={setFilterStatus}
-          placeholder="Trạng thái"
-          options={[
-            { value: "all", label: "Tất cả trạng thái" },
-            ...Object.entries(STATUS_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label }))
-          ]}
-        />
-      </div>
-
-      {!bugs || bugs.length === 0 ? (
-        <div className="text-center py-12">
-          <Bug size={32} className="mx-auto mb-3 text-gray-300" />
-          <p className="text-sm text-gray-500">Chưa có bug nào được báo cáo</p>
-        </div>
-      ) : filteredBugs.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-sm text-gray-500">Không tìm thấy bug nào khớp với bộ lọc</p>
-        </div>
       ) : (
-        <div className="space-y-3">
-          {filteredBugs.map(bug => {
-            const sevCfg = SEVERITY_CONFIG[bug.severity]
-            const statusCfg = STATUS_CONFIG[bug.status]
-            const SevIcon = sevCfg.icon
-            const StatusIcon = statusCfg.icon
-            return (
-              <div key={bug.id} className="bg-white border border-gray-100 rounded-xl p-4 group">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${sevCfg.cls}`}>
-                        <SevIcon size={10} /> {sevCfg.label}
+        <ProjectTabSection>
+          <div className="overflow-x-auto -mx-1 rounded-xl border border-gray-100">
+            <table className="w-full min-w-[1200px] text-sm">
+              <thead>
+                <tr>
+                  <th className={`${thCls} w-10`}>STT</th>
+                  <th className={thCls}>Phiên bản</th>
+                  <th className={thCls}>Ngày test</th>
+                  <th className={thCls}>Người test</th>
+                  <th className={thCls}>Loại test</th>
+                  <th className={thCls}>Bug phát hiện</th>
+                  <th className={thCls}>Bug thông qua</th>
+                  <th className={thCls}>Bug bị từ chối</th>
+                  <th className={thCls}>Bug kiểm tra</th>
+                  <th className={thCls}>Bug tính tiền</th>
+                  <th className={thCls}>Người xác nhận</th>
+                  <th className={thCls}>Ngày xác nhận</th>
+                  <th className={thCls}>Tình trạng xử lý bug</th>
+                  <th className={`${thCls} w-16`} />
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((s, idx) => (
+                  <tr key={s.id} className="hover:bg-gray-50/80 transition-colors group">
+                    <td className={`${tdCls} text-gray-400 font-mono`}>{idx + 1}</td>
+                    <td className={`${tdTextCls} font-bold text-gray-800 whitespace-nowrap`}>{s.version}</td>
+                    <td className={`${tdTextCls} whitespace-nowrap`}>{s.testDate}</td>
+                    <td className={`${tdTextCls} whitespace-nowrap`}>{s.testerName || empName(employees, s.testerId)}</td>
+                    <td className={tdTextCls}>{testTypeLabel(s.testType)}</td>
+                    <td className={`${tdCls} font-bold text-red-600`}>{s.bugsFound}</td>
+                    <td className={`${tdCls} font-bold text-emerald-600`}>{s.bugsPassed}</td>
+                    <td className={`${tdCls} font-bold text-gray-500`}>{s.bugsRejected}</td>
+                    <td className={`${tdCls} font-bold text-blue-600`}>{s.bugsReviewing}</td>
+                    <td className={`${tdCls} font-bold text-amber-600`}>{s.bugsBillable}</td>
+                    <td className={`${tdTextCls} whitespace-nowrap`}>{s.confirmedByName || empName(employees, s.confirmedById)}</td>
+                    <td className={`${tdTextCls} whitespace-nowrap`}>{s.confirmedAt || "—"}</td>
+                    <td className={tdTextCls}>
+                      <span className="inline-flex px-2 py-0.5 rounded-lg bg-gray-100 text-[10px] font-bold text-gray-600">
+                        {handlingStatusLabel(s.handlingStatus)}
                       </span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusCfg.cls}`}>
-                        <StatusIcon size={10} /> {statusCfg.label}
-                      </span>
-                    </div>
-                    <h4 className="text-sm font-bold text-gray-800">{bug.title}</h4>
-                    {bug.description && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{bug.description}</p>}
-                    <div className="flex items-center gap-3 mt-2">
-                      {bug.assignedToId && employees && (
-                        <span className="text-[11px] text-gray-500 flex items-center gap-1">
-                          <User size={12} /> {employees.find(e => e.id === bug.assignedToId)?.name || "—"}
-                        </span>
-                      )}
-                      <span className="text-[11px] text-gray-400">Tạo: {new Date(bug.createdAt).toLocaleDateString("vi-VN")}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => cycleStatus(bug)} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700" title="Chuyển trạng thái">
-                      <CheckCircle2 size={14} />
-                    </button>
-                    <button onClick={() => openEdit(bug)} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-700">
-                      <Info size={14} />
-                    </button>
-                    <button onClick={() => setDeleteTarget(bug.id)} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600">
-                      <XCircle size={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                    </td>
+                    <td className={tdTextCls}>
+                      <div className="flex gap-0.5 justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button type="button" onClick={() => openEdit(s)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700">
+                          <Edit2 size={13} />
+                        </button>
+                        <button type="button" onClick={() => setDeleteId(s.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ProjectTabSection>
       )}
 
       <Modal
         open={showForm}
         onClose={() => setShowForm(false)}
-        title={editTarget ? "Sửa bug" : "Báo bug mới"}
+        title={editTarget ? "Chỉnh sửa phiên test" : "Thêm phiên test"}
         icon={Bug}
-        width="lg"
+        width="xl"
         footer={
-          <div className="flex gap-3">
+          <>
             <ModalCancelButton onClick={() => setShowForm(false)} />
-            <ModalSubmitButton onClick={handleSave} label={editTarget ? "Cập nhật" : "Tạo"} />
-          </div>
+            <ModalSubmitButton onClick={handleSave} disabled={!form.version.trim() || !form.testDate}
+              label={editTarget ? "Lưu thay đổi" : "Thêm phiên test"} />
+          </>
         }
       >
-        <div className="p-6 space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-gray-600 mb-1.5">Tiêu đề *</label>
-            <input
-              type="text"
-              value={form.title}
-              onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20"
-              placeholder="Mô tả ngắn gọn về bug"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5">Mức độ</label>
-              <CustomCombobox
-                value={form.severity}
-                onChange={v => setForm(f => ({ ...f, severity: v as BugType["severity"] }))}
-                options={Object.entries(SEVERITY_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label }))}
-              />
+              <label className="text-xs font-bold text-gray-600 block mb-1.5">Phiên bản *</label>
+              <input value={form.version} onChange={e => setForm(f => ({ ...f, version: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20"
+                placeholder="VD: v2.0.0-rc1" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5">Trạng thái</label>
-              <CustomCombobox
-                value={form.status}
-                onChange={v => setForm(f => ({ ...f, status: v as BugType["status"] }))}
-                options={Object.entries(STATUS_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label }))}
-              />
+              <label className="text-xs font-bold text-gray-600 block mb-1.5">Ngày test *</label>
+              <DateInput value={form.testDate} onChange={v => setForm(f => ({ ...f, testDate: v }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1.5">Giao cho</label>
-              <CustomCombobox
-                value={form.assignedToId}
-                onChange={v => setForm(f => ({ ...f, assignedToId: v }))}
-                placeholder="Chọn nhân viên"
-                options={(employees || []).map(e => ({ value: e.id, label: e.name, desc: e.department }))}
-              />
+              <label className="text-xs font-bold text-gray-600 block mb-1.5">Người test</label>
+              <CustomCombobox value={form.testerId} onChange={v => setForm(f => ({ ...f, testerId: v }))}
+                placeholder="Chọn nhân viên..."
+                options={employees.map(e => ({ value: e.id, label: e.name, desc: e.department }))} />
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-600 mb-1.5">Mô tả chi tiết</label>
-            <textarea
-              value={form.description}
-              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20 resize-none"
-              placeholder="Mô tả các bước để reproduce bug, expected result, actual result..."
-            />
+            <div>
+              <label className="text-xs font-bold text-gray-600 block mb-1.5">Loại test</label>
+              <CustomSelect value={form.testType} onChange={v => setForm(f => ({ ...f, testType: v }))}
+                options={TEST_TYPE_OPTIONS} />
+            </div>
+            {[
+              { key: "bugsFound" as const, label: "Bug phát hiện" },
+              { key: "bugsPassed" as const, label: "Bug thông qua" },
+              { key: "bugsRejected" as const, label: "Bug bị từ chối" },
+              { key: "bugsReviewing" as const, label: "Bug kiểm tra" },
+              { key: "bugsBillable" as const, label: "Bug tính tiền" },
+            ].map(({ key, label }) => (
+              <div key={key}>
+                <label className="text-xs font-bold text-gray-600 block mb-1.5">{label}</label>
+                <input type="number" min={0} value={form[key]}
+                  onChange={e => setForm(f => ({ ...f, [key]: Number(e.target.value) || 0 }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20" />
+              </div>
+            ))}
+            <div>
+              <label className="text-xs font-bold text-gray-600 block mb-1.5">Người xác nhận</label>
+              <CustomCombobox value={form.confirmedById} onChange={v => setForm(f => ({ ...f, confirmedById: v }))}
+                placeholder="Chọn người xác nhận..."
+                options={employees.map(e => ({ value: e.id, label: e.name, desc: e.position }))} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-600 block mb-1.5">Ngày xác nhận</label>
+              <DateInput value={form.confirmedAt} onChange={v => setForm(f => ({ ...f, confirmedAt: v }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="text-xs font-bold text-gray-600 block mb-1.5">Tình trạng xử lý bug</label>
+              <CustomSelect value={form.handlingStatus} onChange={v => setForm(f => ({ ...f, handlingStatus: v }))}
+                options={BUG_HANDLING_STATUS_OPTIONS} />
+            </div>
           </div>
         </div>
       </Modal>
 
-      {deleteTarget && (
-        <ConfirmModal
-          isOpen={true}
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={() => { onDeleteBug && onDeleteBug(deleteTarget); setDeleteTarget(null) }}
-          title="Xóa bug?"
-          message="Bạn chắc chắn muốn xóa bug này?"
-          confirmText="Xóa"
-          type="danger"
-        />
-      )}
-    </div>
+      <ConfirmModal
+        isOpen={deleteId !== null}
+        onClose={() => setDeleteId(null)}
+        onConfirm={() => { if (deleteId) onDelete(deleteId); setDeleteId(null) }}
+        title="Xóa phiên test?"
+        message="Bạn có chắc muốn xóa phiên test này?"
+        confirmText="Xóa"
+        type="danger"
+      />
+    </ProjectDetailTabShell>
   )
 }

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo, ReactNode } from "react"
-import { useNavigate, useLocation } from "react-router-dom"
+import React, { useState, useEffect, useMemo, ReactNode, useRef } from "react"
+import { useNavigate, useLocation, Routes, Route } from "react-router-dom"
 import {
   LayoutDashboard, Users, Clock, BarChart3, Bell,
   Wrench, LogOut, ChevronDown, ChevronRight,
-  Shield, Wifi, CheckSquare, FileText, Calendar, User, Fingerprint, Settings, MessageCircle, Layers, Menu, Search, Check, Building2, X
+  Shield, Wifi, CheckSquare, FileText, Calendar, User, Fingerprint, Settings, MessageCircle, Layers, Menu, Check, Building2, X
 } from "lucide-react"
 
 import UserPortalApp from "./components/nhan-vien/UserApp"
@@ -19,6 +19,7 @@ import StatisticsPage from "./components/thong-ke/StatisticsPage"
 
 // Imported Vietnamese subfolders / modular components
 import { LoginPage } from "./components/xac-thuc/LoginPage"
+import { BrandLogo } from "./components/ui/BrandLogo"
 import { AdminDashboard } from "./components/tong-quan/AdminDashboard"
 import { EmployeeManagement, EmployeeModal } from "./components/nhan-su/EmployeeManagement"
 import { AttendanceManagement } from "./components/cham-cong/AttendanceManagement"
@@ -30,6 +31,7 @@ import { ProjectManagement } from "./components/du-an/ProjectManagement"
 import { CrmAdminPage } from "./components/crm/CrmAdminPage"
 import { CrmStaffPage } from "./components/crm/CrmStaffPage"
 import { LeadManagement } from "./components/lead/LeadManagement"
+import { PublicRequirementForm } from "./components/lead/PublicRequirementForm"
 
 // Imported user portal components
 import { UserHome } from "./components/nhan-vien/UserHome"
@@ -44,6 +46,8 @@ import { Role, Page, Employee, OrgNode, Assignment, RoleDefinition } from "./typ
 import { INIT_EMPLOYEES, INIT_ORG_NODES, NOTIFICATIONS, INIT_ASSIGNMENTS } from "./constants"
 import { findBranchForNode, initials } from "./utils"
 import { api } from "@/lib/api"
+import { connectChatSocket, releaseChatSocket, resetChatSocket, chatHeartbeat, getChatSocketStatus } from "@/lib/chatSocket"
+import { useNotificationBadge } from "./hooks/useNotifications"
 import { touchSession, resetSessionTouchClock } from "@/lib/session"
 
 function getISOWeek(d: Date): number {
@@ -123,8 +127,9 @@ export default function App() {
         "user-profile", "user-attendance", "user-timeoff", "user-directory",
         "user-chat", "user-workflow", "user-settings", "user-crm"
       ]
-    if (validPages.includes(rawPath as Page)) {
-      return rawPath as Page
+    const firstSegment = rawPath.split("/")[0]
+    if (validPages.includes(firstSegment as Page)) {
+      return firstSegment as Page
     }
     return "dashboard"
   })()
@@ -258,7 +263,13 @@ export default function App() {
   const [loginError, setLoginError] = useState<string | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
-  const [unreadNotifCount, setUnreadNotifCount] = useState(0)
+  const {
+    unread: unreadNotifs,
+    latest: notifPreview,
+    reload: reloadNotificationsCount,
+    setLatest: setNotifPreview,
+    setUnread: setUnreadNotifCount,
+  } = useNotificationBadge(isLoggedIn)
   const [profileUpdates, setProfileUpdates] = useState<any[]>([])
   const [autoOpenUpdateReqId, setAutoOpenUpdateReqId] = useState<string | null>(null)
 
@@ -267,14 +278,6 @@ export default function App() {
       api.profileUpdates.list().then(d => {
         if (d && Array.isArray(d)) setProfileUpdates(d as any[])
       }).catch(err => console.error("Lỗi tải profile updates:", err))
-    }
-  }
-
-  const reloadNotificationsCount = () => {
-    if (isLoggedIn) {
-      api.notifications.list().then(d => {
-        if (d && Array.isArray(d)) setUnreadNotifCount((d as any[]).filter((n: any) => !n.read).length)
-      }).catch(err => console.error("Lỗi tải số lượng thông báo:", err))
     }
   }
 
@@ -341,9 +344,6 @@ export default function App() {
         api.requests.list().then(d => {
           if (d && Array.isArray(d)) setRequests(d as any[])
         }),
-        api.notifications.list().then(d => {
-          if (d && Array.isArray(d)) setUnreadNotifCount((d as any[]).filter((n: any) => !n.read).length)
-        }),
         api.profileUpdates.list().then(d => {
           if (d && Array.isArray(d)) setProfileUpdates(d as any[])
         }).catch(() => {})
@@ -352,10 +352,21 @@ export default function App() {
   }, [isLoggedIn])
 
   useEffect(() => {
-    if (isLoggedIn) {
-      reloadNotificationsCount()
-      const timer = setInterval(reloadNotificationsCount, 30000)
-      return () => clearInterval(timer)
+    if (!isLoggedIn) {
+      resetChatSocket()
+      return
+    }
+    connectChatSocket()
+    const heartbeat = setInterval(() => {
+      if (getChatSocketStatus() === "connected") {
+        chatHeartbeat()
+      } else {
+        api.staffChat.heartbeat().catch(() => {})
+      }
+    }, 25_000)
+    return () => {
+      clearInterval(heartbeat)
+      releaseChatSocket()
     }
   }, [isLoggedIn])
 
@@ -419,6 +430,7 @@ export default function App() {
   }
 
   const handleLogout = () => {
+    resetChatSocket()
     localStorage.removeItem("dudi_token")
     localStorage.removeItem("dudi_user")
     resetSessionTouchClock()
@@ -520,12 +532,23 @@ export default function App() {
       case "tai-khoan": return <AccountManagement selectedBranch={selectedBranch} currentUserEmail={loggedEmail} currentUserRole={role} mode="accounts" />
       case "phan-quyen": return <AccountManagement selectedBranch={selectedBranch} currentUserEmail={loggedEmail} currentUserRole={role} mode="roles" />
       case "ip": return <IPManagement selectedBranch={selectedBranch} />
-      case "du-an": return <ProjectManagement currentUserId={currentEmp.id} currentUserRole={role} selectedBranch={selectedBranch} />
+      case "du-an": {
+        const projectId = location.pathname.match(/^\/du-an\/([^/]+)/)?.[1]
+        return (
+          <ProjectManagement
+            currentUserId={currentEmp.id}
+            currentUserRole={role}
+            selectedBranch={selectedBranch}
+            projectId={projectId}
+            onNavigateToProject={(id) => navigate(id ? `/du-an/${id}` : "/du-an")}
+          />
+        )
+      }
       case "cong-viec": return <TaskManagement selectedBranch={selectedBranch} />
       case "tien-ich": return <SystemConfigPage />
       case "crm": return <CrmAdminPage />
       case "staff-portal": return (
-        <div className="w-full h-[calc(100vh-130px)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
+        <div className="w-full h-[calc(100vh-2.5rem)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
           <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} embed={true} />
         </div>
       )
@@ -548,348 +571,98 @@ export default function App() {
   }
 
 
-  const unreadNotifs = unreadNotifCount
   const showStaffFab = canOpenStaffPortal(activeRolePermissions)
 
   return (
-    <>
-      {sessionAlertMsg && (
-        <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
-      )}
-      <div className="flex h-screen bg-[#F5F1EF] overflow-hidden" onClick={() => { }}>
-        <UserAwareSidebar active={activePage} onNavigate={setActivePage}
-          collapsed={sidebarCollapsed} role={role} roleName={roleName} modules={activeRolePermissions} onLogout={handleLogout}
-          pendingRequestsCount={pendingRequestsCount} />
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <Header
-            onToggle={() => setSidebarCollapsed(p => !p)}
-            unread={unreadNotifs}
-            onMarkAllRead={() => setUnreadNotifCount(0)}
-            currentUser={currentUserInfo}
-            onLogout={handleLogout}
-            onNavigate={setActivePage}
-            selectedBranch={selectedBranch}
-            onBranchChange={setSelectedBranch}
-            branches={branches}
-            profileUpdates={profileUpdates}
-            onReloadProfileUpdates={reloadProfileUpdates}
-            employees={employees}
-            orgNodes={orgNodes}
-            onSelectUpdateReq={setAutoOpenUpdateReqId}
-            onReloadNotifCount={reloadNotificationsCount}
-          />
-          <main className="flex-1 overflow-y-auto p-5 relative"
-            style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
-            {isPageLoading && (
-              <div className="absolute top-0 left-0 right-0 h-0.5 z-[100] overflow-hidden pointer-events-none">
-                <div className="h-full bg-gradient-to-r from-[#C62828] to-[#E64A19] animate-[loadingBar_0.4s_ease-out_forwards]" />
-              </div>
-            )}
-            <div key={activePage} className="page-enter-active">
-              {renderPage()}
-            </div>
-            {globalAddEmpOpen && (
-              <EmployeeModal
-                editEmp={null}
-                employees={employees}
-                orgNodes={orgNodes}
-                onClose={() => setGlobalAddEmpOpen(false)}
-                onSave={async (form) => {
-                  const snapshotDate = new Date().toISOString().split("T")[0].split("-").reverse().join("/")
-                  const path = []
-                  let curr = orgNodes.find(n => n.id === form.orgNodeId)
-                  while (curr) {
-                    path.push(curr.name)
-                    const pId = curr.parentId
-                    curr = pId ? orgNodes.find(n => n.id === pId) : undefined
-                  }
-                  const snapshot = path.reverse().join(" · ")
-
-                  const joinEntry = {
-                    id: 1,
-                    type: "join" as const,
-                    date: form.joinDate || snapshotDate,
-                    toDate: "",
-                    title: form.position || "Nhân viên",
-                    orgNodeId: form.orgNodeId,
-                    snapshot: snapshot,
-                    note: "Tiếp nhận nhân sự mới"
-                  }
-                  const finalForm = { ...form, workHistory: [joinEntry] }
-
-                  try {
-                    const created = await api.employees.create(finalForm) as Employee
-                    setEmployees(prev => [...prev, created])
-                  } catch {
-                    const newId = `NV${String(employees.length + 1).padStart(3, "0")}`
-                    setEmployees(prev => [...prev, { id: newId, ...finalForm } as Employee])
-                  }
-                  setGlobalAddEmpOpen(false)
-                }}
-              />
-            )}
-          </main>
-        </div>
-      </div>
-    </>
-  )
-}
-
-function Header({
-  onToggle, unread, onMarkAllRead, currentUser, onLogout, onNavigate, selectedBranch, onBranchChange, branches,
-  profileUpdates = [], onReloadProfileUpdates, employees = [], orgNodes = [], onSelectUpdateReq, onReloadNotifCount
-}: {
-  onToggle: () => void; unread: number; onMarkAllRead?: () => void
-  currentUser: { name: string; id: string; role: Role; position: string; department: string }
-  onLogout: () => void
-  onNavigate: (p: Page) => void
-  selectedBranch: string
-  onBranchChange: (b: string) => void
-  branches: { id: string; name: string }[]
-  profileUpdates?: any[]
-  onReloadProfileUpdates?: () => void
-  employees?: Employee[]
-  orgNodes?: OrgNode[]
-  onSelectUpdateReq?: (id: string | null) => void
-  onReloadNotifCount?: () => void
-}) {
-  const [showDrop, setShowDrop] = useState(false)
-  const [showBranchDrop, setShowBranchDrop] = useState(false)
-  const [showNotifDrop, setShowNotifDrop] = useState(false)
-  const [notifs, setNotifs] = useState<any[]>([])
-  const [loadingNotifs, setLoadingNotifs] = useState(false)
-  const shortName = currentUser.name.split(" ").slice(-2).join(" ")
-
-  const pendingUpdates = profileUpdates.filter(req => {
-    if (req.status !== "pending_approval") return false
-    if (currentUser.role !== "role-admin" && currentUser.role !== "role-super-admin") return false
-    
-    const matchedEmp = employees.find(e => e.id === currentUser.id)
-    if (matchedEmp) {
-      const adminBranchId = findBranchForNode(matchedEmp.orgNodeId ?? "", orgNodes)
-      if (!adminBranchId) return true
-      
-      const reqEmp = employees.find(e => e.id === req.employeeId)
-      if (!reqEmp) return true
-      const reqBranchId = findBranchForNode(reqEmp.orgNodeId ?? "", orgNodes)
-      return adminBranchId === reqBranchId
-    }
-    return true
-  })
-
-  async function openNotifs() {
-    setShowNotifDrop(v => !v)
-    onReloadProfileUpdates?.()
-    setLoadingNotifs(true)
-    try {
-      const data = await api.notifications.list({ read: "false" }) as any[]
-      setNotifs(data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoadingNotifs(false)
-    }
-  }
-
-  async function markAllRead() {
-    await api.notifications.markAllRead()
-    setNotifs([])
-    onReloadNotifCount?.()
-  }
-  return (
-    <header className="bg-white border-b border-black/5 px-5 py-3 flex items-center gap-4 flex-shrink-0 relative">
-      <button onClick={onToggle} className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500">
-        <Menu size={20} />
-      </button>
-      <div className="flex-1 max-w-sm">
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input type="text" placeholder="Tìm kiếm nhân viên, ID..."
-            className="w-full pl-9 pr-4 py-2 bg-gray-50 rounded-xl text-sm border border-gray-100 focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10 transition-all" />
-        </div>
-      </div>
-      <div className="ml-auto flex items-center gap-3">
-        {(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") && (
-          <div className="relative">
-            <button
-              onClick={() => setShowBranchDrop(!showBranchDrop)}
-              className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 rounded-xl px-3.5 py-2 border border-gray-100 shadow-sm transition-all active:scale-[0.98] text-xs font-bold text-gray-700 flex-shrink-0 cursor-pointer"
-            >
-              <Building2 size={13.5} className="text-gray-400" />
-              <span>
-                {selectedBranch === "all"
-                  ? "Tất cả chi nhánh"
-                  : (branches.find(b => b.id === selectedBranch)?.name || "Tất cả chi nhánh")}
-              </span>
-              <ChevronDown size={12} className={`text-gray-400 transition-transform duration-200 ${showBranchDrop ? "rotate-180" : ""}`} />
-            </button>
-
-            {showBranchDrop && (
-              <>
-                <div className="fixed inset-0 z-[90]" onClick={() => setShowBranchDrop(false)} />
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl py-1.5 z-[100] flex flex-col animate-in fade-in slide-in-from-top-2 duration-150">
-                  <button
-                    onClick={() => {
-                      onBranchChange("all")
-                      setShowBranchDrop(false)
-                    }}
-                    className={`px-4 py-2 text-left text-xs font-bold hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedBranch === "all" ? "text-[#C62828] bg-red-50/40" : "text-gray-600"}`}
-                  >
-                    <span>Tất cả chi nhánh</span>
-                    {selectedBranch === "all" && <Check size={12} className="flex-shrink-0 text-[#C62828]" />}
-                  </button>
-                  {branches.map(b => (
-                    <button
-                      key={b.id}
-                      onClick={() => {
-                        onBranchChange(b.id)
-                        setShowBranchDrop(false)
-                      }}
-                      className={`px-4 py-2 text-left text-xs font-bold hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedBranch === b.id ? "text-[#C62828] bg-red-50/40" : "text-gray-600"}`}
-                    >
-                      <span className="truncate">{b.name}</span>
-                      {selectedBranch === b.id && <Check size={12} className="flex-shrink-0 text-[#C62828]" />}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-        {/* Notification dropdown */}
-        <div className="relative">
-          <button onClick={openNotifs} className="relative p-2.5 hover:bg-gray-100 rounded-xl transition-colors text-gray-500">
-            <Bell size={19} />
-            {(unread > 0 || pendingUpdates.length > 0) && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-4 bg-[#C62828] text-white text-[9px] font-extrabold rounded-full flex items-center justify-center animate-pulse border border-white px-1 shadow-sm">
-                {unread + pendingUpdates.length}
-              </span>
-            )}
-          </button>
-          {showNotifDrop && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowNotifDrop(false)} />
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-black/8 z-50 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-black text-gray-800">Thông báo</p>
-                  <button onClick={markAllRead} className="text-[11px] font-bold text-[#C62828] hover:underline">Đọc tất cả</button>
-                </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {pendingUpdates.map((req: any) => {
-                    const reqEmp = employees.find(e => e.id === req.employeeId)
-                    const empName = reqEmp?.name || req.employeeId
-                    return (
-                      <button key={req.id} onClick={() => { 
-                        onSelectUpdateReq?.(req.id);
-                        onNavigate("nhan-su"); 
-                        setShowNotifDrop(false);
-                      }}
-                        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-orange-50 bg-orange-50/20 transition-colors text-left border-b border-gray-50 last:border-0">
-                        <div className="relative flex h-2 w-2 mt-1.5 flex-shrink-0">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs leading-relaxed font-bold text-gray-800">
-                            Hồ sơ cập nhật của <span className="text-orange-600 font-extrabold">{empName}</span> đang chờ duyệt
-                          </p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">Nhấp để đi tới trang duyệt hồ sơ</p>
-                        </div>
-                      </button>
-                    )
-                  })}
-
-                  {loadingNotifs ? (
-                    <div className="p-8 text-center">
-                      <div className="w-6 h-6 rounded-full border-2 border-[#C62828]/30 border-t-[#C62828] animate-spin mx-auto" />
-                    </div>
-                  ) : notifs.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-gray-400">Không có thông báo nào</div>
-                  ) : notifs.map((n: any) => (
-                    <button key={n.id} onClick={async () => { 
-                      await api.notifications.markRead(n.id); 
-                      setNotifs(ns => ns.filter(x => x.id !== n.id));
-                      onReloadNotifCount?.();
-                    }}
-                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0 bg-red-50/30">
-                      <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-[#C62828]" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs leading-relaxed font-bold text-gray-800">{n.message}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">{n.time}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                {(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") && (
-                  <div className="border-t border-gray-100 p-2">
-                    <button onClick={() => { setShowNotifDrop(false); onNavigate("thong-bao") }}
-                      className="w-full text-center text-xs font-bold text-[#C62828] py-2 hover:bg-red-50 rounded-xl transition-colors">
-                      Quản lý thông báo hệ thống →
-                    </button>
+    <Routes>
+      {/* Route dành cho khách hàng điền form */}
+      <Route path="/form/:leadId" element={<PublicRequirementForm />} />
+      {/* Route dành cho admin */}
+      <Route path="*" element={
+        <>
+          {sessionAlertMsg && (
+            <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
+          )}
+          <div className="flex h-screen bg-[#F5F1EF] overflow-hidden" onClick={() => { }}>
+            <UserAwareSidebar active={activePage} onNavigate={setActivePage}
+              collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(p => !p)}
+              role={role} roleName={roleName} modules={activeRolePermissions} onLogout={handleLogout}
+              pendingRequestsCount={pendingRequestsCount}
+              currentUser={currentUserInfo}
+              unread={unreadNotifs}
+              notifPreview={notifPreview}
+              onMarkAllRead={async () => {
+                await api.notifications.markAllRead()
+                setUnreadNotifCount(0)
+                setNotifPreview([])
+              }}
+              onReloadNotifCount={reloadNotificationsCount}
+              selectedBranch={selectedBranch}
+              onBranchChange={setSelectedBranch}
+              branches={branches}
+              profileUpdates={profileUpdates}
+              onReloadProfileUpdates={reloadProfileUpdates}
+              employees={employees}
+              orgNodes={orgNodes}
+              onSelectUpdateReq={setAutoOpenUpdateReqId}
+            />
+            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+              <main className="flex-1 overflow-y-auto p-5 relative"
+                style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
+                {isPageLoading && (
+                  <div className="absolute top-0 left-0 right-0 h-0.5 z-[100] overflow-hidden pointer-events-none">
+                    <div className="h-full bg-gradient-to-r from-[#C62828] to-[#E64A19] animate-[loadingBar_0.4s_ease-out_forwards]" />
                   </div>
                 )}
-              </div>
-            </>
-          )}
-        </div>
-        {/* User dropdown */}
-        <div className="relative">
-          <button onClick={() => setShowDrop(p => !p)}
-            className="flex items-center gap-2.5 pl-3 border-l border-gray-100 cursor-pointer group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-bold">
-              {initials(currentUser.name)}
-            </div>
-            <div className="text-left">
-              <div className="text-xs font-semibold text-gray-700 leading-none">{shortName}</div>
-              <div className="text-[10px] text-gray-400 mt-0.5 font-mono">{currentUser.id}</div>
-            </div>
-            <ChevronDown size={13} className={`text-gray-400 transition-transform ${showDrop ? "rotate-180" : ""}`} />
-          </button>
-          {showDrop && (
-            <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-black/8 z-50 overflow-hidden">
-              {/* User info */}
-              <div className="p-4 bg-gradient-to-br from-[#C62828]/5 to-[#E64A19]/5 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-lg font-bold">
-                    {initials(currentUser.name)}
-                  </div>
-                  <div>
-                    <div className="font-bold text-gray-800 text-sm">{currentUser.name}</div>
-                    <div className="text-xs text-gray-500">{currentUser.position} · {currentUser.department}</div>
-                    <div className="text-[10px] font-mono text-[#C62828] mt-0.5">{currentUser.id}</div>
-                  </div>
+                <div key={activePage} className="page-enter-active">
+                  {renderPage()}
                 </div>
-                <div className={`mt-3 text-center text-xs font-bold py-1 rounded-lg
-                  ${(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") ? "bg-amber-100 text-amber-700" : "bg-blue-50 text-blue-600"}`}>
-                  {(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") ? "👑 Quản trị viên" : "🧑‍💻 Nhân viên"}
-                </div>
-              </div>
-              {/* Menu items */}
-              <div className="py-1">
-                <button onClick={() => { onNavigate((currentUser.role === "role-admin" || currentUser.role === "role-super-admin") ? "tai-khoan" : "user-settings"); setShowDrop(false) }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-                >
-                  <Settings size={15} className="text-gray-400" />
-                  Cài đặt tài khoản
-                </button>
-                <button onClick={() => { onNavigate("user-profile"); setShowDrop(false) }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-                  <User size={15} className="text-gray-400" />
-                  Thông tin cá nhân
-                </button>
-              </div>
-              <div className="border-t border-gray-100 py-1">
-                <button onClick={() => { onLogout(); setShowDrop(false) }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
-                  <LogOut size={15} />
-                  Đăng xuất
-                </button>
-              </div>
+                {globalAddEmpOpen && (
+                  <EmployeeModal
+                    editEmp={null}
+                    employees={employees}
+                    orgNodes={orgNodes}
+                    onClose={() => setGlobalAddEmpOpen(false)}
+                    onSave={async (form) => {
+                      const snapshotDate = new Date().toISOString().split("T")[0].split("-").reverse().join("/")
+                      const path = []
+                      let curr = orgNodes.find(n => n.id === form.orgNodeId)
+                      while (curr) {
+                        path.push(curr.name)
+                        const pId = curr.parentId
+                        curr = pId ? orgNodes.find(n => n.id === pId) : undefined
+                      }
+                      const snapshot = path.reverse().join(" · ")
+
+                      const joinEntry = {
+                        id: 1,
+                        type: "join" as const,
+                        date: form.joinDate || snapshotDate,
+                        toDate: "",
+                        title: form.position || "Nhân viên",
+                        orgNodeId: form.orgNodeId,
+                        snapshot: snapshot,
+                        note: "Tiếp nhận nhân sự mới"
+                      }
+                      const finalForm = { ...form, workHistory: [joinEntry] }
+
+                      try {
+                        const created = await api.employees.create(finalForm) as Employee
+                        setEmployees(prev => [...prev, created])
+                      } catch {
+                        const newId = `NV${String(employees.length + 1).padStart(3, "0")}`
+                        setEmployees(prev => [...prev, { id: newId, ...finalForm } as Employee])
+                      }
+                      setGlobalAddEmpOpen(false)
+                    }}
+                  />
+                )}
+              </main>
             </div>
-          )}
-        </div>
-      </div>
-    </header>
+          </div>
+        </>
+      } />
+    </Routes>
   )
 }
 
@@ -909,37 +682,106 @@ function NavItem({ page, icon: Icon, label, badge, active, onNavigate, collapsed
   )
 }
 
-function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate, collapsed, expanded, onToggle }: {
+function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate, collapsed, expanded, onToggle, onFlyoutOpen }: {
   gKey: string; icon: React.ElementType; label: string; pages: Page[]; children: ReactNode
   active: Page; onNavigate: (p: Page) => void; collapsed: boolean
   expanded: string[]; onToggle: (k: string) => void
+  onFlyoutOpen?: () => void
 }) {
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 })
   const open = expanded.includes(gKey)
   const hasActiveChild = pages.includes(active)
+
+  useEffect(() => {
+    if (!collapsed || !open || !btnRef.current) return
+    const update = () => {
+      const rect = btnRef.current!.getBoundingClientRect()
+      setFlyoutPos({ top: rect.top, left: rect.right + 8 })
+    }
+    update()
+    window.addEventListener("scroll", update, true)
+    window.addEventListener("resize", update)
+    return () => {
+      window.removeEventListener("scroll", update, true)
+      window.removeEventListener("resize", update)
+    }
+  }, [collapsed, open])
+
+  const handleClick = () => {
+    onFlyoutOpen?.()
+    onToggle(gKey)
+  }
+
   return (
-    <div>
-      <button onClick={() => onToggle(gKey)}
+    <div className="relative">
+      <button
+        ref={btnRef}
+        onClick={handleClick}
+        title={label}
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 cursor-pointer
-          ${hasActiveChild ? "text-white font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white/90"}`}>
+          ${collapsed ? "justify-center" : ""}
+          ${hasActiveChild ? "text-white font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white/90"}`}
+      >
         <Icon size={18} className={`flex-shrink-0 ${hasActiveChild ? "text-[#FF8A65]" : "text-white/60"}`} />
-        {!collapsed && <>
-          <span className="flex-1 text-left font-medium">{label}</span>
-          <ChevronDown size={14} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-        </>}
+        {!collapsed && (
+          <>
+            <span className="flex-1 text-left font-medium">{label}</span>
+            <ChevronDown size={14} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+          </>
+        )}
       </button>
       {!collapsed && open && (
         <div className="ml-4 mt-1 border-l border-white/10 pl-3 space-y-0.5">{children}</div>
+      )}
+      {collapsed && open && (
+        <>
+          <div className="fixed inset-0 z-[90]" onClick={() => onToggle(gKey)} />
+          <div
+            className="fixed w-56 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl py-1.5 z-[100] flex flex-col"
+            style={{ top: flyoutPos.top, left: flyoutPos.left }}
+          >
+            <div className="px-4 py-2 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">
+              {label}
+            </div>
+            {React.Children.map(children, child => {
+              if (!React.isValidElement(child)) return child
+              return React.cloneElement(child, {
+                flyout: true,
+                onSelect: () => onToggle(gKey),
+              } as Partial<React.ComponentProps<typeof SubItem>>)
+            })}
+          </div>
+        </>
       )}
     </div>
   )
 }
 
-function SubItem({ page, label, badge, active, onNavigate }: {
+function SubItem({ page, label, badge, active, onNavigate, flyout, onSelect }: {
   page: Page; label: string; badge?: number
   active: Page; onNavigate: (p: Page) => void
+  flyout?: boolean
+  onSelect?: () => void
 }) {
+  const handleClick = () => {
+    onNavigate(page)
+    onSelect?.()
+  }
+
+  if (flyout) {
+    return (
+      <button onClick={handleClick}
+        className={`w-full flex items-center justify-between px-4 py-2 text-left text-xs font-bold hover:bg-gray-50 transition-colors
+          ${active === page ? "text-[#C62828] bg-red-50/40" : "text-gray-600"}`}>
+        <span className="truncate">{label}</span>
+        {badge ? <span className="bg-[#FF6D00] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">{badge}</span> : null}
+      </button>
+    )
+  }
+
   return (
-    <button onClick={() => onNavigate(page)}
+    <button onClick={handleClick}
       className={`w-full flex items-center justify-between text-xs py-2 px-2 rounded-lg transition-all cursor-pointer
         ${active === page ? "text-[#FF8A65] font-semibold" : "text-white/45 hover:text-white/80"}`}>
       <span>{label}</span>
@@ -948,27 +790,307 @@ function SubItem({ page, label, badge, active, onNavigate }: {
   )
 }
 
-function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modules, onLogout, pendingRequestsCount = 0 }:
-  { active: Page; onNavigate: (p: Page) => void; collapsed: boolean; role: Role; roleName: string; modules: string[]; onLogout: () => void; pendingRequestsCount?: number }) {
-
+function UserAwareSidebar({
+  active, onNavigate, collapsed, onToggle, role, roleName, modules, onLogout, pendingRequestsCount = 0,
+  currentUser, unread = 0, notifPreview = [], onMarkAllRead, onReloadNotifCount,
+  selectedBranch = "all", onBranchChange, branches = [],
+  profileUpdates = [], onReloadProfileUpdates, employees = [], orgNodes = [], onSelectUpdateReq,
+}: {
+  active: Page
+  onNavigate: (p: Page) => void
+  collapsed: boolean
+  onToggle: () => void
+  role: Role
+  roleName: string
+  modules: string[]
+  onLogout: () => void
+  pendingRequestsCount?: number
+  currentUser?: { name: string; id: string; role: Role; position: string; department: string }
+  unread?: number
+  notifPreview?: any[]
+  onMarkAllRead?: () => void | Promise<void>
+  onReloadNotifCount?: () => void
+  selectedBranch?: string
+  onBranchChange?: (b: string) => void
+  branches?: { id: string; name: string }[]
+  profileUpdates?: any[]
+  onReloadProfileUpdates?: () => void
+  employees?: Employee[]
+  orgNodes?: OrgNode[]
+  onSelectUpdateReq?: (id: string | null) => void
+}) {
   const [expanded, setExpanded] = useState<string[]>(["nhan-su"])
-  const toggle = (k: string) => setExpanded(p => p.includes(k) ? p.filter(x => x !== k) : [...p, k])
+  const [showBranchDrop, setShowBranchDrop] = useState(false)
+  const [showNotifDrop, setShowNotifDrop] = useState(false)
+  const [showUserDrop, setShowUserDrop] = useState(false)
+  const userBtnRef = useRef<HTMLButtonElement>(null)
+  const [userFlyoutPos, setUserFlyoutPos] = useState({ left: 0, bottom: 0 })
+  const [notifs, setNotifs] = useState<any[]>([])
+  const [loadingNotifs, setLoadingNotifs] = useState(false)
+  const toggle = (k: string) => setExpanded(p => {
+    if (collapsed) return p.includes(k) ? [] : [k]
+    return p.includes(k) ? p.filter(x => x !== k) : [...p, k]
+  })
+
+  const closeOverlays = () => {
+    setShowBranchDrop(false)
+    setShowNotifDrop(false)
+    setShowUserDrop(false)
+    setExpanded([])
+  }
 
   const hasAccess = (moduleKey: string) => hasPageAccess(modules, moduleKey)
+  const isAdmin = currentUser?.role === "role-admin" || currentUser?.role === "role-super-admin"
+  const shortName = currentUser?.name.split(" ").slice(-2).join(" ") ?? ""
+
+  const pendingUpdates = profileUpdates.filter(req => {
+    if (req.status !== "pending_approval") return false
+    if (!isAdmin) return false
+    const matchedEmp = employees.find(e => e.id === currentUser?.id)
+    if (matchedEmp) {
+      const adminBranchId = findBranchForNode(matchedEmp.orgNodeId ?? "", orgNodes)
+      if (!adminBranchId) return true
+      const reqEmp = employees.find(e => e.id === req.employeeId)
+      if (!reqEmp) return true
+      const reqBranchId = findBranchForNode(reqEmp.orgNodeId ?? "", orgNodes)
+      return adminBranchId === reqBranchId
+    }
+    return true
+  })
+
+  const notifBadge = unread + pendingUpdates.length
+  const branchLabel = selectedBranch === "all"
+    ? "Tất cả chi nhánh"
+    : (branches.find(b => b.id === selectedBranch)?.name || "Chi nhánh")
+
+  const dropPos = collapsed
+    ? "absolute left-full top-0 ml-2"
+    : "absolute left-0 right-0 top-full mt-1.5"
+
+  async function openNotifs() {
+    const opening = !showNotifDrop
+    setShowNotifDrop(opening)
+    setShowBranchDrop(false)
+    setShowUserDrop(false)
+    setExpanded([])
+    onReloadProfileUpdates?.()
+    if (opening) {
+      if (notifPreview.length > 0) {
+        setNotifs(notifPreview)
+        return
+      }
+      setLoadingNotifs(true)
+      try {
+        const data = await api.notifications.list({ read: "false" }) as any[]
+        setNotifs(data)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoadingNotifs(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (showNotifDrop && notifPreview.length > 0) {
+      setNotifs(notifPreview)
+    }
+  }, [notifPreview, showNotifDrop])
+
+  async function markAllRead() {
+    await onMarkAllRead?.()
+    setNotifs([])
+    onReloadNotifCount?.()
+  }
+
+  useEffect(() => {
+    if (!collapsed || !showUserDrop || !userBtnRef.current) return
+    const update = () => {
+      const rect = userBtnRef.current!.getBoundingClientRect()
+      setUserFlyoutPos({ left: rect.right + 8, bottom: window.innerHeight - rect.bottom })
+    }
+    update()
+    window.addEventListener("scroll", update, true)
+    window.addEventListener("resize", update)
+    return () => {
+      window.removeEventListener("scroll", update, true)
+      window.removeEventListener("resize", update)
+    }
+  }, [collapsed, showUserDrop])
+
+  const userMenuItems = currentUser ? (
+    <>
+      <button
+        onClick={() => { onNavigate(isAdmin ? "tai-khoan" : "user-settings"); setShowUserDrop(false) }}
+        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-white/65 hover:text-white hover:bg-white/8 transition-colors"
+      >
+        <Settings size={15} className="text-white/40 flex-shrink-0" />
+        Cài đặt tài khoản
+      </button>
+      <button
+        onClick={() => { onNavigate("user-profile"); setShowUserDrop(false) }}
+        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-white/65 hover:text-white hover:bg-white/8 transition-colors"
+      >
+        <User size={15} className="text-white/40 flex-shrink-0" />
+        Thông tin cá nhân
+      </button>
+      <div className="my-1 border-t border-white/8" />
+      <button
+        onClick={() => { onLogout(); setShowUserDrop(false) }}
+        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-red-400/90 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+      >
+        <LogOut size={15} className="flex-shrink-0" />
+        Đăng xuất
+      </button>
+    </>
+  ) : null
 
   return (
-    <aside className={`${collapsed ? "w-16" : "w-60"} bg-[#160606] flex flex-col transition-all duration-300 flex-shrink-0 overflow-hidden relative z-40`}>
-      {/* Logo */}
-      <div className="p-4 flex items-center gap-3 border-b border-white/5">
-        <div className="w-9 h-9 bg-[#C62828] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
-          <span className="text-white text-xs font-black leading-none">D<br /><span className="text-[8px] font-semibold tracking-wide">S</span></span>
-        </div>
-        {!collapsed && (
-          <div>
-            <div className="text-white font-black text-sm tracking-wide leading-none">DUDI</div>
-            <div className="text-white/40 text-xs font-medium">software</div>
+    <aside className={`${collapsed ? "w-16" : "w-60"} bg-[#160606] flex flex-col transition-all duration-300 flex-shrink-0 overflow-visible relative z-40`}>
+      {/* Logo + thu gọn */}
+      <div className={`p-3 border-b border-white/5 flex ${collapsed ? "flex-col items-center gap-2" : "items-center gap-2"}`}>
+        <button
+          onClick={onToggle}
+          title={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
+          className="p-1.5 rounded-lg hover:bg-white/10 text-white/45 hover:text-white/80 transition-colors flex-shrink-0"
+        >
+          <Menu size={18} />
+        </button>
+        <BrandLogo
+          size={collapsed ? 28 : 34}
+          withText={!collapsed}
+          collapsed={collapsed}
+          textLight
+          className={collapsed ? "" : "flex-1 min-w-0"}
+        />
+      </div>
+
+      {/* Chi nhánh + Thông báo */}
+      <div className={`px-2 pt-2 pb-1 space-y-1 border-b border-white/5 ${collapsed ? "flex flex-col items-center" : ""}`}>
+        {isAdmin && onBranchChange && (
+          <div className="relative w-full">
+            <button
+              onClick={() => { setShowBranchDrop(p => !p); setShowNotifDrop(false); setShowUserDrop(false); setExpanded([]) }}
+              title={branchLabel}
+              className={`w-full flex items-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/75 cursor-pointer
+                ${collapsed ? "justify-center p-2.5" : "px-3 py-2.5 text-xs font-bold"}`}
+            >
+              <Building2 size={16} className="text-white/45 flex-shrink-0" />
+              {!collapsed && (
+                <>
+                  <span className="flex-1 text-left truncate">{branchLabel}</span>
+                  <ChevronDown size={12} className={`text-white/40 flex-shrink-0 transition-transform ${showBranchDrop ? "rotate-180" : ""}`} />
+                </>
+              )}
+            </button>
+            {showBranchDrop && (
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowBranchDrop(false)} />
+                <div className={`${dropPos} w-56 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl py-1.5 z-[100] flex flex-col`}>
+                  <button
+                    onClick={() => { onBranchChange("all"); setShowBranchDrop(false) }}
+                    className={`px-4 py-2 text-left text-xs font-bold hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedBranch === "all" ? "text-[#C62828] bg-red-50/40" : "text-gray-600"}`}
+                  >
+                    <span>Tất cả chi nhánh</span>
+                    {selectedBranch === "all" && <Check size={12} className="text-[#C62828]" />}
+                  </button>
+                  {branches.map(b => (
+                    <button
+                      key={b.id}
+                      onClick={() => { onBranchChange(b.id); setShowBranchDrop(false) }}
+                      className={`px-4 py-2 text-left text-xs font-bold hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedBranch === b.id ? "text-[#C62828] bg-red-50/40" : "text-gray-600"}`}
+                    >
+                      <span className="truncate">{b.name}</span>
+                      {selectedBranch === b.id && <Check size={12} className="text-[#C62828]" />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
+
+        <div className="relative w-full">
+          <button
+            onClick={openNotifs}
+            title="Quản lý thông báo"
+            className={`w-full flex items-center gap-2 rounded-xl hover:bg-white/8 transition-all text-white/55 hover:text-white/85 relative
+              ${collapsed ? "justify-center p-2.5" : "px-3 py-2.5 text-sm"}`}
+          >
+            <Bell size={18} className="flex-shrink-0" />
+            {!collapsed && <span className="font-medium flex-1 text-left truncate">Quản lý thông báo</span>}
+            {notifBadge > 0 && (
+              <span className={`min-w-[18px] h-[18px] bg-[#C62828] text-white text-[9px] font-extrabold rounded-full flex items-center justify-center border-2 border-[#160606] px-1
+                ${collapsed ? "absolute -top-0.5 -right-0.5" : ""}`}>
+                {notifBadge}
+              </span>
+            )}
+          </button>
+          {showNotifDrop && (
+            <>
+              <div className="fixed inset-0 z-[90]" onClick={() => setShowNotifDrop(false)} />
+              <div className={`${dropPos} w-80 bg-white rounded-2xl shadow-xl border border-black/8 z-[100] overflow-hidden`}>
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <p className="text-sm font-black text-gray-800">Thông báo</p>
+                  <button onClick={markAllRead} className="text-[11px] font-bold text-[#C62828] hover:underline">Đọc tất cả</button>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {pendingUpdates.map((req: any) => {
+                    const reqEmp = employees.find(e => e.id === req.employeeId)
+                    const empName = reqEmp?.name || req.employeeId
+                    return (
+                      <button key={req.id} onClick={() => {
+                        onSelectUpdateReq?.(req.id)
+                        onNavigate("nhan-su")
+                        setShowNotifDrop(false)
+                      }}
+                        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-orange-50 bg-orange-50/20 transition-colors text-left border-b border-gray-50 last:border-0">
+                        <div className="relative flex h-2 w-2 mt-1.5 flex-shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs leading-relaxed font-bold text-gray-800">
+                            Hồ sơ cập nhật của <span className="text-orange-600 font-extrabold">{empName}</span> đang chờ duyệt
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">Nhấp để đi tới trang duyệt hồ sơ</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                  {loadingNotifs ? (
+                    <div className="p-8 text-center">
+                      <div className="w-6 h-6 rounded-full border-2 border-[#C62828]/30 border-t-[#C62828] animate-spin mx-auto" />
+                    </div>
+                  ) : notifs.length === 0 && pendingUpdates.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-gray-400">Không có thông báo nào</div>
+                  ) : notifs.map((n: any) => (
+                    <button key={n.id} onClick={async () => {
+                      await api.notifications.markRead(n.id)
+                      setNotifs(ns => ns.filter(x => x.id !== n.id))
+                      onReloadNotifCount?.()
+                    }}
+                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0 bg-red-50/30">
+                      <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-[#C62828]" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs leading-relaxed font-bold text-gray-800">{n.message}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{n.time}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {isAdmin && (
+                  <div className="border-t border-gray-100 p-2">
+                    <button onClick={() => { setShowNotifDrop(false); onNavigate("thong-bao") }}
+                      className="w-full text-center text-xs font-bold text-[#C62828] py-2 hover:bg-red-50 rounded-xl transition-colors">
+                      Quản lý thông báo hệ thống →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Navigation */}
@@ -983,7 +1105,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
             label="Quản lý nhân sự"
             pages={["nhan-su", "co-cau", "cham-cong", "duyet-don"].filter(hasAccess) as Page[]}
             active={active} onNavigate={onNavigate} collapsed={collapsed}
-            expanded={expanded} onToggle={toggle}
+            expanded={expanded} onToggle={toggle} onFlyoutOpen={closeOverlays}
           >
             {hasAccess("nhan-su") && <SubItem page="nhan-su" label="Danh sách nhân viên" active={active} onNavigate={onNavigate} />}
             {hasAccess("co-cau") && <SubItem page="co-cau" label="Cơ cấu tổ chức" active={active} onNavigate={onNavigate} />}
@@ -999,7 +1121,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
             label="Quản trị hệ thống"
             pages={["tai-khoan", "phan-quyen", "ip"].filter(hasAccess) as Page[]}
             active={active} onNavigate={onNavigate} collapsed={collapsed}
-            expanded={expanded} onToggle={toggle}
+            expanded={expanded} onToggle={toggle} onFlyoutOpen={closeOverlays}
           >
             {hasAccess("tai-khoan") && <SubItem page="tai-khoan" label="Quản lý tài khoản" active={active} onNavigate={onNavigate} />}
             {hasAccess("phan-quyen") && <SubItem page="phan-quyen" label="Phân quyền vai trò" active={active} onNavigate={onNavigate} />}
@@ -1016,22 +1138,66 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
         {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý khách hàng" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
 
-      {/* Role badge */}
-      {!collapsed && (
-        <div className="px-3 pb-2">
-          <div className={`rounded-xl px-3 py-2 text-center text-xs font-bold
-            ${(role === "role-admin" || role === "role-super-admin") ? "bg-amber-500/20 text-amber-300" : "bg-white/8 text-white/50"}`}>
-            {roleName}
-          </div>
-        </div>
-      )}
-
-      {/* Logout */}
+      {/* User */}
       <div className="p-2 border-t border-white/5">
-        <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-red-400 hover:bg-red-50/10 transition-all">
-          <LogOut size={18} />
-          {!collapsed && <span className="font-medium">Đăng xuất</span>}
-        </button>
+        {currentUser && (
+          <div>
+            <button
+              ref={userBtnRef}
+              onClick={() => { setShowUserDrop(p => !p); setShowBranchDrop(false); setShowNotifDrop(false); setExpanded([]) }}
+              title={currentUser.name}
+              className={`w-full flex items-center gap-2.5 rounded-xl transition-all px-2 py-2
+                ${showUserDrop ? "bg-white/10" : "hover:bg-white/8"}
+                ${collapsed ? "justify-center" : ""}`}
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ring-2 ring-white/10">
+                {initials(currentUser.name)}
+              </div>
+              {!collapsed && (
+                <>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="text-xs font-semibold text-white/90 truncate leading-tight">{shortName}</div>
+                    <div className="text-[10px] text-white/35 truncate mt-0.5">{roleName}</div>
+                  </div>
+                  <ChevronDown size={13} className={`text-white/35 flex-shrink-0 transition-transform duration-200 ${showUserDrop ? "rotate-180" : ""}`} />
+                </>
+              )}
+            </button>
+
+            {showUserDrop && !collapsed && (
+              <div className="mt-1 px-1 pb-1 space-y-0.5">
+                {userMenuItems}
+              </div>
+            )}
+
+            {showUserDrop && collapsed && (
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowUserDrop(false)} />
+                <div
+                  className="fixed w-52 bg-[#1c0a0a] border border-white/10 rounded-2xl shadow-2xl py-2 z-[100]"
+                  style={{ left: userFlyoutPos.left, bottom: userFlyoutPos.bottom }}
+                >
+                  <div className="px-3 pb-2 mb-1 border-b border-white/8">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {initials(currentUser.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-white/90 truncate">{currentUser.name}</div>
+                        <div className="text-[10px] text-white/40 truncate">{currentUser.position}</div>
+                      </div>
+                    </div>
+                    <div className={`inline-block mt-2 text-[9px] font-bold px-2 py-0.5 rounded-md
+                      ${isAdmin ? "bg-amber-500/15 text-amber-300" : "bg-white/8 text-white/45"}`}>
+                      {roleName}
+                    </div>
+                  </div>
+                  <div className="px-1">{userMenuItems}</div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   )

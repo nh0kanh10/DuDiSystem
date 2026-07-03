@@ -39,7 +39,12 @@ export function initChatSocket(httpServer) {
       if (dbVersion !== tokenVersion) {
         return next(new Error("Session expired"))
       }
-      socket.user = { ...decoded, permissionsVersion: dbVersion }
+      socket.user = {
+        ...decoded,
+        employeeId: dbUser.employeeId ?? decoded.employeeId,
+        roleId: dbUser.roleId ?? decoded.roleId,
+        permissionsVersion: dbVersion,
+      }
       next()
     } catch {
       next(new Error("Unauthorized"))
@@ -47,7 +52,19 @@ export function initChatSocket(httpServer) {
   })
 
   io.on("connection", (socket) => {
-    const user = socket.user
+    const resolveUser = () => {
+      const base = socket.user
+      if (!base?.id) return base
+      const dbUser = getById(base.id)
+      if (!dbUser) return base
+      return {
+        ...base,
+        employeeId: dbUser.employeeId ?? base.employeeId,
+        roleId: dbUser.roleId ?? base.roleId,
+      }
+    }
+
+    const user = resolveUser()
     const employeeId = user?.employeeId
     if (!employeeId) {
       socket.disconnect(true)
@@ -60,11 +77,14 @@ export function initChatSocket(httpServer) {
     socket.join(roomEmployee(employeeId))
     if (branchId) socket.join(roomBranch(branchId))
     if (isAdminUser(user)) socket.join(roomAdmins())
+    socket.join(roomNotificationsBroadcast())
 
     const heartbeat = () => {
-      const result = staffChat.heartbeat(user)
+      const activeUser = resolveUser()
+      const result = staffChat.heartbeat(activeUser)
       if (result?.error) return
-      broadcastPresence(employeeId, branchId, true, result.lastSeenAt)
+      const activeId = activeUser?.employeeId ?? employeeId
+      broadcastPresence(activeId, branchId, true, result.lastSeenAt)
     }
 
     heartbeat()
@@ -91,8 +111,10 @@ export function initChatSocket(httpServer) {
     })
 
     socket.on("disconnect", () => {
-      staffChat.setOffline(user)
-      broadcastPresence(employeeId, branchId, false, new Date().toISOString())
+      const activeUser = resolveUser()
+      const activeId = activeUser?.employeeId ?? employeeId
+      staffChat.setOffline(activeUser)
+      broadcastPresence(activeId, branchId, false, new Date().toISOString())
     })
   })
 
@@ -110,6 +132,41 @@ function roomBranch(id) {
 
 function roomAdmins() {
   return "chat:admins"
+}
+
+function roomNotificationsBroadcast() {
+  return "notifications:broadcast"
+}
+
+/** @param {object} notification */
+export function emitNotificationCreated(notification) {
+  if (!io || !notification) return
+  const payload = { notification }
+  if (notification.recipientId) {
+    io.to(roomEmployee(notification.recipientId)).emit("notification:new", payload)
+  } else {
+    io.to(roomNotificationsBroadcast()).emit("notification:new", payload)
+  }
+}
+
+export function emitNotificationRead(recipientId, data) {
+  if (!io) return
+  const payload = { ...data }
+  if (recipientId) {
+    io.to(roomEmployee(recipientId)).emit("notification:read", payload)
+  } else {
+    io.to(roomNotificationsBroadcast()).emit("notification:read", payload)
+  }
+}
+
+/** @param {"created"|"updated"|"deleted"} action */
+export function emitTaskChanged(action, task) {
+  if (!io || !task) return
+  const payload = { action, task }
+  if (task.assigneeId) {
+    io.to(roomEmployee(task.assigneeId)).emit("task:changed", payload)
+  }
+  io.to(roomAdmins()).emit("task:changed", payload)
 }
 
 function broadcastPresence(employeeId, branchId, online, lastSeenAt) {

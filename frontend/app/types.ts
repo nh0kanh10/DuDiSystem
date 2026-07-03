@@ -236,7 +236,16 @@ export interface TimeOffSlot {
 
 
 export type LeadStatus = "new" | "contacted" | "requirement-gathering" | "requirement-done" | "converted" | "lost"
+export type FormStatus = "not_sent" | "sent" | "opened" | "in_progress" | "completed"
+export type FormType = "landing_page" | "ecommerce" | "company_profile"
 export type TaskCategory = "CODE" | "CONTENT" | "OPS" | "DESIGN" | "TEST" | "ADMIN"
+
+export interface LeadNote {
+  id: string
+  content: string
+  createdAt: string
+  createdBy?: string
+}
 
 export interface Lead {
   id: string
@@ -253,6 +262,13 @@ export interface Lead {
   assignedToName?: string
   requirementFormId?: string
   convertedProjectId?: string
+  formType?: FormType
+  formStatus?: FormStatus
+  formSentAt?: string
+  formOpenedAt?: string
+  formCompletedAt?: string
+  formDeadline?: string
+  notes?: LeadNote[]
   createdAt: string
   updatedAt: string
 }
@@ -267,11 +283,90 @@ export interface RequirementForm {
   projectType?: string 
   colorScheme?: string
   features?: string[]
-  references?: string[] 
+  references?: string 
   additionalNotes?: string
   attachments?: ProjectAttachment[]
   createdAt: string
   lockedAt?: string
+  
+  // Common fields
+  customer_name?: string
+  customer_phone?: string
+  customer_email?: string
+  company?: string
+  industry?: string
+  source?: string
+  goal?: string
+  cta?: string
+  kpi?: string
+  target_audience?: string
+  location?: string
+  user_flow?: string
+  structure?: string
+  sections?: string
+  has_register_form?: boolean
+  has_call_button?: boolean
+  has_chat?: boolean
+  has_content?: boolean
+  has_images?: boolean
+  has_logo?: boolean
+  brand_color?: string
+  style?: string
+  has_facebook_pixel?: boolean
+  has_google_analytics?: boolean
+  has_zalo_messenger?: boolean
+  has_responsive?: boolean
+  has_speed_optimized?: boolean
+  has_seo?: boolean
+  hosting_status?: string
+  deadline?: string
+  budget?: string
+  priority?: string
+  notes?: string
+  
+  // Landing page specific
+  main_product?: string
+  usp?: string
+  offers?: string
+  pricing?: string
+  insight?: string
+  
+  // Ecommerce specific
+  product_count?: string
+  has_categories?: boolean
+  has_variants?: boolean
+  has_blog?: boolean
+  top_features?: string
+  has_cart?: boolean
+  has_online_payment?: boolean
+  has_quick_order?: boolean
+  has_user_account?: boolean
+  has_wishlist?: boolean
+  has_coupon?: boolean
+  payment_methods?: string
+  has_order_tracking?: boolean
+  has_order_status?: boolean
+  has_order_email?: boolean
+  order_handler?: string
+  order_process?: string
+  has_shipping_integration?: boolean
+  has_admin?: boolean
+  has_product_admin?: boolean
+  has_order_admin?: boolean
+  has_customer_admin?: boolean
+  payment_integrations?: string
+  shipping_integrations?: string
+  
+  // Company profile specific
+  services?: string
+  strengths?: string
+  has_news?: boolean
+  has_contact_form?: boolean
+  has_google_maps?: boolean
+  has_newsletter?: boolean
+  has_content_admin?: boolean
+  has_page_admin?: boolean
+  has_multilingual?: boolean
 }
 
 export interface ProjectVaultItem {
@@ -283,6 +378,27 @@ export interface ProjectVaultItem {
   url?: string
   description?: string
   attachments?: ProjectAttachment[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TestSession {
+  id: string
+  projectId: string
+  version: string
+  testDate: string
+  testerId?: string
+  testerName?: string
+  testType: string
+  bugsFound: number
+  bugsPassed: number
+  bugsRejected: number
+  bugsReviewing: number
+  bugsBillable: number
+  confirmedById?: string
+  confirmedByName?: string
+  confirmedAt?: string
+  handlingStatus: string
   createdAt: string
   updatedAt: string
 }
@@ -321,20 +437,30 @@ export interface Project {
   createdAt: string
   leadId?: string
   requirementForm?: RequirementForm
+  requirementForms?: RequirementForm[]
   vaultItems?: ProjectVaultItem[]
   bugs?: Bug[]
+  testSessions?: TestSession[]
 }
 
 export interface TaskItem {
   id: string
   title: string
+  taskDetail?: string
   description?: string
-  assignee: string
+  assigneeId?: string
+  assigneeName?: string
+  assigneeDept?: string
+  assignee?: string
+  startDate?: string
   dueDate: string
+  resourceUrl?: string
+  notes?: string
   priority: "high" | "medium" | "low"
   status: "todo" | "in-progress" | "done"
-  category?: TaskCategory 
+  category?: TaskCategory
   projectId?: string
+  parentId?: string
 }
 
 export type Page =

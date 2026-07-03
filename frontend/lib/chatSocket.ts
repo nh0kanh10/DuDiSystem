@@ -4,6 +4,7 @@ const SOCKET_BASE = (import.meta.env.VITE_API_URL ?? "http://localhost:3001/api"
 
 let socket: Socket | null = null
 let refCount = 0
+let connectedToken = ""
 
 export type ChatSocketStatus = "disconnected" | "connecting" | "connected"
 
@@ -11,13 +12,17 @@ function token() {
   return localStorage.getItem("dudi_token") ?? ""
 }
 
-export function connectChatSocket(): Socket | null {
-  const t = token()
-  if (!t) return null
+function destroySocket() {
+  if (socket) {
+    socket.removeAllListeners()
+    socket.disconnect()
+    socket = null
+  }
+  connectedToken = ""
+}
 
-  refCount += 1
-  if (socket) return socket
-
+function createSocket(t: string) {
+  connectedToken = t
   socket = io(SOCKET_BASE, {
     path: "/socket.io",
     auth: { token: t },
@@ -32,16 +37,41 @@ export function connectChatSocket(): Socket | null {
     /* fallback REST polling handles offline */
   })
 
+  socket.on("connect", () => {
+    window.dispatchEvent(new Event("dudi:chat-socket-connect"))
+  })
+
   return socket
+}
+
+/** Force disconnect regardless of refCount — call on logout or token identity change. */
+export function resetChatSocket() {
+  refCount = 0
+  destroySocket()
+}
+
+export function getOrCreateChatSocket(): Socket | null {
+  const t = token()
+  if (!t) return null
+
+  if (socket && connectedToken !== t) {
+    destroySocket()
+    refCount = 0
+  }
+
+  if (!socket) createSocket(t)
+  return socket
+}
+
+export function connectChatSocket(): Socket | null {
+  const s = getOrCreateChatSocket()
+  if (s) refCount += 1
+  return s
 }
 
 export function releaseChatSocket() {
   refCount = Math.max(0, refCount - 1)
-  if (refCount === 0 && socket) {
-    socket.removeAllListeners()
-    socket.disconnect()
-    socket = null
-  }
+  if (refCount === 0) destroySocket()
 }
 
 export function getChatSocket() {

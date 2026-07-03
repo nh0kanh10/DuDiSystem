@@ -2,8 +2,14 @@
   {
     "id": "T1",
     "title": "Redesign dashboard UI",
+    "taskDetail": "Dashboard v2",
+    "description": "Thiết kế lại giao diện dashboard theo design system mới",
+    "category": "DESIGN",
     "assigneeId": "NV003",
+    "startDate": "01/06/2026",
     "dueDate": "30/06/2026",
+    "resourceUrl": "https://figma.com/dudi-dashboard",
+    "notes": "Ưu tiên mobile-first",
     "priority": "high",
     "status": "in-progress",
     "projectId": "PRJ001"
@@ -11,8 +17,14 @@
   {
     "id": "T2",
     "title": "Fix attendance API bug",
+    "taskDetail": "API chấm công",
+    "description": "Sửa lỗi sync dữ liệu chấm công giữa FE và BE",
+    "category": "CODE",
     "assigneeId": "NV002",
+    "startDate": "20/06/2026",
     "dueDate": "26/06/2026",
+    "resourceUrl": "",
+    "notes": "Đã deploy hotfix staging",
     "priority": "high",
     "status": "done",
     "projectId": "PRJ001"
@@ -20,8 +32,14 @@
   {
     "id": "T3",
     "title": "Tích hợp API backend vào FE",
+    "taskDetail": "Module dự án",
+    "description": "Kết nối toàn bộ API quản lý dự án với frontend",
+    "category": "CODE",
     "assigneeId": "NV001",
+    "startDate": "15/06/2026",
     "dueDate": "29/06/2026",
+    "resourceUrl": "https://docs.dudi.local/api",
+    "notes": "",
     "priority": "high",
     "status": "in-progress",
     "projectId": "PRJ001"
@@ -29,8 +47,14 @@
   {
     "id": "T4",
     "title": "Viết unit test module chấm công",
+    "taskDetail": "Unit test",
+    "description": "Bổ sung test coverage cho attendance service",
+    "category": "TEST",
     "assigneeId": "NV002",
+    "startDate": "01/07/2026",
     "dueDate": "03/07/2026",
+    "resourceUrl": "",
+    "notes": "Mục tiêu 80% coverage",
     "priority": "medium",
     "status": "todo",
     "projectId": "PRJ001"
@@ -173,8 +197,14 @@
   {
     "id": "T20",
     "title": "Review code module Nhân sự",
+    "taskDetail": "Code review",
+    "description": "Review PR module nhân sự trước khi merge",
+    "category": "CODE",
     "assigneeId": "NV004",
+    "startDate": "25/06/2026",
     "dueDate": "28/06/2026",
+    "resourceUrl": "",
+    "notes": "",
     "priority": "medium",
     "status": "done",
     "projectId": "PRJ001"
@@ -194,5 +224,70 @@
     "dueDate": "29/06/2026",
     "priority": "low",
     "status": "in-progress"
+  },
+  {
+    "id": "T23",
+    "title": "Làm nội dung",
+    "assigneeId": "NV011",
+    "startDate": "01/07/2026",
+    "dueDate": "15/07/2026",
+    "status": "in-progress",
+    "projectId": "PRJ002"
+  },
+  {
+    "id": "T24",
+    "title": "Chính sách bảo mật",
+    "description": "Soạn nội dung chính sách bảo mật thông tin khách hàng",
+    "category": "CONTENT",
+    "resourceUrl": "https://yame.vn",
+    "notes": "Soạn nội dung xong đưa khách check xem ok không",
+    "assigneeId": "NV011",
+    "status": "done",
+    "projectId": "PRJ002",
+    "parentId": "T23"
+  },
+  {
+    "id": "T25",
+    "title": "Điều khoản sử dụng",
+    "description": "Soạn điều khoản sử dụng website",
+    "category": "CONTENT",
+    "resourceUrl": "https://yame.vn",
+    "assigneeId": "NV011",
+    "status": "done",
+    "projectId": "PRJ002",
+    "parentId": "T23"
+  },
+  {
+    "id": "T26",
+    "title": "Chính sách thanh toán",
+    "description": "Soạn chính sách thanh toán & phương thức",
+    "category": "CONTENT",
+    "resourceUrl": "https://yame.vn",
+    "assigneeId": "NV011",
+    "status": "done",
+    "projectId": "PRJ002",
+    "parentId": "T23"
+  },
+  {
+    "id": "T27",
+    "title": "Chính sách giao nhận",
+    "description": "Soạn chính sách giao hàng & nhận hàng",
+    "category": "CONTENT",
+    "resourceUrl": "https://yame.vn",
+    "assigneeId": "NV011",
+    "status": "in-progress",
+    "projectId": "PRJ002",
+    "parentId": "T23"
+  },
+  {
+    "id": "T28",
+    "title": "Chính sách đổi trả",
+    "description": "Soạn chính sách đổi trả & hoàn tiền",
+    "category": "CONTENT",
+    "resourceUrl": "https://yame.vn",
+    "assigneeId": "NV011",
+    "status": "todo",
+    "projectId": "PRJ002",
+    "parentId": "T23"
   }
 ]

@@ -50,14 +50,17 @@ function resolveScopeFromEmployee(employeeId) {
 }
 
 export async function createUser(data) {
-  const { email, roleId, employeeId, status, scopeId } = data
+  const loginId = data.loginId ?? data.email
+  const { roleId, employeeId, status, scopeId } = data
   if (roleId === "role-super-admin") {
     throw new Error("Không thể gán vai trò ẩn hệ thống")
   }
-  if (!email) throw new Error("Email là bắt buộc")
+  if (!loginId) throw new Error("Mã đăng nhập là bắt buộc")
 
-  const existing = repo.getByEmail(email)
-  if (existing) throw new Error("Email đã tồn tại")
+  if (repo.getByEmail(loginId)) throw new Error("Mã đăng nhập đã tồn tại")
+  if (employeeId && repo.getByEmployeeId(employeeId)) {
+    throw new Error("Nhân viên này đã có tài khoản")
+  }
 
   let rawPassword = "123456"
   if (employeeId) {
@@ -73,7 +76,7 @@ export async function createUser(data) {
 
   const user = repo.create({
     id: `U-${Date.now()}`,
-    email,
+    email: loginId,
     password: hashedPassword,
     roleId: roleId || "role-user",
     employeeId: employeeId || null,

@@ -11,6 +11,8 @@ import { Employee, EmpExtForm, WorkHistoryEntry, WorkHistoryType, Attachment, Or
 import { api } from "@/lib/api"
 import { Badge } from "../ui/badge"
 import { initials } from "../../utils"
+import { deriveOrgFields, isOrgPlacementChanged, buildOrgSnapshot } from "../../utils/orgUtils"
+import { previewEmployeeId } from "../../utils/employeeId"
 import UserProfile from "../nhan-vien/UserProfile"
 import { CustomDatePicker as DateInput } from "../ui/CustomDatePicker"
 import { VNAddressSelect } from "../ui/VNAddressSelect"
@@ -653,19 +655,9 @@ function PersonalTab({ form, sf, inp, sel, lbl, readonly = false }: {
       </div>
 
       <div>
-        <p className={sectionLabel}>Học vấn & Ghi chú</p>
+        <p className={sectionLabel}>Học vấn</p>
         <div className="grid grid-cols-1 gap-3">
           <div><label className={lbl}>Trường đại học / cao đẳng</label><input disabled={readonly} value={form.university} onChange={e => !readonly && sf("university", e.target.value)} placeholder="Tên trường..." className={inp} /></div>
-          <div><label className={lbl}>Ghi chú</label>
-            <textarea
-              disabled={readonly}
-              value={form.notes}
-              onChange={e => !readonly && sf("notes", e.target.value)}
-              rows={2}
-              placeholder="Ghi chú thêm..."
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/50 resize-none text-gray-700 bg-white"
-            />
-          </div>
         </div>
       </div>
     </div>
@@ -734,6 +726,15 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
     return orgNodes.filter(n => n.type === "team" && n.parentId === activeHierarchy.positionId)
   }, [orgNodes, activeHierarchy.positionId])
 
+  const applyOrgSelection = (nodeId: string) => {
+    if (readonly) return
+    const derived = deriveOrgFields(nodeId, orgNodes)
+    sf("orgNodeId", nodeId)
+    sf("branchId", derived.branchId)
+    sf("department", derived.department)
+    sf("position", derived.position)
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -746,7 +747,7 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
               onChange={bId => {
                 if (!readonly) {
                   sf("branchId", bId)
-                  sf("orgNodeId", bId)
+                  applyOrgSelection(bId)
                 }
               }}
               options={branches.map(b => ({ value: b.id, label: b.name }))}
@@ -760,9 +761,7 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
               value={activeHierarchy.departmentId}
               onChange={dId => {
                 if (!readonly) {
-                  const node = orgNodes.find(n => n.id === dId)
-                  sf("department", node ? node.name : "")
-                  sf("orgNodeId", dId || activeHierarchy.branchId)
+                  applyOrgSelection(dId || activeHierarchy.branchId)
                 }
               }}
               options={deptList.map(d => ({ value: d.id, label: d.name }))}
@@ -776,7 +775,7 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
             <CustomSelect
               value={activeHierarchy.subDepartmentId}
               onChange={sdId => {
-                if (!readonly) sf("orgNodeId", sdId || activeHierarchy.departmentId || activeHierarchy.branchId)
+                if (!readonly) applyOrgSelection(sdId || activeHierarchy.departmentId || activeHierarchy.branchId)
               }}
               options={subDeptList.map(sd => ({ value: sd.id, label: sd.name }))}
               disabled={readonly || !activeHierarchy.departmentId}
@@ -790,9 +789,7 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
               value={activeHierarchy.positionId}
               onChange={pId => {
                 if (!readonly) {
-                  const node = orgNodes.find(n => n.id === pId)
-                  sf("position", node ? node.name : "")
-                  sf("orgNodeId", pId || activeHierarchy.subDepartmentId || activeHierarchy.departmentId || activeHierarchy.branchId)
+                  applyOrgSelection(pId || activeHierarchy.subDepartmentId || activeHierarchy.departmentId || activeHierarchy.branchId)
                 }
               }}
               options={posList.map(p => ({ value: p.id, label: p.name }))}
@@ -806,7 +803,7 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
             <CustomSelect
               value={activeHierarchy.teamId}
               onChange={tId => {
-                if (!readonly) sf("orgNodeId", tId || activeHierarchy.positionId || activeHierarchy.subDepartmentId || activeHierarchy.departmentId || activeHierarchy.branchId)
+                if (!readonly) applyOrgSelection(tId || activeHierarchy.positionId || activeHierarchy.subDepartmentId || activeHierarchy.departmentId || activeHierarchy.branchId)
               }}
               options={teamList.map(t => ({ value: t.id, label: t.name }))}
               disabled={readonly || !activeHierarchy.positionId}
@@ -885,7 +882,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
 
   const blank = (): EmpExtForm => ({
     name: "", email: "", phone: "", department: "", position: "", positionId: "",
-    joinDate: todayVN(), status: "active", contractType: "Chính thức",
+    joinDate: todayVN(), status: "active", contractType: "staff",
     branchId: "", orgNodeId: "",
     cccd: "", cccdDate: "", cccdPlace: "", bankAccount: "", bank: "",
     dob: "", gender: "Nam",
@@ -926,21 +923,10 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
     { key: "history",     label: "Lịch sử",       Icon: ClipboardList, badge: form.workHistory.length || undefined },
   ]
 
-  const newId = useMemo(() => {
-    const d = new Date()
-    const yy = d.getFullYear()
-    const mm = String(d.getMonth() + 1).padStart(2, "0")
-    const dd = String(d.getDate()).padStart(2, "0")
-    const min = String(d.getMinutes()).padStart(2, "0")
-    const baseId = `${yy}${mm}${dd}${min}`
-    let candidate = baseId
-    let count = 1
-    while (employees.some(e => e.id === candidate)) {
-      candidate = `${baseId}-${count}`
-      count++
-    }
-    return candidate
-  }, [employees])
+  const newId = useMemo(
+    () => previewEmployeeId(employees.map(e => e.id)),
+    [employees]
+  )
 
   return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3">
@@ -949,7 +935,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
         <div className="bg-gradient-to-r from-[#C62828] to-[#E64A19] px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
           <div>
             <h3 className="text-white font-bold text-lg">{editEmp ? `Sửa hồ sơ — ${editEmp.name}` : "Thêm nhân viên mới"}</h3>
-            <p className="text-white/60 text-xs mt-0.5">ID: {editEmp ? editEmp.id : newId}</p>
+            <p className="text-white/60 text-xs mt-0.5">Mã NV (dự kiến): {editEmp ? editEmp.id : newId}</p>
           </div>
           <button onClick={onClose} className="text-white/70 hover:text-white transition-colors"><X size={20} /></button>
         </div>
@@ -1117,7 +1103,9 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     if (["0000000000", "1111111111", "2222222222"].includes(e.id)) return false
     const q = search.toLowerCase()
     const matchQ = !q || e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
-    const matchS = filterStatus === "all" || e.status === filterStatus
+    const matchS = filterStatus === "all"
+      || e.status === filterStatus
+      || (filterStatus === "intern" && e.contractType === "intern")
     const matchD = filterDept === "all" || e.department === filterDept
     const matchB = selectedBranch === "all" || (e as any).branchId === selectedBranch
     return matchQ && matchS && matchD && matchB
@@ -1132,27 +1120,12 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
         const created = await api.employees.create(finalForm) as Employee
         setEmployees(prev => [...prev, created])
       }
-    } catch {
-      if (editEmp) {
-        setEmployees(prev => prev.map(e => e.id === editEmp.id ? { ...e, ...finalForm } : e))
-      } else {
-        const d = new Date()
-        const yy = d.getFullYear()
-        const mm = String(d.getMonth() + 1).padStart(2, "0")
-        const dd = String(d.getDate()).padStart(2, "0")
-        const min = String(d.getMinutes()).padStart(2, "0")
-        const baseId = `${yy}${mm}${dd}${min}`
-        let candidate = baseId
-        let count = 1
-        while (employees.some(e => e.id === candidate)) {
-          candidate = `${baseId}-${count}`
-          count++
-        }
-        setEmployees(prev => [...prev, { id: candidate, ...finalForm } as Employee])
-      }
+      setShowModal(false)
+      setEditEmp(null)
+    } catch (err) {
+      console.error("Lỗi lưu nhân viên:", err)
+      alert(err instanceof Error ? err.message : "Không thể lưu nhân viên")
     }
-    setShowModal(false)
-    setEditEmp(null)
   }
 
   const handleConfirmHistory = async (writeHistory: boolean) => {
@@ -1160,14 +1133,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     let finalForm = { ...historyConfirm.pendingForm }
 
     if (writeHistory) {
-      const path = []
-      let curr = orgNodes.find(n => n.id === finalForm.orgNodeId)
-      while (curr) {
-        path.push(curr.name)
-        const pId = curr.parentId
-        curr = pId ? orgNodes.find(n => n.id === pId) : undefined
-      }
-      const snapshot = path.reverse().join(" · ")
+      const snapshot = buildOrgSnapshot(finalForm.orgNodeId, orgNodes)
 
       const newHistoryEntry = {
         id: finalForm.workHistory.length + 1,
@@ -1190,8 +1156,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     let finalForm = { ...form }
     
     if (editEmp) {
-      const isDeptChanged = form.department !== editEmp.department
-      const isPosChanged = form.position !== editEmp.position
+      const orgChanged = isOrgPlacementChanged(editEmp, form)
       const isStatusChanged = form.status !== editEmp.status
 
       let detectedType: "transfer" | "promotion" | "resign" | "rehire" | null = null
@@ -1210,7 +1175,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
         }
       }
 
-      if (!detectedType && (isDeptChanged || isPosChanged)) {
+      if (!detectedType && orgChanged) {
         detectedType = "transfer"
         defaultNote = "Thuyên chuyển công tác"
       }
@@ -1225,14 +1190,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
         return
       }
     } else {
-      const path = []
-      let curr = orgNodes.find(n => n.id === form.orgNodeId)
-      while (curr) {
-        path.push(curr.name)
-        const pId = curr.parentId
-        curr = pId ? orgNodes.find(n => n.id === pId) : undefined
-      }
-      const snapshot = path.reverse().join(" · ")
+      const snapshot = buildOrgSnapshot(form.orgNodeId, orgNodes)
 
       const joinEntry = {
         id: 1,

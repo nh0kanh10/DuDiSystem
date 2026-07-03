@@ -3,6 +3,7 @@ import { Plus, Lock, FileText, Globe, Server, Shield, Folder, Eye, EyeOff, Edit,
 import { ProjectVaultItem } from "../../types"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 import ConfirmModal from "../ui/ConfirmModal"
+import { ProjectDetailTabShell, ProjectTabEmptyState, tabPrimaryBtn } from "./ProjectDetailTabShell"
 
 const VAULT_CATEGORY_CONFIG: Record<ProjectVaultItem["category"], { label: string; icon: React.ElementType; color: string }> = {
   contract: { label: "Hợp đồng", icon: FileText, color: "text-blue-600 bg-blue-50 border-blue-200" },
@@ -60,38 +61,51 @@ export function ProjectVaultTab({ vaultItems, onAddItem, onEditItem, onDeleteIte
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-          <Lock size={16} className="text-[#C62828]" /> Vault - Kho tài liệu & thông tin bí mật
-        </h3>
-        <button onClick={openAdd} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#C62828] text-white text-xs font-bold rounded-lg hover:bg-[#B71C1C] transition">
+    <ProjectDetailTabShell
+      icon={Lock}
+      title="Vault"
+      description="Kho tài liệu & thông tin nhạy cảm — hợp đồng, hosting, domain, tài khoản"
+      action={
+        <button type="button" onClick={openAdd} className={tabPrimaryBtn}>
           <Plus size={14} /> Thêm mục
         </button>
-      </div>
-
+      }
+      stats={vaultItems && vaultItems.length > 0 ? [
+        { label: "Tổng mục", value: vaultItems.length },
+        { label: "Hợp đồng", value: vaultItems.filter(i => i.category === "contract").length },
+        { label: "Hosting", value: vaultItems.filter(i => i.category === "hosting").length },
+        { label: "Tài khoản", value: vaultItems.filter(i => i.category === "credentials").length },
+      ] : undefined}
+    >
       {!vaultItems || vaultItems.length === 0 ? (
-        <div className="text-center py-12">
-          <Lock size={32} className="mx-auto mb-3 text-gray-300" />
-          <p className="text-sm text-gray-500">Vault trống. Thêm các thông tin quan trọng (hợp đồng, hosting, tài khoản) vào đây!</p>
-        </div>
+        <ProjectTabEmptyState
+          icon={Lock}
+          title="Vault đang trống"
+          description="Lưu hợp đồng, thông tin hosting, domain và mật khẩu quan trọng của dự án tại đây"
+          action={
+            <button type="button" onClick={openAdd} className={tabPrimaryBtn}>
+              <Plus size={14} /> Thêm mục đầu tiên
+            </button>
+          }
+        />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {Object.entries(VAULT_CATEGORY_CONFIG).map(([cat, cfg]) => {
             const items = itemsByCategory[cat as ProjectVaultItem["category"]]
             if (!items || items.length === 0) return null
             const Icon = cfg.icon
             return (
               <div key={cat} className="space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 px-1">
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center border ${cfg.color}`}>
                     <Icon size={14} />
                   </div>
                   <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">{cfg.label}</h4>
+                  <span className="text-[10px] font-bold text-gray-300">{items.length}</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {items.map(item => (
-                    <div key={item.id} className="bg-white border border-gray-100 rounded-xl p-4 group">
+                    <div key={item.id} className="bg-white border border-gray-100 rounded-2xl p-4 group shadow-xs hover:border-gray-200 transition-colors">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <h5 className="text-sm font-bold text-gray-800">{item.name}</h5>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -206,6 +220,6 @@ export function ProjectVaultTab({ vaultItems, onAddItem, onEditItem, onDeleteIte
           type="danger"
         />
       )}
-    </div>
+    </ProjectDetailTabShell>
   )
 }
