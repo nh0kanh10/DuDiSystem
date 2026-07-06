@@ -133,3 +133,6 @@ src copy/
 
 .vercel
 .env*.local
+
+# Lead quote/contract files (generated at runtime)
+backend/storage/

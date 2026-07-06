@@ -7,7 +7,7 @@ interface ModalProps {
   onClose: () => void
   title: string
   icon?: React.ElementType
-  width?: "sm" | "md" | "lg" | "xl" | "3xl"
+  width?: "sm" | "md" | "lg" | "xl" | "3xl" | "5xl" | "6xl"
   children: React.ReactNode
   footer?: React.ReactNode
   bodyClassName?: string
@@ -20,6 +20,8 @@ const WIDTH = {
   lg:  "max-w-lg",
   xl:  "max-w-2xl",
   "3xl": "max-w-3xl",
+  "5xl": "max-w-5xl",
+  "6xl": "max-w-6xl",
 }
 
 export function Modal({ open, onClose, title, icon: Icon, width = "xl", children, footer, bodyClassName = "", noFooter = false }: ModalProps) {

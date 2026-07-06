@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 import ConfirmModal from "../ui/ConfirmModal"
+import { CrmLeadCell } from "./CrmLeadCell"
 import { StatCard } from "../ui/StatCard"
 import { CustomCombobox } from "../ui/CustomCombobox"
 import { AvatarCircle } from "../ui/AvatarCircle"
@@ -44,7 +45,7 @@ const emptyForm = {
 
 type TabType = "dashboard" | "data"
 
-export function CrmAdminPage() {
+export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => void }) {
   const [tab, setTab] = useState<TabType>("dashboard")
   const [stats, setStats] = useState<any>(null)
   const [records, setRecords] = useState<any[]>([])
@@ -74,10 +75,43 @@ export function CrmAdminPage() {
   const [inlineAssignEmpId, setInlineAssignEmpId] = useState("")
   const [inlineAssignLoading, setInlineAssignLoading] = useState(false)
   const [confirmInlineOpen, setConfirmInlineOpen] = useState(false)
+  const [convertingId, setConvertingId] = useState<string | null>(null)
+  const [convertModalRecord, setConvertModalRecord] = useState<any>(null)
+  const [convertLeadName, setConvertLeadName] = useState("")
 
   const notify = (msg: string, type = "success") => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3500)
+  }
+
+  const handleConvertToLead = (record: { id: string; convertedLeadId?: string; businessName?: string }) => {
+    setConvertModalRecord(record)
+    setConvertLeadName(record.businessName ? `${record.businessName} — deal mới` : "")
+  }
+
+  const submitConvertToLead = async () => {
+    if (!convertModalRecord) return
+    const leadName = convertLeadName.trim()
+    if (!leadName) {
+      notify("Vui lòng nhập tên lead (cơ hội)", "error")
+      return
+    }
+    setConvertingId(convertModalRecord.id)
+    try {
+      const result = await api.crm.convertToLead(convertModalRecord.id, {
+        leadName,
+        forceNew: Boolean(convertModalRecord.convertedLeadId),
+      })
+      setRecords((p) => p.map((x) => x.id === convertModalRecord.id ? { ...x, ...result.record } : x))
+      notify(result.alreadyExists ? `Lead ${result.lead.code} đã tồn tại` : `Đã tạo Lead ${result.lead.code}`)
+      setConvertModalRecord(null)
+      setConvertLeadName("")
+      onOpenLead?.(result.lead.id)
+    } catch (e) {
+      notify(e instanceof Error ? e.message : "Không chuyển được sang Lead", "error")
+    } finally {
+      setConvertingId(null)
+    }
   }
 
   const fetchStats = async () => {
@@ -469,7 +503,7 @@ export function CrmAdminPage() {
                             : <Square size={15} className="text-gray-400" />}
                         </button>
                       </th>
-                      {["Tên doanh nghiệp", "Loại hình", "Địa chỉ", "Khu vực", "SĐT", "Website", "Maps", "Trạng thái", "Nhân viên", "Ghi chú", ""].map(h => (
+                      {["Tên doanh nghiệp", "Loại hình", "Địa chỉ", "Khu vực", "SĐT", "Website", "Maps", "Trạng thái", "Nhân viên", "Lead", "Ghi chú", ""].map(h => (
                         <th key={h} className="py-3 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -550,7 +584,7 @@ export function CrmAdminPage() {
                               className="flex items-center gap-1.5 cursor-pointer group/cell"
                               onClick={() => {
                                 setInlineAssignId(r.id)
-                                setInlineAssignEmpId(r.assignedToId ?? "")
+                                setInlineAssignEmpId(r.assignedTo ?? "")
                               }}
                             >
                               <AvatarCircle name={r.assignedToName} size="sm" />
@@ -568,6 +602,18 @@ export function CrmAdminPage() {
                               <UserPlus size={11} /> Chưa giao
                             </button>
                           )}
+                        </td>
+                        <td className="py-2 px-2 whitespace-nowrap">
+                          <CrmLeadCell
+                            record={r}
+                            converting={convertingId === r.id}
+                            onOpenLead={onOpenLead}
+                            onCreateNew={() => handleConvertToLead(r)}
+                            fetchLeads={async (crmId) => {
+                              const res = await api.crm.listLeadsForCrm(crmId)
+                              return res.leads
+                            }}
+                          />
                         </td>
                         <td className="py-2 px-2">
                           {editingNoteId === r.id ? (
@@ -784,6 +830,45 @@ export function CrmAdminPage() {
               rows={3}
               className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-sm focus:outline-none resize-none"
               placeholder="Ghi chú thêm..."
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(convertModalRecord)}
+        onClose={() => { setConvertModalRecord(null); setConvertLeadName("") }}
+        title="Tạo Lead từ CRM"
+        footer={
+          <>
+            <ModalCancelButton onClick={() => { setConvertModalRecord(null); setConvertLeadName("") }} />
+            <ModalSubmitButton
+              onClick={() => void submitConvertToLead()}
+              loading={Boolean(convertingId)}
+              label="Tạo Lead"
+            />
+          </>
+        }
+      >
+        <div className="p-6 space-y-4">
+          <p className="text-xs text-gray-500 leading-relaxed">
+            <strong>Khách hàng</strong> lưu theo SĐT/tên công ty. <strong>Tên lead</strong> (VD: Website bán hàng Q2/2026).
+          </p>
+          {convertModalRecord?.businessName && (
+            <div className="rounded-xl bg-gray-50 border border-gray-100 px-3 py-2 text-sm text-gray-700">
+              <span className="text-[10px] font-bold text-gray-400 uppercase">Doanh nghiệp CRM</span>
+              <p className="font-semibold mt-0.5">{convertModalRecord.businessName}</p>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1.5">Tên lead *</label>
+            <input
+              type="text"
+              value={convertLeadName}
+              onChange={(e) => setConvertLeadName(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20"
+              placeholder="VD: Website landing page chiến dịch hè"
+              autoFocus
             />
           </div>
         </div>

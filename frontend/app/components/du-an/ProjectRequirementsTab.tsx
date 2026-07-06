@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react"
-import { FileText, ExternalLink, Paperclip, CheckCircle2, Lock, Clock, ChevronRight } from "lucide-react"
+import { FileText, ExternalLink, Paperclip, CheckCircle2, Lock, Clock, ChevronRight, Copy } from "lucide-react"
 import { RequirementForm } from "../../types"
 import { ProjectDetailTabShell, ProjectTabEmptyState, ProjectTabSection } from "./ProjectDetailTabShell"
 import { FORM_TYPE_LABELS } from "./projectRequirementMock"
+import { collectRequirementFeatures, formatRequirementFormForAI } from "../lead/requirementFormForAi"
 
 function normalizeReferences(refs?: string | string[]): string[] {
   if (!refs) return []
@@ -23,7 +24,6 @@ function formatDate(iso?: string) {
   return new Date(iso).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
 }
 
-/** Dòng label – giá trị, dễ quét mắt */
 function InfoRow({ label, value }: { label: string; value?: React.ReactNode }) {
   if (value === undefined || value === null || value === "") return null
   return (
@@ -48,87 +48,23 @@ function FeatureTags({ items }: { items: string[] }) {
   )
 }
 
-function collectFeatures(form: RequirementForm): { group: string; items: string[] }[] {
-  const groups: { group: string; items: string[] }[] = []
-
-  const landing = [
-    form.has_register_form && "Form đăng ký",
-    form.has_call_button && "Gọi điện",
-    form.has_chat && "Chat Zalo/Messenger",
-  ].filter(Boolean) as string[]
-  if (landing.length) groups.push({ group: "Landing page", items: landing })
-
-  const ecommerce = [
-    form.has_cart && "Giỏ hàng",
-    form.has_online_payment && "Thanh toán online",
-    form.has_quick_order && "Đặt hàng nhanh",
-    form.has_user_account && "Tài khoản",
-    form.has_wishlist && "Yêu thích",
-    form.has_coupon && "Mã giảm giá",
-  ].filter(Boolean) as string[]
-  if (ecommerce.length) groups.push({ group: "Bán hàng", items: ecommerce })
-
-  const orders = [
-    form.has_order_tracking && "Lưu đơn hàng",
-    form.has_order_status && "Trạng thái đơn",
-    form.has_order_email && "Email xác nhận",
-    form.has_shipping_integration && "Kết nối vận chuyển",
-  ].filter(Boolean) as string[]
-  if (orders.length) groups.push({ group: "Đơn hàng", items: orders })
-
-  const company = [
-    form.has_contact_form && "Form liên hệ",
-    form.has_newsletter && "Đăng ký nhận tin",
-    form.has_news && "Tin tức",
-    form.has_google_maps && "Google Maps",
-  ].filter(Boolean) as string[]
-  if (company.length) groups.push({ group: "Giới thiệu", items: company })
-
-  const admin = [
-    form.has_admin && "Admin tổng",
-    form.has_product_admin && "QL sản phẩm",
-    form.has_order_admin && "QL đơn hàng",
-    form.has_customer_admin && "QL khách hàng",
-    form.has_content_admin && "QL bài viết",
-    form.has_page_admin && "QL trang",
-    form.has_multilingual && "Đa ngôn ngữ",
-  ].filter(Boolean) as string[]
-  if (admin.length) groups.push({ group: "Quản trị", items: admin })
-
-  const integrations = [
-    form.has_facebook_pixel && "Facebook Pixel",
-    form.has_google_analytics && "Google Analytics",
-    form.has_zalo_messenger && "Zalo/Messenger",
-    form.has_google_maps && "Google Maps",
-  ].filter(Boolean) as string[]
-  if (integrations.length) groups.push({ group: "Tích hợp", items: integrations })
-
-  const tech = [
-    form.has_responsive && "Responsive",
-    form.has_speed_optimized && "Tối ưu tốc độ",
-    form.has_seo && "SEO cơ bản",
-    form.has_content && "Có nội dung",
-    form.has_images && "Hình ảnh/video",
-    form.has_logo && "Logo",
-  ].filter(Boolean) as string[]
-  if (tech.length) groups.push({ group: "Kỹ thuật", items: tech })
-
-  return groups
+function collectFeatures(form: RequirementForm) {
+  return collectRequirementFeatures(form)
 }
 
 function formHasContent(form: RequirementForm): boolean {
   const refs = normalizeReferences(form.references)
   return hasAny(
-    form.customer_name, form.customer_phone, form.customer_email, form.company, form.industry, form.source,
+    form.customer_name, form.customer_phone, form.customer_email, form.company, form.industry, form.source, form.tax_id, form.address,
     form.goal, form.cta, form.kpi,
     form.main_product, form.usp, form.offers, form.pricing, form.product_count,
     form.services, form.strengths,
     form.target_audience, form.insight, form.location,
-    form.user_flow, form.structure, form.sections, form.top_features,
+    form.user_flow, form.structure, form.sections, form.top_features, form.features?.length ? true : false,
     form.payment_methods, form.order_handler, form.order_process,
-    form.brand_color, form.style, refs.length, form.deadline, form.budget, form.priority, form.notes,
+    form.brand_color, form.colorScheme, form.style, refs.length > 0 ? true : false, form.deadline, form.budget, form.priority, form.notes, form.additionalNotes,
     form.hosting_status, form.payment_integrations, form.shipping_integrations,
-    form.attachments?.length,
+    (form.attachments?.length ?? 0) > 0 ? true : false,
     ...collectFeatures(form).flatMap(g => g.items),
   )
 }
@@ -150,7 +86,6 @@ function RequirementFormReadable({ form }: { form: RequirementForm }) {
 
   return (
     <div className="space-y-4">
-      {/* Tóm tắt nhanh */}
       {(form.customer_name || form.company || form.goal) && (
         <div className="rounded-2xl border border-[#C62828]/10 bg-gradient-to-br from-[#C62828]/[0.04] to-white p-5">
           <p className="text-[10px] font-black text-[#C62828] uppercase tracking-wider mb-2">Tóm tắt</p>
@@ -166,13 +101,15 @@ function RequirementFormReadable({ form }: { form: RequirementForm }) {
         </div>
       )}
 
-      {hasAny(form.customer_name, form.customer_phone, form.customer_email, form.company, form.industry, form.source) && (
+      {hasAny(form.customer_name, form.customer_phone, form.customer_email, form.company, form.industry, form.source, form.tax_id, form.address) && (
         <ProjectTabSection title="Thông tin khách hàng">
           <dl className="divide-y divide-gray-50">
             <InfoRow label="Họ tên" value={form.customer_name} />
             <InfoRow label="Điện thoại" value={form.customer_phone} />
             <InfoRow label="Email" value={form.customer_email} />
             <InfoRow label="Công ty" value={form.company} />
+            <InfoRow label="Mã số thuế" value={form.tax_id} />
+            <InfoRow label="Địa chỉ" value={form.address} />
             <InfoRow label="Ngành" value={form.industry} />
             <InfoRow label="Nguồn" value={form.source} />
           </dl>
@@ -213,13 +150,14 @@ function RequirementFormReadable({ form }: { form: RequirementForm }) {
         </ProjectTabSection>
       )}
 
-      {hasAny(form.user_flow, form.structure, form.sections, form.top_features) && (
+      {hasAny(form.user_flow, form.structure, form.sections, form.top_features, form.features?.length ? true : false) && (
         <ProjectTabSection title="Cấu trúc & Luồng">
           <dl className="divide-y divide-gray-50">
             <InfoRow label="User flow" value={form.user_flow} />
             <InfoRow label="Cấu trúc trang" value={form.structure} />
             <InfoRow label="Các section" value={form.sections} />
             <InfoRow label="Tính năng ưu tiên" value={form.top_features} />
+            <InfoRow label="Danh sách tính năng" value={form.features?.join(", ")} />
           </dl>
         </ProjectTabSection>
       )}
@@ -236,10 +174,11 @@ function RequirementFormReadable({ form }: { form: RequirementForm }) {
         </ProjectTabSection>
       )}
 
-      {hasAny(form.brand_color, form.style, refs.length, hostingLabel) && (
+      {hasAny(form.brand_color, form.colorScheme, form.style, refs.length > 0 ? true : false, hostingLabel) && (
         <ProjectTabSection title="Thương hiệu & Tham khảo">
           <dl className="divide-y divide-gray-50">
             <InfoRow label="Màu thương hiệu" value={form.brand_color} />
+            <InfoRow label="Bảng màu" value={form.colorScheme} />
             <InfoRow label="Phong cách UI" value={form.style} />
             <InfoRow label="Hosting" value={hostingLabel} />
             {refs.length > 0 && (
@@ -272,13 +211,14 @@ function RequirementFormReadable({ form }: { form: RequirementForm }) {
         </ProjectTabSection>
       )}
 
-      {hasAny(form.deadline, form.budget, form.priority, form.notes) && (
-        <ProjectTabSection title="Thời gian & Ghi chú">
+      {hasAny(form.deadline, form.budget, form.priority, form.notes, form.additionalNotes) && (
+        <ProjectTabSection title={hasAny(form.deadline, form.budget, form.priority) ? "Thời gian & Ghi chú" : "Ghi chú"}>
           <dl className="divide-y divide-gray-50">
             <InfoRow label="Deadline" value={form.deadline} />
             <InfoRow label="Ngân sách" value={form.budget} />
             <InfoRow label="Ưu tiên số 1" value={form.priority} />
             <InfoRow label="Ghi chú" value={form.notes} />
+            <InfoRow label="Ghi chú bổ sung" value={form.additionalNotes} />
           </dl>
         </ProjectTabSection>
       )}
@@ -323,6 +263,14 @@ export function ProjectRequirementsTab({
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const activeForm = forms.find(f => f.id === activeId) ?? forms[0] ?? null
+  const [copied, setCopied] = useState(false)
+
+  const handleCopyAI = () => {
+    if (!activeForm) return
+    navigator.clipboard.writeText(formatRequirementFormForAI(activeForm))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   if (forms.length === 0) {
     return (
@@ -402,15 +350,29 @@ export function ProjectRequirementsTab({
                   {activeForm.code} · {formTypeLabel(activeForm)} · Gửi {formatDate(activeForm.lockedAt || activeForm.createdAt)}
                 </p>
               </div>
-              {activeForm.isLocked ? (
-                <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold shrink-0">
-                  Đã khóa
-                </span>
-              ) : (
-                <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold shrink-0">
-                  Bản nháp
-                </span>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleCopyAI}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                    copied
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  <Copy size={12} />
+                  {copied ? "Đã sao chép" : "Sao chép"}
+                </button>
+                {activeForm.isLocked ? (
+                  <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-bold">
+                    Đã khóa
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-[10px] font-bold">
+                    Bản nháp
+                  </span>
+                )}
+              </div>
             </div>
             <RequirementFormReadable form={activeForm} />
           </div>

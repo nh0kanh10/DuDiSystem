@@ -16,6 +16,8 @@ router.delete("/data/:id",       requireCrmAdmin, ctrl.deleteData)
 router.post("/data/delete-bulk", requireCrmAdmin, ctrl.deleteBulkData)
 router.post("/data/import-csv",  requireCrmAdmin, upload.single("file"), ctrl.importCsv)
 router.post("/data/auto-assign", requireCrmAdmin, ctrl.autoAssign)
+router.post("/data/:id/convert-to-lead", requireEmployeeCrm, ctrl.convertToLead)
+router.get("/data/:id/leads", requireEmployeeCrm, ctrl.listCrmLeads)
 
 router.post("/assignments/assign",      requireCrmAdmin, ctrl.assignOne)
 router.post("/assignments/assign-bulk", requireCrmAdmin, ctrl.assignBulk)
@@ -27,6 +29,7 @@ router.patch("/data/:id/note", requireEmployeeCrm, ctrl.updateNote)
 
 router.get("/employee/data",              requireEmployeeCrm, ctrl.listMyData)
 router.patch("/employee/data/:id/status", requireEmployeeCrm, ctrl.updateMyStatus)
+router.post("/employee/data/:id/convert-to-lead", requireEmployeeCrm, ctrl.convertToLead)
 router.get("/dashboard/employee",         requireEmployeeCrm, ctrl.employeeDashboard)
 
 export default router

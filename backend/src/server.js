@@ -29,6 +29,12 @@ import allowedIPRoutes from "./routes/allowedIP.routes.js"
 import timeOffSlotRoutes from "./routes/timeOffSlot.routes.js"
 import profileUpdateRoutes from "./routes/profileUpdate.routes.js"
 import staffChatRoutes from "./routes/staffChat.routes.js"
+import quoteRoutes from "./routes/quote.routes.js"
+import contractRoutes from "./routes/contract.routes.js"
+import leadRoutes from "./routes/lead.routes.js"
+import customerRoutes from "./routes/customer.routes.js"
+import leadFormPublicRoutes from "./routes/leadForm.public.routes.js"
+import templateRoutes from "./routes/template.routes.js"
 
 const app = express()
 
@@ -68,6 +74,12 @@ app.use("/api/allowed-ips", allowedIPRoutes)
 app.use("/api/time-off-slots", timeOffSlotRoutes)
 app.use("/api/profile-updates", profileUpdateRoutes)
 app.use("/api/staff-chat", staffChatRoutes)
+app.use("/api/quotes", quoteRoutes)
+app.use("/api/contracts", contractRoutes)
+app.use("/api/leads", leadRoutes)
+app.use("/api/customers", customerRoutes)
+app.use("/api/public/lead-forms", leadFormPublicRoutes)
+app.use("/api/templates", templateRoutes)
 
 app.use(notFoundHandler)
 app.use(errorHandler)

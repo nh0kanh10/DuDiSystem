@@ -6,17 +6,20 @@ import {
   CheckSquare, TrendingUp, Clock, CheckCircle2, PauseCircle,
   AlertCircle, File, Trash, ExternalLink, Check,
   CircleDot, PlayCircle, User, Eye, Bell, Users2, Crown,
-  Lock, Bug
+  Lock, Bug, RefreshCw
 } from "lucide-react"
 import { mergeProjectRequirementDemo } from "./projectRequirementMock"
 import { ProjectRequirementsTab } from "./ProjectRequirementsTab"
 import { mergeTaskList, subscribeTaskSocket } from "@/lib/taskSocket"
-import { ProjectVaultTab } from "./ProjectVaultTab"
+import { ProjectDocVaultTab } from "./ProjectDocVaultTab"
+import { buildRequirementFormsFromLead } from "../lead/leadRequirementForm"
+import { downloadVaultAttachment, previewVaultAttachment } from "./VaultFileDropzone"
+import { DocxFilePreview } from "../lead/DocxFilePreview"
 import { ProjectTestingTab } from "./ProjectTestingTab"
 import { ProjectTasksTab } from "./ProjectTasksTab"
 import { ProjectDetailTabShell, ProjectTabEmptyState, ProjectTabSection, tabDashedAddBtn } from "./ProjectDetailTabShell"
 import { api } from "@/lib/api"
-import { Project, ProjectTeam, ProjectStatus, Employee, Group, OrgNode, Role, TestSession } from "../../types"
+import { Project, ProjectTeam, ProjectStatus, Employee, Group, OrgNode, Role, TestSession, ProjectVaultAudience, ProjectVaultCategory, ProjectVaultItem } from "../../types"
 import { initials } from "../../utils"
 import { CustomDatePicker as DateInput } from "../ui/CustomDatePicker"
 import { CustomSelect } from "../ui/CustomSelect"
@@ -185,9 +188,10 @@ export function ProjectManagement({
 
   const [detail, setDetail] = useState<Project | null>(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
-  const [detailTab, setDetailTab] = useState<"overview" | "tasks" | "attachments" | "requirements" | "vault" | "testing">("overview")
-      // Mock state for new fields (will be replaced with API later)
-      const [localVaultItems, setLocalVaultItems] = useState<any[]>([])
+  const [detailTab, setDetailTab] = useState<"overview" | "tasks" | "requirements" | "documents" | "testing">("overview")
+      const [localVaultItems, setLocalVaultItems] = useState<ProjectVaultItem[]>([])
+      const [previewDoc, setPreviewDoc] = useState<ProjectVaultItem | null>(null)
+      const [previewKey, setPreviewKey] = useState(0)
       const [localTestSessions, setLocalTestSessions] = useState<TestSession[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
@@ -234,10 +238,58 @@ export function ProjectManagement({
         setDetail(p)
         setDetailTab("overview")
         loadTasksFor(projectId)
-        setLocalVaultItems([
-          { id: "1", category: "hosting", name: "Server Hosting", url: "https://example.com", description: "Main production server", createdAt: new Date().toISOString() },
-          { id: "2", category: "contract", name: "Service Agreement", description: "Signed contract with client", createdAt: new Date().toISOString() },
-        ])
+
+        let loadedVaultItems: ProjectVaultItem[] = []
+        try {
+          loadedVaultItems = await api.projects.listVault(p.id)
+        } catch (e) {
+          console.error("Failed to load project vault", e)
+        }
+        if (p.leadId) {
+          try {
+            const docs = await api.leadDocuments.list(p.leadId)
+            const docVaultItems = docs.map(d => ({
+              id: `doc-${d.id}`,
+              projectId: p.id,
+              audience: "client" as ProjectVaultAudience,
+              category: (d.type === "quote" ? "quotation" : d.type === "solution" ? "client-file" : "contract") as ProjectVaultCategory,
+              name: d.label || (d.isAppendix ? "Phụ lục hợp đồng" : (d.type === "quote" ? "Báo giá" : d.type === "solution" ? "Giải pháp" : "Hợp đồng")),
+              description: "Khởi tạo từ Lead",
+              createdAt: d.createdAt || new Date().toISOString(),
+              updatedAt: d.updatedAt || new Date().toISOString(),
+              parentId: d.parentDocumentId ? `doc-${d.parentDocumentId}` : null,
+              isAppendix: d.isAppendix
+            }))
+            loadedVaultItems = [...loadedVaultItems, ...docVaultItems]
+            
+            const leadData = await api.leads.get(p.leadId)
+            
+            if (leadData) {
+              const mappedForms = buildRequirementFormsFromLead(leadData as import("../../types").Lead)
+              p.requirementForms = [...(p.requirementForms || []), ...mappedForms]
+              setDetail({ ...p }) 
+            }
+          } catch (e) {
+            console.error("Failed to load lead documents/requirements", e)
+          }
+        }
+
+        if (p.requirementForms && p.requirementForms.length > 0) {
+          const reqVaultItems = p.requirementForms.map(req => ({
+            id: `req-${req.id}`,
+            projectId: p.id,
+            audience: "client" as ProjectVaultAudience,
+            category: "requirement" as ProjectVaultCategory,
+            name: req.title || "Phiếu thu thập yêu cầu",
+            url: req.publicLink || "",
+            description: "Yêu cầu từ khách hàng",
+            createdAt: req.createdAt || new Date().toISOString(),
+            updatedAt: req.createdAt || new Date().toISOString()
+          }))
+          loadedVaultItems = [...loadedVaultItems, ...reqVaultItems]
+        }
+
+        setLocalVaultItems(loadedVaultItems)
         setLocalTestSessions(defaultTestSessions(projectId))
       } catch {
         if (!cancelled) onNavigateToProject?.(null)
@@ -398,13 +450,17 @@ export function ProjectManagement({
     }
   }
 
-  async function handleAddAttachment() {
-    if (!detail || !attachForm.name.trim() || !attachForm.url.trim()) return
-    const updated = await api.projects.addAttachment(detail.id, attachForm) as Project
+  async function handleAddAttachment(data?: { name: string; url: string; type: "file" | "link" }) {
+    if (!detail) return
+    const payload = data ?? attachForm
+    if (!payload.name.trim() || !payload.url.trim()) return
+    const updated = await api.projects.addAttachment(detail.id, payload) as Project
     setProjects(ps => ps.map(p => p.id === updated.id ? updated : p))
     setDetail(updated)
-    setAttachForm({ name: "", url: "", type: "file" })
-    setShowAttachForm(false)
+    if (!data) {
+      setAttachForm({ name: "", url: "", type: "file" })
+      setShowAttachForm(false)
+    }
   }
 
   async function handleRemoveAttachment(attachId: string) {
@@ -495,6 +551,64 @@ export function ProjectManagement({
       ...f,
       memberIds: f.memberIds.includes(id) ? f.memberIds.filter(m => m !== id) : [...f.memberIds, id],
     }))
+  }
+
+  const handleDownloadVaultItem = async (item: ProjectVaultItem) => {
+    if (!detail) return
+    if (item.fileAttachment?.dataUrl) {
+      downloadVaultAttachment(item.fileAttachment)
+      return
+    }
+    if (item.hasFile || item.fileAttachment?.hasFile) {
+      try {
+        await api.projects.downloadVaultFile(
+          detail.id,
+          item.id,
+          item.fileAttachment?.name || item.name,
+        )
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "Tải file thất bại")
+      }
+      return
+    }
+    if (item.id.startsWith("doc-") && detail.leadId) {
+      try {
+        await api.leadDocuments.downloadFile(
+          detail.leadId,
+          item.id.replace("doc-", ""),
+          item.name + ".docx"
+        )
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "Tải file thất bại")
+      }
+    } else if (item.url) {
+      window.open(item.url, "_blank")
+    }
+  }
+
+  const handlePreviewVaultItem = async (item: ProjectVaultItem) => {
+    if (!detail) return
+    if (item.fileAttachment?.dataUrl) {
+      previewVaultAttachment(item.fileAttachment)
+      return
+    }
+    if (item.hasFile || item.fileAttachment?.hasFile) {
+      try {
+        const blob = await api.projects.vaultFileBlob(detail.id, item.id)
+        const url = URL.createObjectURL(blob)
+        window.open(url, "_blank", "noopener,noreferrer")
+        setTimeout(() => URL.revokeObjectURL(url), 120_000)
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "Xem file thất bại")
+      }
+      return
+    }
+    if (item.id.startsWith("doc-")) {
+      setPreviewDoc(item)
+      setPreviewKey(k => k + 1)
+    } else if (item.url) {
+      window.open(item.url, "_blank")
+    }
   }
 
   return (
@@ -1049,15 +1163,24 @@ export function ProjectManagement({
             </div>
 
             <div className="flex border-b border-gray-100 flex-shrink-0 overflow-x-auto bg-white sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
-              {(["overview", "tasks", "requirements", "vault", "testing", "attachments"] as const).map(tab => (
+              {(["overview", "tasks", "requirements", "documents", "testing"] as const).map(tab => (
                 <button key={tab} onClick={() => setDetailTab(tab)}
                   className={`px-5 py-3.5 text-xs font-bold transition-colors border-b-2 whitespace-nowrap ${detailTab === tab ? "border-[#C62828] text-[#C62828] bg-[#C62828]/[0.03]" : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/80"}`}>
                   {tab === "overview" ? "Tổng quan"
                     : tab === "tasks" ? `Công việc (${tasks.length})`
                     : tab === "requirements" ? "Yêu cầu"
-                    : tab === "vault" ? <span className="flex items-center gap-1"><Lock size={12} /> Vault</span>
-                    : tab === "testing" ? <span className="flex items-center gap-1"><Bug size={12} /> Testing</span>
-                    : `Tài liệu (${detail.attachments.length})`}
+                    : tab === "documents" ? (
+                        <span className="flex items-center gap-1">
+                          <Lock size={12} />
+                          Tài liệu & Vault
+                          {(localVaultItems.length + detail.attachments.length) > 0 && (
+                            <span className="ml-0.5 px-1.5 py-0.5 bg-gray-100 rounded-full text-[10px] font-black text-gray-500">
+                              {localVaultItems.length + detail.attachments.length}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    : <span className="flex items-center gap-1"><Bug size={12} /> Testing</span>}
                 </button>
               ))}
               <button onClick={() => { onNavigateToProject?.(null); setMainTab("teams"); setTeamProjectFilter(detail.id) }}
@@ -1071,7 +1194,7 @@ export function ProjectManagement({
                 <ProjectDetailTabShell
                   icon={FolderOpen}
                   title="Tổng quan dự án"
-                  description={detail.description || "Thông tin tiến độ, thời gian và nhóm thực hiện"}
+                  description="Thông tin tiến độ, thời gian và nhóm thực hiện"
                   stats={[
                     { label: "Tiến độ", value: `${detail.progress}%`, cls: detail.progress >= 100 ? "text-emerald-600" : "text-[#C62828]" },
                     { label: "Công việc", value: `${detail.doneCount ?? 0}/${detail.taskCount ?? 0}` },
@@ -1168,12 +1291,26 @@ export function ProjectManagement({
                 <ProjectRequirementsTab requirementForms={detail.requirementForms} requirementForm={detail.requirementForm} />
               )}
 
-              {detailTab === "vault" && (
-                <ProjectVaultTab
+              {detailTab === "documents" && (
+                <ProjectDocVaultTab
                   vaultItems={localVaultItems}
-                  onAddItem={(item) => setLocalVaultItems(prev => [...prev, { ...item, id: Date.now().toString() }])}
-                  onEditItem={(id, item) => setLocalVaultItems(prev => prev.map(x => x.id === id ? { ...x, ...item } : x))}
-                  onDeleteItem={(id) => setLocalVaultItems(prev => prev.filter(x => x.id !== id))}
+                  legacyAttachments={detail.attachments}
+                  onAddItem={async (payload, file) => {
+                    const created = await api.projects.createVaultItem(detail.id, payload, file ?? undefined)
+                    setLocalVaultItems(prev => [...prev, { ...created, projectId: detail.id }])
+                  }}
+                  onEditItem={async (id, patch, file) => {
+                    const updated = await api.projects.updateVaultItem(detail.id, id, patch, file ?? undefined)
+                    setLocalVaultItems(prev => prev.map(x => x.id === id ? { ...updated, projectId: detail.id } : x))
+                  }}
+                  onDeleteItem={async (id) => {
+                    await api.projects.deleteVaultItem(detail.id, id)
+                    setLocalVaultItems(prev => prev.filter(x => x.id !== id))
+                  }}
+                  onAddAttachment={handleAddAttachment}
+                  onRemoveAttachment={handleRemoveAttachment}
+                  onDownload={handleDownloadVaultItem}
+                  onPreview={handlePreviewVaultItem}
                 />
               )}
 
@@ -1191,113 +1328,6 @@ export function ProjectManagement({
                   onEdit={(id, patch) => setLocalTestSessions(prev => prev.map(s => s.id === id ? { ...s, ...patch, updatedAt: new Date().toISOString() } : s))}
                   onDelete={(id) => setLocalTestSessions(prev => prev.filter(s => s.id !== id))}
                 />
-              )}
-
-              {detailTab === "attachments" && (
-                <ProjectDetailTabShell
-                  icon={Paperclip}
-                  title="Tài liệu đính kèm"
-                  description="File và liên kết liên quan đến dự án"
-                  stats={detail.attachments.length > 0 ? [
-                    { label: "Tổng", value: detail.attachments.length },
-                    { label: "File", value: detail.attachments.filter(a => a.type === "file").length },
-                    { label: "Link", value: detail.attachments.filter(a => a.type === "link").length },
-                  ] : undefined}
-                >
-                  {(!showAttachForm && detail.attachments.length > 0) && (
-                    <button type="button" onClick={() => setShowAttachForm(true)} className={tabDashedAddBtn}>
-                      <Plus size={15} /> Thêm tài liệu
-                    </button>
-                  )}
-                  {showAttachForm && (
-                    <ProjectTabSection title="Thêm tài liệu mới">
-                      <div className="flex gap-2">
-                        <button onClick={() => setAttachForm(f => ({ ...f, type: "file" }))}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${attachForm.type === "file" ? "bg-[#C62828] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
-                          <File size={12} /> File
-                        </button>
-                        <button onClick={() => setAttachForm(f => ({ ...f, type: "link" }))}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${attachForm.type === "link" ? "bg-[#C62828] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
-                          <Link2 size={12} /> Link
-                        </button>
-                      </div>
-                      <input
-                        value={attachForm.name} onChange={e => setAttachForm(f => ({ ...f, name: e.target.value }))}
-                        placeholder="Tên tài liệu..."
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20"
-                      />
-                      {attachForm.type === "link" ? (
-                        <input
-                          value={attachForm.url} onChange={e => setAttachForm(f => ({ ...f, url: e.target.value }))}
-                          placeholder="https://..."
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20"
-                        />
-                      ) : (
-                        <label className="flex items-center gap-2 w-full px-3 py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-400 hover:border-[#C62828]/40 hover:text-[#C62828] cursor-pointer transition-colors">
-                          <File size={14} className="shrink-0" />
-                          <span className="truncate">{attachForm.url ? attachForm.url : "Chọn file từ máy..."}</span>
-                          <input
-                            type="file" className="hidden"
-                            onChange={e => {
-                              const file = e.target.files?.[0]
-                              if (!file) return
-                              setAttachForm(f => ({
-                                ...f,
-                                url: file.name,
-                                name: f.name || file.name,
-                              }))
-                            }}
-                          />
-                        </label>
-                      )}
-                      <div className="flex gap-2 justify-end">
-                        <button onClick={() => setShowAttachForm(false)}
-                          className="px-4 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">Hủy</button>
-                        <button onClick={handleAddAttachment}
-                          className="px-4 py-1.5 text-xs font-bold bg-[#C62828] text-white rounded-lg hover:bg-[#B71C1C] transition-colors">Thêm</button>
-                      </div>
-                    </ProjectTabSection>
-                  )}
-
-                  {detail.attachments.length === 0 && !showAttachForm ? (
-                    <ProjectTabEmptyState
-                      icon={Paperclip}
-                      title="Chưa có tài liệu"
-                      description="Đính kèm file hoặc liên kết Figma, tài liệu kỹ thuật cho dự án"
-                      action={
-                        <button type="button" onClick={() => setShowAttachForm(true)} className={tabDashedAddBtn}>
-                          <Plus size={15} /> Thêm tài liệu đầu tiên
-                        </button>
-                      }
-                    />
-                  ) : detail.attachments.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {detail.attachments.map(a => (
-                      <div key={a.id} className="flex items-center gap-3 p-4 bg-white border border-gray-100 rounded-2xl hover:border-gray-200 hover:shadow-xs group transition-all">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${a.type === "link" ? "bg-blue-50" : "bg-gray-100"}`}>
-                          {a.type === "link" ? <Link2 size={16} className="text-blue-500" /> : <FileText size={16} className="text-gray-500" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-gray-700 truncate">{a.name}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">{a.uploadedAt}{a.size ? ` · ${a.size}` : ""}</p>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {a.type === "link" && (
-                            <a href={a.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                              className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors">
-                              <ExternalLink size={13} />
-                            </a>
-                          )}
-                          <button onClick={() => handleRemoveAttachment(a.id)}
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors">
-                            <Trash size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    </div>
-                  ) : null}
-                </ProjectDetailTabShell>
               )}
             </div>
           </div>
@@ -1453,6 +1483,29 @@ export function ProjectManagement({
         cancelText="Hủy"
         type="danger"
       />
+
+      <Modal
+        open={previewDoc !== null}
+        onClose={() => setPreviewDoc(null)}
+        title={previewDoc?.name || "Xem trước tài liệu"}
+        icon={Eye}
+        width="5xl"
+        bodyClassName="p-4 flex flex-col h-[75vh]"
+        footer={
+          <button type="button" className={tabDashedAddBtn} onClick={() => setPreviewKey((k) => k + 1)}>
+            <RefreshCw size={13} className="mr-1 inline-block" /> Làm mới
+          </button>
+        }
+      >
+        {previewDoc && detail?.leadId && (
+          <DocxFilePreview
+            docId={previewDoc.id.replace("doc-", "")}
+            refreshKey={previewKey}
+            loadBlob={() => api.leadDocuments.fileBlob(detail.leadId!, previewDoc.id.replace("doc-", ""))}
+          />
+        )}
+      </Modal>
+
     </div>
   )
 }

@@ -238,22 +238,55 @@ export interface TimeOffSlot {
 export type LeadStatus = "new" | "contacted" | "requirement-gathering" | "requirement-done" | "converted" | "lost"
 export type FormStatus = "not_sent" | "sent" | "opened" | "in_progress" | "completed"
 export type FormType = "landing_page" | "ecommerce" | "company_profile"
+export type CustomerType = "individual" | "company"
 export type TaskCategory = "CODE" | "CONTENT" | "OPS" | "DESIGN" | "TEST" | "ADMIN"
 
 export interface LeadNote {
   id: string
   content: string
   createdAt: string
+  updatedAt?: string
   createdBy?: string
+}
+
+export interface Customer {
+  id: string
+  code: string
+  displayName: string
+  customerType?: CustomerType
+  companyName?: string
+  contactName?: string
+  contactPhone?: string
+  contactEmail?: string
+  address?: string
+  taxId?: string
+  industry?: string
+  leadIds?: string[]
+  sourceCrmIds?: string[]
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Lead {
   id: string
   code: string
   name: string
+  customerId?: string
+  customerCode?: string
+  customerDisplayName?: string
   status: LeadStatus
-  sourceCrmId?: string 
+  sourceCrmId?: string
+  customerType?: CustomerType
+  companyName?: string
   contactName?: string
+  industry?: string
+  address?: string
+  taxId?: string
+  requirementFormPayload?: Record<string, unknown>
+  requirementFormSubmissions?: RequirementFormSubmission[]
+  lastFormCompletedAt?: string
+  activeRequirementTitle?: string
+  projectIds?: string[]
   contactPhone?: string
   contactEmail?: string
   budgetEstimate?: string
@@ -268,9 +301,23 @@ export interface Lead {
   formOpenedAt?: string
   formCompletedAt?: string
   formDeadline?: string
+  formToken?: string
+  formLinkIssuedAt?: string
+  formLinkRevokedAt?: string
   notes?: LeadNote[]
   createdAt: string
   updatedAt: string
+}
+
+export interface RequirementFormSubmission {
+  id: string
+  formType?: FormType
+  title?: string
+  kind?: "internal" | "form"
+  payload: Record<string, unknown>
+  completedAt: string
+  sentAt?: string
+  code?: string
 }
 
 export interface RequirementForm {
@@ -296,6 +343,8 @@ export interface RequirementForm {
   company?: string
   industry?: string
   source?: string
+  tax_id?: string
+  address?: string
   goal?: string
   cta?: string
   kpi?: string
@@ -369,17 +418,49 @@ export interface RequirementForm {
   has_multilingual?: boolean
 }
 
+export type ProjectVaultAudience = "client" | "internal"
+
+export type ProjectVaultCategory =
+  | "quotation"         
+  | "requirement"       
+  | "contract"          
+  | "client-handover"   
+  | "client-account"    
+  | "client-file"       
+  | "hosting"           
+  | "domain"            
+  | "credentials"       
+  | "internal-handover" 
+  | "tech-doc"          
+  | "license"           
+  | "assets"            
+  | "other"             
+
+export interface VaultFileAttachment {
+  name: string
+  size: number
+  mimeType: string
+  dataUrl?: string
+  hasFile?: boolean
+}
+
 export interface ProjectVaultItem {
   id: string
   projectId: string
-  category: "contract" | "hosting" | "domain" | "credentials" | "assets" | "other"
+  audience: ProjectVaultAudience   
+  category: ProjectVaultCategory
   name: string
-  value?: string 
+  value?: string      
   url?: string
   description?: string
+  meta?: Record<string, string>
+  fileAttachment?: VaultFileAttachment
+  hasFile?: boolean
   attachments?: ProjectAttachment[]
   createdAt: string
   updatedAt: string
+  parentId?: string | null
+  isAppendix?: boolean
 }
 
 export interface TestSession {
@@ -436,6 +517,7 @@ export interface Project {
   teams: ProjectTeam[]
   createdAt: string
   leadId?: string
+  customerId?: string
   requirementForm?: RequirementForm
   requirementForms?: RequirementForm[]
   vaultItems?: ProjectVaultItem[]

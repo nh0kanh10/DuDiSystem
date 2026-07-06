@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react"
-import { Settings, Clock, ShieldAlert, Check, RefreshCw, Users, Layers, X, Edit, Lock, User, Save } from "lucide-react"
+import { Settings, Clock, ShieldAlert, Check, RefreshCw, Users, Layers, X, Edit, Lock, User, Save, Building } from "lucide-react"
 import { createPortal } from "react-dom"
 import { api } from "@/lib/api"
 
@@ -261,154 +261,168 @@ export function SystemConfigPage() {
             <h3 className="font-black text-sm text-white">Cấu hình hệ thống</h3>
           </div>
 
-          <form onSubmit={handleSave} className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Tên tổ chức / Công ty</label>
-                <input
-                  type="text"
-                  value={config.companyName}
-                  onChange={e => setConfig({ ...config, companyName: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 focus:ring-2 focus:ring-[#C62828]/10 transition-all"
-                  required
-                />
+          <form onSubmit={handleSave} className="p-6 space-y-6 bg-gray-50/30">
+            
+            {/* Khối 1: Thông tin chung & Chấm công */}
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2">
+                <Building size={15} className="text-[#C62828]" />
+                <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">Thông tin chung & Chấm công</h4>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Yêu cầu mạng IP văn phòng</label>
-                <div className="flex items-center h-10">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config.requireIP}
-                      onChange={e => setConfig({ ...config, requireIP: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                    <span className="ml-3 text-sm font-semibold text-gray-600">Bắt buộc check-in theo IP</span>
-                  </label>
+              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Tên tổ chức / Công ty</label>
+                  <input
+                    type="text"
+                    value={config.companyName}
+                    onChange={e => setConfig({ ...config, companyName: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 focus:ring-2 focus:ring-[#C62828]/10 transition-all"
+                    required
+                  />
                 </div>
-              </div>
 
-              <div>
-                <h4 className="text-xs font-bold text-[#C62828] uppercase tracking-wider border-b border-gray-100 pb-2 mb-3 col-span-2 flex items-center gap-1.5">
-                  <Clock size={14} /> Ca làm việc sáng
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Giờ bắt đầu</label>
-                    <CustomTimePicker
-                      value={config.morningStart}
-                      onChange={val => setConfig({ ...config, morningStart: val })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Giờ nghỉ trưa</label>
-                    <CustomTimePicker
-                      value={config.morningEnd}
-                      onChange={val => setConfig({ ...config, morningEnd: val })}
-                    />
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Yêu cầu mạng IP văn phòng</label>
+                  <div className="flex items-center h-10">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={config.requireIP}
+                        onChange={e => setConfig({ ...config, requireIP: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                      <span className="ml-3 text-sm font-semibold text-gray-600">Bắt buộc check-in theo IP</span>
+                    </label>
                   </div>
                 </div>
-              </div>
 
-              <div>
-                <h4 className="text-xs font-bold text-[#C62828] uppercase tracking-wider border-b border-gray-100 pb-2 mb-3 col-span-2 flex items-center gap-1.5">
-                  <Clock size={14} /> Ca làm việc chiều
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Giờ bắt đầu lại</label>
-                    <CustomTimePicker
-                      value={config.afternoonStart}
-                      onChange={val => setConfig({ ...config, afternoonStart: val })}
-                    />
+                <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-dashed border-gray-200">
+                  <div className="space-y-4">
+                    <h5 className="text-[11px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock size={13} /> Ca làm việc sáng
+                    </h5>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Giờ bắt đầu</label>
+                        <CustomTimePicker
+                          value={config.morningStart}
+                          onChange={val => setConfig({ ...config, morningStart: val })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Giờ nghỉ trưa</label>
+                        <CustomTimePicker
+                          value={config.morningEnd}
+                          onChange={val => setConfig({ ...config, morningEnd: val })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Thời gian đi trễ cho phép (Phút)</label>
+                      <input
+                        type="number"
+                        value={config.lateGraceMinutes}
+                        onChange={e => setConfig({ ...config, lateGraceMinutes: Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
+                        required
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Giờ kết thúc ca</label>
-                    <CustomTimePicker
-                      value={config.afternoonEnd}
-                      onChange={val => setConfig({ ...config, afternoonEnd: val })}
-                    />
+
+                  <div className="space-y-4">
+                    <h5 className="text-[11px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <Clock size={13} /> Ca làm việc chiều
+                    </h5>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Giờ bắt đầu lại</label>
+                        <CustomTimePicker
+                          value={config.afternoonStart}
+                          onChange={val => setConfig({ ...config, afternoonStart: val })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Giờ kết thúc ca</label>
+                        <CustomTimePicker
+                          value={config.afternoonEnd}
+                          onChange={val => setConfig({ ...config, afternoonEnd: val })}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Thời gian về sớm cho phép (Phút)</label>
+                      <input
+                        type="number"
+                        value={config.earlyGraceMinutes}
+                        onChange={e => setConfig({ ...config, earlyGraceMinutes: Number(e.target.value) })}
+                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Thời gian đi trễ cho phép (Phút)</label>
-                <input
-                  type="number"
-                  value={config.lateGraceMinutes}
-                  onChange={e => setConfig({ ...config, lateGraceMinutes: Number(e.target.value) })}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Thời gian về sớm cho phép (Phút)</label>
-                <input
-                  type="number"
-                  value={config.earlyGraceMinutes}
-                  onChange={e => setConfig({ ...config, earlyGraceMinutes: Number(e.target.value) })}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
-                  required
-                />
               </div>
             </div>
 
-            <div className="border-t border-gray-150 pt-5 mt-5">
-              <h4 className="text-xs font-bold text-[#C62828] uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Users size={14} /> Cấu hình quản lý nhân sự
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Khối 2: Quản lý nhân sự */}
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2">
+                <Users size={15} className="text-[#C62828]" />
+                <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">Cấu hình quản lý nhân sự</h4>
+              </div>
+              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Thời gian thực tập mặc định (Tháng)</label>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Thời gian thực tập mặc định (Tháng)</label>
                   <input
                     type="number"
                     value={config.internshipMonths || 2}
                     onChange={e => setConfig({ ...config, internshipMonths: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
                     required
                   />
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-gray-150 pt-5 mt-5">
-              <h4 className="text-xs font-bold text-[#C62828] uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <ShieldAlert size={14} className="text-red-600" /> Cấu hình bảo mật & Phiên làm việc
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Khối 3: Bảo mật & Phiên làm việc */}
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2">
+                <ShieldAlert size={15} className="text-[#C62828]" />
+                <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">Bảo mật & Phiên làm việc</h4>
+              </div>
+              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Thời gian tự động đăng xuất do không hoạt động (Phút)</label>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Thời gian tự động đăng xuất do không hoạt động (Phút)</label>
                   <input
                     type="number"
                     min={5}
                     max={1440}
                     value={config.sessionTimeoutMinutes || 30}
                     onChange={e => setConfig({ ...config, sessionTimeoutMinutes: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
                     required
                   />
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-gray-150 pt-5 mt-5">
-              <h4 className="text-xs font-bold text-[#C62828] uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                <Layers size={14} /> Quản lý dự án
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Khối 4: Quản lý dự án */}
+            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2">
+                <Layers size={15} className="text-[#C62828]" />
+                <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">Quản lý dự án</h4>
+              </div>
+              <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Nhắc nhở deadline trước (Ngày)</label>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Nhắc nhở deadline trước (Ngày)</label>
                   <input
                     type="number"
                     min={1}
                     max={60}
                     value={config.projectDeadlineWarningDays}
                     onChange={e => setConfig({ ...config, projectDeadlineWarningDays: Number(e.target.value) })}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
                   />
                   <p className="text-[11px] text-gray-400 mt-1">Hiển thị cảnh báo trong trang Quản lý dự án khi còn ≤ số ngày này đến deadline</p>
                 </div>

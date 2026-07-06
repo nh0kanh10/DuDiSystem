@@ -52,6 +52,8 @@ export function createProject(data) {
     endDate: data.endDate || "",
     managerId: data.managerId || "",
     memberIds: data.memberIds || [],
+    leadId: data.leadId || "",
+    customerId: data.customerId || "",
     progress: 0,
     attachments: [],
     teams: [],
@@ -61,7 +63,7 @@ export function createProject(data) {
 }
 
 export function updateProject(id, patch) {
-  const ALLOWED = ["name", "code", "description", "status", "startDate", "endDate", "managerId", "memberIds", "progress", "attachments", "teams"]
+  const ALLOWED = ["name", "code", "description", "status", "startDate", "endDate", "managerId", "memberIds", "leadId", "customerId", "progress", "attachments", "teams"]
   const safe = Object.fromEntries(Object.entries(patch).filter(([k]) => ALLOWED.includes(k)))
   const p = repo.update(id, safe)
   if (!p) return null

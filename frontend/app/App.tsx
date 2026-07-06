@@ -546,7 +546,9 @@ export default function App() {
       }
       case "cong-viec": return <TaskManagement selectedBranch={selectedBranch} />
       case "tien-ich": return <SystemConfigPage />
-      case "crm": return <CrmAdminPage />
+      case "crm": return (
+        <CrmAdminPage onOpenLead={(id) => navigate(`/lead/${id}`)} />
+      )
       case "staff-portal": return (
         <div className="w-full h-[calc(100vh-2.5rem)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
           <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} embed={true} />
@@ -564,8 +566,21 @@ export default function App() {
       case "user-chat": return <UserChat />
       case "user-workflow": return <UserWorkflow />
       case "user-settings": return <UserSettings onLogout={handleLogout} />
-      case "user-crm": return <CrmStaffPage />
-        case "lead": return <LeadManagement currentUserId={currentEmp.id} employees={employees} />
+      case "user-crm": return (
+        <CrmStaffPage onOpenLead={(id) => navigate(`/lead/${id}`)} />
+      )
+        case "lead": {
+          const leadId = location.pathname.match(/^\/lead\/([^/]+)/)?.[1]
+          return (
+            <LeadManagement
+              currentUserId={currentEmp.id}
+              employees={employees}
+              leadId={leadId}
+              onNavigateToLead={(id) => navigate(id ? `/lead/${id}` : "/lead")}
+              onNavigateToProject={(id) => navigate(id ? `/du-an/${id}` : "/du-an")}
+            />
+          )
+        }
         default: return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
       }
   }

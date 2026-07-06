@@ -1,25 +1,9 @@
 import React, { useState, useEffect } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useSearchParams } from "react-router-dom"
 import { CheckCircle2, Loader2, Send } from "lucide-react"
 import { Lead, FormType } from "../../types"
 import { CustomCombobox } from "../ui/CustomCombobox"
-
-const getMockLead = (id: string): Lead | null => {
-  return {
-    id,
-    code: "LD-2025-001",
-    name: "Website bán hàng ABC",
-    status: "requirement-gathering",
-    contactName: "Nguyễn Văn A",
-    contactPhone: "0901234567",
-    contactEmail: "a@example.com",
-    budgetEstimate: "50-70 triệu",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    formType: "ecommerce",
-    formStatus: "sent"
-  }
-}
+import { api } from "../../../lib/api"
 
 const getFormTitle = (type: FormType): string => {
   switch (type) {
@@ -32,17 +16,21 @@ const getFormTitle = (type: FormType): string => {
 
 export function PublicRequirementForm() {
   const { leadId } = useParams<{ leadId: string }>()
+  const [searchParams] = useSearchParams()
   const [lead, setLead] = useState<Lead | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-
+  const [readOnly, setReadOnly] = useState(false)
   const [form, setForm] = useState({
     customer_name: "",
     customer_phone: "",
     customer_email: "",
     company: "",
     industry: "",
+    tax_id: "",
+    address: "",
     source: "",
     goal: "",
     cta: "",
@@ -113,34 +101,100 @@ export function PublicRequirementForm() {
   })
 
   useEffect(() => {
-    if (leadId) {
-      setTimeout(() => {
-        const foundLead = getMockLead(leadId)
-        if (foundLead) {
-          setLead({...foundLead, formStatus: "opened", formOpenedAt: new Date().toISOString()})
-          setForm(prev => ({
-            ...prev,
-            customer_name: foundLead.contactName || "",
-            customer_phone: foundLead.contactPhone || "",
-            customer_email: foundLead.contactEmail || "",
-          }))
-        }
-        setLoading(false)
-      }, 500)
+    if (!leadId) {
+      setLoading(false)
+      setLoadError("Link form không hợp lệ")
+      return
     }
-  }, [leadId])
+    let cancelled = false
+    const urlType = searchParams.get("type") as FormType | null
+    const token = searchParams.get("token") || ""
+    ;(async () => {
+      setLoading(true)
+      setLoadError("")
+      try {
+        if (!token) throw new Error("Link thiếu mã bảo mật. Vui lòng dùng link sales đã gửi.")
+        const data = await api.publicLeadForms.get(leadId, token, urlType || undefined)
+        if (cancelled) return
+        const formType = (urlType || data.lead.formType || "landing_page") as FormType
+        const isLocked = Boolean(data.locked || data.readOnly)
+        setReadOnly(isLocked)
+        if (isLocked && data.lead.formStatus === "completed") {
+          setSubmitted(true)
+        }
+        setLead({
+          id: data.lead.id,
+          code: data.lead.code,
+          name: data.lead.name,
+          status: "requirement-gathering",
+          formType,
+          formStatus: (data.lead.formStatus as Lead["formStatus"]) || "opened",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        setForm((prev) => ({
+          ...prev,
+          customer_name: data.prefill.customer_name || "",
+          customer_phone: data.prefill.customer_phone || "",
+          customer_email: data.prefill.customer_email || "",
+          company: data.prefill.company || "",
+          industry: data.prefill.industry || "",
+          location: data.prefill.location || "",
+          tax_id: data.prefill.tax_id || "",
+          address: data.prefill.address || data.prefill.location || "",
+          budget: data.prefill.budget || "",
+        }))
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(e instanceof Error ? e.message : "Không tải được form")
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [leadId, searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!leadId || readOnly) return
+    const token = searchParams.get("token") || ""
+    if (!token) return
     setSubmitting(true)
-    setTimeout(() => {
-      if (lead) {
-        setLead({...lead, formStatus: "completed", formCompletedAt: new Date().toISOString()})
-      }
-      setSubmitting(false)
+    try {
+      await api.publicLeadForms.submit(leadId, token, form)
+      setLead((prev) => prev ? { ...prev, formStatus: "completed" } : prev)
       setSubmitted(true)
-    }, 1500)
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Gửi form thất bại. Vui lòng thử lại.")
+    } finally {
+      setSubmitting(false)
+    }
   }
+  // Auto-resize textareas based on content
+  useEffect(() => {
+    if (loading) return
+    const adjustHeight = (el: HTMLTextAreaElement) => {
+      el.style.height = "auto"
+      el.style.height = `${el.scrollHeight + 2}px`
+    }
+    const timer = setTimeout(() => {
+      document.querySelectorAll("textarea").forEach(adjustHeight)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [loading, lead?.formType])
+
+  useEffect(() => {
+    const handleInput = (e: Event) => {
+      const target = e.target as HTMLElement
+      if (target.tagName.toLowerCase() === "textarea") {
+        target.style.height = "auto"
+        target.style.height = `${target.scrollHeight + 2}px`
+      }
+    }
+    document.addEventListener("input", handleInput)
+    return () => document.removeEventListener("input", handleInput)
+  }, [])
 
   if (loading) {
     return (
@@ -152,9 +206,10 @@ export function PublicRequirementForm() {
 
   if (!lead) {
     return (
-      <div className="min-h-screen bg-[#F5F1EF] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 text-lg">Không tìm thấy yêu cầu</p>
+      <div className="min-h-screen bg-[#F5F1EF] flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-8 max-w-md text-center shadow-lg border border-gray-100">
+          <p className="text-gray-700 font-semibold">{loadError || "Không tìm thấy yêu cầu"}</p>
+          <p className="text-sm text-gray-500 mt-2">Vui lòng liên hệ sales để nhận link form mới.</p>
         </div>
       </div>
     )
@@ -241,6 +296,26 @@ export function PublicRequirementForm() {
                   />
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">MST <span className="text-gray-400 font-normal">(không bắt buộc)</span></label>
+                  <input
+                    type="text"
+                    value={form.tax_id}
+                    onChange={(e) => setForm(prev => ({...prev, tax_id: e.target.value}))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20 bg-gray-50"
+                    placeholder="Mã số thuế"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Địa chỉ <span className="text-gray-400 font-normal">(không bắt buộc)</span></label>
+                  <input
+                    type="text"
+                    value={form.address}
+                    onChange={(e) => setForm(prev => ({...prev, address: e.target.value, location: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20 bg-gray-50"
+                    placeholder="Số nhà, đường, quận, thành phố"
+                  />
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-gray-600 mb-1">Nguồn khách</label>
                   <input
                     type="text"
@@ -256,10 +331,10 @@ export function PublicRequirementForm() {
             <div className="space-y-4">
               <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">2</span>
-                Mục tiêu (WHY – QUAN TRỌNG NHẤT)
+                Mục tiêu dự án (Bạn muốn đạt được điều gì nhất?)
               </h3>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">{currentFormType === "landing_page" ? "Mục đích chính" : "Mục tiêu website (WHY)"}</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1">{currentFormType === "landing_page" ? "Mục đích chính của bạn là gì? (Ví dụ: Tăng doanh số, Thu thập thông tin khách hàng...)" : "Mục đích chính của website là gì?"}</label>
                 <textarea
                   rows={3}
                   value={form.goal}
@@ -268,7 +343,7 @@ export function PublicRequirementForm() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Hành động mong muốn (CTA)</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Hành động mong muốn khách hàng thực hiện? (Ví dụ: Điền form, Gọi điện, Mua hàng...)</label>
                 <textarea
                   rows={2}
                   value={form.cta}
@@ -277,7 +352,7 @@ export function PublicRequirementForm() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">{currentFormType === "landing_page" ? "KPI mong muốn (lead/ngày, đơn/ngày…)" : "KPI (đơn/ngày, doanh thu…)"}</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1">{currentFormType === "landing_page" ? "Mục tiêu đo lường / KPI (Ví dụ: 10 đơn/ngày, 50 lead/tháng...)" : "Mục tiêu đo lường / KPI (Ví dụ: Tăng 20% doanh thu...)"}</label>
                 <input
                   type="text"
                   value={form.kpi}
@@ -292,10 +367,10 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">3</span>
-                  {currentFormType === "landing_page" ? "Sản phẩm / Offer (WHAT)" : "Sản phẩm (WHAT)"}
+                  Sản phẩm & Dịch vụ của bạn
                 </h3>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">{currentFormType === "landing_page" ? "Sản phẩm/dịch vụ chính" : "Sản phẩm chính"}</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Sản phẩm/dịch vụ chính bạn đang cung cấp là gì?</label>
                   <textarea
                     rows={3}
                     value={form.main_product}
@@ -306,7 +381,7 @@ export function PublicRequirementForm() {
                 {currentFormType === "landing_page" && (
                   <>
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">Điểm nổi bật (USP)</label>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Điểm nổi bật nhất của sản phẩm/dịch vụ là gì? (Tại sao khách hàng nên chọn bạn?)</label>
                       <textarea
                         rows={2}
                         value={form.usp}
@@ -315,7 +390,7 @@ export function PublicRequirementForm() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">Ưu đãi (nếu có)</label>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Bạn có chương trình ưu đãi nào hiện tại không? (Khuyến mãi, Quà tặng...)</label>
                       <textarea
                         rows={2}
                         value={form.offers}
@@ -324,7 +399,7 @@ export function PublicRequirementForm() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-1">Giá / cách bán</label>
+                      <label className="block text-xs font-bold text-gray-600 mb-1">Mức giá và hình thức bán hàng (Ví dụ: 500k/sản phẩm, bán combo...)</label>
                       <input
                         type="text"
                         value={form.pricing}
@@ -375,10 +450,10 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">3</span>
-                  Tổng quan doanh nghiệp (WHAT)
+                  Thông tin về doanh nghiệp của bạn
                 </h3>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Sản phẩm/dịch vụ chính</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Sản phẩm/dịch vụ chính bạn đang cung cấp là gì?</label>
                   <textarea
                     rows={3}
                     value={form.main_product}
@@ -387,7 +462,7 @@ export function PublicRequirementForm() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Danh sách dịch vụ</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Danh sách các dịch vụ/lĩnh vực hoạt động</label>
                   <textarea
                     rows={3}
                     value={form.services}
@@ -396,7 +471,7 @@ export function PublicRequirementForm() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Điểm mạnh / lợi thế</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Điểm mạnh/lợi thế cạnh tranh của doanh nghiệp là gì?</label>
                   <textarea
                     rows={2}
                     value={form.strengths}
@@ -411,10 +486,10 @@ export function PublicRequirementForm() {
             <div className="space-y-4">
               <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">4</span>
-                Khách hàng mục tiêu
+                Chân dung khách hàng mục tiêu
               </h3>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Đối tượng</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Họ là ai? (Độ tuổi, giới tính, sở thích, nghề nghiệp...)</label>
                 <textarea
                   rows={2}
                   value={form.target_audience}
@@ -424,7 +499,7 @@ export function PublicRequirementForm() {
               </div>
               {currentFormType === "landing_page" && (
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Insight / vấn đề khách đang gặp</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Họ đang gặp vấn đề gì mà sản phẩm của bạn có thể giải quyết?</label>
                   <textarea
                     rows={2}
                     value={form.insight}
@@ -434,7 +509,7 @@ export function PublicRequirementForm() {
                 </div>
               )}
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Khu vực</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Họ thường sống ở khu vực nào? (Ví dụ: Hà Nội, TP.HCM, Toàn quốc...)</label>
                 <input
                   type="text"
                   value={form.location}
@@ -448,7 +523,7 @@ export function PublicRequirementForm() {
             <div className="space-y-4">
               <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">5</span>
-                Hành trình người dùng (FLOW)
+                Hành trình của khách hàng trên website
               </h3>
               <div>
                 <textarea
@@ -467,10 +542,10 @@ export function PublicRequirementForm() {
             <div className="space-y-4">
               <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">6</span>
-                {currentFormType === "landing_page" ? "Nội dung landing (STRUCTURE)" : "Cấu trúc website (STRUCTURE)"}
+                Cấu trúc & Nội dung dự kiến
               </h3>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">{currentFormType === "landing_page" ? "Các section dự kiến (Hero / Giới thiệu / Lợi ích / Feedback / CTA…)" : "Trang dự kiến"}</label>
+                <label className="block text-xs font-bold text-gray-600 mb-1">{currentFormType === "landing_page" ? "Bạn dự định website sẽ có những nội dung/phần nào? (Ví dụ: Hero / Giới thiệu / Lợi ích / Feedback / CTA...)" : "Bạn dự định website sẽ có những trang nào? (Ví dụ: Trang chủ, Giới thiệu, Sản phẩm, Liên hệ...)"}</label>
                 <textarea
                   rows={3}
                   value={form.structure}
@@ -499,7 +574,7 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">7</span>
-                  Chức năng (FEATURE)
+                  Các tính năng cần thiết cho website
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="flex items-center gap-3">
@@ -541,10 +616,10 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">7</span>
-                  Chức năng chính (FEATURE)
+                  Các tính năng cần thiết cho website
                 </h3>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">3 chức năng quan trọng nhất</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Theo bạn, 3 tính năng nào là quan trọng nhất đối với website này?</label>
                   <textarea
                     rows={2}
                     value={form.top_features}
@@ -622,7 +697,7 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">7</span>
-                  Chức năng chính (FEATURE)
+                  Các tính năng cần thiết cho website
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
@@ -674,10 +749,10 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">8</span>
-                  Đơn hàng & thanh toán (CORE)
+                  Quy trình Đơn hàng & Thanh toán
                 </h3>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Phương thức thanh toán (COD / Chuyển khoản / Online…)</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Khách hàng sẽ thanh toán qua các hình thức nào? (COD, Chuyển khoản, Momo...)</label>
                   <input
                     type="text"
                     value={form.payment_methods}
@@ -725,7 +800,7 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">8</span>
-                  Nội dung & tài nguyên
+                  Tài liệu & Nội dung đã chuẩn bị
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
@@ -759,10 +834,10 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">9</span>
-                  Vận hành (RẤT QUAN TRỌNG)
+                  Quy trình Vận hành & Xử lý đơn hàng
                 </h3>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Ai xử lý đơn</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Ai sẽ là người phụ trách xử lý đơn hàng trên hệ thống?</label>
                   <input
                     type="text"
                     value={form.order_handler}
@@ -771,7 +846,7 @@ export function PublicRequirementForm() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Quy trình xử lý đơn</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Mô tả ngắn gọn quy trình xử lý đơn hàng của bạn</label>
                   <textarea
                     rows={2}
                     value={form.order_process}
@@ -797,7 +872,7 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">10</span>
-                  Nội dung & tài nguyên
+                  Tài liệu & Nội dung đã chuẩn bị
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
@@ -829,7 +904,7 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">9</span>
-                  Branding & UI
+                  Giao diện & Nhận diện thương hiệu
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
@@ -844,7 +919,7 @@ export function PublicRequirementForm() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Màu thương hiệu</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Màu sắc chủ đạo bạn muốn sử dụng là gì?</label>
                   <input
                     type="text"
                     value={form.brand_color}
@@ -853,7 +928,7 @@ export function PublicRequirementForm() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Phong cách mong muốn</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Bạn thích phong cách thiết kế nào? (Hiện đại, Tối giản, Sang trọng...)</label>
                   <input
                     type="text"
                     value={form.style}
@@ -862,7 +937,7 @@ export function PublicRequirementForm() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Landing tham khảo</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Có website/landing page nào bạn thấy thích và muốn tham khảo không? (Dán link vào đây)</label>
                   <textarea
                     rows={2}
                     value={form.references}
@@ -878,7 +953,7 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">11</span>
-                  Branding & UI
+                  Giao diện & Nhận diện thương hiệu
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
@@ -893,7 +968,7 @@ export function PublicRequirementForm() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Màu thương hiệu</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Màu sắc chủ đạo bạn muốn sử dụng là gì?</label>
                   <input
                     type="text"
                     value={form.brand_color}
@@ -902,7 +977,7 @@ export function PublicRequirementForm() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Phong cách UI</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Bạn thích phong cách thiết kế nào? (Hiện đại, Tối giản, Sang trọng...)</label>
                   <input
                     type="text"
                     value={form.style}
@@ -911,7 +986,7 @@ export function PublicRequirementForm() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Website tham khảo</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Có website/landing page nào bạn thấy thích và muốn tham khảo không? (Dán link vào đây)</label>
                   <textarea
                     rows={2}
                     value={form.references}
@@ -927,7 +1002,7 @@ export function PublicRequirementForm() {
               <div className="space-y-4">
                 <h3 className="text-sm font-black text-gray-700 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs">9</span>
-                  Branding & UI
+                  Giao diện & Nhận diện thương hiệu
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3">
@@ -942,7 +1017,7 @@ export function PublicRequirementForm() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Màu thương hiệu</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Màu sắc chủ đạo bạn muốn sử dụng là gì?</label>
                   <input
                     type="text"
                     value={form.brand_color}
@@ -951,7 +1026,7 @@ export function PublicRequirementForm() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Phong cách UI</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Bạn thích phong cách thiết kế nào? (Hiện đại, Tối giản, Sang trọng...)</label>
                   <input
                     type="text"
                     value={form.style}
@@ -960,7 +1035,7 @@ export function PublicRequirementForm() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-600 mb-1">Website tham khảo</label>
+                  <label className="block text-xs font-bold text-gray-600 mb-1">Có website/landing page nào bạn thấy thích và muốn tham khảo không? (Dán link vào đây)</label>
                   <textarea
                     rows={2}
                     value={form.references}

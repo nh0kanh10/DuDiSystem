@@ -23,5 +23,9 @@ export const COLLECTIONS = [
   "chatConversations",
   "chatMessages",
   "chatReadStates",
-  "chatPresence"
+  "chatPresence",
+  "leadDocuments",
+  "projectVaultItems",
+  "leads",
+  "customers",
 ]

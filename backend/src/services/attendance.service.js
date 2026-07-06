@@ -31,7 +31,10 @@ export function validateClientIP(employeeId, clientIP, reqUser) {
       return cleanItemIp === "127.0.0.1" || cleanItemIp === "::1" || cleanItemIp === "localhost"
     })
     if (!hasLocalConfig) {
-      return { valid: true }
+      return {
+        valid: false,
+        error: "Không xác định được IP mạng thực tế (đang nhận localhost). Vui lòng kiểm tra lại kết nối mạng hoặc gửi IP public từ client.",
+      }
     }
   }
 

@@ -91,7 +91,8 @@ const MODULE_TREE = [
     id: "group-crm",
     label: "Quản lý khách hàng",
     children: [
-      { id: "crm", label: "Quản lý khách hàng" }
+      { id: "crm", label: "Quản lý khách hàng" },
+      { id: "lead", label: "Quản lý Lead" },
     ]
   }
 ]

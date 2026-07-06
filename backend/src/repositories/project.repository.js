@@ -6,6 +6,7 @@ export function getAll(filter = {}) {
   let rows = findAll(COL)
   if (filter.status) rows = rows.filter(p => p.status === filter.status)
   if (filter.managerId) rows = rows.filter(p => p.managerId === filter.managerId)
+  if (filter.leadId) rows = rows.filter(p => String(p.leadId || "") === String(filter.leadId))
   if (filter.q) {
     const q = filter.q.toLowerCase()
     rows = rows.filter(p => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q))

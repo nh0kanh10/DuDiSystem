@@ -49,19 +49,33 @@ export function useEmployeeAttendance() {
   const [punching, setPunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [ipStatus, setIpStatus] = useState<{ valid: boolean; ip: string; message: string } | null>(null)
+  const [publicIP, setPublicIP] = useState("")
+
+  const detectPublicIP = useCallback(async () => {
+    try {
+      const res = await fetch("https://api.ipify.org?format=json")
+      const json = (await res.json()) as { ip?: string }
+      const ip = (json.ip || "").trim()
+      if (ip) setPublicIP(ip)
+      return ip
+    } catch {
+      return ""
+    }
+  }, [])
 
   const verifyWifi = useCallback(async () => {
     try {
-      const data = await api.attendance.checkIP()
+      const ip = publicIP || (await detectPublicIP())
+      const data = await api.attendance.checkIP(ip || undefined)
       setIpStatus({ valid: true, ip: data.ip, message: data.message })
     } catch (e) {
       setIpStatus({
         valid: false,
-        ip: "",
+        ip: publicIP,
         message: e instanceof Error ? e.message : "Không xác thực được WiFi",
       })
     }
-  }, [])
+  }, [detectPublicIP, publicIP])
 
   const today = todayISO()
   const monthStart = useMemo(() => {
@@ -129,26 +143,38 @@ export function useEmployeeAttendance() {
     setPunching(true)
     setError(null)
     try {
-      await api.attendance.checkIP()
+      const ip = publicIP || (await detectPublicIP())
+      await api.attendance.checkIP(ip || undefined)
       await verifyWifi()
       const time = formatTimeNow()
       const activeRecord = todayRecord?.employeeId === employeeId ? todayRecord : null
       const recordId = activeRecord?.id ?? `TEMP_${employeeId}_${today}`
       const body: Record<string, string> = isIntern
-        ? { checkIn: time }
+        ? { checkIn: time, ...(ip ? { ip } : {}) }
         : hasPunchTime(activeRecord?.checkIn) && !hasPunchTime(activeRecord?.checkOut)
-          ? { checkOut: time }
-          : { checkIn: time }
+          ? { checkOut: time, ...(ip ? { ip } : {}) }
+          : { checkIn: time, ...(ip ? { ip } : {}) }
 
       const updated = (await api.attendance.update(recordId, body)) as AttendanceRecord
       setTodayRecord(updated)
       await load()
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chấm công thất bại")
+      const msg = e instanceof Error ? e.message : "Chấm công thất bại"
+      const isWifiError = /wifi|ip|mạng/i.test(msg)
+      if (isWifiError) {
+        setIpStatus({
+          valid: false,
+          ip: publicIP,
+          message: msg,
+        })
+        setError(null)
+      } else {
+        setError(msg)
+      }
     } finally {
       setPunching(false)
     }
-  }, [employeeId, isIntern, today, todayRecord, load, verifyWifi])
+  }, [detectPublicIP, employeeId, isIntern, load, publicIP, today, todayRecord, verifyWifi])
 
   const punchLabel = getPunchLabel(todayRecord, isIntern)
   const statusText = getTodayStatusText(todayRecord, isIntern)
