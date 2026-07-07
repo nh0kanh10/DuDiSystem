@@ -349,6 +349,17 @@ export function LeadDocumentsTab({
       {error && <p className="text-sm text-red-600 font-semibold">{error}</p>}
 
       <DocList
+        title="Giải pháp"
+        icon={Box}
+        items={solutions}
+        loading={loading && solutions.length === 0}
+        onDownload={handleDownload}
+        onPreview={(doc) => { setPreviewDoc(doc); setPreviewKey((k) => k + 1) }}
+        onDelete={handleDelete}
+        emptyText="Chưa có file giải pháp nào. Tải lên ở tab Giải pháp."
+      />
+
+      <DocList
         title="Phiên bản báo giá"
         icon={FileText}
         items={quotes}
@@ -358,17 +369,6 @@ export function LeadDocumentsTab({
         onEdit={onRestoreQuote ? handleRestore : undefined}
         onDelete={handleDelete}
         emptyText="Chưa lưu báo giá nào. Dùng nút Lưu ở tab Báo giá."
-      />
-
-      <DocList
-        title="Giải pháp"
-        icon={Box}
-        items={solutions}
-        loading={loading && solutions.length === 0}
-        onDownload={handleDownload}
-        onPreview={(doc) => { setPreviewDoc(doc); setPreviewKey((k) => k + 1) }}
-        onDelete={handleDelete}
-        emptyText="Chưa có file giải pháp nào. Tải lên ở tab Giải pháp."
       />
 
       <ContractDocList
