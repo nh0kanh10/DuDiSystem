@@ -116,7 +116,8 @@ export function LeadDetailPage({
     )
   }
 
-  const statusConfig = STATUS_CONFIG[lead.status]
+  const status = lead.convertedProjectId ? "converted" : lead.status
+  const statusConfig = STATUS_CONFIG[status]
   const StatusIcon = statusConfig.icon
   const formConfig = lead.formStatus ? FORM_STATUS_CONFIG[lead.formStatus] : null
   const FormIcon = formConfig?.icon

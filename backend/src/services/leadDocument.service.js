@@ -169,6 +169,10 @@ export async function saveDocument(leadId, { type = "quote", payload = {}, label
   }
 
   repo.create(doc)
+  const lead = leadSvc.getLead(leadId)
+  if (lead && ["new", "contacted", "requirement-gathering"].includes(lead.status)) {
+    leadSvc.updateLead(leadId, { status: "requirement-done" })
+  }
   return publicDoc(doc)
 }
 
@@ -363,5 +367,11 @@ export async function uploadDirectDocument(leadId, type, options = {}, user = {}
   }
 
   repo.create(doc)
+  if (type === "quote" || type === "contract") {
+    const lead = leadSvc.getLead(leadId)
+    if (lead && ["new", "contacted", "requirement-gathering"].includes(lead.status)) {
+      leadSvc.updateLead(leadId, { status: "requirement-done" })
+    }
+  }
   return publicDoc(doc)
 }

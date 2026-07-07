@@ -212,7 +212,8 @@ export function LeadManagement({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredLeads.map((lead) => {
-            const statusConfig = STATUS_CONFIG[lead.status]
+            const status = lead.convertedProjectId ? "converted" : lead.status
+            const statusConfig = STATUS_CONFIG[status]
             const Icon = statusConfig.icon
             return (
               <div

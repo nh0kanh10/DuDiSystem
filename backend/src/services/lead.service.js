@@ -3,6 +3,7 @@ import * as repo from "../repositories/lead.repository.js"
 import * as projectSvc from "./project.service.js"
 import * as customerSvc from "./customer.service.js"
 import { getById as getEmployeeById } from "../repositories/employee.repository.js"
+import { listByLead } from "../repositories/leadDocument.repository.js"
 
 const SEED_LEADS = [
   {
@@ -83,6 +84,12 @@ function enrichLead(lead) {
     if (customer) {
       out.customerCode = customer.code
       out.customerDisplayName = customer.displayName
+    }
+  }
+  if (out.status !== "converted" && !out.convertedProjectId) {
+    const hasDoc = listByLead(out.id).some((d) => d.type === "quote" || d.type === "contract")
+    if (hasDoc && ["new", "contacted", "requirement-gathering"].includes(out.status)) {
+      out.status = "requirement-done"
     }
   }
   return out
