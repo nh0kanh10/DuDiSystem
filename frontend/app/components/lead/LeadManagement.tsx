@@ -64,7 +64,7 @@ export function LeadManagement({
 
   useEffect(() => {
     void loadLeads()
-  }, [loadLeads])
+  }, [loadLeads, leadId])
 
   if (leadId) {
     return (
