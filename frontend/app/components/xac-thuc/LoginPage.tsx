@@ -1,15 +1,32 @@
-import React, { useState } from "react"
-import { Lock, User, ArrowRight } from "lucide-react"
+import React, { useState, useEffect, useRef } from "react"
+import { Lock, User, ArrowRight, Loader2, ServerCrash } from "lucide-react"
 import { BrandLogo } from "../ui/BrandLogo"
 
-export function LoginPage({ onLogin, loginError }: {
+export function LoginPage({ onLogin, loginError, isLoading }: {
   onLogin: (id: string, pass: string) => void
   loginError?: string | null
+  isLoading?: boolean
 }) {
   const [id, setId] = useState("")
   const [pass, setPass] = useState("")
+  const [showWarmup, setShowWarmup] = useState(false)
+  const warmupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handleSubmit = () => onLogin(id.trim(), pass)
+  useEffect(() => {
+    if (isLoading) {
+      warmupTimerRef.current = setTimeout(() => setShowWarmup(true), 3000)
+    } else {
+      if (warmupTimerRef.current) clearTimeout(warmupTimerRef.current)
+      setShowWarmup(false)
+    }
+    return () => {
+      if (warmupTimerRef.current) clearTimeout(warmupTimerRef.current)
+    }
+  }, [isLoading])
+
+  const handleSubmit = () => {
+    if (!isLoading) onLogin(id.trim(), pass)
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") handleSubmit()
@@ -62,6 +79,19 @@ export function LoginPage({ onLogin, loginError }: {
           <h2 className="text-2xl font-bold text-gray-800 mb-1">Đăng nhập</h2>
           <p className="text-gray-400 text-sm mb-8">Nhập mã nhân viên để truy cập hệ thống</p>
 
+          {showWarmup && !loginError && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5">
+              <ServerCrash size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-amber-700">Server đang khởi động...</p>
+                <p className="text-[11px] text-amber-600 mt-0.5 leading-relaxed">
+                  Server cần 30–60 giây để khởi động .
+                  Vui lòng chờ, hệ thống đang kết nối.
+                </p>
+              </div>
+            </div>
+          )}
+
           {loginError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium">
               {loginError}
@@ -106,9 +136,17 @@ export function LoginPage({ onLogin, loginError }: {
             </div>
             <button
               onClick={handleSubmit}
-              className="w-full bg-[#C62828] hover:bg-[#B71C1C] active:bg-[#A31515] text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-md shadow-[#C62828]/20"
+              disabled={isLoading}
+              className="w-full bg-[#C62828] hover:bg-[#B71C1C] active:bg-[#A31515] disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 shadow-md shadow-[#C62828]/20"
             >
-              Đăng nhập hệ thống <ArrowRight size={18} />
+              {isLoading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>{showWarmup ? "Đang chờ server..." : "Đang đăng nhập..."}</span>
+                </>
+              ) : (
+                <>Đăng nhập hệ thống <ArrowRight size={18} /></>
+              )}
             </button>
           </div>
 

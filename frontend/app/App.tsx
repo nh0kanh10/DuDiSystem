@@ -111,6 +111,7 @@ export default function App() {
   })
   const [sessionTimeout, setSessionTimeout] = useState<number>(30)
   const [sessionAlertMsg, setSessionAlertMsg] = useState<string | null>(null)
+  const [loginLoading, setLoginLoading] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -191,7 +192,6 @@ export default function App() {
     }
   }, [isLoggedIn, location.pathname, navigate, activeRolePermissions])
 
-  // ─── LẮNG NGHE SỰ KIỆN HẾT HẠN TOKEN TOÀN CỤC (401) ───
   useEffect(() => {
     const handleUnauthorized = () => {
       handleLogout()
@@ -203,40 +203,48 @@ export default function App() {
     }
   }, [])
 
+  const lastActivityRef = useRef<number>(Date.now())
+
   useEffect(() => {
     if (!isLoggedIn) return
 
+    const SESSION_MS = sessionTimeout * 60 * 1000
     let idleTimeoutId: ReturnType<typeof setTimeout> | undefined
-    let activityDebounceId: ReturnType<typeof setTimeout> | undefined
 
-    const scheduleIdleLogout = () => {
+    const scheduleIdleCheck = () => {
       if (idleTimeoutId) clearTimeout(idleTimeoutId)
+      const remaining = SESSION_MS - (Date.now() - lastActivityRef.current)
       idleTimeoutId = setTimeout(() => {
-        handleLogout()
-        setSessionAlertMsg(`Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`)
-      }, sessionTimeout * 60 * 1000)
+        const idleDuration = Date.now() - lastActivityRef.current
+        if (idleDuration >= SESSION_MS) {
+          handleLogout()
+          setSessionAlertMsg(
+            `Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`
+          )
+        } else {
+          scheduleIdleCheck()
+        }
+      }, Math.max(remaining, 1000))
     }
 
     const onActivity = () => {
-      if (activityDebounceId) clearTimeout(activityDebounceId)
-      activityDebounceId = setTimeout(() => {
-        touchSession()
-        scheduleIdleLogout()
-      }, 500)
+      lastActivityRef.current = Date.now()
+      touchSession()
+      scheduleIdleCheck()
     }
 
-    const events = ["mousedown", "keydown", "scroll", "touchstart", "click", "visibilitychange"] as const
+    const events = ["mousedown", "keydown", "scroll", "touchstart", "click"] as const
 
+    lastActivityRef.current = Date.now()
     touchSession()
-    scheduleIdleLogout()
+    scheduleIdleCheck()
 
     events.forEach(event => {
-      window.addEventListener(event, onActivity)
+      window.addEventListener(event, onActivity, { passive: true })
     })
 
     return () => {
       if (idleTimeoutId) clearTimeout(idleTimeoutId)
-      if (activityDebounceId) clearTimeout(activityDebounceId)
       events.forEach(event => {
         window.removeEventListener(event, onActivity)
       })
@@ -395,6 +403,7 @@ export default function App() {
 
   const handleLogin = async (email: string, pass: string) => {
     setLoginError(null)
+    setLoginLoading(true)
     try {
       const res = await api.auth.login(email, pass)
       if (res && res.token) {
@@ -422,10 +431,11 @@ export default function App() {
         e.message.includes("NetworkError")
       )
       const errorMsg = isConnectionError
-        ? "Không thể kết nối tới backend. Hãy chắc chắn backend đang chạy tại http://localhost:3001"
+        ? "Không thể kết nối tới server. Server Render có thể đang khởi động — vui lòng thử lại sau ít giây."
         : (e instanceof Error ? e.message : "Đăng nhập thất bại")
       setLoginError(errorMsg)
-      return
+    } finally {
+      setLoginLoading(false)
     }
   }
 
@@ -447,7 +457,7 @@ export default function App() {
       {sessionAlertMsg && (
         <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
       )}
-      <LoginPage onLogin={handleLogin} loginError={loginError} />
+      <LoginPage onLogin={handleLogin} loginError={loginError} isLoading={loginLoading} />
     </>
   )
 

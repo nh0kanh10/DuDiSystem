@@ -47,6 +47,7 @@ export function LeadContractTab({
   const appendixInputRef = useRef<HTMLInputElement>(null)
   const [partyA, setPartyA] = useState(() => resolvePartyAFromLead(lead))
   const [uploadContractLabel, setUploadContractLabel] = useState("")
+  const [activeTab, setActiveTab] = useState<"generate" | "upload">("generate")
 
   useEffect(() => {
     setPartyA(resolvePartyAFromLead(lead))
@@ -93,6 +94,15 @@ export function LeadContractTab({
     const base = `Hợp đồng từ ${quote.label}`
     setContractLabel(n > 1 ? `${base} (${n})` : base)
   }, [selectedQuoteId, quotes, mainContracts])
+
+  useEffect(() => {
+    const quote = quotes.find((q) => q.id === selectedQuoteId)
+    if (quote?.uploadedFile) {
+      setActiveTab("upload")
+    } else {
+      setActiveTab("generate")
+    }
+  }, [selectedQuoteId, quotes])
 
   const handleCreate = async () => {
     if (!selectedQuoteId) return
@@ -271,92 +281,124 @@ export function LeadContractTab({
 
           {(() => {
             const selectedQuote = quotes.find(q => q.id === selectedQuoteId);
+            const isQuoteUploaded = !!selectedQuote?.uploadedFile;
             
-            if (isUploaded) {
-              return (
-                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 max-w-md mx-auto my-8">
-                  <div className="text-center mb-6">
-                    <Upload size={40} className="mx-auto text-gray-400 mb-3" />
-                    <h3 className="text-base font-black text-gray-800">Tải lên file hợp đồng</h3>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Báo giá này được tải lên từ máy. Vui lòng tải lên file Word (.doc, .docx) hợp đồng do bạn tự soạn thảo.
-                    </p>
+            return (
+              <div className="space-y-4">
+                {!isQuoteUploaded && (
+                  <div className="flex bg-gray-100 rounded-xl p-1 w-fit">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("generate")}
+                      className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${
+                        activeTab === "generate"
+                          ? "bg-white text-[#C62828] shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      Tạo từ báo giá
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("upload")}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${
+                        activeTab === "upload"
+                          ? "bg-white text-[#C62828] shadow-sm"
+                          : "text-gray-500 hover:text-gray-700"
+                      }`}
+                    >
+                      <Upload size={12} className="mr-1" />
+                      Tải file hợp đồng lên
+                    </button>
                   </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
-                        Tên file hợp đồng <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        className={inputCls}
-                        value={uploadContractLabel}
-                        onChange={(e) => setUploadContractLabel(e.target.value)}
-                        placeholder="VD: Hợp đồng triển khai website — bản ký chính thức"
-                      />
+                )}
+
+                {activeTab === "upload" ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 max-w-md mx-auto my-4">
+                    <div className="text-center mb-6">
+                      <Upload size={40} className="mx-auto text-gray-400 mb-3" />
+                      <h3 className="text-base font-black text-gray-800">Tải lên file hợp đồng</h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {isQuoteUploaded
+                          ? "Báo giá này được tải lên từ máy. Vui lòng tải lên file Word (.doc, .docx) hợp đồng do bạn tự soạn thảo."
+                          : "Vui lòng tải lên file Word (.doc, .docx) hợp đồng do bạn tự soạn thảo."}
+                      </p>
                     </div>
                     
-                    <label className={`flex items-center justify-center gap-2 w-full py-4 ${!uploadContractLabel.trim() || uploadingContract ? "bg-gray-300 cursor-not-allowed" : "bg-[#C62828] cursor-pointer hover:bg-[#B71C1C]"} text-white rounded-xl text-base font-bold transition-colors shadow-sm`}>
-                      {uploadingContract ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-                      Chọn file & Tải lên
-                      <input type="file" className="hidden" accept=".doc,.docx" onChange={handleUploadContractDirect} disabled={uploadingContract || !uploadContractLabel.trim()} />
-                    </label>
-                  </div>
-                </div>
-              );
-            }
-            return (
-              <>
-                <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-3 mt-4">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Bên A — Khách hàng</p>
-                  <div className="grid sm:grid-cols-2 gap-3">
-                    {[
-                      { key: "companyName", label: "Tên doanh nghiệp", span: 2 },
-                      { key: "taxId", label: "MST" },
-                      { key: "representative", label: "Đại diện" },
-                      { key: "position", label: "Chức vụ" },
-                      { key: "address", label: "Địa chỉ", span: 2 },
-                    ].map((f) => (
-                      <div key={f.key} className={f.span === 2 ? "sm:col-span-2" : ""}>
-                        <label className="text-[10px] font-bold text-gray-500 mb-1 block">{f.label}</label>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
+                          Tên file hợp đồng <span className="text-red-500">*</span>
+                        </label>
                         <input
                           className={inputCls}
-                          value={partyA[f.key as keyof typeof partyA]}
-                          onChange={(e) => setPartyA((p) => ({ ...p, [f.key]: e.target.value }))}
+                          value={uploadContractLabel}
+                          onChange={(e) => setUploadContractLabel(e.target.value)}
+                          placeholder="VD: Hợp đồng triển khai website — bản ký chính thức"
                         />
                       </div>
-                    ))}
+                      
+                      <label className={`flex items-center justify-center gap-2 w-full py-4 ${!uploadContractLabel.trim() || uploadingContract ? "bg-gray-300 cursor-not-allowed" : "bg-[#C62828] cursor-pointer hover:bg-[#B71C1C]"} text-white rounded-xl text-base font-bold transition-colors shadow-sm`}>
+                        {uploadingContract ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+                        Chọn file & Tải lên
+                        <input type="file" className="hidden" accept=".doc,.docx" onChange={handleUploadContractDirect} disabled={uploadingContract || !uploadContractLabel.trim()} />
+                      </label>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-3 mt-2">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Bên A — Khách hàng</p>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {[
+                          { key: "companyName", label: "Tên doanh nghiệp", span: 2 },
+                          { key: "taxId", label: "MST" },
+                          { key: "representative", label: "Đại diện" },
+                          { key: "position", label: "Chức vụ" },
+                          { key: "address", label: "Địa chỉ", span: 2 },
+                        ].map((f) => (
+                          <div key={f.key} className={f.span === 2 ? "sm:col-span-2" : ""}>
+                            <label className="text-[10px] font-bold text-gray-500 mb-1 block">{f.label}</label>
+                            <input
+                              className={inputCls}
+                              value={partyA[f.key as keyof typeof partyA] || ""}
+                              onChange={(e) => setPartyA((p) => ({ ...p, [f.key]: e.target.value }))}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 space-y-1.5 mt-4">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Tên hợp đồng (bắt buộc)</label>
-                  <input
-                    className={inputCls}
-                    value={contractLabel}
-                    onChange={(e) => {
-                      contractLabelTouched.current = true
-                      setContractLabel(e.target.value)
-                    }}
-                    placeholder="VD: Hợp đồng triển khai website — bản ký chính thức"
-                  />
-                  <p className="text-[10px] text-gray-400">
-                    Mỗi lần tạo = 1 hợp đồng mới — đặt tên khác nhau để phân biệt trong tab Tài liệu.
-                  </p>
-                </div>
+                    <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 space-y-1.5 mt-4">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Tên hợp đồng (bắt buộc)</label>
+                      <input
+                        className={inputCls}
+                        value={contractLabel}
+                        onChange={(e) => {
+                          contractLabelTouched.current = true
+                          setContractLabel(e.target.value)
+                        }}
+                        placeholder="VD: Hợp đồng triển khai website — bản ký chính thức"
+                      />
+                      <p className="text-[10px] text-gray-400">
+                        Mỗi lần tạo = 1 hợp đồng mới — đặt tên khác nhau để phân biệt trong tab Tài liệu.
+                      </p>
+                    </div>
 
-                <div className="flex justify-end mt-4">
-                  <Button
-                    type="button"
-                    disabled={creating || !selectedQuoteId || !contractLabel.trim()}
-                    onClick={handleCreate}
-                    className="bg-[#C62828] hover:bg-[#B71C1C] text-white text-xs font-black"
-                  >
-                    {creating ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <ArrowRight size={14} className="mr-1.5" />}
-                    Tạo hợp đồng từ báo giá
-                  </Button>
-                </div>
-              </>
+                    <div className="flex justify-end mt-4">
+                      <Button
+                        type="button"
+                        disabled={creating || !selectedQuoteId || !contractLabel.trim()}
+                        onClick={handleCreate}
+                        className="bg-[#C62828] hover:bg-[#B71C1C] text-white text-xs font-black"
+                      >
+                        {creating ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <ArrowRight size={14} className="mr-1.5" />}
+                        Tạo hợp đồng từ báo giá
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
             );
           })()}
         </>

@@ -7,11 +7,12 @@ export function DocxFilePreview({
   loadBlob,
   refreshKey,
   docId,
+  downloadName,
 }: {
   loadBlob: () => Promise<Blob>
   refreshKey: number
-  /** Ổn định effect khi đổi tài liệu xem trước */
   docId?: string
+  downloadName?: string
 }) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const styleRef = useRef<HTMLDivElement>(null)
@@ -19,20 +20,51 @@ export function DocxFilePreview({
   loadBlobRef.current = loadBlob
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [objectUrl, setObjectUrl] = useState("")
+
+  const ext = (downloadName || "").toLowerCase().split(".").pop() || ""
+  const isPdf = ext === "pdf"
+  const isImage = ["png", "jpg", "jpeg", "gif", "webp"].includes(ext)
+  const isDocx = ["docx", "doc"].includes(ext) || ext === ""
+
+  useEffect(() => {
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl)
+      }
+    }
+  }, [objectUrl])
 
   useEffect(() => {
     let cancelled = false
     const run = async () => {
       const bodyEl = bodyRef.current
-      if (!bodyEl) return
       setLoading(true)
       setError("")
-      bodyEl.innerHTML = ""
-      if (styleRef.current) styleRef.current.innerHTML = ""
+      setObjectUrl(prev => {
+        if (prev) URL.revokeObjectURL(prev)
+        return ""
+      })
+      if (bodyEl) {
+        bodyEl.innerHTML = ""
+      }
+      if (styleRef.current) {
+        styleRef.current.innerHTML = ""
+      }
+
       try {
         const blob = await loadBlobRef.current()
         if (cancelled) return
-        await renderAsync(blob, bodyEl, styleRef.current ?? bodyEl, DOCX_PREVIEW_RENDER_OPTIONS)
+
+        if (isPdf || isImage) {
+          const url = URL.createObjectURL(blob)
+          setObjectUrl(url)
+        } else if (isDocx) {
+          if (!bodyEl) return
+          await renderAsync(blob, bodyEl, styleRef.current ?? bodyEl, DOCX_PREVIEW_RENDER_OPTIONS)
+        } else {
+          setError("Không hỗ trợ xem trước định dạng này")
+        }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Không hiển thị được xem trước")
@@ -42,8 +74,10 @@ export function DocxFilePreview({
       }
     }
     void run()
-    return () => { cancelled = true }
-  }, [refreshKey, docId])
+    return () => {
+      cancelled = true
+    }
+  }, [refreshKey, docId, isPdf, isImage, isDocx])
 
   return (
     <div className="relative rounded-2xl border border-gray-200 overflow-hidden flex flex-col flex-1 min-h-0">
@@ -59,9 +93,20 @@ export function DocxFilePreview({
         </p>
       )}
       <div ref={styleRef} aria-hidden className="hidden" />
+      {isPdf && objectUrl && (
+        <iframe
+          src={objectUrl}
+          className="flex-1 w-full h-full border-0"
+        />
+      )}
+      {isImage && objectUrl && (
+        <div className="flex-1 flex items-center justify-center p-4 bg-gray-50 overflow-auto">
+          <img src={objectUrl} alt="Preview" className="max-w-full max-h-full object-contain" />
+        </div>
+      )}
       <div
         ref={bodyRef}
-        className={`${DOCX_PREVIEW_WRAPPER_CLASS} flex-1 min-h-0`}
+        className={`${DOCX_PREVIEW_WRAPPER_CLASS} flex-1 min-h-0 ${(!isDocx || error || loading) ? "hidden" : ""}`}
       />
     </div>
   )

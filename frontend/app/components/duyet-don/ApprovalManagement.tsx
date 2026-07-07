@@ -2348,7 +2348,14 @@ export default function ApprovalManagement({
                   <FileText size={16} className="text-[#C62828]" />
                 </div>
                 <div>
-                  <h3 className="font-black text-gray-800 text-base">{requestEditMode ? "Sửa đơn chờ duyệt" : "Chi tiết đơn xin nghỉ"}</h3>
+                  <h3 className="font-black text-gray-800 text-base">
+                    {requestEditMode ? "Sửa đơn" : "Chi tiết đơn xin nghỉ"}
+                    {!requestEditMode && isRequestExpired(selectedRequest) && (
+                      <span className="ml-2 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                        Quá hạn
+                      </span>
+                    )}
+                  </h3>
                   <p className="text-xs text-gray-400">Mã đơn: <span className="font-mono font-bold text-gray-600">{selectedRequest.id}</span></p>
                 </div>
               </div>
@@ -2358,6 +2365,17 @@ export default function ApprovalManagement({
             </div>
 
             <div className="p-6 space-y-4">
+              {isRequestExpired(selectedRequest) && !requestEditMode && (
+                <div className="flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <AlertCircle size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-black text-amber-700">Đơn đã quá hạn nhưng vẫn có thể xử lý</p>
+                    <p className="text-[11px] text-amber-600 leading-relaxed mt-0.5">
+                      Admin có thể duyệt hoặc nhấn “Sửa đơn” để đổi ngày/lý do trước khi duyệt.
+                    </p>
+                  </div>
+                </div>
+              )}
               {requestEditMode ? (
                 <div className="space-y-4">
                   <p className="text-xs text-gray-500">

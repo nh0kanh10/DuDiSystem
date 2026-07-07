@@ -50,6 +50,11 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
   const { requests, loading, error, submit, cancel, reload } = useLeaveRequests(employee.id)
+
+  const handleTabChange = (t: "register" | "history") => {
+    if (t === "register") reload()
+    setTab(t)
+  }
   const intern = isInternEmployee(employee)
   const kind = intern ? EMPLOYEE_KIND.intern : EMPLOYEE_KIND.staff
   const scopes = scopesForEmployee(employee)
@@ -140,7 +145,7 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
               <button
                 key={t}
                 type="button"
-                onClick={() => setTab(t)}
+                onClick={() => handleTabChange(t)}
                 style={{
                   flex: 1,
                   padding: "16px 0",
@@ -164,7 +169,7 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
               <button
                 key={t}
                 type="button"
-                onClick={() => setTab(t)}
+                onClick={() => handleTabChange(t)}
                 className={`py-2 px-4 rounded-lg text-sm font-bold transition-all ${tab === t ? "bg-white shadow text-[#C62828]" : "text-gray-500 hover:text-gray-800"}`}
               >
                 {t === "register" ? "Tạo đơn xin nghỉ" : "Lịch sử đơn"}

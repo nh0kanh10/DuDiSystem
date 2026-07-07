@@ -397,6 +397,7 @@ export function LeadDocumentsTab({
         {previewDoc && (
           <DocxFilePreview
             docId={previewDoc.id}
+            downloadName={previewDoc.downloadName}
             refreshKey={previewKey}
             loadBlob={() => api.leadDocuments.fileBlob(leadId, previewDoc.id)}
           />
