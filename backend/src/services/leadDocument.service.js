@@ -170,8 +170,16 @@ export async function saveDocument(leadId, { type = "quote", payload = {}, label
 
   repo.create(doc)
   const lead = leadSvc.getLead(leadId)
-  if (lead && ["new", "contacted", "requirement-gathering"].includes(lead.status)) {
-    leadSvc.updateLead(leadId, { status: "requirement-done" })
+  if (lead) {
+    if (type === "contract") {
+      if (["new", "contacted", "requirement-gathering", "requirement-done", "quoted"].includes(lead.status)) {
+        leadSvc.updateLead(leadId, { status: "contracted" })
+      }
+    } else if (type === "quote") {
+      if (["new", "contacted", "requirement-gathering", "requirement-done"].includes(lead.status)) {
+        leadSvc.updateLead(leadId, { status: "quoted" })
+      }
+    }
   }
   return publicDoc(doc)
 }
@@ -367,10 +375,16 @@ export async function uploadDirectDocument(leadId, type, options = {}, user = {}
   }
 
   repo.create(doc)
-  if (type === "quote" || type === "contract") {
-    const lead = leadSvc.getLead(leadId)
-    if (lead && ["new", "contacted", "requirement-gathering"].includes(lead.status)) {
-      leadSvc.updateLead(leadId, { status: "requirement-done" })
+  const lead = leadSvc.getLead(leadId)
+  if (lead) {
+    if (type === "contract") {
+      if (["new", "contacted", "requirement-gathering", "requirement-done", "quoted"].includes(lead.status)) {
+        leadSvc.updateLead(leadId, { status: "contracted" })
+      }
+    } else if (type === "quote") {
+      if (["new", "contacted", "requirement-gathering", "requirement-done"].includes(lead.status)) {
+        leadSvc.updateLead(leadId, { status: "quoted" })
+      }
     }
   }
   return publicDoc(doc)

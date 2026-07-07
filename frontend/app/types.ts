@@ -235,7 +235,7 @@ export interface TimeOffSlot {
 }
 
 
-export type LeadStatus = "new" | "contacted" | "requirement-gathering" | "requirement-done" | "converted" | "lost"
+export type LeadStatus = "new" | "contacted" | "requirement-gathering" | "requirement-done" | "quoted" | "contracted" | "converted" | "lost"
 export type FormStatus = "not_sent" | "sent" | "opened" | "in_progress" | "completed"
 export type FormType = "landing_page" | "ecommerce" | "company_profile"
 export type CustomerType = "individual" | "company"

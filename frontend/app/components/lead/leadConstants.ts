@@ -1,5 +1,5 @@
 import type { ElementType } from "react"
-import { CheckCircle2, Clock, Edit, ExternalLink, Send, User, XCircle, ArrowRight } from "lucide-react"
+import { CheckCircle2, Clock, Edit, ExternalLink, Send, User, XCircle, ArrowRight, FileText, FileCheck } from "lucide-react"
 import { FormStatus, LeadStatus } from "../../types"
 
 export const STATUS_CONFIG: Record<LeadStatus, { label: string; cls: string; icon: ElementType }> = {
@@ -7,6 +7,8 @@ export const STATUS_CONFIG: Record<LeadStatus, { label: string; cls: string; ico
   contacted: { label: "Đã liên hệ", cls: "bg-purple-50 text-purple-700 border-purple-200", icon: User },
   "requirement-gathering": { label: "Thu thập yêu cầu", cls: "bg-amber-50 text-amber-700 border-amber-200", icon: Send },
   "requirement-done": { label: "Đủ yêu cầu", cls: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: CheckCircle2 },
+  quoted: { label: "Đã báo giá", cls: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: FileText },
+  contracted: { label: "Đã có hợp đồng", cls: "bg-teal-50 text-teal-700 border-teal-200", icon: FileCheck },
   converted: { label: "Đã thành dự án", cls: "bg-green-50 text-green-700 border-green-200", icon: ArrowRight },
   lost: { label: "Đã mất", cls: "bg-red-50 text-red-700 border-red-200", icon: XCircle },
 }

@@ -87,9 +87,17 @@ function enrichLead(lead) {
     }
   }
   if (out.status !== "converted" && !out.convertedProjectId) {
-    const hasDoc = listByLead(out.id).some((d) => d.type === "quote" || d.type === "contract")
-    if (hasDoc && ["new", "contacted", "requirement-gathering"].includes(out.status)) {
-      out.status = "requirement-done"
+    const docs = listByLead(out.id)
+    const hasContract = docs.some((d) => d.type === "contract")
+    const hasQuote = docs.some((d) => d.type === "quote")
+    if (hasContract) {
+      if (["new", "contacted", "requirement-gathering", "requirement-done", "quoted"].includes(out.status)) {
+        out.status = "contracted"
+      }
+    } else if (hasQuote) {
+      if (["new", "contacted", "requirement-gathering", "requirement-done"].includes(out.status)) {
+        out.status = "quoted"
+      }
     }
   }
   return out
