@@ -80,7 +80,7 @@ export function DocxFilePreview({
   }, [refreshKey, docId, isPdf, isImage, isDocx])
 
   return (
-    <div className="relative rounded-2xl border border-gray-200 overflow-hidden flex flex-col flex-1 min-h-0">
+    <div className="relative rounded-2xl border border-gray-200 overflow-hidden flex flex-col flex-1 min-h-[60vh] h-full w-full">
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-white/80 text-gray-700 text-sm font-semibold">
           <Loader2 size={18} className="animate-spin" />
@@ -95,7 +95,7 @@ export function DocxFilePreview({
       <div ref={styleRef} aria-hidden className="hidden" />
       {isPdf && objectUrl && (
         <iframe
-          src={objectUrl}
+          src={`${objectUrl}#view=FitH`}
           className="flex-1 w-full h-full border-0"
         />
       )}

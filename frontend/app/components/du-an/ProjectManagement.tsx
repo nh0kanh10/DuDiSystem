@@ -1500,6 +1500,7 @@ export function ProjectManagement({
         {previewDoc && detail?.leadId && (
           <DocxFilePreview
             docId={previewDoc.id.replace("doc-", "")}
+            downloadName={previewDoc.name}
             refreshKey={previewKey}
             loadBlob={() => api.leadDocuments.fileBlob(detail.leadId!, previewDoc.id.replace("doc-", ""))}
           />
