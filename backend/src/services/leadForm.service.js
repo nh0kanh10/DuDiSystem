@@ -173,7 +173,6 @@ export function addInternalRequirement(leadId, { title, notes, formType } = {}) 
   return { lead: updated }
 }
 
-/** @deprecated — dùng addInternalRequirement; giữ route cũ */
 export function addRequirementRound(leadId, body = {}) {
   return addInternalRequirement(leadId, body)
 }

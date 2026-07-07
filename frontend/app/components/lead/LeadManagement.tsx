@@ -28,12 +28,14 @@ export function LeadManagement({
   currentUserId,
   employees,
   leadId,
+  selectedBranch,
   onNavigateToLead,
   onNavigateToProject,
 }: {
   currentUserId?: string
   employees?: Employee[]
   leadId?: string
+  selectedBranch?: string
   onNavigateToLead?: (id?: string) => void
   onNavigateToProject?: (projectId: string) => void
 }) {
@@ -72,6 +74,7 @@ export function LeadManagement({
         leadId={leadId}
         onBack={() => onNavigateToLead?.()}
         onNavigateToProject={onNavigateToProject}
+        selectedBranch={selectedBranch}
       />
     )
   }
@@ -137,7 +140,7 @@ export function LeadManagement({
       await api.leads.delete(lead.id)
       setShowDeleteConfirm(null)
       await loadLeads()
-    } catch { /* ignore */ }
+    } catch {  }
   }
 
   return (
@@ -150,7 +153,7 @@ export function LeadManagement({
             <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150" />
           </div>
           <div>
-            <h2 className="text-xl font-black tracking-tight">Quản lý Lead</h2>
+            <h2 className="text-xl font-black tracking-tight">Trước dự án</h2>
             <p className="text-xs text-white/80 mt-1">Theo dõi khách hàng tiềm năng từ đầu đến khi thành dự án</p>
           </div>
         </div>

@@ -240,13 +240,13 @@ export default function App() {
     scheduleIdleCheck()
 
     events.forEach(event => {
-      window.addEventListener(event, onActivity, { passive: true })
+      window.addEventListener(event, onActivity, { capture: true, passive: true })
     })
 
     return () => {
       if (idleTimeoutId) clearTimeout(idleTimeoutId)
       events.forEach(event => {
-        window.removeEventListener(event, onActivity)
+        window.removeEventListener(event, onActivity, { capture: true })
       })
     }
   }, [isLoggedIn, sessionTimeout])
@@ -586,6 +586,7 @@ export default function App() {
               currentUserId={currentEmp.id}
               employees={employees}
               leadId={leadId}
+              selectedBranch={selectedBranch}
               onNavigateToLead={(id) => navigate(id ? `/lead/${id}` : "/lead")}
               onNavigateToProject={(id) => navigate(id ? `/du-an/${id}` : "/du-an")}
             />
@@ -946,21 +947,6 @@ function UserAwareSidebar({
   const userMenuItems = currentUser ? (
     <>
       <button
-        onClick={() => { onNavigate(isAdmin ? "tai-khoan" : "user-settings"); setShowUserDrop(false) }}
-        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-white/65 hover:text-white hover:bg-white/8 transition-colors"
-      >
-        <Settings size={15} className="text-white/40 flex-shrink-0" />
-        Cài đặt tài khoản
-      </button>
-      <button
-        onClick={() => { onNavigate("user-profile"); setShowUserDrop(false) }}
-        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-white/65 hover:text-white hover:bg-white/8 transition-colors"
-      >
-        <User size={15} className="text-white/40 flex-shrink-0" />
-        Thông tin cá nhân
-      </button>
-      <div className="my-1 border-t border-white/8" />
-      <button
         onClick={() => { onLogout(); setShowUserDrop(false) }}
         className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-red-400/90 hover:text-red-300 hover:bg-red-500/10 transition-colors"
       >
@@ -972,7 +958,6 @@ function UserAwareSidebar({
 
   return (
     <aside className={`${collapsed ? "w-16" : "w-60"} bg-[#160606] flex flex-col transition-all duration-300 flex-shrink-0 overflow-visible relative z-40`}>
-      {/* Logo + thu gọn */}
       <div className={`p-3 border-b border-white/5 flex ${collapsed ? "flex-col items-center gap-2" : "items-center gap-2"}`}>
         <button
           onClick={onToggle}
@@ -1158,9 +1143,9 @@ function UserAwareSidebar({
         {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Thông báo" badge={2} active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("lead") && <NavItem page="lead" icon={User} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("lead") && <NavItem page="lead" icon={User} label="Trước dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý khách hàng" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
 
       {/* User */}

@@ -9,7 +9,6 @@ import { OrgNode, OrgNodeType, Employee, Assignment } from "../../types"
 import AssignMemberModal from "./AssignMemberModal"
 import SetManagerModal from "./SetManagerModal"
 
-// ─── Utils ────────────────────────────────────────────────────────────────────
 
 function collectDescendantIds(nodeId: string, nodes: OrgNode[]): string[] {
   const ids = [nodeId]
@@ -45,7 +44,6 @@ function getAncestors(nodeId: string, allNodes: OrgNode[]): OrgNode[] {
   return result
 }
 
-// ─── Level theme ──────────────────────────────────────────────────────────────
 
 type LevelTheme = {
   label: string
@@ -53,7 +51,7 @@ type LevelTheme = {
   lightBg: string
   border: string
   textColor: string
-  Icon: React.ComponentType<{ size?: number; className?: string }>
+  Icon: React.ComponentType<{ size?: number | string; className?: string }>
 }
 
 const THEME: Record<OrgNodeType, LevelTheme> = {
@@ -99,8 +97,6 @@ const THEME: Record<OrgNodeType, LevelTheme> = {
   },
 }
 
-// ─── Tabs per level ───────────────────────────────────────────────────────────
-
 type TabId = "children" | "personnel" | "temp" | "info" | "manager"
 
 const LEVEL_TABS: Record<OrgNodeType, { id: TabId; label: string }[]> = {
@@ -134,7 +130,6 @@ const LEVEL_TABS: Record<OrgNodeType, { id: TabId; label: string }[]> = {
   ],
 }
 
-// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface OrgDetailViewProps {
   node: OrgNode
@@ -204,7 +199,6 @@ export default function OrgDetailView({
     return isUnder && isTempOut
   }), [employees, descIds, activeAsgn])
 
-  // Stats chips
   const statsChips = useMemo(() => {
     const positions = childNodes.filter(n => n.type === "position").length
     const teams = childNodes.filter(n => n.type === "team").length
@@ -254,7 +248,6 @@ export default function OrgDetailView({
       </div>
     )
 
-    // Branch → department cards
     if (node.type === "branch") {
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -727,7 +720,6 @@ export default function OrgDetailView({
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="px-6 flex gap-0 border-t border-gray-100 overflow-x-auto">
           {tabs.map(t => {
             const badge = tabBadge(t.id)
@@ -749,7 +741,6 @@ export default function OrgDetailView({
         </div>
       </div>
 
-      {/* Tab content */}
       <div className="bg-white rounded-3xl border border-black/[0.05] shadow-sm p-6">
         {activeTab === "children" && renderChildren()}
         {activeTab === "personnel" && renderPersonnel()}

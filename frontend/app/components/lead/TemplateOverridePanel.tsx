@@ -4,16 +4,7 @@ import { api, TemplateInfo, TemplateType } from "../../../lib/api"
 import { Button } from "../ui/button"
 import ConfirmModal from "../ui/ConfirmModal"
 
-function formatSize(bytes: number) {
-  if (!bytes) return "—"
-  if (bytes < 1024) return `${bytes} B`
-  return `${(bytes / 1024).toFixed(1)} KB`
-}
-
-function formatDate(iso: string | null) {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleString("vi-VN")
-}
+import { formatDate, formatSize } from "./leadDocumentDisplay"
 
 export function TemplateOverridePanel({
   type,

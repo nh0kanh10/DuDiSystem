@@ -127,9 +127,8 @@ export async function updateDocument(req, res) {
   try {
     const { leadId, docId } = req.params
     if (!leadSvc.getLead(leadId)) return notFound(res, "Không tìm thấy lead")
-    const { payload, label } = req.body ?? {}
-    if (!payload) return fail(res, "Thiếu payload")
-    const data = await docSvc.updateDocument(leadId, docId, { payload, label }, req.user)
+    const { payload, label, parentDocumentId } = req.body ?? {}
+    const data = await docSvc.updateDocument(leadId, docId, { payload, label, parentDocumentId }, req.user)
     ok(res, data)
   } catch (err) {
     res.status(400).json({ success: false, error: err.message })

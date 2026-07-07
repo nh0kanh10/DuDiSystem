@@ -1,9 +1,9 @@
-import React, { useState, useRef } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import {
   Plus, FileText, Globe, Server, Shield, Folder,
   Eye, EyeOff, Edit, Trash2, Lock, Users, Building2,
   Receipt, ClipboardList, Handshake, Key, BookOpen, BadgeCheck,
-  Link2, File, ExternalLink, ChevronDown, ChevronRight, LayoutList, Download, RefreshCw,
+  Link2, File, ExternalLink, ChevronDown, ChevronRight, LayoutList, Download, RefreshCw, Copy, Check,
 } from "lucide-react"
 import { ProjectVaultItem, ProjectAttachment, ProjectVaultAudience, ProjectVaultCategory } from "../../types"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
@@ -11,33 +11,47 @@ import ConfirmModal from "../ui/ConfirmModal"
 import { tabPrimaryBtn, tabDashedAddBtn } from "./ProjectDetailTabShell"
 import { VAULT_CATEGORY_FIELDS, vaultMetaToLegacy, type VaultFieldDef } from "./vaultCategoryFields"
 import { VaultFileDropzone } from "./VaultFileDropzone"
+import {
+  canPreviewVaultItem,
+  canDownloadVaultItem,
+  vaultHasStoredFile,
+  vaultIsLeadDocument,
+  canOpenVaultUrl,
+} from "../../utils/vaultItemCapabilities"
 
 const CLIENT_CATEGORIES: Record<string, { label: string; icon: React.ElementType; color: string; dot: string }> = {
   quotation:         { label: "Báo giá",            icon: Receipt,       color: "text-emerald-600 bg-emerald-50 border-emerald-200", dot: "bg-emerald-400" },
   requirement:       { label: "Yêu cầu / SRS",      icon: ClipboardList, color: "text-blue-600 bg-blue-50 border-blue-200",          dot: "bg-blue-400" },
   contract:          { label: "Hợp đồng",            icon: Handshake,     color: "text-violet-600 bg-violet-50 border-violet-200",    dot: "bg-violet-400" },
+  "tech-doc":        { label: "Tài liệu kỹ thuật / HDSD", icon: BookOpen,   color: "text-indigo-600 bg-indigo-50 border-indigo-200",  dot: "bg-indigo-400" },
+  "client-file":     { label: "Tài liệu khách gửi",     icon: FileText,      color: "text-gray-600 bg-gray-50 border-gray-200",          dot: "bg-gray-400" },
+}
+
+const HANDOVER_CATEGORIES: Record<string, { label: string; icon: React.ElementType; color: string; dot: string }> = {
   "client-handover": { label: "Bàn giao khách",     icon: BadgeCheck,    color: "text-amber-600 bg-amber-50 border-amber-200",       dot: "bg-amber-400" },
   "client-account":  { label: "Tài khoản bàn giao", icon: Key,           color: "text-orange-600 bg-orange-50 border-orange-200",    dot: "bg-orange-400" },
-  "client-file":     { label: "File gửi khách",     icon: FileText,      color: "text-gray-600 bg-gray-50 border-gray-200",          dot: "bg-gray-400" },
+  "internal-handover": { label: "Bàn giao nội bộ",   icon: Building2,     color: "text-blue-600 bg-blue-50 border-blue-200",          dot: "bg-blue-400" },
 }
 
 const INTERNAL_CATEGORIES: Record<string, { label: string; icon: React.ElementType; color: string; dot: string }> = {
   hosting:             { label: "Hosting / VPS",     icon: Server,    color: "text-purple-600 bg-purple-50 border-purple-200",  dot: "bg-purple-400" },
   domain:              { label: "Domain",             icon: Globe,     color: "text-emerald-600 bg-emerald-50 border-emerald-200", dot: "bg-emerald-400" },
   credentials:         { label: "Tài khoản nội bộ",  icon: Shield,    color: "text-red-600 bg-red-50 border-red-200",           dot: "bg-red-400" },
-  "internal-handover": { label: "Bàn giao nội bộ",   icon: Building2, color: "text-blue-600 bg-blue-50 border-blue-200",        dot: "bg-blue-400" },
-  "tech-doc":          { label: "Tài liệu kỹ thuật", icon: BookOpen,  color: "text-indigo-600 bg-indigo-50 border-indigo-200",  dot: "bg-indigo-400" },
   license:             { label: "License / Key",      icon: BadgeCheck,color: "text-teal-600 bg-teal-50 border-teal-200",        dot: "bg-teal-400" },
   assets:              { label: "Tài nguyên",         icon: Folder,    color: "text-pink-600 bg-pink-50 border-pink-200",        dot: "bg-pink-400" },
   other:               { label: "Khác",               icon: FileText,  color: "text-gray-600 bg-gray-50 border-gray-200",        dot: "bg-gray-400" },
 }
 
-function getCategoryConfig(audience: ProjectVaultAudience) {
-  return audience === "client" ? CLIENT_CATEGORIES : INTERNAL_CATEGORIES
+export type FormAudience = "client" | "handover" | "internal"
+
+function getCategoryConfig(audience: FormAudience) {
+  if (audience === "client") return CLIENT_CATEGORIES
+  if (audience === "handover") return HANDOVER_CATEGORIES
+  return INTERNAL_CATEGORIES
 }
 
 const EMPTY_FORM = {
-  audience: "client" as ProjectVaultAudience,
+  audience: "client" as FormAudience,
   category: "quotation" as ProjectVaultCategory,
   name: "",
   value: "",
@@ -46,6 +60,24 @@ const EMPTY_FORM = {
   meta: {} as Record<string, string>,
   pendingFile: null as File | null,
   existingFile: null as { name: string; size: number } | null,
+  isAppendix: false,
+  parentId: "",
+}
+
+export function formatHref(url: string) {
+  if (!url) return ""
+  const trimmed = url.trim()
+  if (/^(https?:)?\/\//i.test(trimmed)) {
+    return trimmed
+  }
+  return `https://${trimmed}`
+}
+
+export function adjustTextareaHeight(el: HTMLTextAreaElement | null) {
+  if (el) {
+    el.style.height = "auto"
+    el.style.height = `${el.scrollHeight}px`
+  }
 }
 
 function isVirtualVaultItem(id: string) {
@@ -79,7 +111,18 @@ function CategoryFormFields({
     }
 
     if (field.type === "textarea") {
-      return <textarea {...common} rows={2} className={`${inputCls} resize-none`} />
+      return (
+        <textarea
+          {...common}
+          ref={adjustTextareaHeight}
+          onChange={(e) => {
+            adjustTextareaHeight(e.target)
+            onChange(field.key, e.target.value)
+          }}
+          rows={2}
+          className={`${inputCls} resize-none overflow-hidden`}
+        />
+      )
     }
     if (field.type === "select" && field.options) {
       return (
@@ -170,7 +213,27 @@ function VaultItemCard({
   onPreview?: (item: ProjectVaultItem) => void
 }) {
   const [showValue, setShowValue] = useState(false)
+  const [copied, setCopied] = useState(false)
   const Icon = catCfg.icon
+
+  const handleCopyLink = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!item.url) return
+    try {
+      await navigator.clipboard.writeText(formatHref(item.url))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const hasStoredFile = vaultHasStoredFile(item)
+  const hasUrl = canOpenVaultUrl(item)
+  const isLeadDoc = vaultIsLeadDocument(item)
+  const showPreview = canPreviewVaultItem(item)
+  const showDownload = canDownloadVaultItem(item)
+  const showEditDelete = !isVirtualVaultItem(item.id) && !isLeadDoc
 
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-4 group shadow-xs hover:border-gray-200 hover:shadow-md transition-all cursor-pointer"
@@ -183,19 +246,31 @@ function VaultItemCard({
           <h5 className="text-sm font-bold text-gray-800 truncate">{item.name}</h5>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          {onPreview && (
+          {showPreview && onPreview && (
             <button onClick={(e) => { e.stopPropagation(); onPreview(item); }} title="Xem trước"
               className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors">
               <Eye size={12} />
             </button>
           )}
-          {onDownload && (
+          {showDownload && onDownload && (
             <button onClick={(e) => { e.stopPropagation(); onDownload(item); }} title="Tải về"
               className="p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors">
               <Download size={12} />
             </button>
           )}
-          {!isVirtualVaultItem(item.id) && (
+          {hasUrl && !hasStoredFile && !isLeadDoc && (
+            <a
+              href={formatHref(item.url!)}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Mở link"
+              className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+            >
+              <ExternalLink size={12} />
+            </a>
+          )}
+          {showEditDelete && (
             <>
               <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} title="Sửa"
                 className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
@@ -265,8 +340,16 @@ function VaultItemCard({
       {item.url && (
         <div className="flex items-center gap-2 mt-1">
           <Link2 size={11} className="text-gray-400 flex-shrink-0" />
-          <a href={item.url} target="_blank" rel="noreferrer"
-            className="text-xs text-[#C62828] hover:underline truncate">{item.url}</a>
+          <a href={formatHref(item.url)} target="_blank" rel="noreferrer"
+            className="text-xs text-[#C62828] hover:underline truncate flex-1">{item.url}</a>
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+            title="Sao chép link"
+          >
+            {copied ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+          </button>
         </div>
       )}
     </div>
@@ -274,7 +357,7 @@ function VaultItemCard({
 }
 
 function DocVaultFormModal({
-  open, editTarget, form, setForm, onClose, onSave, saving,
+  open, editTarget, form, setForm, onClose, onSave, saving, parentContracts,
 }: {
   open: boolean
   editTarget: ProjectVaultItem | null
@@ -283,11 +366,12 @@ function DocVaultFormModal({
   onClose: () => void
   onSave: () => void
   saving?: boolean
+  parentContracts: ProjectVaultItem[]
 }) {
   const catCfg = getCategoryConfig(form.audience)
 
-  function switchAudience(a: ProjectVaultAudience) {
-    const defaultCat = (a === "client" ? "quotation" : "hosting") as ProjectVaultCategory
+  function switchAudience(a: FormAudience) {
+    const defaultCat = (a === "client" ? "quotation" : a === "handover" ? "client-handover" : "hosting") as ProjectVaultCategory
     setForm(f => ({
       ...f,
       audience: a,
@@ -310,7 +394,7 @@ function DocVaultFormModal({
       onClose={onClose}
       title={editTarget ? "Sửa tài liệu" : "Thêm tài liệu / Vault"}
       icon={Folder}
-      width="md"
+      width="xl"
       footer={
         <div className="flex gap-3">
           <ModalCancelButton onClick={onClose} />
@@ -323,7 +407,7 @@ function DocVaultFormModal({
           <div>
             <label className="block text-xs font-bold text-gray-600 mb-2">Ngăn lưu trữ</label>
             <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
-              {(["client", "internal"] as const).map(a => (
+              {(["client", "handover", "internal"] as const).map(a => (
                 <button
                   key={a}
                   type="button"
@@ -332,11 +416,19 @@ function DocVaultFormModal({
                     form.audience === a
                       ? a === "client"
                         ? "bg-white text-emerald-700 shadow-sm"
-                        : "bg-white text-[#C62828] shadow-sm"
+                        : a === "handover"
+                          ? "bg-white text-amber-700 shadow-sm"
+                          : "bg-white text-[#C62828] shadow-sm"
                       : "text-gray-400 hover:text-gray-600"
                   }`}
                 >
-                  {a === "client" ? <><Users size={13} /> Khách hàng</> : <><Lock size={13} /> Nội bộ</>}
+                  {a === "client" ? (
+                    <><Users size={13} /> Khách hàng</>
+                  ) : a === "handover" ? (
+                    <><BadgeCheck size={13} /> Bàn giao</>
+                  ) : (
+                    <><Lock size={13} /> Nội bộ</>
+                  )}
                 </button>
               ))}
             </div>
@@ -355,6 +447,38 @@ function DocVaultFormModal({
             ))}
           </select>
         </div>
+
+        {form.category === "contract" && (
+          <div className="bg-gray-50 border border-gray-100 rounded-xl p-3.5 space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.isAppendix}
+                onChange={e => setForm(f => ({ ...f, isAppendix: e.target.checked, parentId: e.target.checked ? f.parentId : "" }))}
+                className="rounded border-gray-300 text-[#C62828] focus:ring-[#C62828]"
+              />
+              <span className="text-xs font-bold text-gray-700">Đây là phụ lục hợp đồng</span>
+            </label>
+            
+            {form.isAppendix && (
+              <div className="space-y-1.5 animate-fadeIn">
+                <label className="block text-[11px] font-bold text-gray-500">Hợp đồng chính (cha)</label>
+                <select
+                  value={form.parentId}
+                  onChange={e => setForm(f => ({ ...f, parentId: e.target.value }))}
+                  className={inputCls}
+                >
+                  <option value="">— Chọn Hợp đồng cha —</option>
+                  {parentContracts.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.meta?.contractNo ? `(${c.meta.contractNo})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        )}
 
         <div>
           <label className="block text-xs font-bold text-gray-600 mb-1.5">Tên hiển thị <span className="text-red-500">*</span></label>
@@ -393,10 +517,14 @@ function DocVaultFormModal({
         <div>
           <label className="block text-xs font-bold text-gray-600 mb-1.5">Ghi chú thêm</label>
           <textarea
+            ref={adjustTextareaHeight}
             value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            onChange={e => {
+              adjustTextareaHeight(e.target)
+              setForm(f => ({ ...f, description: e.target.value }))
+            }}
             rows={2}
-            className={`${inputCls} resize-none`}
+            className={`${inputCls} resize-none overflow-hidden`}
             placeholder="Ghi chú nội bộ, không hiển thị trong form chính..."
           />
         </div>
@@ -467,10 +595,11 @@ function AddAttachmentInline({
   )
 }
 
-type TreeNodeId = `client` | `internal` | `attach` | `cat:${string}`
+type TreeNodeId = "client" | "handover" | "internal" | "attach" | `cat:${string}`
 
 function TreeSidebar({
   clientGroups,
+  handoverGroups,
   internalGroups,
   attachCount,
   activeNode,
@@ -478,16 +607,19 @@ function TreeSidebar({
   onAddItem,
 }: {
   clientGroups: { catKey: string; catCfg: any; items: ProjectVaultItem[] }[]
+  handoverGroups: { catKey: string; catCfg: any; items: ProjectVaultItem[] }[]
   internalGroups: { catKey: string; catCfg: any; items: ProjectVaultItem[] }[]
   attachCount: number
   activeNode: TreeNodeId
   onSelect: (id: TreeNodeId) => void
-  onAddItem: (audience: ProjectVaultAudience) => void
+  onAddItem: (audience: FormAudience) => void
 }) {
   const [clientOpen, setClientOpen] = useState(true)
+  const [handoverOpen, setHandoverOpen] = useState(true)
   const [internalOpen, setInternalOpen] = useState(true)
 
   const clientTotal = clientGroups.reduce((s, g) => s + g.items.length, 0) + attachCount
+  const handoverTotal = handoverGroups.reduce((s, g) => s + g.items.length, 0)
   const internalTotal = internalGroups.reduce((s, g) => s + g.items.length, 0)
 
   function SectionHeader({
@@ -533,7 +665,6 @@ function TreeSidebar({
   function CatLeaf({ catKey, catCfg, count }: { catKey: string; catCfg: any; count: number }) {
     const id = `cat:${catKey}` as TreeNodeId
     const isActive = activeNode === id
-    const Icon = catCfg.icon
     return (
       <button
         onClick={() => onSelect(id)}
@@ -572,9 +703,11 @@ function TreeSidebar({
 
       {clientOpen && (
         <div className="space-y-0.5">
-          {clientGroups.map(({ catKey, catCfg, items }) => (
-            <CatLeaf key={catKey} catKey={catKey} catCfg={catCfg} count={items.length} />
-          ))}
+          {Object.entries(CLIENT_CATEGORIES).map(([catKey, catCfg]) => {
+            const grp = clientGroups.find(g => g.catKey === catKey)
+            const count = grp ? grp.items.length : 0
+            return <CatLeaf key={catKey} catKey={catKey} catCfg={catCfg} count={count} />
+          })}
           {attachCount > 0 && (
             <button
               onClick={() => onSelect("attach")}
@@ -589,9 +722,30 @@ function TreeSidebar({
               <span className="text-[10px] font-black text-gray-400 flex-shrink-0">{attachCount}</span>
             </button>
           )}
-          {clientGroups.length === 0 && attachCount === 0 && (
-            <p className="pl-8 text-[11px] text-gray-300 py-1 italic">Chưa có tài liệu</p>
-          )}
+        </div>
+      )}
+
+      <div className="my-1 border-t border-gray-100" />
+
+      <SectionHeader
+        id="handover"
+        label="Bàn giao"
+        icon={BadgeCheck}
+        count={handoverTotal}
+        open={handoverOpen}
+        onToggle={() => setHandoverOpen(o => !o)}
+        color="text-amber-600 bg-amber-50"
+        addLabel="Thêm tài liệu bàn giao"
+        onAdd={() => onAddItem("handover")}
+      />
+
+      {handoverOpen && (
+        <div className="space-y-0.5">
+          {Object.entries(HANDOVER_CATEGORIES).map(([catKey, catCfg]) => {
+            const grp = handoverGroups.find(g => g.catKey === catKey)
+            const count = grp ? grp.items.length : 0
+            return <CatLeaf key={catKey} catKey={catKey} catCfg={catCfg} count={count} />
+          })}
         </div>
       )}
 
@@ -611,12 +765,11 @@ function TreeSidebar({
 
       {internalOpen && (
         <div className="space-y-0.5">
-          {internalGroups.map(({ catKey, catCfg, items }) => (
-            <CatLeaf key={catKey} catKey={catKey} catCfg={catCfg} count={items.length} />
-          ))}
-          {internalGroups.length === 0 && (
-            <p className="pl-8 text-[11px] text-gray-300 py-1 italic">Vault trống</p>
-          )}
+          {Object.entries(INTERNAL_CATEGORIES).map(([catKey, catCfg]) => {
+            const grp = internalGroups.find(g => g.catKey === catKey)
+            const count = grp ? grp.items.length : 0
+            return <CatLeaf key={catKey} catKey={catKey} catCfg={catCfg} count={count} />
+          })}
         </div>
       )}
     </div>
@@ -626,6 +779,7 @@ function TreeSidebar({
 function ContentPane({
   activeNode,
   clientGroups,
+  handoverGroups,
   internalGroups,
   legacyAttachments,
   showAddAttach,
@@ -644,6 +798,7 @@ function ContentPane({
 }: {
   activeNode: TreeNodeId
   clientGroups: { catKey: string; catCfg: any; items: ProjectVaultItem[] }[]
+  handoverGroups: { catKey: string; catCfg: any; items: ProjectVaultItem[] }[]
   internalGroups: { catKey: string; catCfg: any; items: ProjectVaultItem[] }[]
   legacyAttachments: ProjectAttachment[]
   showAddAttach: boolean
@@ -652,7 +807,7 @@ function ContentPane({
   onRemoveAttachment?: (id: string) => void
   openEdit: (item: ProjectVaultItem) => void
   setDeleteTarget: (id: string) => void
-  openAdd: (audience: ProjectVaultAudience) => void
+  openAdd: (audience: FormAudience) => void
   tabPrimaryBtn: string
   tabDashedAddBtn: string
   onDownload?: (item: ProjectVaultItem) => void
@@ -678,12 +833,14 @@ function ContentPane({
     const Icon = catCfg.icon
 
     // Phân loại item cha và con (phụ lục)
+    const topLevelIds = new Set(items.filter(i => !i.parentId && !i.isAppendix).map(i => i.id))
     const topLevelItems = items.filter(i => !i.parentId && !i.isAppendix)
+
     const childItemsByParentId = items.reduce((acc, i) => {
-      if (i.parentId) {
+      if (i.parentId && topLevelIds.has(i.parentId)) {
         if (!acc[i.parentId]) acc[i.parentId] = []
         acc[i.parentId].push(i)
-      } else if (i.isAppendix) {
+      } else if (i.isAppendix || i.parentId) {
         if (!acc['orphan']) acc['orphan'] = []
         acc['orphan'].push(i)
       }
@@ -765,13 +922,16 @@ function ContentPane({
     )
   }
 
-  const showClient = activeNode === "client" || activeNode === "attach" || activeNode.startsWith("cat:")
-  const showInternal = activeNode === "internal" || activeNode.startsWith("cat:")
-
   const clientVisible = activeNode === "client"
     ? clientGroups
     : activeNode.startsWith("cat:")
       ? clientGroups.filter(g => `cat:${g.catKey}` === activeNode)
+      : []
+
+  const handoverVisible = activeNode === "handover"
+    ? handoverGroups
+    : activeNode.startsWith("cat:")
+      ? handoverGroups.filter(g => `cat:${g.catKey}` === activeNode)
       : []
 
   const internalVisible = activeNode === "internal"
@@ -781,19 +941,20 @@ function ContentPane({
       : []
 
   const isClientCat = activeNode === "client" || (activeNode.startsWith("cat:") && CLIENT_CATEGORIES[activeNode.slice(4)])
+  const isHandoverCat = activeNode === "handover" || (activeNode.startsWith("cat:") && HANDOVER_CATEGORIES[activeNode.slice(4)])
   const isInternalCat = activeNode === "internal" || (activeNode.startsWith("cat:") && INTERNAL_CATEGORIES[activeNode.slice(4)])
   const isAttach = activeNode === "attach"
 
   return (
     <div className="flex-1 min-w-0 space-y-6 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
-      {(isClientCat || isInternalCat) && clientVisible.length === 0 && internalVisible.length === 0 && !isAttach && (
+      {(isClientCat || isHandoverCat || isInternalCat) && clientVisible.length === 0 && handoverVisible.length === 0 && internalVisible.length === 0 && !isAttach && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-3">
             <Folder size={24} className="text-gray-300" />
           </div>
           <p className="text-sm font-bold text-gray-400">Chưa có tài liệu</p>
           <p className="text-xs text-gray-300 mt-1 mb-4">Nhấn + để thêm vào mục này</p>
-          <button onClick={() => openAdd(isInternalCat ? "internal" : "client")} className={tabPrimaryBtn}>
+          <button onClick={() => openAdd(isInternalCat ? "internal" : isHandoverCat ? "handover" : "client")} className={tabPrimaryBtn}>
             <Plus size={14} /> Thêm tài liệu
           </button>
         </div>
@@ -802,6 +963,14 @@ function ContentPane({
       {isClientCat && clientVisible.length > 0 && (
         <div className="space-y-6">
           {clientVisible.map(({ catKey, catCfg, items }) => (
+            <SectionBlock key={catKey} id={catKey} catKey={catKey} catCfg={catCfg} items={items} isInternal={false} />
+          ))}
+        </div>
+      )}
+
+      {isHandoverCat && handoverVisible.length > 0 && (
+        <div className="space-y-6">
+          {handoverVisible.map(({ catKey, catCfg, items }) => (
             <SectionBlock key={catKey} id={catKey} catKey={catKey} catCfg={catCfg} items={items} isInternal={false} />
           ))}
         </div>
@@ -856,10 +1025,11 @@ function ContentPane({
     </div>
   )
 }
-
 export function ProjectDocVaultTab({
   vaultItems = [],
   legacyAttachments = [],
+  autoOpenCategory,
+  onAutoOpenTriggered,
   onAddItem,
   onEditItem,
   onDeleteItem,
@@ -870,6 +1040,8 @@ export function ProjectDocVaultTab({
 }: {
   vaultItems?: ProjectVaultItem[]
   legacyAttachments?: ProjectAttachment[]
+  autoOpenCategory?: ProjectVaultCategory | null
+  onAutoOpenTriggered?: () => void
   onAddItem?: (item: Omit<ProjectVaultItem, "projectId" | "id" | "createdAt" | "updatedAt">, file?: File | null) => void | Promise<void>
   onEditItem?: (id: string, patch: Partial<ProjectVaultItem>, file?: File | null) => void | Promise<void>
   onDeleteItem?: (id: string) => void | Promise<void>
@@ -887,8 +1059,30 @@ export function ProjectDocVaultTab({
   const [showAddAttach, setShowAddAttach] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  const clientItems = vaultItems.filter(i => i.audience === "client")
-  const internalItems = vaultItems.filter(i => i.audience === "internal")
+  useEffect(() => {
+    if (autoOpenCategory) {
+      let audience: FormAudience = "client"
+      if (["client-handover", "client-account", "internal-handover"].includes(autoOpenCategory)) {
+        audience = "handover"
+      } else if (["hosting", "domain", "credentials", "tech-doc", "license", "assets", "other"].includes(autoOpenCategory)) {
+        audience = "internal"
+      }
+
+      setActiveNode(`cat:${autoOpenCategory}`)
+      setEditTarget(null)
+      setForm({
+        ...EMPTY_FORM,
+        audience,
+        category: autoOpenCategory,
+      })
+      setShowForm(true)
+      onAutoOpenTriggered?.()
+    }
+  }, [autoOpenCategory])
+
+  const clientItems = vaultItems.filter(i => i.audience === "client" && Object.keys(CLIENT_CATEGORIES).includes(i.category))
+  const handoverItems = vaultItems.filter(i => Object.keys(HANDOVER_CATEGORIES).includes(i.category))
+  const internalItems = vaultItems.filter(i => i.audience === "internal" && Object.keys(INTERNAL_CATEGORIES).includes(i.category))
 
   function groupByCategory(items: ProjectVaultItem[], catMap: Record<string, any>) {
     return Object.entries(catMap)
@@ -897,24 +1091,43 @@ export function ProjectDocVaultTab({
   }
 
   const clientGroups = groupByCategory(clientItems, CLIENT_CATEGORIES)
+  const handoverGroups = groupByCategory(handoverItems, HANDOVER_CATEGORIES)
   const internalGroups = groupByCategory(internalItems, INTERNAL_CATEGORIES)
 
   const totalDocs = vaultItems.length + legacyAttachments.length
 
-  function openAdd(audience: ProjectVaultAudience) {
+  function openAdd(audience: FormAudience) {
+    let defaultCat: ProjectVaultCategory = "quotation"
+    if (audience === "client") defaultCat = "quotation"
+    else if (audience === "handover") defaultCat = "client-handover"
+    else defaultCat = "hosting"
+
+    if (activeNode.startsWith("cat:")) {
+      const activeCat = activeNode.slice(4) as ProjectVaultCategory
+      const catCfg = getCategoryConfig(audience)
+      if (catCfg[activeCat]) {
+        defaultCat = activeCat
+      }
+    }
+
     setEditTarget(null)
     setForm({
       ...EMPTY_FORM,
       audience,
-      category: (audience === "client" ? "quotation" : "hosting") as ProjectVaultCategory,
+      category: defaultCat,
     })
     setShowForm(true)
   }
 
   function openEdit(item: ProjectVaultItem) {
+    let audience: FormAudience = item.audience as FormAudience
+    if (["client-handover", "client-account", "internal-handover"].includes(item.category)) {
+      audience = "handover"
+    }
+
     setEditTarget(item)
     setForm({
-      audience: item.audience,
+      audience,
       category: item.category,
       name: item.name,
       value: item.value ?? "",
@@ -925,6 +1138,8 @@ export function ProjectDocVaultTab({
       existingFile: item.fileAttachment?.hasFile
         ? { name: item.fileAttachment.name, size: item.fileAttachment.size }
         : null,
+      isAppendix: item.isAppendix ?? false,
+      parentId: item.parentId ?? "",
     })
     setShowForm(true)
   }
@@ -932,14 +1147,19 @@ export function ProjectDocVaultTab({
   async function handleSave() {
     if (!form.name.trim() || saving) return
     const legacy = vaultMetaToLegacy({ category: form.category, meta: form.meta })
+    const isClientCategory = (cat: ProjectVaultCategory) =>
+      ["quotation", "requirement", "contract", "client-file", "client-handover", "client-account"].includes(cat)
+
     const payload = {
-      audience: form.audience,
+      audience: isClientCategory(form.category) ? "client" : ("internal" as ProjectVaultAudience),
       category: form.category,
       name: form.name.trim(),
       meta: { ...form.meta },
       value: legacy.value,
       url: legacy.url,
       description: form.description.trim() || undefined,
+      isAppendix: form.category === "contract" ? form.isAppendix : false,
+      parentId: form.category === "contract" && form.isAppendix && form.parentId ? form.parentId : null,
     }
     setSaving(true)
     try {
@@ -976,7 +1196,7 @@ export function ProjectDocVaultTab({
         </div>
         <button
           type="button"
-          onClick={() => openAdd(activeNode === "internal" ? "internal" : "client")}
+          onClick={() => openAdd(activeNode === "internal" ? "internal" : activeNode === "handover" ? "handover" : "client")}
           className={tabPrimaryBtn}
         >
           <Plus size={14} /> Thêm
@@ -987,6 +1207,7 @@ export function ProjectDocVaultTab({
         <div className="w-56 flex-shrink-0 overflow-y-auto overflow-x-hidden p-3 bg-gray-50/50 border-r border-gray-100" style={{ scrollbarWidth: "thin" }}>
           <TreeSidebar
             clientGroups={clientGroups}
+            handoverGroups={handoverGroups}
             internalGroups={internalGroups}
             attachCount={legacyAttachments.length}
             activeNode={activeNode}
@@ -999,6 +1220,7 @@ export function ProjectDocVaultTab({
           <ContentPane
             activeNode={activeNode}
             clientGroups={clientGroups}
+            handoverGroups={handoverGroups}
             internalGroups={internalGroups}
             legacyAttachments={legacyAttachments}
             showAddAttach={showAddAttach}
@@ -1007,10 +1229,7 @@ export function ProjectDocVaultTab({
             onRemoveAttachment={onRemoveAttachment}
             openEdit={openEdit}
             setDeleteTarget={setDeleteTarget}
-            openAdd={(audience) => {
-              setForm(prev => ({ ...prev, audience, category: audience === "client" ? "quotation" : "hosting" }))
-              setShowForm(true)
-            }}
+            openAdd={openAdd}
             tabPrimaryBtn={tabPrimaryBtn}
             tabDashedAddBtn={tabDashedAddBtn}
             onDownload={onDownload}
@@ -1029,6 +1248,7 @@ export function ProjectDocVaultTab({
         onClose={() => setShowForm(false)}
         onSave={handleSave}
         saving={saving}
+        parentContracts={vaultItems.filter(i => i.category === "contract" && !i.parentId && !i.isAppendix && i.id !== editTarget?.id)}
       />
 
       {deleteTarget && (

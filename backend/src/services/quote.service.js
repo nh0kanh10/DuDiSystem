@@ -12,7 +12,6 @@ function sumCosts(items = []) {
   return items.reduce((s, i) => s + (Number(i.amount) || 0), 0)
 }
 
-/** Template Word đã có "BÁO GIÁ PHÁT TRIỂN" — {{title}} chỉ phần tên dự án */
 export function normalizeQuoteTitle(title, project) {
   let raw = String(title || project || "").trim()
   if (!raw) return ""
@@ -24,7 +23,6 @@ export function normalizeQuoteTitle(title, project) {
 
 const TOEIC_SAMPLE_PROJECT = "Hệ thống Website luyện thi TOEIC trực tuyến"
 
-/** Bỏ project/title mẫu TOEIC còn sót trong payload cũ */
 export function resolveQuoteProject(input = {}, { useSampleDefaults = false } = {}) {
   const sampleProject = useSampleDefaults ? TOEIC_QUOTE_SAMPLE.project : ""
   let project = String(input.project ?? sampleProject ?? "").trim()
@@ -104,7 +102,6 @@ export function normalizePayload(input = {}, { useSampleDefaults = true } = {}) 
   }
 }
 
-/** Dữ liệu khớp placeholder trong Template.docx */
 export function buildTemplateData(rawInput = {}, options = {}) {
   const data = normalizePayload(rawInput, options)
   const phases = data.phases

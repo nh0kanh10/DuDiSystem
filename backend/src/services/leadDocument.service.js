@@ -147,6 +147,14 @@ export async function saveDocument(leadId, { type = "quote", payload = {}, label
       ? `Phụ lục #${version}`
       : `Hợp đồng #${version}`
 
+  const finalLabel = String(label || defaultLabel).trim() || defaultLabel
+  if (type === "contract" && !isAppendix) {
+    const list = repo.listByLead(leadId, "contract").filter(d => !d.parentDocumentId)
+    if (list.some(d => d.label.toLowerCase() === finalLabel.toLowerCase())) {
+      throw new Error("Tên hợp đồng gốc đã tồn tại, vui lòng đặt tên khác.")
+    }
+  }
+
   const file = await persistDocumentFile(leadId, type, id, payload)
   const doc = {
     id,
@@ -154,7 +162,7 @@ export async function saveDocument(leadId, { type = "quote", payload = {}, label
     type,
     documentKind: documentKind || (isAppendix ? "contract_appendix" : type),
     version,
-    label: String(label || defaultLabel).trim() || defaultLabel,
+    label: finalLabel,
     downloadName: file.downloadName,
     storageProvider: FILE_STORAGE_PROVIDER,
     storageKey: file.storageKey,
@@ -184,20 +192,69 @@ export async function saveDocument(leadId, { type = "quote", payload = {}, label
   return publicDoc(doc)
 }
 
-export async function updateDocument(leadId, docId, { payload, label }, user = {}) {
+export async function updateDocument(leadId, docId, { payload, label, parentDocumentId }, user = {}) {
   const doc = repo.getById(docId)
   if (!doc || String(doc.leadId) !== String(leadId)) {
     throw new Error("Không tìm thấy tài liệu")
   }
 
-  const file = await persistDocumentFile(leadId, doc.type, docId, payload)
+  if (label != null) {
+    const finalLabel = String(label).trim()
+    if (doc.parentDocumentId || doc.documentKind === "contract_appendix") {
+      const baseLabel = finalLabel.split(" — ")[0]
+      const list = repo.listByLead(leadId, "contract").filter(d => d.parentDocumentId)
+      const isDuplicate = list.some(d => {
+        if (d.id === docId) return false
+        return d.label.split(" — ")[0].toLowerCase() === baseLabel.toLowerCase()
+      })
+      if (isDuplicate) {
+        throw new Error("Tên phụ lục đã tồn tại, vui lòng chọn tên khác.")
+      }
+    } else if (doc.type === "contract") {
+      const list = repo.listByLead(leadId, "contract").filter(d => !d.parentDocumentId)
+      const isDuplicate = list.some(d => d.id !== docId && d.label.toLowerCase() === finalLabel.toLowerCase())
+      if (isDuplicate) {
+        throw new Error("Tên hợp đồng gốc đã tồn tại, vui lòng đặt tên khác.")
+      }
+    }
+  }
+
+  const isUploaded = doc.payload?.uploadedFile || doc.uploadedFile || doc.documentKind === "contract_appendix" || doc.documentKind === "uploaded_doc"
+  let file = { downloadName: doc.downloadName, storageKey: doc.storageKey, fileSize: doc.fileSize }
+  if (!isUploaded && (doc.type === "quote" || doc.type === "contract")) {
+    file = await persistDocumentFile(leadId, doc.type, docId, payload || doc.payload)
+  }
+
+  console.log(`[leadDocument] updateDocument docId=${docId} parentDocumentId=${parentDocumentId} currentParent=${doc.parentDocumentId}`)
   const updatedBy = user.employeeId ?? user.id ?? ""
+  let finalLabel = label != null ? String(label).trim() || doc.label : doc.label
+  let finalParentDocId = parentDocumentId !== undefined ? parentDocumentId : doc.parentDocumentId
+  let finalPayload = {
+    ...(doc.payload || {}),
+    ...(payload || {}),
+    parentDocumentId: finalParentDocId || null,
+  }
+
+  if (parentDocumentId !== undefined && parentDocumentId !== doc.parentDocumentId) {
+    const parentDoc = repo.getById(parentDocumentId)
+    if (parentDoc) {
+      finalPayload.parentContractLabel = parentDoc.label
+      const baseLabel = finalLabel.split(" — ")[0]
+      finalLabel = `${baseLabel} — ${parentDoc.label}`
+    } else {
+      finalPayload.parentContractLabel = ""
+      finalLabel = finalLabel.split(" — ")[0]
+    }
+  }
+
   const patch = {
-    payload,
-    label: label != null ? String(label).trim() || doc.label : doc.label,
+    payload: finalPayload,
+    label: finalLabel,
     downloadName: file.downloadName,
     storageKey: file.storageKey ?? doc.storageKey,
     fileSize: file.fileSize,
+    parentDocumentId: finalParentDocId || null,
+    sourceDocumentId: finalParentDocId || null,
     updatedAt: new Date().toISOString(),
     updatedBy,
     updatedByName: displayName(updatedBy),
@@ -269,6 +326,12 @@ export async function createContractAppendix(leadId, parentDocId, options = {}, 
   const baseLabel = String(options.label || options.title || "").trim()
     || originalName.replace(/\.docx$/i, "")
     || `Phụ lục #${version}`
+
+  const list = repo.listByLead(leadId, "contract").filter(d => d.parentDocumentId)
+  if (list.some(d => d.label.split(" — ")[0].toLowerCase() === baseLabel.toLowerCase())) {
+    throw new Error(`Tên phụ lục "${baseLabel}" đã tồn tại trên hệ thống.`)
+  }
+
   const label = `${baseLabel} — ${parentDoc.label}`
   const downloadName = originalName.toLowerCase().endsWith(".docx")
     ? originalName
@@ -344,6 +407,12 @@ export async function uploadDirectDocument(leadId, type, options = {}, user = {}
 
   const baseLabel = String(options.label || "").trim() || originalName.replace(/\.[^/.]+$/, "")
   const label = baseLabel
+  if (type === "contract") {
+    const list = repo.listByLead(leadId, "contract").filter(d => !d.parentDocumentId)
+    if (list.some(d => d.label.toLowerCase() === label.toLowerCase())) {
+      throw new Error("Tên hợp đồng gốc đã tồn tại, vui lòng đặt tên khác.")
+    }
+  }
   const downloadName = originalName
 
   const storageKey = leadDocumentKey(leadId, type, id, downloadName)

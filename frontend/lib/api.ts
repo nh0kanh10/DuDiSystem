@@ -435,7 +435,7 @@ export const api = {
       req<LeadDocumentRecord>("POST", `/leads/${encodeURIComponent(leadId)}/documents`, body),
     get: (leadId: string, docId: string) =>
       req<LeadDocumentRecord>("GET", `/leads/${encodeURIComponent(leadId)}/documents/${encodeURIComponent(docId)}`),
-    update: (leadId: string, docId: string, body: { payload: QuotePayload | ContractPayload; label?: string }) =>
+    update: (leadId: string, docId: string, body: { payload?: QuotePayload | ContractPayload; label?: string; parentDocumentId?: string }) =>
       req<LeadDocumentRecord>("PUT", `/leads/${encodeURIComponent(leadId)}/documents/${encodeURIComponent(docId)}`, body),
     delete: (leadId: string, docId: string) =>
       req<{ message: string }>("DELETE", `/leads/${encodeURIComponent(leadId)}/documents/${encodeURIComponent(docId)}`),

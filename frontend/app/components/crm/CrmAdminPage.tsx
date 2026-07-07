@@ -277,8 +277,8 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
             <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150" />
           </div>
           <div>
-            <h2 className="text-xl font-black tracking-tight text-white">Quản lý khách hàng</h2>
-            <p className="text-xs text-white/80 mt-1">Quản lý data khách hàng và phân công nhân viên</p>
+            <h2 className="text-xl font-black tracking-tight text-white">Quản lý Lead</h2>
+            <p className="text-xs text-white/80 mt-1">Quản lý data Lead và phân công nhân viên</p>
           </div>
         </div>
         <button onClick={refresh} className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl transition">

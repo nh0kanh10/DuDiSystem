@@ -177,7 +177,6 @@ export default function UserDashboard({ onNavigate, onLogout }: Props) {
                     <span style={{ fontSize: 32, lineHeight: 1 }}>🏖️</span>
                 </BubbleButton>
 
-                {/* ── Công việc ── bottom-left */}
                 <BubbleButton
                     label="Công việc" size={110}
                     borderColor="rgba(37,99,235,0.45)" bgGradient="radial-gradient(circle at 50% 30%, #09153d, #04091a)"
@@ -187,7 +186,6 @@ export default function UserDashboard({ onNavigate, onLogout }: Props) {
                     <CheckSquare size={30} className="text-blue-400/90 group-hover:text-blue-300 transition-colors" />
                 </BubbleButton>
 
-                {/* ── Cài đặt ── bottom-right */}
                 <BubbleButton
                     label="Cài đặt" size={110}
                     borderColor="rgba(100,100,100,0.4)" bgGradient="radial-gradient(circle at 50% 30%, #1a1a1a, #0a0a0a)"
@@ -197,7 +195,6 @@ export default function UserDashboard({ onNavigate, onLogout }: Props) {
                     <Settings size={30} className="text-gray-400/90 group-hover:text-gray-300 transition-colors" />
                 </BubbleButton>
 
-                {/* ── Chat nội bộ ── middle-right far edge */}
                 <BubbleButton
                     label="Chat" size={90}
                     borderColor="rgba(16,185,129,0.4)" bgGradient="radial-gradient(circle at 50% 30%, #063825, #02140d)"

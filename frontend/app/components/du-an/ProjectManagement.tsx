@@ -6,15 +6,16 @@ import {
   CheckSquare, TrendingUp, Clock, CheckCircle2, PauseCircle,
   AlertCircle, File, Trash, ExternalLink, Check,
   CircleDot, PlayCircle, User, Eye, Bell, Users2, Crown,
-  Lock, Bug, RefreshCw
+  Lock, Bug, RefreshCw, BadgeCheck, Loader2
 } from "lucide-react"
 import { mergeProjectRequirementDemo } from "./projectRequirementMock"
 import { ProjectRequirementsTab } from "./ProjectRequirementsTab"
 import { mergeTaskList, subscribeTaskSocket } from "@/lib/taskSocket"
-import { ProjectDocVaultTab } from "./ProjectDocVaultTab"
+import { ProjectDocVaultTab, formatHref } from "./ProjectDocVaultTab"
 import { buildRequirementFormsFromLead } from "../lead/leadRequirementForm"
-import { downloadVaultAttachment, previewVaultAttachment } from "./VaultFileDropzone"
+import { downloadVaultAttachment } from "./VaultFileDropzone"
 import { DocxFilePreview } from "../lead/DocxFilePreview"
+import { canOpenVaultUrl, vaultFileName } from "../../utils/vaultItemCapabilities"
 import { ProjectTestingTab } from "./ProjectTestingTab"
 import { ProjectTasksTab } from "./ProjectTasksTab"
 import { ProjectDetailTabShell, ProjectTabEmptyState, ProjectTabSection, tabDashedAddBtn } from "./ProjectDetailTabShell"
@@ -190,9 +191,17 @@ export function ProjectManagement({
   const [loadingDetail, setLoadingDetail] = useState(false)
   const [detailTab, setDetailTab] = useState<"overview" | "tasks" | "requirements" | "documents" | "testing">("overview")
       const [localVaultItems, setLocalVaultItems] = useState<ProjectVaultItem[]>([])
-      const [previewDoc, setPreviewDoc] = useState<ProjectVaultItem | null>(null)
+      const [vaultPreview, setVaultPreview] = useState<{
+        title: string
+        downloadName: string
+        loadBlob: () => Promise<Blob>
+      } | null>(null)
       const [previewKey, setPreviewKey] = useState(0)
       const [localTestSessions, setLocalTestSessions] = useState<TestSession[]>([])
+  const [showCloseChecklist, setShowCloseChecklist] = useState(false)
+  const [closingProject, setClosingProject] = useState(false)
+  const [checklistError, setChecklistError] = useState("")
+  const [autoAddVaultCategory, setAutoAddVaultCategory] = useState<ProjectVaultCategory | null>(null)
   const [tasks, setTasks] = useState<any[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
 
@@ -248,18 +257,29 @@ export function ProjectManagement({
         if (p.leadId) {
           try {
             const docs = await api.leadDocuments.list(p.leadId)
-            const docVaultItems = docs.map(d => ({
-              id: `doc-${d.id}`,
-              projectId: p.id,
-              audience: "client" as ProjectVaultAudience,
-              category: (d.type === "quote" ? "quotation" : d.type === "solution" ? "client-file" : "contract") as ProjectVaultCategory,
-              name: d.label || (d.isAppendix ? "Phụ lục hợp đồng" : (d.type === "quote" ? "Báo giá" : d.type === "solution" ? "Giải pháp" : "Hợp đồng")),
-              description: "Khởi tạo từ Lead",
-              createdAt: d.createdAt || new Date().toISOString(),
-              updatedAt: d.updatedAt || new Date().toISOString(),
-              parentId: d.parentDocumentId ? `doc-${d.parentDocumentId}` : null,
-              isAppendix: d.isAppendix
-            }))
+            const docVaultItems = docs.map(d => {
+              const downloadName = d.downloadName || `${d.label || d.type || "tai-lieu"}.docx`
+              const hasFile = Boolean(d.hasFile ?? d.fileSize)
+              return {
+                id: `doc-${d.id}`,
+                projectId: p.id,
+                audience: "client" as ProjectVaultAudience,
+                category: (d.type === "quote" ? "quotation" : d.type === "solution" ? "client-file" : "contract") as ProjectVaultCategory,
+                name: d.label || (d.isAppendix ? "Phụ lục hợp đồng" : (d.type === "quote" ? "Báo giá" : d.type === "solution" ? "Giải pháp" : "Hợp đồng")),
+                description: "Khởi tạo từ Lead",
+                createdAt: d.createdAt || new Date().toISOString(),
+                updatedAt: d.updatedAt || new Date().toISOString(),
+                parentId: d.parentDocumentId ? `doc-${d.parentDocumentId}` : null,
+                isAppendix: d.isAppendix,
+                hasFile,
+                fileAttachment: hasFile ? {
+                  name: downloadName,
+                  size: d.fileSize || 0,
+                  mimeType: "application/octet-stream",
+                  hasFile: true,
+                } : undefined,
+              }
+            })
             loadedVaultItems = [...loadedVaultItems, ...docVaultItems]
             
             const leadData = await api.leads.get(p.leadId)
@@ -311,6 +331,56 @@ export function ProjectManagement({
     })
     return () => { unsub() }
   }, [projectId])
+
+  const handleQuickAddVaultItem = (category: ProjectVaultCategory) => {
+    setShowCloseChecklist(false)
+    setDetailTab("documents")
+    setAutoAddVaultCategory(category)
+  }
+
+  const checkProjectDocuments = (vaultItems: ProjectVaultItem[]) => {
+    const requirements = [
+      { category: "requirement", label: "Yêu cầu dự án (SRS / Phiếu yêu cầu)" },
+      { category: "quotation", label: "Báo giá dự án" },
+      { category: "contract", label: "Hợp đồng dự án" },
+      { category: "tech-doc", label: "Hướng dẫn sử dụng / tài liệu vận hành" },
+      { category: "client-handover", label: "Biên bản nghiệm thu và bàn giao khách hàng" },
+      { category: "internal-handover", label: "Tài liệu bàn giao nội bộ dev" },
+    ]
+    return requirements.map(r => ({
+      ...r,
+      exists: vaultItems.some(item => item.category === r.category)
+    }))
+  }
+
+  const projectChecklist = checkProjectDocuments(localVaultItems)
+  const isChecklistValid = projectChecklist.every(item => item.exists)
+
+  const handleCloseProjectConfirm = async () => {
+    if (!isChecklistValid || !detail) return
+    setClosingProject(true)
+    setChecklistError("")
+    try {
+      await api.projects.update(detail.id, { status: "completed" })
+      await refreshProject(detail.id)
+      setShowCloseChecklist(false)
+    } catch (e) {
+      setChecklistError(e instanceof Error ? e.message : "Đóng dự án thất bại")
+    } finally {
+      setClosingProject(false)
+    }
+  }
+
+  const handleReopenProject = async () => {
+    if (!detail) return
+    if (!window.confirm("Bạn có chắc chắn muốn mở lại dự án này?")) return
+    try {
+      await api.projects.update(detail.id, { status: "active" })
+      await refreshProject(detail.id)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Mở lại dự án thất bại")
+    }
+  }
 
   async function load() {
     setLoading(true)
@@ -589,25 +659,40 @@ export function ProjectManagement({
   const handlePreviewVaultItem = async (item: ProjectVaultItem) => {
     if (!detail) return
     if (item.fileAttachment?.dataUrl) {
-      previewVaultAttachment(item.fileAttachment)
+      const dataUrl = item.fileAttachment.dataUrl
+      setVaultPreview({
+        title: item.name,
+        downloadName: item.fileAttachment.name,
+        loadBlob: async () => {
+          const res = await fetch(dataUrl)
+          return res.blob()
+        },
+      })
+      setPreviewKey((k) => k + 1)
       return
     }
     if (item.hasFile || item.fileAttachment?.hasFile) {
-      try {
-        const blob = await api.projects.vaultFileBlob(detail.id, item.id)
-        const url = URL.createObjectURL(blob)
-        window.open(url, "_blank", "noopener,noreferrer")
-        setTimeout(() => URL.revokeObjectURL(url), 120_000)
-      } catch (e) {
-        alert(e instanceof Error ? e.message : "Xem file thất bại")
-      }
+      const name = vaultFileName(item)
+      setVaultPreview({
+        title: item.name,
+        downloadName: name,
+        loadBlob: () => api.projects.vaultFileBlob(detail.id, item.id),
+      })
+      setPreviewKey((k) => k + 1)
       return
     }
-    if (item.id.startsWith("doc-")) {
-      setPreviewDoc(item)
-      setPreviewKey(k => k + 1)
-    } else if (item.url) {
-      window.open(item.url, "_blank")
+    if (item.id.startsWith("doc-") && detail.leadId) {
+      const docId = item.id.replace("doc-", "")
+      setVaultPreview({
+        title: item.name,
+        downloadName: item.fileAttachment?.name || `${item.name}.docx`,
+        loadBlob: () => api.leadDocuments.fileBlob(detail.leadId!, docId),
+      })
+      setPreviewKey((k) => k + 1)
+      return
+    }
+    if (canOpenVaultUrl(item) && item.url) {
+      window.open(formatHref(item.url), "_blank", "noopener,noreferrer")
     }
   }
 
@@ -1154,7 +1239,27 @@ export function ProjectManagement({
                 </div>
                 <h3 className="text-xl font-black text-gray-800 leading-snug">{detail.name}</h3>
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {detail.status === "completed" ? (
+                  <button
+                    type="button"
+                    onClick={handleReopenProject}
+                    className="h-8 px-3 border border-emerald-200 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50 text-xs font-bold rounded-xl flex items-center gap-1 shadow-sm transition-all"
+                  >
+                    <RefreshCw size={12} /> Mở lại dự án
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChecklistError("")
+                      setShowCloseChecklist(true)
+                    }}
+                    className="h-8 px-3 border border-red-200 text-[#C62828] bg-red-50/30 hover:bg-red-50 text-xs font-bold rounded-xl flex items-center gap-1 shadow-sm transition-all"
+                  >
+                    <Lock size={12} /> Đóng dự án
+                  </button>
+                )}
                 <button onClick={() => openEdit(detail)}
                   className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-gray-700 transition-colors">
                   <Edit2 size={16} />
@@ -1295,6 +1400,8 @@ export function ProjectManagement({
                 <ProjectDocVaultTab
                   vaultItems={localVaultItems}
                   legacyAttachments={detail.attachments}
+                  autoOpenCategory={autoAddVaultCategory}
+                  onAutoOpenTriggered={() => setAutoAddVaultCategory(null)}
                   onAddItem={async (payload, file) => {
                     const created = await api.projects.createVaultItem(detail.id, payload, file ?? undefined)
                     setLocalVaultItems(prev => [...prev, { ...created, projectId: detail.id }])
@@ -1333,6 +1440,88 @@ export function ProjectManagement({
           </div>
         </div>
       )}
+
+      <Modal
+        open={showCloseChecklist}
+        onClose={() => setShowCloseChecklist(false)}
+        title="Đóng dự án: Kiểm tra hồ sơ tài liệu bắt buộc"
+        icon={BadgeCheck}
+        width="md"
+        footer={
+          <>
+            <ModalCancelButton onClick={() => setShowCloseChecklist(false)} />
+            <ModalSubmitButton
+              onClick={handleCloseProjectConfirm}
+              loading={closingProject}
+              disabled={!isChecklistValid}
+              label="Xác nhận đóng dự án"
+              loadingLabel="Đang xử lý..."
+            />
+          </>
+        }
+      >
+        <div className="space-y-4 p-6">
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Dự án chỉ được đóng (hoàn thành) sau khi đã cập nhật đầy đủ 6 loại hồ sơ tài liệu nghiệp vụ bắt buộc dưới đây:
+          </p>
+
+          <div className="space-y-2.5">
+            {projectChecklist.map((item) => (
+              <div
+                key={item.category}
+                className={`flex items-center justify-between border rounded-2xl px-4 py-3 ${
+                  item.exists ? "border-emerald-100 bg-emerald-50/20" : "border-red-100 bg-red-50/10"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                      item.exists ? "bg-emerald-100/60 text-emerald-700" : "bg-red-100/60 text-[#C62828]"
+                    }`}
+                  >
+                    {item.exists ? <Check size={14} strokeWidth={3} /> : <AlertCircle size={14} />}
+                  </div>
+                  <span className={`text-xs font-bold ${item.exists ? "text-gray-700" : "text-gray-500"}`}>
+                    {item.label}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span
+                    className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                      item.exists ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-[#C62828]"
+                    }`}
+                  >
+                    {item.exists ? "Đã có" : "Thiếu"}
+                  </span>
+                  {!item.exists && (
+                    <button
+                      type="button"
+                      onClick={() => handleQuickAddVaultItem(item.category as ProjectVaultCategory)}
+                      className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 flex items-center justify-center transition-colors"
+                      title="Tải lên tài liệu này"
+                    >
+                      <Plus size={13} strokeWidth={3} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {!isChecklistValid && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-700 flex items-start gap-2">
+              <AlertCircle size={14} className="shrink-0 mt-0.5" />
+              <span>
+                Lưu ý: Vui lòng tải các file còn thiếu lên mục Tài liệu & Vault của dự án trước khi thực hiện đóng dự án.
+              </span>
+            </div>
+          )}
+
+          {checklistError && (
+            <p className="text-xs text-red-600 font-semibold">{checklistError}</p>
+          )}
+        </div>
+      </Modal>
 
       <Modal
         open={showTeamForm}
@@ -1485,9 +1674,9 @@ export function ProjectManagement({
       />
 
       <Modal
-        open={previewDoc !== null}
-        onClose={() => setPreviewDoc(null)}
-        title={previewDoc?.name || "Xem trước tài liệu"}
+        open={vaultPreview !== null}
+        onClose={() => setVaultPreview(null)}
+        title={vaultPreview?.title || "Xem trước tài liệu"}
         icon={Eye}
         width="5xl"
         bodyClassName="p-4 flex flex-col h-[75vh]"
@@ -1497,12 +1686,11 @@ export function ProjectManagement({
           </button>
         }
       >
-        {previewDoc && detail?.leadId && (
+        {vaultPreview && (
           <DocxFilePreview
-            docId={previewDoc.id.replace("doc-", "")}
-            downloadName={previewDoc.name}
+            downloadName={vaultPreview.downloadName}
             refreshKey={previewKey}
-            loadBlob={() => api.leadDocuments.fileBlob(detail.leadId!, previewDoc.id.replace("doc-", ""))}
+            loadBlob={vaultPreview.loadBlob}
           />
         )}
       </Modal>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react"
 import {
   ArrowLeft, CheckCircle2, Clock, Copy, DollarSign, FileText, Loader2, Send, ExternalLink, Mail, MessageCircle, Lock, RefreshCw, Plus, FolderKanban
 } from "lucide-react"
-import { Lead, FormType, Project } from "../../types"
+import { Lead, FormType, Project, Employee } from "../../types"
 import { CustomCombobox } from "../ui/CustomCombobox"
 import { Button } from "../ui/button"
 import { Textarea } from "../ui/textarea"
@@ -26,10 +26,12 @@ export function LeadDetailPage({
   leadId,
   onBack,
   onNavigateToProject,
+  selectedBranch,
 }: {
   leadId: string
   onBack: () => void
   onNavigateToProject?: (projectId: string) => void
+  selectedBranch?: string
 }) {
   const { lead, setLead, loading, syncing, error, setError, refresh: refreshLead } = useLeadRealtime(leadId)
   const [activeTab, setActiveTab] = useState<DetailTab>("info")
@@ -57,6 +59,8 @@ export function LeadDetailPage({
   const [converting, setConverting] = useState(false)
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [projectName, setProjectName] = useState("")
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [projectManagerId, setProjectManagerId] = useState("")
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean
     title: string
@@ -73,6 +77,10 @@ export function LeadDetailPage({
   useEffect(() => {
     if (lead?.formType) setSelectedFormType(lead.formType)
   }, [lead?.formType])
+
+  useEffect(() => {
+    api.employees.list().then(d => setEmployees(d as Employee[])).catch(() => {})
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -261,8 +269,14 @@ export function LeadDetailPage({
     })
   }
 
+  const filteredEmployees = employees.filter(e => {
+    if (!selectedBranch || selectedBranch === "all") return true
+    return e.branchId === selectedBranch
+  })
+
   const openProjectModal = () => {
     setProjectName(lead.name || "")
+    setProjectManagerId(lead.assignedToId || "")
     setShowProjectModal(true)
   }
 
@@ -272,11 +286,15 @@ export function LeadDetailPage({
       setError("Vui lòng nhập tên dự án")
       return
     }
+    if (!projectManagerId) {
+      setError("Vui lòng chọn người quản lý dự án")
+      return
+    }
     if (!canConvert || converting) return
     setConverting(true)
     setError("")
     try {
-      const result = await api.leads.convertToProject(lead.id, { name })
+      const result = await api.leads.convertToProject(lead.id, { name, managerId: projectManagerId })
       setLead(result.lead)
       setShowProjectModal(false)
       if (result.project?.id) {
@@ -859,6 +877,15 @@ export function LeadDetailPage({
               className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20"
               placeholder="VD: Website bán hàng ABC Shop"
               autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1.5">Người quản lý dự án *</label>
+            <CustomCombobox
+              value={projectManagerId}
+              onChange={(v) => setProjectManagerId(v)}
+              placeholder="Chọn người quản lý dự án"
+              options={filteredEmployees.map((e) => ({ value: e.id, label: e.name, desc: e.department }))}
             />
           </div>
         </div>

@@ -9,6 +9,11 @@ function stripMongoMeta(doc) {
   return rest
 }
 
+function clone(obj) {
+  if (!obj) return obj
+  return JSON.parse(JSON.stringify(obj))
+}
+
 function read(collection) {
   if (!cache.has(collection)) cache.set(collection, [])
   return cache.get(collection)
@@ -35,9 +40,10 @@ export async function loadCache() {
 
 export function findAll(collection, query = {}) {
   const docs = read(collection)
-  return docs.filter(doc =>
+  const matched = docs.filter(doc =>
     Object.entries(query).every(([k, v]) => doc[k] === v)
   )
+  return clone(matched)
 }
 
 export function findOne(collection, query) {
@@ -50,10 +56,11 @@ export function findById(collection, id) {
 
 export function insertOne(collection, doc) {
   const docs = read(collection)
-  docs.push(doc)
+  const cloned = clone(doc)
+  docs.push(cloned)
   write(collection, docs)
-  void getModel(collection).create(doc).catch(err => logPersistError("insertOne", collection, err))
-  return doc
+  void getModel(collection).create(clone(doc)).catch(err => logPersistError("insertOne", collection, err))
+  return clone(cloned)
 }
 
 export function updateById(collection, id, patch) {
@@ -61,7 +68,7 @@ export function updateById(collection, id, patch) {
   let updated = null
   const next = docs.map(doc => {
     if (doc.id === id) {
-      updated = { ...doc, ...patch }
+      updated = clone({ ...doc, ...patch })
       return updated
     }
     return doc
@@ -69,9 +76,9 @@ export function updateById(collection, id, patch) {
   if (!updated) return null
   write(collection, next)
   void getModel(collection)
-    .updateOne({ id }, { $set: patch })
+    .updateOne({ id }, { $set: clone(patch) })
     .catch(err => logPersistError("updateById", collection, err))
-  return updated
+  return clone(updated)
 }
 
 export function deleteById(collection, id) {
@@ -101,17 +108,15 @@ export function deleteMany(collection, query) {
 
 export function updateMany(collection, query, patch) {
   const docs = read(collection)
-  let count = 0
   const next = docs.map(doc => {
     if (Object.entries(query).every(([k, v]) => doc[k] === v)) {
-      count++
-      return { ...doc, ...patch }
+      return clone({ ...doc, ...patch })
     }
     return doc
   })
   write(collection, next)
   void getModel(collection)
-    .updateMany(query, { $set: patch })
+    .updateMany(query, { $set: clone(patch) })
     .catch(err => logPersistError("updateMany", collection, err))
-  return count
+  return next.filter(doc => Object.entries(query).every(([k, v]) => doc[k] === v)).length
 }
