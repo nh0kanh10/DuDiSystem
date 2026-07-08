@@ -104,7 +104,6 @@ export function useNotifications(options?: { pollInterval?: number; enableSocket
   return { items, loading, error, unread, reload: () => load(), markRead, markAllRead, deleteItem }
 }
 
-/** Badge + dropdown admin — đồng bộ unread qua socket. */
 export function useNotificationBadge(initialLoad = true) {
   const [unread, setUnread] = useState(0)
   const [latest, setLatest] = useState<StaffNotification[]>([])
@@ -115,7 +114,6 @@ export function useNotificationBadge(initialLoad = true) {
       setLatest(data ?? [])
       setUnread((data ?? []).filter(n => !n.read).length)
     } catch {
-      /* giữ số cũ */
     }
   }, [])
 

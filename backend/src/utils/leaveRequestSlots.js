@@ -72,6 +72,7 @@ export function findSlotConflict(employeeId, newSlots, existingRequests, exclude
   const occupied = new Map()
 
   for (const req of existingRequests) {
+    if (req.employeeId !== employeeId) continue
     if (excludeId && req.id === excludeId) continue
     if (req.status !== "pending" && req.status !== "approved") continue
     if (req.category !== "leave" && req.category !== "timeoff") continue

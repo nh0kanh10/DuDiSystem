@@ -56,7 +56,7 @@ export function checkIP(req, res) {
   ok(res, {
     valid: true,
     ip: ipToCheck,
-    message: `Địa chỉ IP (${ipToCheck}) hợp lệ để chấm công.`
+    message: "Kết nối mạng hợp lệ để chấm công."
   });
 }
 

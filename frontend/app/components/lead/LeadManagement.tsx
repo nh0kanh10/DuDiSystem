@@ -8,6 +8,7 @@ import { LeadDetailPage } from "./LeadDetailPage"
 import { STATUS_CONFIG } from "./leadConstants"
 import { resolveCustomerType } from "./leadCustomer"
 import { api } from "../../../lib/api"
+import { useToast } from "../../hooks/useToast"
 
 const EMPTY_LEAD_FORM = {
   name: "",
@@ -50,6 +51,7 @@ export function LeadManagement({
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<Lead | null>(null)
   const [listError, setListError] = useState("")
+  const { showToast } = useToast()
 
   const loadLeads = useCallback(async () => {
     setLoading(true)
@@ -115,6 +117,43 @@ export function LeadManagement({
   }
 
   const handleSave = async () => {
+    if (!form.name.trim()) {
+      showToast("Tên Lead không được để trống", "error")
+      return
+    }
+    if (form.customerType === "company" && !form.companyName.trim()) {
+      showToast("Tên công ty không được để trống khi chọn loại khách hàng là Công ty", "error")
+      return
+    }
+    if (form.contactPhone.trim()) {
+      const cleanPhone = form.contactPhone.trim()
+      const phoneRegex = /^[0-9]+$/
+      if (!phoneRegex.test(cleanPhone)) {
+        showToast("Số điện thoại chỉ được chứa các chữ số", "error")
+        return
+      }
+      if (cleanPhone.length < 9 || cleanPhone.length > 11) {
+        showToast("Số điện thoại phải từ 9 đến 11 chữ số", "error")
+        return
+      }
+    }
+    if (form.contactEmail.trim()) {
+      const cleanEmail = form.contactEmail.trim()
+      const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+      if (!emailRegex.test(cleanEmail)) {
+        showToast("Email không đúng định dạng", "error")
+        return
+      }
+    }
+    if (form.taxId.trim()) {
+      const cleanTax = form.taxId.trim()
+      const taxRegex = /^[0-9\-]+$/
+      if (!taxRegex.test(cleanTax)) {
+        showToast("Mã số thuế chỉ được chứa số và dấu gạch ngang", "error")
+        return
+      }
+    }
+
     setSaving(true)
     try {
       const payload = {
@@ -129,7 +168,6 @@ export function LeadManagement({
       setShowForm(false)
       await loadLeads()
     } catch {
-      /* keep modal open */
     } finally {
       setSaving(false)
     }
@@ -275,7 +313,7 @@ export function LeadManagement({
         onClose={() => setShowForm(false)}
         title={editTarget ? "Sửa Lead" : "Thêm Lead mới"}
         icon={User}
-        width="lg"
+        width="xl"
         footer={
           <div className="flex gap-3">
             <ModalCancelButton onClick={() => setShowForm(false)} />
@@ -354,7 +392,7 @@ export function LeadManagement({
               <CustomCombobox value={form.status} onChange={(v) => setForm((f) => ({ ...f, status: v as LeadStatus }))} options={Object.entries(STATUS_CONFIG).map(([key, cfg]) => ({ value: key, label: cfg.label }))} />
             </div>
             <div>
-              <label className="block text-xs font-black text-gray-600 mb-1.5">Giao cho</label>
+              <label className="block text-xs font-black text-gray-600 mb-1.5">Nhân viên phụ trách</label>
               <CustomCombobox value={form.assignedToId} onChange={(v) => setForm((f) => ({ ...f, assignedToId: v }))} placeholder="Chọn nhân viên" options={(employees || []).map((e) => ({ value: e.id, label: e.name, desc: e.department }))} />
             </div>
           </div>

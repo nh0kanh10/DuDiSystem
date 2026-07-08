@@ -8,7 +8,6 @@ export function resolveCustomerType(lead?: Pick<Lead, "customerType" | "companyN
   return "individual"
 }
 
-/** Nhãn khách trên báo giá / hợp đồng */
 export function leadCustomerLabel(lead?: Lead): string {
   if (!lead) return "—"
   const type = resolveCustomerType(lead)
@@ -32,7 +31,6 @@ export const CUSTOMER_TYPE_LABELS: Record<CustomerType, string> = {
   company: "Công ty",
 }
 
-/** Chuẩn hóa hiển thị — sửa lead cũ contactName trùng companyName */
 export function normalizeCustomerDisplay(lead?: Lead) {
   const type = resolveCustomerType(lead)
   let companyName = String(lead?.companyName ?? "").trim()

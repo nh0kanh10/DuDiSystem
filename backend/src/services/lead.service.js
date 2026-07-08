@@ -129,20 +129,47 @@ export function createLead(body = {}) {
   if (customerType !== "individual" && customerType !== "company") {
     customerType = companyName || body.sourceCrmId ? "company" : "individual"
   }
+
+  const name = String(body.name || "").trim()
+  if (!name) throw new Error("Tên lead không được để trống")
+  if (customerType === "company" && !companyName) {
+    throw new Error("Tên công ty không được để trống khi chọn loại khách hàng là Công ty")
+  }
+
+  const contactPhone = String(body.contactPhone || "").trim()
+  if (contactPhone) {
+    if (!/^[0-9]+$/.test(contactPhone)) {
+      throw new Error("Số điện thoại chỉ được chứa các chữ số")
+    }
+    if (contactPhone.length < 9 || contactPhone.length > 11) {
+      throw new Error("Số điện thoại phải từ 9 đến 11 chữ số")
+    }
+  }
+
+  const contactEmail = String(body.contactEmail || "").trim()
+  if (contactEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail)) {
+    throw new Error("Email không đúng định dạng")
+  }
+
+  const taxId = String(body.taxId || "").trim()
+  if (taxId && !/^[0-9\-]+$/.test(taxId)) {
+    throw new Error("Mã số thuế chỉ được chứa số và dấu gạch ngang")
+  }
+
   const lead = {
     id,
     code: body.code || nextCode(),
-    name: String(body.name || "").trim(),
+    name,
     customerId: body.customerId || "",
     status: body.status || "new",
     contactName: body.contactName || "",
-    contactPhone: body.contactPhone || "",
-    contactEmail: body.contactEmail || "",
+    contactPhone,
+    contactEmail,
     customerType,
     companyName,
     industry: body.industry || "",
     address: body.address || "",
-    taxId: body.taxId || "",
+    taxId,
     budgetEstimate: body.budgetEstimate || "",
     roughNotes: body.roughNotes || "",
     assignedToId: body.assignedToId || "",
@@ -154,7 +181,6 @@ export function createLead(body = {}) {
     createdAt: now,
     updatedAt: now,
   }
-  if (!lead.name) throw new Error("Tên lead là bắt buộc")
   repo.create(lead)
 
   let customerId = body.customerId || ""
@@ -192,6 +218,42 @@ export function updateLead(id, body = {}) {
   ensureSeed()
   const existing = repo.getById(id)
   if (!existing) return null
+
+  if (body.name !== undefined) {
+    if (!String(body.name || "").trim()) throw new Error("Tên lead không được để trống")
+  }
+  const type = body.customerType !== undefined ? body.customerType : existing.customerType
+  const cName = body.companyName !== undefined ? String(body.companyName ?? "").trim() : (existing.companyName || "")
+  if (type === "company" && !cName) {
+    throw new Error("Tên công ty không được để trống khi chọn loại khách hàng là Công ty")
+  }
+
+  if (body.contactPhone !== undefined) {
+    const cleanPhone = String(body.contactPhone || "").trim()
+    if (cleanPhone) {
+      if (!/^[0-9]+$/.test(cleanPhone)) {
+        throw new Error("Số điện thoại chỉ được chứa các chữ số")
+      }
+      if (cleanPhone.length < 9 || cleanPhone.length > 11) {
+        throw new Error("Số điện thoại phải từ 9 đến 11 chữ số")
+      }
+    }
+  }
+
+  if (body.contactEmail !== undefined) {
+    const cleanEmail = String(body.contactEmail || "").trim()
+    if (cleanEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(cleanEmail)) {
+      throw new Error("Email không đúng định dạng")
+    }
+  }
+
+  if (body.taxId !== undefined) {
+    const cleanTax = String(body.taxId || "").trim()
+    if (cleanTax && !/^[0-9\-]+$/.test(cleanTax)) {
+      throw new Error("Mã số thuế chỉ được chứa số và dấu gạch ngang")
+    }
+  }
+
   const patch = {}
   for (const key of ALLOWED_PATCH) {
     if (body[key] !== undefined) patch[key] = body[key]

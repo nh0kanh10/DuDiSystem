@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { CustomSelect } from "./ui/CustomSelect";
+import { useToast } from "@/app/hooks/useToast";
 
 type AllowedIP = {
   id: string;
@@ -109,15 +110,12 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editIp, setEditIp] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [editOrgNodeId, setEditOrgNodeId] = useState<string>("");
+  const [editOrgNodeId, setEditOrgNodeId] = useState<string>(" ");
   const [loading, setLoading] = useState(false);
   const [currentIP, setCurrentIP] = useState<string | null>(null);
   const [serverIPs, setServerIPs] = useState<string[]>([]);
   const [showHelp, setShowHelp] = useState(false);
-  const [toast, setToast] = useState<{
-    message: string;
-    type: "success" | "error";
-  } | null>(null);
+  const { showToast } = useToast();
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     id: string;
@@ -191,10 +189,7 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
     return ipv4Regex.test(ip.trim());
   };
 
-  const showToast = (message: string, type: "success" | "error") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
+
 
   const handleUseUserIP = () => {
     if (currentIP) {
@@ -693,24 +688,6 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
         title="Xác nhận xóa IP"
         message="Bạn có chắc chắn muốn xóa IP này khỏi danh sách?"
       />
-
-      {toast && createPortal(
-        <div
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 px-6 py-3 rounded-xl shadow-lg border transition-all duration-300 ${
-            toast.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-              : "bg-red-50 border-red-200 text-red-800"
-          }`}
-        >
-          {toast.type === "success" ? (
-            <CheckCircle2 size={20} className="text-emerald-600" />
-          ) : (
-            <AlertCircle size={20} className="text-red-600" />
-          )}
-          <span className="font-semibold">{toast.message}</span>
-        </div>,
-        document.body
-      )}
     </div>
   );
 }

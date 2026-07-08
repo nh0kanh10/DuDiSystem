@@ -35,6 +35,7 @@ import leadRoutes from "./routes/lead.routes.js"
 import customerRoutes from "./routes/customer.routes.js"
 import leadFormPublicRoutes from "./routes/leadForm.public.routes.js"
 import templateRoutes from "./routes/template.routes.js"
+import storageRoutes from "./routes/storage.routes.js"
 
 const app = express()
 
@@ -80,6 +81,7 @@ app.use("/api/leads", leadRoutes)
 app.use("/api/customers", customerRoutes)
 app.use("/api/public/lead-forms", leadFormPublicRoutes)
 app.use("/api/templates", templateRoutes)
+app.use("/api/storage", storageRoutes)
 
 app.use(notFoundHandler)
 app.use(errorHandler)

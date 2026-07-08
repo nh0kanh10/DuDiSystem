@@ -9,7 +9,15 @@ function parseVNDate(s: string): Date | null {
   if (!s) return null
   const parts = s.split("/").map(Number)
   if (parts.length !== 3 || parts.some(isNaN)) return null
-  return new Date(parts[2], parts[1] - 1, parts[0])
+  const [d, m, y] = parts
+  if (m < 1 || m > 12 || d < 1 || d > 31 || y < 1900 || y > 2100) return null
+  const date = new Date(y, m - 1, d)
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null
+  return date
+}
+
+function isValidVNDate(s: string): boolean {
+  return /^\d{2}\/\d{2}\/\d{4}$/.test(s) && parseVNDate(s) !== null
 }
 
 function formatVNDate(d: Date | undefined): string {
@@ -84,6 +92,12 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
   const [hour, setHour] = useState(parsed.hour)
   const [minute, setMinute] = useState(parsed.minute)
   const [month, setMonth] = useState<Date>(parsed.date || new Date())
+  const [localDateInput, setLocalDateInput] = useState(value)
+
+  React.useEffect(() => {
+    setLocalDateInput(value)
+    if (parsed.date) setMonth(parsed.date)
+  }, [value])
 
   const hours   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"))
   const minutes = ["00","05","10","15","20","25","30","35","40","45","50","55"]
@@ -109,23 +123,54 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
 
   function handleClear() {
     onChange("")
+    setLocalDateInput("")
     setHour("08"); setMinute("00")
     setIsOpen(false)
   }
 
+  function handleDateInputBlur() {
+    if (localDateInput === "") { onChange(""); return }
+    // format: "DD/MM/YYYY HH:mm" or just date part
+    const datePart = localDateInput.split(" ")[0]
+    const timePart = localDateInput.split(" ")[1] || `${hour}:${minute}`
+    if (isValidVNDate(datePart)) {
+      onChange(`${datePart} ${timePart}`)
+    } else {
+      setLocalDateInput(value)
+    }
+  }
+
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!isOpen) return
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current?.contains(e.target as Node)) return
+      const popoverContent = document.querySelector('[data-slot="popover-content"]')
+      if (popoverContent && popoverContent.contains(e.target as Node)) return
+      setIsOpen(false)
+    }
+    document.addEventListener("mousedown", handleOutsideClick, true)
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick, true)
+    }
+  }, [isOpen])
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={disabled}
-          className={`${className} flex items-center justify-between text-left cursor-pointer pr-3 disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-gray-50`}
-        >
-          <span className={value ? "text-gray-700 text-sm font-medium" : "text-gray-400 text-sm"}>
-            {value || placeholder}
-          </span>
-          <CalendarIcon size={15} className="text-gray-400 shrink-0 ml-2" />
-        </button>
+        <div ref={containerRef} className="relative w-full">
+          <input
+            type="text"
+            disabled={disabled}
+            placeholder={placeholder}
+            value={localDateInput}
+            onChange={e => setLocalDateInput(e.target.value)}
+            onBlur={handleDateInputBlur}
+            className={`${className} pr-10 cursor-text`}
+          />
+          <CalendarIcon size={15} className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer hover:text-gray-600 transition-colors" />
+        </div>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 z-[999] bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden" align="start">
         <DayPicker
@@ -137,7 +182,7 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
           locale={vi}
           showOutsideDays
           components={{
-            Nav: () => null,
+            Nav: () => <></>,
             MonthCaption: ({ calendarMonth }) => (
               <CustomCaption month={calendarMonth.date} onMonthChange={setMonth} />
             ),
@@ -146,7 +191,7 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
             months: "flex flex-col",
             month: "p-4 pb-2 space-y-2",
             month_caption: "",
-            table: "w-full border-collapse",
+            month_grid: "w-full border-collapse",
             weekdays: "flex mb-1",
             weekday: "w-9 text-center text-[11px] font-bold text-gray-400",
             week: "flex",
@@ -196,29 +241,70 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
   placeholder?: string
 }) {
   const [isOpen, setIsOpen] = useState(false)
-  const dateValue = React.useMemo(() => parseVNDate(value) || undefined, [value])
+  const [localValue, setLocalValue] = useState(value)
+  const dateValue = React.useMemo(() => parseVNDate(localValue) || undefined, [localValue])
   const [month, setMonth] = useState<Date>(dateValue || new Date())
+
+  React.useEffect(() => {
+    setLocalValue(value)
+  }, [value])
+
+  React.useEffect(() => {
+    if (dateValue) setMonth(dateValue)
+  }, [dateValue])
 
   const handleSelect = (date: Date | undefined) => {
     if (date) {
-      onChange(formatVNDate(date))
+      const formatted = formatVNDate(date)
+      setLocalValue(formatted)
+      onChange(formatted)
       setIsOpen(false)
     }
   }
 
+  const handleBlur = () => {
+    if (localValue === "") {
+      onChange("")
+      return
+    }
+    if (!isValidVNDate(localValue)) {
+      setLocalValue(value)
+      return
+    }
+    onChange(localValue)
+  }
+
+  const containerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!isOpen) return
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (containerRef.current?.contains(e.target as Node)) return
+      const popoverContent = document.querySelector('[data-slot="popover-content"]')
+      if (popoverContent && popoverContent.contains(e.target as Node)) return
+      setIsOpen(false)
+    }
+    document.addEventListener("mousedown", handleOutsideClick, true)
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick, true)
+    }
+  }, [isOpen])
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={disabled}
-          className={`${className} flex items-center justify-between text-left cursor-pointer pr-3 disabled:cursor-not-allowed disabled:opacity-60 disabled:bg-gray-50`}
-        >
-          <span className={value ? "text-gray-700 text-sm font-medium" : "text-gray-400 text-sm"}>
-            {value || placeholder}
-          </span>
-          <CalendarIcon size={15} className="text-gray-400 shrink-0 ml-2" />
-        </button>
+        <div ref={containerRef} className="relative w-full">
+          <input
+            type="text"
+            disabled={disabled}
+            placeholder={placeholder}
+            value={localValue}
+            onChange={e => setLocalValue(e.target.value)}
+            onBlur={handleBlur}
+            className={`${className} pr-10 cursor-text`}
+          />
+          <CalendarIcon size={15} className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer hover:text-gray-600 transition-colors" />
+        </div>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 z-[999] bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden" align="start">
         <DayPicker
@@ -230,7 +316,7 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
           locale={vi}
           showOutsideDays
           components={{
-            Nav: () => null,
+            Nav: () => <></>,
             MonthCaption: ({ calendarMonth }) => (
               <CustomCaption month={calendarMonth.date} onMonthChange={setMonth} />
             ),
@@ -239,7 +325,7 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
             months: "flex flex-col",
             month: "p-4 space-y-2",
             month_caption: "",
-            table: "w-full border-collapse",
+            month_grid: "w-full border-collapse",
             weekdays: "flex mb-1",
             weekday: "w-9 text-center text-[11px] font-bold text-gray-400",
             week: "flex",
@@ -256,3 +342,4 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
     </Popover>
   )
 }
+

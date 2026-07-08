@@ -138,6 +138,24 @@ export const api = {
       req<{ token: string; user: Record<string, unknown> }>("POST", "/auth/login", { loginKey: loginId, password }),
     me: () => req<any>("GET", "/auth/me"),
     refresh: () => req<{ token: string }>("POST", "/auth/refresh"),
+    changePassword: (oldPassword: string, newPassword: string) =>
+      req<any>("POST", "/auth/change-password", { oldPassword, newPassword }),
+  },
+  storage: {
+    upload: async (file: File): Promise<{ key: string; url: string; name: string }> => {
+      const form = new FormData()
+      form.append("file", file)
+      const res = await fetch(`${BASE}/storage/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}` },
+        body: form,
+      })
+      const json = await res.json() as any
+      if (!res.ok || !json.success) throw new Error(json.error || "Upload file thất bại")
+      touchSession()
+      return json.data
+    },
+    downloadUrl: (key: string) => `${BASE}/storage/download?key=${encodeURIComponent(key)}`,
   },
   users: {
     list: (params?: { includeCoreAdmins?: boolean }) => req<any[]>("GET", `/users${qs(params as any)}`),
@@ -397,8 +415,13 @@ export const api = {
   },
 
   staffChat: {
-    roster: (q?: string, scope?: "conversations" | "all") =>
-      req<StaffChatRosterResponse>("GET", `/staff-chat/roster${qs({ q, scope: scope === "all" ? "all" : undefined })}`),
+    roster: (q?: string, scope?: "conversations" | "all") => {
+      const parts: string[] = []
+      if (q?.trim()) parts.push(`q=${encodeURIComponent(q.trim())}`)
+      if (scope === "all") parts.push("scope=all")
+      const query = parts.length ? `?${parts.join("&")}` : ""
+      return req<StaffChatRosterResponse>("GET", `/staff-chat/roster${query}`)
+    },
     conversations: () =>
       req<StaffChatConversationsResponse>("GET", "/staff-chat/conversations"),
     openConversation: (peerId: string) =>

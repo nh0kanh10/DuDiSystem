@@ -3,12 +3,13 @@ import { createPortal } from "react-dom"
 import {
   Plus, Search, Edit2, Trash2, X, Download, MoreHorizontal, Eye, Users,
   Building2, Paperclip, Briefcase, ExternalLink, FileText, Image as ImageIcon,
-  File, Link2, AlertCircle, UserPlus, UserMinus, ArrowRightLeft,
+  File, Link2, AlertCircle, CheckCircle2, UserPlus, UserMinus, ArrowRightLeft,
   TrendingUp, RefreshCw, ChevronLeft, ChevronRight, Maximize2,
   User, Camera, ClipboardList, Upload, Calendar
 } from "lucide-react"
 import { Employee, EmpExtForm, WorkHistoryEntry, WorkHistoryType, Attachment, OrgNode } from "../../types"
 import { api } from "@/lib/api"
+import { useToast } from "@/app/hooks/useToast"
 import { Badge } from "../ui/badge"
 import { initials } from "../../utils"
 import { deriveOrgFields, isOrgPlacementChanged, buildOrgSnapshot } from "../../utils/orgUtils"
@@ -58,6 +59,8 @@ function todayVN(): string {
   const d = new Date()
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
 }
+
+const DEFAULT_INTERNSHIP_MONTHS = 2 
 
 function addMonthsToVNDate(dateStr: string, months: number): string {
   const d = parseVNDate(dateStr)
@@ -242,36 +245,43 @@ function FilesTab({
   const [showAddLink, setShowAddLink] = useState(false)
   const [err, setErr] = useState("")
   const [lightbox, setLightbox] = useState<number | null>(null)
+  const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { showToast } = useToast()
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (!files) return
-    
-    const newPhotos = [...photos]
-    const newAttachments = [...attachments]
+    if (!files || files.length === 0) return
+    e.target.value = ""
 
-    Array.from(files).forEach(file => {
-      const isImg = file.type.startsWith("image/")
-      if (isImg) {
-        const mockImgUrl = `https://picsum.photos/seed/${encodeURIComponent(file.name)}/800/800`
-        newPhotos.push(mockImgUrl)
-      } else {
-        const mockDocUrl = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
-          ? "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
-          : `https://example.com/docs/${encodeURIComponent(file.name)}`
-        newAttachments.push({
-          id: Date.now() + Math.random(),
-          name: file.name,
-          url: mockDocUrl,
-          type: "file",
-          uploadedAt: todayVN()
-        })
+    setUploading(true)
+    try {
+      const newPhotos = [...photos]
+      const newAttachments = [...attachments]
+
+      for (const file of Array.from(files)) {
+        const result = await api.storage.upload(file)
+        const isImg = file.type.startsWith("image/")
+        if (isImg) {
+          newPhotos.push(result.url)
+        } else {
+          newAttachments.push({
+            id: Date.now() + Math.random(),
+            name: result.name,
+            url: result.url,
+            type: "file",
+            uploadedAt: todayVN()
+          })
+        }
       }
-    })
-    
-    onChangePhotos(newPhotos)
-    onChangeAttachments(newAttachments)
+
+      onChangePhotos(newPhotos)
+      onChangeAttachments(newAttachments)
+    } catch (err: any) {
+      showToast(err.message || "Upload file thất bại", "error")
+    } finally {
+      setUploading(false)
+    }
   }
 
   const addLink = () => {
@@ -302,13 +312,13 @@ function FilesTab({
         <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" disabled={readonly} />
         <button
           onClick={() => {
-            if (readonly) return
+            if (readonly || uploading) return
             fileInputRef.current?.click()
           }}
-          disabled={readonly}
-          className="w-full md:w-auto flex-1 flex items-center justify-center gap-2 px-5 py-3 border-2 border-dashed border-[#C62828] text-[#C62828] bg-white hover:bg-red-50/50 rounded-xl text-sm font-black transition-all cursor-pointer">
-          <Upload size={15} />
-          <span>Chọn ảnh/tài liệu từ máy tính</span>
+          disabled={readonly || uploading}
+          className="w-full md:w-auto flex-1 flex items-center justify-center gap-2 px-5 py-3 border-2 border-dashed border-[#C62828] text-[#C62828] bg-white hover:bg-red-50/50 rounded-xl text-sm font-black transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+          {uploading ? <span className="w-4 h-4 border-2 border-[#C62828] border-t-transparent rounded-full animate-spin" /> : <Upload size={15} />}
+          <span>{uploading ? "Đang tải lên..." : "Chọn ảnh/tài liệu từ máy tính"}</span>
         </button>
         <button
           onClick={() => {
@@ -570,8 +580,18 @@ function PersonalTab({ form, sf, inp, sel, lbl, readonly = false }: {
       <div>
         <p className={sectionLabel}>Định danh cá nhân</p>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={lbl}>Họ và tên *</label><input disabled={readonly} value={form.name} onChange={e => !readonly && sf("name", e.target.value)} placeholder="Nguyễn Văn A" className={inp} /></div>
-          <div><label className={lbl}>Ngày sinh</label><DateInput disabled={readonly} value={form.dob} onChange={val => !readonly && sf("dob", val)} className={inp} /></div>
+          <div><label className={lbl}>Họ và tên *</label><input autoComplete="new-password" disabled={readonly} value={form.name} onChange={e => !readonly && sf("name", e.target.value)} placeholder="Nguyễn Văn A" className={inp} /></div>
+          <div><label className={lbl}>Ngày sinh</label><DateInput disabled={readonly} value={form.dob} onChange={val => {
+            if (!readonly) {
+              if (val) {
+                const parts = val.split("/").map(Number)
+                const d = new Date(parts[2], parts[1] - 1, parts[0])
+                const today = new Date(); today.setHours(0,0,0,0)
+                if (d > today) return // không cho phép ngày trong tương lai
+              }
+              sf("dob", val)
+            }
+          }} className={inp} /></div>
           <div><label className={lbl}>Giới tính</label>
             <CustomSelect
               disabled={readonly}
@@ -586,8 +606,8 @@ function PersonalTab({ form, sf, inp, sel, lbl, readonly = false }: {
               heightClass="h-[42px]"
             />
           </div>
-          <div><label className={lbl}>Số điện thoại</label><input disabled={readonly} value={form.phone} onChange={e => !readonly && sf("phone", e.target.value)} placeholder="09xx xxx xxx" className={inp} /></div>
-          <div className="col-span-2"><label className={lbl}>Email</label><input disabled={readonly} value={form.email} onChange={e => !readonly && sf("email", e.target.value)} placeholder="email@dudi.vn" className={inp} /></div>
+          <div><label className={lbl}>Số điện thoại</label><input autoComplete="new-password" disabled={readonly} value={form.phone} onChange={e => !readonly && sf("phone", e.target.value)} placeholder="09xx xxx xxx" className={inp} /></div>
+          <div className="col-span-2"><label className={lbl}>Email</label><input autoComplete="new-password" disabled={readonly} value={form.email} onChange={e => !readonly && sf("email", e.target.value)} placeholder="email@dudi.vn" className={inp} /></div>
         </div>
       </div>
 
@@ -595,7 +615,17 @@ function PersonalTab({ form, sf, inp, sel, lbl, readonly = false }: {
         <p className={sectionLabel}>CCCD / CMND</p>
         <div className="grid grid-cols-2 gap-3">
           <div><label className={lbl}>Số CCCD</label><input disabled={readonly} value={form.cccd} onChange={e => !readonly && sf("cccd", e.target.value)} placeholder="012345678901" className={inp} /></div>
-          <div><label className={lbl}>Ngày cấp</label><DateInput disabled={readonly} value={form.cccdDate} onChange={val => !readonly && sf("cccdDate", val)} className={inp} /></div>
+          <div><label className={lbl}>Ngày cấp</label><DateInput disabled={readonly} value={form.cccdDate} onChange={val => {
+            if (!readonly) {
+              if (val) {
+                const parts = val.split("/").map(Number)
+                const d = new Date(parts[2], parts[1] - 1, parts[0])
+                const today = new Date(); today.setHours(0,0,0,0)
+                if (d > today) return // ngày cấp không thể ở tương lai
+              }
+              sf("cccdDate", val)
+            }
+          }} className={inp} /></div>
           <div className="col-span-2"><label className={lbl}>Nơi cấp</label><input disabled={readonly} value={form.cccdPlace} onChange={e => !readonly && sf("cccdPlace", e.target.value)} placeholder="Cục CSQLHC về TTXH..." className={inp} /></div>
         </div>
       </div>
@@ -668,7 +698,7 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
   form: EmpExtForm
   sf: (k: keyof EmpExtForm, v: any) => void
   inp: string; sel: string; lbl: string
-  orgNodes: { id: string; name: string; type?: string; parentId?: string }[]
+  orgNodes: OrgNode[]
   branches: { id: string; name: string }[]
   readonly?: boolean
 }) {
@@ -873,12 +903,13 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
 export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }: {
   editEmp: Employee | null
   employees: Employee[]
-  orgNodes: { id: string; name: string; type?: string; parentId?: string }[]
+  orgNodes: OrgNode[]
   onClose: () => void
   onSave: (form: EmpExtForm) => void
 }) {
   const [tab, setTab] = useState<EditTab>("personal")
   const branches = orgNodes.filter(n => n.type === "branch")
+  const { showToast } = useToast()
 
   const blank = (): EmpExtForm => ({
     name: "", email: "", phone: "", department: "", position: "", positionId: "",
@@ -894,23 +925,26 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
 
   const [form, setForm] = useState<EmpExtForm>(() => editEmp ? { ...blank(), ...editEmp } : blank())
   const sf = useCallback((k: keyof EmpExtForm, v: any) => setForm(p => ({ ...p, [k]: v })), [])
-  const [internshipMonths, setInternshipMonths] = useState(2)
+
+  const [internshipMonths, setInternshipMonths] = useState<number | null>(null)
 
   useEffect(() => {
     api.systemConfig.get()
       .then(res => {
-        if (res && res.internshipMonths !== undefined) {
-          setInternshipMonths(Number(res.internshipMonths))
-        }
+        const m = Number(res?.internshipMonths)
+        setInternshipMonths(Number.isFinite(m) && m > 0 ? m : DEFAULT_INTERNSHIP_MONTHS)
       })
-      .catch(err => console.error("Lỗi lấy cấu hình thực tập:", err))
+      .catch(() => setInternshipMonths(DEFAULT_INTERNSHIP_MONTHS))
   }, [])
 
+ 
   useEffect(() => {
-    if (form.contractType === "intern" && !form.internEndDate && form.joinDate) {
-      sf("internEndDate", addMonthsToVNDate(form.joinDate, internshipMonths))
-    }
-  }, [form.status, form.joinDate, internshipMonths, form.internEndDate, sf])
+    if (internshipMonths == null) return
+    if (form.contractType !== "intern" || !form.joinDate) return
+    const nextEnd = addMonthsToVNDate(form.joinDate, internshipMonths)
+    if (!nextEnd) return
+    setForm((p) => (p.internEndDate === nextEnd ? p : { ...p, internEndDate: nextEnd }))
+  }, [internshipMonths, form.contractType, form.joinDate])
 
   const inp = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/50 focus:ring-1 focus:ring-[#C62828]/10 transition-all text-gray-700 bg-white"
   const sel = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/50 text-gray-700 bg-white"
@@ -927,6 +961,88 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
     () => previewEmployeeId(employees.map(e => e.id)),
     [employees]
   )
+
+  const handleOnSaveClick = () => {
+    const name = (form.name || "").trim()
+    if (!name) {
+      showToast("Họ tên không được để trống", "error")
+      setTab("personal")
+      return
+    }
+
+    const email = (form.email || "").trim()
+    if (!email) {
+      showToast("Email không được để trống", "error")
+      setTab("personal")
+      return
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      showToast("Email không đúng định dạng", "error")
+      setTab("personal")
+      return
+    }
+    const duplicateEmail = employees.find(e => e.email.trim().toLowerCase() === email.toLowerCase() && (!editEmp || e.id !== editEmp.id))
+    if (duplicateEmail) {
+      showToast(`Email "${email}" đã tồn tại trên hệ thống (Nhân viên: ${duplicateEmail.name})`, "error")
+      setTab("personal")
+      return
+    }
+
+    const phone = (form.phone || "").trim()
+    if (phone) {
+      const phoneRegex = /^[0-9]+$/
+      if (!phoneRegex.test(phone)) {
+        showToast("Số điện thoại chỉ được chứa ký số", "error")
+        setTab("personal")
+        return
+      }
+      if (phone.length < 10 || phone.length > 11) {
+        showToast("Số điện thoại phải từ 10 đến 11 ký số", "error")
+        setTab("personal")
+        return
+      }
+      const duplicatePhone = employees.find(e => e.phone.trim() === phone && (!editEmp || e.id !== editEmp.id))
+      if (duplicatePhone) {
+        showToast(`Số điện thoại "${phone}" đã tồn tại trên hệ thống (Nhân viên: ${duplicatePhone.name})`, "error")
+        setTab("personal")
+        return
+      }
+    }
+
+    const cccd = (form.cccd || "").trim()
+    if (cccd) {
+      const cccdRegex = /^[0-9]+$/
+      if (!cccdRegex.test(cccd)) {
+        showToast("Số CCCD chỉ được chứa ký số", "error")
+        setTab("personal")
+        return
+      }
+      if (cccd.length !== 9 && cccd.length !== 12) {
+        showToast("Số CCCD phải có độ dài là 9 hoặc 12 ký số", "error")
+        setTab("personal")
+        return
+      }
+      const duplicateCccd = employees.find(e => e.cccd && e.cccd.trim() === cccd && (!editEmp || e.id !== editEmp.id))
+      if (duplicateCccd) {
+        showToast(`Số CCCD "${cccd}" đã tồn tại trên hệ thống (Nhân viên: ${duplicateCccd.name})`, "error")
+        setTab("personal")
+        return
+      }
+    }
+
+    const bankAccount = (form.bankAccount || "").trim()
+    if (bankAccount) {
+      const bankAccRegex = /^[0-9]+$/
+      if (!bankAccRegex.test(bankAccount)) {
+        showToast("Số tài khoản ngân hàng chỉ được chứa ký số", "error")
+        setTab("personal")
+        return
+      }
+    }
+
+    onSave(form)
+  }
 
   return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3">
@@ -973,7 +1089,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
               className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors">
               Hủy
             </button>
-            <button onClick={() => onSave(form)}
+            <button onClick={handleOnSaveClick}
               className="px-6 py-2.5 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-sm shadow-[#C62828]/20">
               {editEmp ? "Lưu thay đổi" : "Thêm nhân viên"}
             </button>
@@ -988,7 +1104,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
 export function EmployeeManagement({ employees, setEmployees, orgNodes = [], selectedBranch = "all", onBranchChange, autoOpenUpdateReqId, onClearAutoOpenReq }: {
   employees: Employee[]
   setEmployees: React.Dispatch<React.SetStateAction<Employee[]>>
-  orgNodes?: { id: string; name: string; type?: string; parentId?: string }[]
+  orgNodes?: OrgNode[]
   selectedBranch?: string
   onBranchChange?: (b: string) => void
   autoOpenUpdateReqId?: string | null
@@ -1011,6 +1127,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
   const [deleteEmpId, setDeleteEmpId] = useState<string | null>(null)
   const [profileUpdates, setProfileUpdates] = useState<any[]>([])
   const [previewReq, setPreviewReq] = useState<any | null>(null)
+  const { showToast } = useToast()
   const [previewMode, setPreviewMode] = useState<"diff" | "form">("diff")
   const [previewFormTab, setPreviewFormTab] = useState<EditTab>("personal")
   const [inputModal, setInputModal] = useState<{
@@ -1060,8 +1177,9 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     try {
       const res = await api.profileUpdates.request(empId, note)
       setProfileUpdates(prev => [...prev, res])
+      showToast("Đã gửi yêu cầu cập nhật hồ sơ thành công!", "success")
     } catch (e: any) {
-      alert(e.message)
+      showToast(e.message, "error")
     }
   }
 
@@ -1073,8 +1191,9 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
         setEmployees(prev => prev.map(e => e.id === previewReq.employeeId ? { ...e, ...previewReq.pendingData } : e))
       }
       setPreviewReq(null)
+      showToast("Đã phê duyệt cập nhật hồ sơ thành công!", "success")
     } catch (e: any) {
-      alert(e.message)
+      showToast(e.message, "error")
     }
   }
 
@@ -1083,8 +1202,9 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       await api.profileUpdates.reject(id, reason)
       setProfileUpdates(prev => prev.map(p => p.id === id ? { ...p, status: "rework_requested", reworkReason: reason } : p))
       setPreviewReq(null)
+      showToast("Đã yêu cầu nhân viên sửa đổi bổ sung hồ sơ!", "success")
     } catch (e: any) {
-      alert(e.message)
+      showToast(e.message, "error")
     }
   }
 
@@ -1116,15 +1236,17 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       if (editEmp) {
         const updated = await api.employees.update(editEmp.id, finalForm) as Employee
         setEmployees(prev => prev.map(e => e.id === editEmp.id ? { ...e, ...updated } : e))
+        showToast("Đã cập nhật thông tin nhân viên thành công!", "success")
       } else {
         const created = await api.employees.create(finalForm) as Employee
         setEmployees(prev => [...prev, created])
+        showToast("Đã thêm mới nhân viên thành công!", "success")
       }
       setShowModal(false)
       setEditEmp(null)
     } catch (err) {
       console.error("Lỗi lưu nhân viên:", err)
-      alert(err instanceof Error ? err.message : "Không thể lưu nhân viên")
+      showToast(err instanceof Error ? err.message : "Không thể lưu nhân viên", "error")
     }
   }
 
@@ -1214,9 +1336,15 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
 
   const confirmDelete = async () => {
     if (!deleteEmpId) return
-    try { await api.employees.delete(deleteEmpId) } catch {}
-    setEmployees(prev => prev.filter(e => e.id !== deleteEmpId))
-    setDeleteEmpId(null)
+    try {
+      await api.employees.delete(deleteEmpId)
+      setEmployees(prev => prev.filter(e => e.id !== deleteEmpId))
+      showToast("Đã xóa nhân viên thành công!", "success")
+    } catch (e: any) {
+      showToast(e.message || "Xóa nhân viên thất bại", "error")
+    } finally {
+      setDeleteEmpId(null)
+    }
   }
 
   const openEdit = (emp: Employee) => { setEditEmp(emp); setShowModal(true) }
@@ -1256,7 +1384,6 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/[0.06] space-y-3">
-        {/* Removed local branch filters to avoid conflict with global header */}
 
         <div className="flex gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">

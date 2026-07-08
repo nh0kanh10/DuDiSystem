@@ -1,5 +1,5 @@
 import { Router } from "express"
-import { loginHandler, getMeHandler, refreshHandler } from "../controllers/auth.controller.js"
+import { loginHandler, getMeHandler, refreshHandler, changePasswordHandler } from "../controllers/auth.controller.js"
 import { authenticate } from "../middlewares/auth.js"
 import { fail } from "../utils/response.js"
 
@@ -13,5 +13,6 @@ router.post("/login", (req, res, next) => {
 
 router.get("/me", authenticate, getMeHandler)
 router.post("/refresh", authenticate, refreshHandler)
+router.post("/change-password", authenticate, changePasswordHandler)
 
 export default router

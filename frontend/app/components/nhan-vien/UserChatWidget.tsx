@@ -135,13 +135,13 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       searchRoster(search.trim());
-    }, 300);
+    }, search.trim() ? 300 : 0);
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
   }, [search, open, searchRoster]);
 
   const rosterList = employees;
 
-  const suggestList = search.trim() ? searchResults : [];
+  const suggestList = searchResults;
 
   const handleOpenChat = useCallback(async (id: string) => {
     setActiveId(id);
@@ -374,11 +374,16 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
                         padding: 6,
                       }}
                     >
-                      {!search.trim() && (
+                      {!search.trim() && !searching && suggestList.length === 0 && (
                         <p style={{ fontSize: 12, color: "#7f5f63", textAlign: "center", padding: "12px 8px" }}>
                           {rosterScope === "company"
-                            ? "Nhập tên để tìm nhân viên mọi chi nhánh"
-                            : "Nhập tên để tìm nhân viên cùng chi nhánh"}
+                            ? "Không có nhân viên khả dụng"
+                            : "Không có nhân viên cùng chi nhánh"}
+                        </p>
+                      )}
+                      {!search.trim() && suggestList.length > 0 && (
+                        <p style={{ fontSize: 11, color: "#a98488", padding: "4px 8px 6px", fontWeight: 600 }}>
+                          {rosterScope === "company" ? "Nhân viên toàn công ty" : "Nhân viên cùng chi nhánh"}
                         </p>
                       )}
                       {search.trim() && searching && (

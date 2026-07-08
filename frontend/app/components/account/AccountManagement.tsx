@@ -9,6 +9,7 @@ import { api } from "../../../lib/api"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomCombobox } from "../ui/CustomCombobox"
 import ConfirmModal from "../ui/ConfirmModal"
+import { useToast } from "@/app/hooks/useToast"
 
 interface UserRecord {
   id: string
@@ -206,7 +207,8 @@ export default function AccountManagement({
     roleType: "management"
   })
 
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
+  const { showToast } = useToast()
+
   const [resetSuccess, setResetSuccess] = useState<{ email: string; rawPass: string } | null>(null)
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean
@@ -217,11 +219,6 @@ export default function AccountManagement({
     type?: "danger" | "warning" | "info"
     onConfirm: () => void
   } | null>(null)
-
-  const showToast = (message: string, type: "success" | "error" = "success") => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
 
   const selectedFormRole = rolesList.find(r => r.id === form.roleId)
   const showBranchSelect = selectedFormRole?.scopeType === "branch"
@@ -654,8 +651,8 @@ export default function AccountManagement({
     setShowModal(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault()
     const loginId = form.employeeId || form.email
     if (!loginId.trim()) {
       showToast("Mã đăng nhập là bắt buộc", "error")
@@ -770,13 +767,6 @@ export default function AccountManagement({
 
   return (
     <div className="space-y-5">
-      {toast && createPortal(
-        <div className={`fixed bottom-6 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] border backdrop-blur-sm animate-in slide-in-from-right duration-300
-          ${toast.type === "success" ? "bg-gray-900/95 text-white border-white/10" : "bg-red-900/95 text-white border-red-500/20"}`}>
-          <div className={`w-2.5 h-2.5 rounded-full ${toast.type === "success" ? "bg-emerald-400" : "bg-red-400"} animate-pulse`} />
-          <span className="text-sm font-semibold">{toast.message}</span>
-        </div>
-        , document.body)}
 
       {resetSuccess && createPortal(
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
@@ -1347,7 +1337,7 @@ export default function AccountManagement({
               <button onClick={() => setShowModal(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-all"><X size={16} /></button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex gap-6">
+            <div className="flex gap-6">
               <div className="flex-1 space-y-4">
                 <div>
                   <label className="text-xs font-black text-gray-500 mb-1.5 block">Gán nhân viên</label>
@@ -1443,7 +1433,7 @@ export default function AccountManagement({
 
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2.5 border border-gray-200 rounded-2xl text-sm font-bold text-gray-600 hover:bg-gray-50 active:scale-95 transition-all">Huỷ</button>
-                  <button type="submit"
+                  <button type="button" onClick={() => handleSubmit()}
                     className="flex-1 py-2.5 bg-[#C62828] text-white rounded-2xl text-sm font-bold hover:bg-[#B71C1C] active:scale-95 transition-all shadow-sm">
                     {editingAcc ? "Cập nhật" : "Tạo tài khoản"}
                   </button>
@@ -1457,7 +1447,6 @@ export default function AccountManagement({
                     <p className="text-[10px] text-gray-400 mt-0.5">Tùy chỉnh riêng cho tài khoản</p>
                   </div>
 
-                  {/* Modal Perm Tab Switcher */}
                   <div className="flex gap-1.5 border-b border-gray-150 pb-2 mb-3">
                     {!isModalRoleStaff && (
                       <button
@@ -1544,7 +1533,7 @@ export default function AccountManagement({
                   </div>
                 </div>
               )}
-            </form>
+            </div>
           </div>
         </div>
         , document.body)}

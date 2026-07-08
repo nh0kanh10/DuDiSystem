@@ -65,7 +65,7 @@ function WifiStatusBanner({ ipStatus, checking }: { ipStatus: { valid: boolean; 
         background: "#f0fdf4", border: "1px solid #bbf7d0",
         color: "#166534", fontSize: 13, fontWeight: 750,
       }}>
-        <span>{ipStatus.message || `Đúng WiFi công ty · ${ipStatus.ip}`}</span>
+        <span>Đúng WiFi công ty</span>
       </div>
     )
   }
@@ -76,7 +76,7 @@ function WifiStatusBanner({ ipStatus, checking }: { ipStatus: { valid: boolean; 
       background: "#fef2f2", border: "1px solid #fecaca",
       color: "#b91c1c", fontSize: 13, fontWeight: 750, textAlign: "center",
     }}>
-      <span>{ipStatus.message}</span>
+      <span>Vui lòng kết nối wifi công ty để chấm công.</span>
     </div>
   )
 }
@@ -90,14 +90,14 @@ function WifiStatusBannerLight({ ipStatus, checking }: { ipStatus: { valid: bool
     return (
       <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm font-medium">
         <Wifi size={15} className="shrink-0" />
-        <span>{ipStatus.message || `Đúng WiFi công ty · ${ipStatus.ip}`}</span>
+        <span>Đúng WiFi công ty</span>
       </div>
     )
   }
   return (
     <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
       <Wifi size={15} className="shrink-0 mt-0.5" />
-      <span>{ipStatus.message}</span>
+      <span>Vui lòng kết nối wifi công ty để chấm công.</span>
     </div>
   )
 }
@@ -143,6 +143,12 @@ function PortalAttendanceView() {
     { l: "Vắng / nghỉ", v: monthStats.absent + monthStats.leave, c: "#ff5555", g: "rgba(255,85,85,0.22)" },
   ]
 
+  const handlePunchWithConfirm = () => {
+    if (window.confirm(`Xác nhận thực hiện ${punchLabel.label}?`)) {
+      punch()
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
       {error && (
@@ -163,14 +169,14 @@ function PortalAttendanceView() {
       <p style={{ fontSize: 13, fontWeight: 750, color: "#7f5f63", letterSpacing: "0.04em" }}>
         {isIntern ? `${EMPLOYEE_KIND.intern.label} · theo buổi` : `${EMPLOYEE_KIND.staff.label} · theo ngày`} · {isSuperAdmin ? "Miễn chấm công" : statusText}
       </p>
-
+ 
       <div style={{ display: "flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
         <span style={{ fontSize: 56, color: PORTAL_BRAND, textShadow: `0 8px 22px ${PORTAL_GR}` }}>{hms.h}</span>
         <span style={{ fontSize: 48, color: PORTAL_BRAND, opacity: 0.3, animation: "colon-blink 1s step-end infinite" }}>:</span>
         <span style={{ fontSize: 56, color: PORTAL_BRAND, textShadow: `0 8px 22px ${PORTAL_GR}` }}>{hms.m}</span>
         <span style={{ fontSize: 18, color: "#8b6b70", marginLeft: 6, alignSelf: "flex-start", marginTop: 6 }}>{hms.s}</span>
       </div>
-
+ 
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {!working && !punchLabel.done && !isSuperAdmin && (
           <>
@@ -179,8 +185,8 @@ function PortalAttendanceView() {
           </>
         )}
         <button
-          onClick={isSuperAdmin ? undefined : punch}
-          disabled={loading || punching || punchLabel.done || isSuperAdmin}
+          onClick={isSuperAdmin ? undefined : handlePunchWithConfirm}
+          disabled={loading || punching || punchLabel.done || isSuperAdmin || (!!ipStatus && !ipStatus.valid)}
           style={{
             width: 112, height: 112, borderRadius: "50%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5,
             border: "none", cursor: (punchLabel.done || isSuperAdmin) ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 900, color: "#fff", opacity: (punchLabel.done || isSuperAdmin) ? 0.5 : 1,
@@ -286,6 +292,22 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
     reload,
   } = useEmployeeAttendance()
 
+  const isSuperAdmin = React.useMemo(() => {
+    try {
+      const raw = localStorage.getItem("dudi_user")
+      const u = raw ? JSON.parse(raw) : null
+      return u?.roleId === "role-super-admin" || ["0000000000", "1111111111", "2222222222"].includes(u?.employeeId)
+    } catch {
+      return false
+    }
+  }, [])
+
+  const handlePunchWithConfirm = () => {
+    if (window.confirm(`Xác nhận thực hiện ${punchLabel.label}?`)) {
+      punch()
+    }
+  }
+
   const working = !punchLabel.done && statusText === "Đang làm việc"
   const monthLabel = new Date().toLocaleDateString("vi-VN", { month: "long", year: "numeric" })
   const times = todayRecord ? formatAttendanceTimes(todayRecord) : null
@@ -333,8 +355,8 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
           )}
         </div>
         <button
-          onClick={punch}
-          disabled={loading || punching || punchLabel.done}
+          onClick={handlePunchWithConfirm}
+          disabled={loading || punching || punchLabel.done || isSuperAdmin || (!!ipStatus && !ipStatus.valid)}
           className={`w-24 h-24 rounded-full flex flex-col items-center justify-center gap-2 transition-all duration-300 border-2 shrink-0
             ${punchLabel.done ? "opacity-50 cursor-not-allowed bg-white/5 border-white/20" :
               working ? "bg-green-600/20 border-green-500/50 hover:scale-105 active:scale-95" :

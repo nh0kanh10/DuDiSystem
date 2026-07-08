@@ -136,3 +136,9 @@ src copy/
 
 # Lead quote/contract files (generated at runtime)
 backend/storage/
+
+# Temp templates and scratches
+scratch/
+_template_unzip/
+*.docx
+

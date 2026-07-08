@@ -136,14 +136,9 @@ export function useStaffChat(options?: { panelOpen?: boolean }) {
   loadRosterRef.current = loadRoster
 
   const searchRoster = useCallback(async (q: string) => {
-    const term = q.trim()
-    if (!term) {
-      setSearchResults([])
-      return
-    }
     setSearching(true)
     try {
-      const data = await api.staffChat.roster(term, "all")
+      const data = await api.staffChat.roster(q.trim() || undefined, "all")
       setSearchResults((data.items ?? []).map(mapRosterItem))
       if (data.rosterScope) setRosterScope(data.rosterScope)
     } catch {

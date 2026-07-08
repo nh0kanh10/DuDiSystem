@@ -234,3 +234,32 @@ export async function updateAdminAccount(id, data) {
 
   return true
 }
+
+export async function changePassword(userId, oldPassword, newPassword) {
+  const user = repo.getById(userId)
+  if (!user) throw new Error("Không tìm thấy tài khoản")
+
+  if (!oldPassword || !newPassword) {
+    throw new Error("Mật khẩu cũ và mật khẩu mới là bắt buộc")
+  }
+
+  const valid = await bcrypt.compare(oldPassword, user.password)
+  if (!valid) throw new Error("Mật khẩu cũ không chính xác")
+
+  if (newPassword.length < 6) {
+    throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự")
+  }
+
+  if (oldPassword === newPassword) {
+    throw new Error("Mật khẩu mới không được trùng với mật khẩu cũ")
+  }
+
+  const salt = await bcrypt.genSalt(10)
+  const hashedPassword = await bcrypt.hash(newPassword, salt)
+
+  repo.update(userId, {
+    password: hashedPassword
+  })
+
+  return true
+}

@@ -6,6 +6,7 @@ import {
 import { Employee, OrgNode } from "../../types"
 import { api } from "@/lib/api"
 import { mergeTaskList, subscribeTaskSocket } from "@/lib/taskSocket"
+import { useToast } from "@/app/hooks/useToast"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomDatePicker } from "../ui/CustomDatePicker"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
@@ -13,6 +14,7 @@ import ConfirmModal from "../ui/ConfirmModal"
 
 export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   const [tasks, setTasks] = useState<any[]>([])
+  const { showToast } = useToast()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [orgNodes, setOrgNodes] = useState<OrgNode[]>([])
   const [loading, setLoading] = useState(false)
@@ -57,11 +59,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     status: "todo" as "todo" | "in-progress" | "done"
   })
 
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
-  const showToast = (message: string, type: "success" | "error" = "success") => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
+
 
   const parseVnDate = (s: string) => {
     if (!s) return null
@@ -393,13 +391,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
   return (
     <div className="space-y-5">
-      {toast && createPortal(
-        <div className={`fixed bottom-6 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] border backdrop-blur-sm animate-in slide-in-from-right duration-300
-          ${toast.type === "success" ? "bg-gray-900/95 text-white border-white/10" : "bg-red-900/95 text-white border-red-500/20"}`}>
-          <div className={`w-2.5 h-2.5 rounded-full ${toast.type === "success" ? "bg-emerald-400" : "bg-red-400"} animate-pulse`} />
-          <span className="text-sm font-semibold">{toast.message}</span>
-        </div>
-      , document.body)}
 
       <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
         <div className="flex items-center">

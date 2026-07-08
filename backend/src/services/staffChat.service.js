@@ -62,10 +62,15 @@ function peerSummary(peer, online) {
   }
 }
 
-function getChatBranchFilter(user) {
-  if (isAdminUser(user)) return null
+function resolveUserBranchId(user) {
   const me = empRepo.getById(user.employeeId)
-  return user.branchId || me?.branchId || null
+  const fromToken = user.branchId
+  if (fromToken && fromToken !== "all") return fromToken
+  return me?.branchId || null
+}
+
+function getChatBranchFilter(user) {
+  return null
 }
 
 function rosterFilterForUser(user) {
@@ -76,18 +81,6 @@ function rosterFilterForUser(user) {
 }
 
 function assertChatPeerInScope(user, peerId) {
-  if (isAdminUser(user)) return null
-
-  const peer = empRepo.getById(peerId)
-  const me = empRepo.getById(user.employeeId)
-  if (!peer || !me) {
-    return { error: "Không tìm thấy thông tin nhân viên", status: 404 }
-  }
-
-  const myBranch = user.branchId || me.branchId
-  if (!myBranch || peer.branchId !== myBranch) {
-    return { error: "Chỉ được nhắn tin với nhân viên cùng chi nhánh", status: 403 }
-  }
   return null
 }
 
@@ -375,7 +368,7 @@ export function getRoster(user, query = "", options = {}) {
     return tb - ta
   })
 
-  return { items, onlineCount, total: items.length, scope, rosterScope: isAdminUser(user) ? "company" : "branch" }
+  return { items, onlineCount, total: items.length, scope, rosterScope: "company" }
 }
 
 export function heartbeat(user) {
@@ -425,6 +418,6 @@ export function getOnlineStatus(user) {
     onlineIds: onlineEmployees.map(e => e.id),
     presence: onlineMap,
     onlineEmployees,
-    rosterScope: isAdminUser(user) ? "company" : "branch",
+    rosterScope: "company",
   }
 }

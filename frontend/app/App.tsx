@@ -34,7 +34,6 @@ import { LeadManagement } from "./components/lead/LeadManagement"
 import { PublicRequirementForm } from "./components/lead/PublicRequirementForm"
 
 // Imported user portal components
-import { UserHome } from "./components/nhan-vien/UserHome"
 import UserAttendance from "./components/nhan-vien/UserAttendance"
 import UserTimeOff from "./components/nhan-vien/UserTimeOff"
 import { UserDirectory } from "./components/nhan-vien/UserDirectory"
@@ -49,6 +48,7 @@ import { api } from "@/lib/api"
 import { connectChatSocket, releaseChatSocket, resetChatSocket, chatHeartbeat, getChatSocketStatus } from "@/lib/chatSocket"
 import { useNotificationBadge } from "./hooks/useNotifications"
 import { touchSession, resetSessionTouchClock } from "@/lib/session"
+import { ToastProvider } from "./hooks/useToast"
 
 function getISOWeek(d: Date): number {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
@@ -82,6 +82,14 @@ function getDateRange(startStr: string, endStr: string): Date[] {
 }
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  )
+}
+
+function AppContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return !!localStorage.getItem("dudi_token")
   })
@@ -504,10 +512,10 @@ export default function App() {
 
   const renderPage = () => {
     if (!hasPageAccess(activeRolePermissions, activePage)) {
-      return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
+      return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
     }
     switch (activePage) {
-      case "dashboard": return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
+      case "dashboard": return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
       case "nhan-su": return (
         <EmployeeManagement
           employees={employees}
@@ -592,7 +600,7 @@ export default function App() {
             />
           )
         }
-        default: return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
+        default: return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
       }
   }
 
@@ -735,7 +743,9 @@ function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate
   }, [collapsed, open])
 
   const handleClick = () => {
-    onFlyoutOpen?.()
+    if (collapsed) {
+      onFlyoutOpen?.()
+    }
     onToggle(gKey)
   }
 
@@ -845,7 +855,7 @@ function UserAwareSidebar({
   orgNodes?: OrgNode[]
   onSelectUpdateReq?: (id: string | null) => void
 }) {
-  const [expanded, setExpanded] = useState<string[]>(["nhan-su"])
+  const [expanded, setExpanded] = useState<string[]>([])
   const [showBranchDrop, setShowBranchDrop] = useState(false)
   const [showNotifDrop, setShowNotifDrop] = useState(false)
   const [showUserDrop, setShowUserDrop] = useState(false)
@@ -1140,7 +1150,7 @@ function UserAwareSidebar({
         )}
 
         {hasAccess("thong-ke") && <NavItem page="thong-ke" icon={BarChart3} label="Báo cáo thống kê" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Thông báo" badge={2} active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Thông báo" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("lead") && <NavItem page="lead" icon={User} label="Trước dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}

@@ -32,6 +32,53 @@ export function getEmployee(id) {
 }
 
 export async function createEmployee(data) {
+  const email = (data.email || "").trim()
+  if (!email) {
+    throw new Error("Email không được để trống")
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    throw new Error("Email không đúng định dạng")
+  }
+  const existingEmail = repo.getByEmail(email)
+  if (existingEmail) {
+    throw new Error(`Email "${email}" đã tồn tại trong hệ thống`)
+  }
+
+  const phone = (data.phone || "").trim()
+  if (phone) {
+    const phoneRegex = /^[0-9]+$/
+    if (!phoneRegex.test(phone)) {
+      throw new Error("Số điện thoại chỉ được chứa ký số")
+    }
+    if (phone.length < 10 || phone.length > 11) {
+      throw new Error("Số điện thoại phải từ 10 đến 11 ký số")
+    }
+  }
+
+  const cccd = (data.cccd || "").trim()
+  if (cccd) {
+    const cccdRegex = /^[0-9]+$/
+    if (!cccdRegex.test(cccd)) {
+      throw new Error("Số CCCD chỉ được chứa ký số")
+    }
+    if (cccd.length !== 9 && cccd.length !== 12) {
+      throw new Error("Số CCCD phải có độ dài là 9 hoặc 12 ký số")
+    }
+    const existingCccd = repo.getAll().find(e => e.cccd && e.cccd.trim() === cccd)
+    if (existingCccd) {
+      throw new Error(`Số CCCD "${cccd}" đã tồn tại trong hệ thống`)
+    }
+  }
+
+  const bankAccount = (data.bankAccount || "").trim()
+  if (bankAccount) {
+    const bankAccRegex = /^[0-9]+$/
+    if (!bankAccRegex.test(bankAccount)) {
+      throw new Error("Số tài khoản ngân hàng chỉ được chứa ký số")
+    }
+  }
+
   const takenIds = collectTakenEmployeeIds(repo, userRepo)
   let fields = {
     id: generateEmployeeId(takenIds),
@@ -91,6 +138,62 @@ export async function createEmployee(data) {
 }
 
 export function updateEmployee(id, patch) {
+  if (patch.email !== undefined) {
+    const email = (patch.email || "").trim()
+    if (!email) {
+      throw new Error("Email không được để trống")
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      throw new Error("Email không đúng định dạng")
+    }
+    const existingEmail = repo.getByEmail(email)
+    if (existingEmail && existingEmail.id !== id) {
+      throw new Error(`Email "${email}" đã tồn tại trong hệ thống`)
+    }
+    patch.email = email
+  }
+
+  if (patch.phone !== undefined) {
+    const phone = (patch.phone || "").trim()
+    if (phone) {
+      const phoneRegex = /^[0-9]+$/
+      if (!phoneRegex.test(phone)) {
+        throw new Error("Số điện thoại chỉ được chứa ký số")
+      }
+      if (phone.length < 10 || phone.length > 11) {
+        throw new Error("Số điện thoại phải từ 10 đến 11 ký số")
+      }
+    }
+  }
+
+  if (patch.cccd !== undefined) {
+    const cccd = (patch.cccd || "").trim()
+    if (cccd) {
+      const cccdRegex = /^[0-9]+$/
+      if (!cccdRegex.test(cccd)) {
+        throw new Error("Số CCCD chỉ được chứa ký số")
+      }
+      if (cccd.length !== 9 && cccd.length !== 12) {
+        throw new Error("Số CCCD phải có độ dài là 9 hoặc 12 ký số")
+      }
+      const existingCccd = repo.getAll().find(e => e.cccd && e.cccd.trim() === cccd)
+      if (existingCccd && existingCccd.id !== id) {
+        throw new Error(`Số CCCD "${cccd}" đã tồn tại trong hệ thống`)
+      }
+    }
+  }
+
+  if (patch.bankAccount !== undefined) {
+    const bankAccount = (patch.bankAccount || "").trim()
+    if (bankAccount) {
+      const bankAccRegex = /^[0-9]+$/
+      if (!bankAccRegex.test(bankAccount)) {
+        throw new Error("Số tài khoản ngân hàng chỉ được chứa ký số")
+      }
+    }
+  }
+
   let safe = { ...patch }
   if (safe.orgNodeId !== undefined) {
     safe = applyOrgSync(safe)

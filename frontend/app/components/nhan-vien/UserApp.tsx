@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { ImageWithFallback } from "../figma/ImageWithFallback";
 import { dudiLogo } from "../ui/BrandLogo";
+import { useToast } from "../../hooks/useToast";
 import { useMyTasks } from "../../hooks/useMyTasks";
 import {
   useNotifications,
@@ -1741,12 +1742,17 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
       .catch(() => {});
   }, []);
   useEffect(() => {
+    loadAdminRequests();
+    loadAnnouncements();
+  }, [employee?.id]);
+
+  useEffect(() => {
     if (activeSubTab === "broadcast") {
       loadAnnouncements();
     } else if (activeSubTab === "admin_req") {
       loadAdminRequests();
     }
-  }, [activeSubTab, employee?.id]);
+  }, [activeSubTab]);
   const handleReload = () => {
     if (activeSubTab === "inbox") {
       reloadInbox();
@@ -2359,7 +2365,51 @@ function SettingsContent({
   const [vals, setVals] = useState(["", "", ""]);
   const [shows, setShows] = useState([false, false, false]);
   const [saved, setSaved] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const labels = ["Mật khẩu cũ", "Mật khẩu mới", "Xác nhận mật khẩu mới"];
+
+  const handleChangePassword = async () => {
+    const oldPassword = vals[0].trim();
+    const newPassword = vals[1].trim();
+    const confirmPassword = vals[2].trim();
+
+    setErrorMsg(null);
+    setSaved(false);
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setErrorMsg("Vui lòng điền đầy đủ các thông tin mật khẩu.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setErrorMsg("Mật khẩu mới phải có ít nhất 6 ký tự.");
+      return;
+    }
+
+    if (newPassword === oldPassword) {
+      setErrorMsg("Mật khẩu mới không được trùng với mật khẩu cũ.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setErrorMsg("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await api.auth.changePassword(oldPassword, newPassword);
+      setSaved(true);
+      setVals(["", "", ""]);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu cũ.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -2455,14 +2505,34 @@ function SettingsContent({
             Đổi mật khẩu thành công!
           </div>
         )}
+        {errorMsg && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 14px",
+              borderRadius: 12,
+              background: "rgba(239,68,68,0.09)",
+              border: "1px solid rgba(239,68,68,0.2)",
+              color: "#ef4444",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {errorMsg}
+          </div>
+        )}
         <button
-          onClick={() => {
-            setSaved(true);
-            setTimeout(() => setSaved(false), 3000);
+          onClick={handleChangePassword}
+          disabled={loading}
+          style={{
+            ...BTN_S,
+            opacity: loading ? 0.7 : 1,
+            cursor: loading ? "not-allowed" : "pointer"
           }}
-          style={BTN_S}
         >
-          Cập nhật mật khẩu
+          {loading ? "Đang xử lý..." : "Cập nhật mật khẩu"}
         </button>
       </div>
       <div
@@ -2571,6 +2641,7 @@ export default function UserPortalApp({
   modules?: string[];
   embed?: boolean;
 }) {
+  const { showToast } = useToast();
   const [activePage, setActivePage] = useState<BubbleId | null>(null);
   const [hovId, setHovId] = useState<BubbleId | null>(null);
   const [employee, setEmployee] = useState<Employee | null>(null);
@@ -2579,6 +2650,22 @@ export default function UserPortalApp({
   >([]);
   const [defaultAnnouncement, setDefaultAnnouncement] = useState("");
   const { unread: notifUnread } = useNotifications();
+  const [adminReqCount, setAdminReqCount] = useState(0);
+
+  useEffect(() => {
+    if (!employee?.id) return;
+    api.profileUpdates.list({ employeeId: employee.id })
+      .then((data: any) => {
+        const filtered = (data || []).filter((r: any) =>
+          ["sent", "rework_requested"].includes(r.status)
+        );
+        setAdminReqCount(filtered.length);
+      })
+      .catch(() => {});
+  }, [employee?.id, activePage]);
+
+  const totalUnread = notifUnread + adminReqCount;
+
   useEffect(() => {
     const loadEmployee = async () => {
       let userObj: any = null;
@@ -2667,7 +2754,30 @@ export default function UserPortalApp({
       clearInterval(timer);
     };
   }, []);
-  const handleBubbleClick = (id: BubbleId) => setActivePage(id);
+  const handleBubbleClick = async (id: BubbleId) => {
+    if (id === "checkin") {
+      const rawUser = localStorage.getItem("dudi_user");
+      const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+      const isSuperAdmin = parsedUser?.roleId === "role-super-admin" || ["0000000000", "1111111111", "2222222222"].includes(parsedUser?.employeeId || parsedUser?.id || "");
+      if (isSuperAdmin) {
+        setActivePage(id);
+        return;
+      }
+
+      try {
+        const res = await api.attendance.checkIP();
+        if (res && res.valid) {
+          setActivePage(id);
+        } else {
+          showToast("Vui lòng kết nối wifi công ty để chấm công.", "error");
+        }
+      } catch (e) {
+        showToast("Vui lòng kết nối wifi công ty để chấm công.", "error");
+      }
+      return;
+    }
+    setActivePage(id);
+  };
   const staffModules = getStaffPortalModules(modules);
   const allowedBubbles = BUBBLES.filter((b) => {
     if (!LIVE_STAFF_BUBBLES.has(b.id)) return false;
@@ -2687,11 +2797,11 @@ export default function UserPortalApp({
     .join("\n");
   return (
     <div
-      className="user-portal-shell"
+      className={`user-portal-shell ${embed ? "embedded" : ""}`}
       style={{
         width: embed ? "100%" : "100vw",
         height: embed ? "100%" : "100vh",
-        overflow: "hidden",
+        overflow: embed ? "auto" : "hidden",
         background: `
           radial-gradient(ellipse at 14% 8%, rgba(232,35,26,0.12) 0%, transparent 42%),
           radial-gradient(ellipse at 92% 84%, rgba(232,35,26,0.08) 0%, transparent 48%),
@@ -2710,6 +2820,16 @@ export default function UserPortalApp({
           text-rendering: geometricPrecision;
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
+        }
+        @media (max-height: 800px) {
+          .user-portal-shell:not(.embedded) {
+            height: auto !important;
+            min-height: 100vh !important;
+            overflow-y: auto !important;
+          }
+          .portal-dashboard-aside, .portal-main-column {
+            min-height: auto !important;
+          }
         }
         @keyframes pulseRing {
           0%   { transform: scale(1);    opacity: 0.65; }
@@ -2813,7 +2933,7 @@ export default function UserPortalApp({
           justify-content: center;
         }
         @media (max-width: 1024px) {
-          .user-portal-shell {
+          .user-portal-shell:not(.embedded) {
             height: auto !important;
             min-height: 100dvh !important;
             overflow-y: auto !important;
@@ -3141,10 +3261,11 @@ export default function UserPortalApp({
         <PortalDashboard
           allowedBubbles={allowedBubbles}
           onNavigate={handleBubbleClick}
-          notifUnread={notifUnread}
+          notifUnread={totalUnread}
           activeAnnouncements={activeAnnouncements}
           defaultAnnouncement={defaultAnnouncement}
           onLogout={onLogout}
+          embed={embed}
         />
       )}
       <UserChatWidget embed={embed} />
@@ -3639,6 +3760,7 @@ function PortalDashboard({
   activeAnnouncements,
   defaultAnnouncement,
   onLogout,
+  embed = false,
 }: {
   allowedBubbles: typeof BUBBLES;
   onNavigate: (id: BubbleId) => void;
@@ -3646,6 +3768,7 @@ function PortalDashboard({
   activeAnnouncements: Announcement[];
   defaultAnnouncement: string;
   onLogout: () => void;
+  embed?: boolean;
 }) {
   return (
     <div
@@ -3675,7 +3798,7 @@ function PortalDashboard({
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          minHeight: "calc(100vh - 158px)",
+          minHeight: embed ? "auto" : "calc(100vh - 158px)",
           borderRight: "1px solid rgba(36,20,22,0.1)",
           paddingRight: 34,
         }}
@@ -3789,7 +3912,7 @@ function PortalDashboard({
           display: "flex",
           flexDirection: "column",
           gap: 18,
-          minHeight: "calc(100vh - 158px)",
+          minHeight: embed ? "auto" : "calc(100vh - 158px)",
         }}
       >
         <div

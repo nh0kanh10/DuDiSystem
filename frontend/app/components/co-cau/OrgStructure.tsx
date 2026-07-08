@@ -10,7 +10,8 @@ import ViewMembersModal from "./ViewMembersModal"
 import PositionManagement from "../vi-tri/PositionManagement"
 import { api } from "@/lib/api"
 import { CustomSelect } from "../ui/CustomSelect"
-import { applyOrgFieldsToEmployee, buildOrgSnapshot, findBranchForNode } from "../../utils/orgUtils"
+import { applyOrgFieldsToEmployee, buildOrgSnapshot, findBranchForNode, deriveOrgFields } from "../../utils/orgUtils"
+import { useToast } from "@/app/hooks/useToast"
 
 type RowItem = 
   | { type: "node"; data: OrgNode }
@@ -50,11 +51,7 @@ export default function OrgStructure({
   }, [rawEmployees])
 
   const isSuperAdmin = currentUserRole === "role-admin" || currentUserRole === "role-super-admin"
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null)
-  const showToast = (msg: string, type: "success" | "error" = "success") => {
-    setToast({ msg, type })
-    setTimeout(() => setToast(null), 3500)
-  }
+  const { showToast } = useToast()
 
   const branchScopedEmployees = useMemo(() => {
     if (!selectedBranch || selectedBranch === "all") return employees
@@ -345,7 +342,7 @@ export default function OrgStructure({
             updatedWorkHistory.push(joinEntry)
           }
 
-          const derived = applyOrgFieldsToEmployee({ orgNodeId: targetNode.id }, targetNode.id, orgNodes)
+          const derived = deriveOrgFields(targetNode.id, orgNodes)
           const newHistoryEntry = {
             id: updatedWorkHistory.length + 1,
             type: historyType,
@@ -1081,14 +1078,6 @@ export default function OrgStructure({
         </div>
       , document.body)}
 
-      {toast && createPortal(
-        <div className={`fixed bottom-5 right-5 z-[200] flex items-center px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold ${
-          toast.type === "error" ? "bg-red-50 text-red-800 border-red-100" : "bg-emerald-50 text-emerald-800 border-emerald-100"
-        }`}>
-          {toast.msg}
-        </div>,
-        document.body
-      )}
     </div>
   )
 }
