@@ -12,12 +12,13 @@ export function initials(name: string): string {
   return name.split(" ").pop()?.charAt(0) ?? "?"
 }
 
-export function findBranchForNode(nodeId: string, nodes: any[]): string {
-  const node = nodes.find(n => n.id === nodeId)
-  if (!node) return "all"
-  if (node.type === "branch") return node.id
-  if (node.parentId) {
-    return findBranchForNode(node.parentId, nodes)
-  }
-  return "all"
+export function removeVietnameseTones(str: string): string {
+  if (!str) return "";
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D");
 }
+
+export { findBranchForNode } from "./utils/orgUtils"

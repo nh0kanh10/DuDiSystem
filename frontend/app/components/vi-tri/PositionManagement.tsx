@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { api } from "../../../lib/api"
-import { Plus, Search, Edit2, Trash2, X, Check, Users, Briefcase } from "lucide-react"
+import { Plus, Search, Edit2, Trash2, X, Check, Users, Briefcase, AlertCircle, CheckCircle2 } from "lucide-react"
 import type { OrgNode } from "../../types"
 import { CustomSelect } from "../ui/CustomSelect"
 import { Input } from "../ui/input"
+import { useToast } from "@/app/hooks/useToast"
 
 interface Position {
   id: string
@@ -52,6 +53,7 @@ export default function PositionManagement() {
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   async function load() {
     try {
@@ -85,21 +87,37 @@ export default function PositionManagement() {
     if (Object.keys(e).length) { setErrors(e); return }
     setSaving(true)
     try {
-      if (editId) await api.positions.update(editId, form)
-      else await api.positions.create(form)
+      if (editId) {
+        await api.positions.update(editId, form)
+        showToast("Đã cập nhật chức danh thành công!", "success")
+      } else {
+        await api.positions.create(form)
+        showToast("Đã thêm mới chức danh thành công!", "success")
+      }
       setShowForm(false); await load()
     } catch (err: any) { setErrors({ _: err.message }) }
     setSaving(false)
   }
 
   async function handleDelete(id: string) {
-    try { await api.positions.delete(id); setDeleteConfirm(null); await load() }
-    catch (err: any) { alert(err.message) }
+    try {
+      await api.positions.delete(id)
+      setDeleteConfirm(null)
+      await load()
+      showToast("Đã xóa chức danh thành công!", "success")
+    } catch (err: any) {
+      showToast(err.message || "Xóa chức danh thất bại", "error")
+    }
   }
 
   async function toggleStatus(p: Position) {
-    try { await api.positions.update(p.id, { status: p.status === "active" ? "inactive" : "active" }); await load() }
-    catch {}
+    try {
+      await api.positions.update(p.id, { status: p.status === "active" ? "inactive" : "active" })
+      await load()
+      showToast("Đã cập nhật trạng thái thành công!", "success")
+    } catch (err: any) {
+      showToast(err.message || "Cập nhật trạng thái thất bại", "error")
+    }
   }
 
   const filtered = positions.filter(p => {

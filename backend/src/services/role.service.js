@@ -1,4 +1,5 @@
 import * as repo from "../repositories/role.repository.js"
+import { bumpPermissionsVersionForRole } from "../utils/access.js"
 
 export function listRoles() {
   return repo.getAll()
@@ -19,7 +20,11 @@ export function updateRole(id, data) {
   const patch = { ...data }
   delete patch.isSystem
   delete patch.id
-  return repo.update(id, patch)
+  const updated = repo.update(id, patch)
+  if (updated && patch.modules && JSON.stringify(patch.modules) !== JSON.stringify(current.modules)) {
+    bumpPermissionsVersionForRole(id)
+  }
+  return updated
 }
 
 export function deleteRole(id) {

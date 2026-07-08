@@ -1,6 +1,7 @@
 import { Router } from "express"
 import multer from "multer"
 import { authenticate } from "../middlewares/auth.js"
+import { requireCrmAdmin, requireEmployeeCrm } from "../middlewares/authorize.js"
 import * as ctrl from "../controllers/crm.controller.js"
 
 const router = Router()
@@ -8,30 +9,27 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 router.use(authenticate)
 
-function requireAdmin(req, res, next) {
-  const role = req.user?.roleId
-  if (role === "role-admin" || role === "role-super-admin") return next()
-  res.status(403).json({ success: false, error: "Bạn không có quyền thực hiện thao tác này" })
-}
+router.get("/data",              requireCrmAdmin, ctrl.listData)
+router.post("/data",             requireCrmAdmin, ctrl.createData)
+router.put("/data/:id",          requireCrmAdmin, ctrl.updateData)
+router.delete("/data/:id",       requireCrmAdmin, ctrl.deleteData)
+router.post("/data/delete-bulk", requireCrmAdmin, ctrl.deleteBulkData)
+router.post("/data/import-csv",  requireCrmAdmin, upload.single("file"), ctrl.importCsv)
+router.post("/data/auto-assign", requireCrmAdmin, ctrl.autoAssign)
+router.post("/data/:id/convert-to-lead", requireEmployeeCrm, ctrl.convertToLead)
+router.get("/data/:id/leads", requireEmployeeCrm, ctrl.listCrmLeads)
 
-router.get("/data",              requireAdmin, ctrl.listData)
-router.post("/data",             requireAdmin, ctrl.createData)
-router.put("/data/:id",          requireAdmin, ctrl.updateData)
-router.delete("/data/:id",       requireAdmin, ctrl.deleteData)
-router.post("/data/delete-bulk", requireAdmin, ctrl.deleteBulkData)
-router.post("/data/import-csv",  requireAdmin, upload.single("file"), ctrl.importCsv)
-router.post("/data/auto-assign", requireAdmin, ctrl.autoAssign)
+router.post("/assignments/assign",      requireCrmAdmin, ctrl.assignOne)
+router.post("/assignments/assign-bulk", requireCrmAdmin, ctrl.assignBulk)
+router.patch("/assignments/reassign",   requireCrmAdmin, ctrl.reassign)
 
-router.post("/assignments/assign",      requireAdmin, ctrl.assignOne)
-router.post("/assignments/assign-bulk", requireAdmin, ctrl.assignBulk)
-router.patch("/assignments/reassign",   requireAdmin, ctrl.reassign)
+router.get("/dashboard/admin", requireCrmAdmin, ctrl.adminDashboard)
 
-router.get("/dashboard/admin", requireAdmin, ctrl.adminDashboard)
+router.patch("/data/:id/note", requireEmployeeCrm, ctrl.updateNote)
 
-router.patch("/data/:id/note", ctrl.updateNote)
-
-router.get("/employee/data",              ctrl.listMyData)
-router.patch("/employee/data/:id/status", ctrl.updateMyStatus)
-router.get("/dashboard/employee",         ctrl.employeeDashboard)
+router.get("/employee/data",              requireEmployeeCrm, ctrl.listMyData)
+router.patch("/employee/data/:id/status", requireEmployeeCrm, ctrl.updateMyStatus)
+router.post("/employee/data/:id/convert-to-lead", requireEmployeeCrm, ctrl.convertToLead)
+router.get("/dashboard/employee",         requireEmployeeCrm, ctrl.employeeDashboard)
 
 export default router

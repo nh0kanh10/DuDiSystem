@@ -6,19 +6,7 @@
     "password": "$2a$10$bFlWDZ7oJv7ftHEo655TWusfOlhXTfxotkKWS3wjQKcekdr0yKnOi",
     "roleId": "role-user",
     "status": "active",
-    "permissions": [
-      "dashboard",
-      "user-profile",
-      "user-attendance",
-      "user-timeoff",
-      "user-directory",
-      "user-chat",
-      "user-workflow",
-      "cong-viec",
-      "thong-bao",
-      "user-settings",
-      "crm-employee-data"
-    ]
+    "permissions": null
   },
   {
     "id": "U002",

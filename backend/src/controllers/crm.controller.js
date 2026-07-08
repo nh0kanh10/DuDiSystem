@@ -186,3 +186,21 @@ export function updateMyStatus(req, res) {
     res.status(err.status === 403 ? 403 : 400).json({ success: false, error: err.message })
   }
 }
+
+export function convertToLead(req, res) {
+  try {
+    const result = svc.convertToLead(req.params.id, req.user, req.body ?? {})
+    res.status(result.alreadyExists ? 200 : 201).json({ success: true, data: result })
+  } catch (err) {
+    res.status(err.status === 403 ? 403 : 400).json({ success: false, error: err.message })
+  }
+}
+
+export function listCrmLeads(req, res) {
+  try {
+    const data = svc.listLeadsForCrmRecord(req.params.id)
+    res.json({ success: true, data })
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message })
+  }
+}

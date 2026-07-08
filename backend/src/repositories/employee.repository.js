@@ -1,6 +1,11 @@
 import { findAll, findById, findOne, insertOne, updateById, deleteById } from "../db/index.js"
+import { deaccentVietnamese } from "../utils/filename.util.js"
 
 const COL = "employees"
+
+function normSearch(s = "") {
+  return deaccentVietnamese(String(s)).toLowerCase()
+}
 
 export function getAll(filter = {}) {
   let rows = findAll(COL)
@@ -8,12 +13,14 @@ export function getAll(filter = {}) {
   if (filter.status) rows = rows.filter(e => e.status === filter.status)
   if (filter.department) rows = rows.filter(e => e.department === filter.department)
   if (filter.q) {
-    const q = filter.q.toLowerCase()
+    const q = normSearch(filter.q)
     rows = rows.filter(e =>
-      e.name.toLowerCase().includes(q) ||
-      e.id.toLowerCase().includes(q) ||
-      e.email.toLowerCase().includes(q) ||
-      (e.phone || "").includes(q)
+      normSearch(e.name).includes(q) ||
+      normSearch(e.id).includes(q) ||
+      normSearch(e.email).includes(q) ||
+      normSearch(e.phone).includes(q) ||
+      normSearch(e.department).includes(q) ||
+      normSearch(e.position).includes(q)
     )
   }
   return rows

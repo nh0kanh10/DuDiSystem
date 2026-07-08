@@ -3,13 +3,60 @@ import * as empRepo from "../repositories/employee.repository.js"
 import * as requestRepo from "../repositories/request.repository.js"
 import * as allowedIPRepo from "../repositories/allowedIP.repository.js"
 import { getSystemConfig } from "./systemConfig.service.js"
+import { isAdminUser } from "../utils/access.js"
+import { getApprovedLeaveForDate } from "../utils/leaveRequestSlots.js"
+
+function parseVnDate(str) {
+  if (!str) return null
+  const parts = str.split("/")
+  if (parts.length !== 3) return null
+  const [d, m, y] = parts.map(Number)
+  if ([d, m, y].some(Number.isNaN)) return null
+  return new Date(y, m - 1, d)
+}
+
+function getContractTypeForDate(emp, dateStr) {
+  if (!emp) return "staff"
+  if (!emp.contractHistory || emp.contractHistory.length === 0) {
+    return emp.contractType || "staff"
+  }
+  
+  const dateParts = dateStr.split("-").map(Number)
+  const targetDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
+  targetDate.setHours(0, 0, 0, 0)
+  
+  for (const item of emp.contractHistory) {
+    const start = parseVnDate(item.startDate)
+    if (!start) continue
+    start.setHours(0, 0, 0, 0)
+    
+    if (item.endDate) {
+      const end = parseVnDate(item.endDate)
+      if (end) {
+        end.setHours(23, 59, 59, 999)
+        if (targetDate >= start && targetDate <= end) {
+          return item.contractType
+        }
+      }
+    } else {
+      if (targetDate >= start) {
+        return item.contractType
+      }
+    }
+  }
+  
+  return emp.contractType || "staff"
+}
 
 export function validateClientIP(employeeId, clientIP, reqUser) {
   const config = getSystemConfig()
   if (!config.requireIP) return { valid: true }
 
-  // Bypass cho Admin/HR sửa chấm công (được cấp quyền "cham-cong" hoặc có role admin)
-  if (reqUser && (reqUser.roleId === "role-admin" || reqUser.permissions?.includes("cham-cong"))) {
+  const isSuperAdmin = reqUser && (
+    reqUser.roleId === "role-super-admin" ||
+    ["0000000000", "1111111111", "2222222222"].includes(reqUser.employeeId || reqUser.id)
+  );
+  if (isSuperAdmin) {
     return { valid: true }
   }
 
@@ -19,19 +66,21 @@ export function validateClientIP(employeeId, clientIP, reqUser) {
   }
 
   const activeIPs = allowedIPRepo.getAll({ status: "active" })
-  if (activeIPs.length === 0) return { valid: true } // Chưa cấu hình IP nào thì cho qua
+  if (activeIPs.length === 0) return { valid: true } 
 
   const employeeBranchId = employee.branchId
   const cleanClientIp = (clientIP || "").replace("::ffff:", "").trim()
 
-  // Bypass local IP để test local nếu không cấu hình IP local cụ thể
   if (cleanClientIp === "127.0.0.1" || cleanClientIp === "::1" || cleanClientIp === "localhost") {
     const hasLocalConfig = activeIPs.some(item => {
       const cleanItemIp = item.ip.replace("::ffff:", "").trim()
       return cleanItemIp === "127.0.0.1" || cleanItemIp === "::1" || cleanItemIp === "localhost"
     })
     if (!hasLocalConfig) {
-      return { valid: true }
+      return {
+        valid: false,
+        error: "Không xác định được IP mạng thực tế (đang nhận localhost). Vui lòng kiểm tra lại kết nối mạng hoặc gửi IP public từ client.",
+      }
     }
   }
 
@@ -99,7 +148,6 @@ export function calcStaffWorkingHours(checkIn, checkOut, config) {
 
   let diffSec = outSec - inSec
 
-  // Tính overlap với giờ nghỉ trưa từ morningEnd đến afternoonStart
   const noonStartSec = parseToSeconds(config?.morningEnd || "12:00")
   const noonEndSec = parseToSeconds(config?.afternoonStart || "13:30")
   const overlapSec = calcOverlap(inSec, outSec, noonStartSec, noonEndSec)
@@ -118,12 +166,23 @@ export function calcStaffWorkingHours(checkIn, checkOut, config) {
   return res || "0s"
 }
 
-export function calculateStaffAttendanceStatus(checkIn, checkOut, config) {
+export function calculateStaffAttendanceStatus(checkIn, checkOut, config, date) {
   if (!checkIn || checkIn === "--") {
     return { status: "absent", note: "Vắng" }
   }
+
+  const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
+  const isPastDate = date && date < todayStr
+  const suffix = isPastDate ? "quên check-out" : "chưa check-out"
+
   if (!checkOut || checkOut === "--") {
-    return { status: "on-time", note: "Chưa check-out" }
+    const inSec = parseToSeconds(checkIn)
+    const staffStartSec = parseToSeconds(config?.employeeStart || "09:00")
+    if (inSec !== -1 && inSec > staffStartSec) {
+      const diffSec = inSec - staffStartSec
+      return { status: "late", note: `Đi trễ ${formatDiffTimeShort(diffSec)}, ${suffix}` }
+    }
+    return { status: "on-time", note: isPastDate ? "Quên check-out" : "Chưa check-out" }
   }
 
   const inSec = parseToSeconds(checkIn)
@@ -132,7 +191,6 @@ export function calculateStaffAttendanceStatus(checkIn, checkOut, config) {
     return { status: "absent", note: "Dữ liệu lỗi" }
   }
 
-  const earlyGrace = Number(config?.earlyGraceMinutes ?? 15)
   const staffStartSec = parseToSeconds(config?.employeeStart || "09:00")
   const staffEndSec = parseToSeconds(config?.employeeEnd || "17:00")
 
@@ -146,7 +204,7 @@ export function calculateStaffAttendanceStatus(checkIn, checkOut, config) {
     noteParts.push(`Đi trễ ${formatDiffTimeShort(diffSec)}`)
   }
 
-  if (outSec < staffEndSec - earlyGrace * 60) {
+  if (outSec < staffEndSec) {
     isEarly = true
     const diffSec = staffEndSec - outSec
     noteParts.push(`Về sớm ${formatDiffTimeShort(diffSec)}`)
@@ -163,12 +221,65 @@ export function calculateStaffAttendanceStatus(checkIn, checkOut, config) {
   }
 }
 
+const WORK_STATUSES = new Set(["on-time", "late", "early", "late_early"])
+const STATUS_PRIORITY = ["late_early", "late", "early", "on-time"]
+
+export function deriveInternDayStatus(statusAm, statusPm) {
+  if (!statusAm && !statusPm) return ""
+  const am = statusAm || "absent"
+  const pm = statusPm || "absent"
+
+  if (am === "leave" && pm === "leave") return "leave"
+  if (am === "absent" && pm === "absent") return "absent"
+
+  const amWorked = WORK_STATUSES.has(am)
+  const pmWorked = WORK_STATUSES.has(pm)
+
+  if (amWorked && pmWorked) {
+    for (const s of STATUS_PRIORITY) {
+      if (am === s || pm === s) return s
+    }
+    return "on-time"
+  }
+
+  if (amWorked) return am
+  if (pmWorked) return pm
+
+  if (am === "leave" || pm === "leave") return "leave"
+  return "absent"
+}
+
+export function buildInternDayNote(statusAm, statusPm, noteAm, notePm) {
+  const parts = []
+
+  const push = (status, note, absentFallback, leaveFallback) => {
+    if (status === "leave") {
+      parts.push(note || leaveFallback)
+    } else if (status === "absent") {
+      parts.push(note || absentFallback)
+    } else if (note && note !== "Đúng giờ") {
+      parts.push(note)
+    }
+  }
+
+  push(statusAm || "absent", noteAm, "Vắng sáng", "Nghỉ phép sáng")
+  push(statusPm || "absent", notePm, "Vắng chiều", "Nghỉ phép chiều")
+
+  if (parts.length === 0) {
+    const am = statusAm || "absent"
+    const pm = statusPm || "absent"
+    if (WORK_STATUSES.has(am) && WORK_STATUSES.has(pm)) return "Đúng giờ"
+    return ""
+  }
+
+  return parts.join(" · ")
+}
+
 export function calculateSessionStatus(checkIn, checkOut, session, config) {
   if (!checkIn || checkIn === "--") {
     return { status: "absent", note: "" }
   }
 
-  const earlyGrace = Number(config?.earlyGraceMinutes ?? 15)
   const inSec = parseToSeconds(checkIn)
   const outSec = parseToSeconds(checkOut)
 
@@ -185,7 +296,7 @@ export function calculateSessionStatus(checkIn, checkOut, session, config) {
       const diffSec = inSec - morningStartSec
       noteParts.push(`Đi trễ sáng ${formatDiffTimeShort(diffSec)}`)
     }
-    if (outSec !== -1 && outSec < morningEndSec - earlyGrace * 60) {
+    if (outSec !== -1 && outSec < morningEndSec) {
       isEarly = true
       const diffSec = morningEndSec - outSec
       noteParts.push(`Về sớm sáng ${formatDiffTimeShort(diffSec)}`)
@@ -199,7 +310,7 @@ export function calculateSessionStatus(checkIn, checkOut, session, config) {
       const diffSec = inSec - afternoonStartSec
       noteParts.push(`Đi trễ chiều ${formatDiffTimeShort(diffSec)}`)
     }
-    if (outSec !== -1 && outSec < afternoonEndSec - earlyGrace * 60) {
+    if (outSec !== -1 && outSec < afternoonEndSec) {
       isEarly = true
       const diffSec = afternoonEndSec - outSec
       noteParts.push(`Về sớm chiều ${formatDiffTimeShort(diffSec)}`)
@@ -251,40 +362,41 @@ function isoToRequestDate(isoStr) {
 function withEmployee(record) {
   const emp = empRepo.getById(record.employeeId)
   const sysConfig = getSystemConfig()
-  const isIntern = emp?.status === "intern"
+  
+  let isIntern = false
+  if (record.contractType) {
+    isIntern = record.contractType === "intern"
+  } else if (record.checkInAm !== undefined || record.checkInPm !== undefined || record.statusAm !== undefined || record.statusPm !== undefined) {
+    isIntern = true
+  } else if (record.checkIn !== undefined || record.checkOut !== undefined) {
+    isIntern = false
+  } else {
+    isIntern = getContractTypeForDate(emp, record.date) === "intern"
+  }
 
   const checkIn = record.checkIn ?? "--"
   const checkOut = record.checkOut ?? "--"
 
   const reqDate = isoToRequestDate(record.date)
-  const approvedRequests = requestRepo.getAll({ employeeId: record.employeeId, status: "approved" })
-    .filter(req => {
-      if (!req.startDate || !req.endDate) return false
-      const [d, m, y] = reqDate.split("/").map(Number)
-      const targetTime = new Date(y, m - 1, d).getTime()
-      
-      const [sd, sm, sy] = req.startDate.split("/").map(Number)
-      const startTime = new Date(sy, sm - 1, sd).getTime()
-      
-      const [ed, em, ey] = req.endDate.split("/").map(Number)
-      const endTime = new Date(ey, em - 1, ed).getTime()
-      
-      return targetTime >= startTime && targetTime <= endTime && (req.category === "leave" || req.category === "timeoff")
-    })
+  const allEmployeeRequests = requestRepo.getAll({ employeeId: record.employeeId })
+  const leaveForDate = getApprovedLeaveForDate(record.employeeId, reqDate, allEmployeeRequests)
 
   if (!isIntern) {
     let status = record.status ?? "absent"
     let note = record.note ?? ""
 
     if (status !== "leave" && status !== "absent") {
-      const calc = calculateStaffAttendanceStatus(checkIn, checkOut, sysConfig)
+      const calc = calculateStaffAttendanceStatus(checkIn, checkOut, sysConfig, record.date)
       status = calc.status
       note = calc.note
     }
 
-    if (approvedRequests.length > 0 && (checkIn === "--" || !checkIn)) {
+    if ((leaveForDate.sang || leaveForDate.chieu) && (checkIn === "--" || !checkIn)) {
       status = "leave"
-      note = approvedRequests[0].reason || "Nghỉ phép"
+      const noteParts = []
+      if (leaveForDate.sang) noteParts.push(leaveForDate.sang)
+      if (leaveForDate.chieu && leaveForDate.chieu !== leaveForDate.sang) noteParts.push(leaveForDate.chieu)
+      note = noteParts.join(" · ") || "Nghỉ phép"
     }
 
     const workingHours = calcStaffWorkingHours(checkIn, checkOut, sysConfig)
@@ -293,7 +405,7 @@ function withEmployee(record) {
       ...record,
       employeeName: emp?.name ?? "—",
       department: emp?.department ?? "—",
-      employeeStatus: emp?.status ?? "active",
+      employeeStatus: "staff",
       workingHours,
       checkIn,
       checkOut,
@@ -343,49 +455,32 @@ function withEmployee(record) {
     }
   }
 
-  const hasApprovedAm = approvedRequests.some(req => {
-    const session = req.session ? req.session.toLowerCase() : "all"
-    return session === "all" || session === "sang" || session === "morning"
-  })
+  const d = new Date()
+  const todayISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+  const isFuture = record.date > todayISO
+
+  const hasApprovedAm = !!leaveForDate.sang
   if (statusAm === "leave" && !hasApprovedAm) {
-    statusAm = "absent"
+    statusAm = isFuture ? "" : "absent"
     noteAm = ""
   }
 
-  const hasApprovedPm = approvedRequests.some(req => {
-    const session = req.session ? req.session.toLowerCase() : "all"
-    return session === "all" || session === "chieu" || session === "afternoon"
-  })
+  const hasApprovedPm = !!leaveForDate.chieu
   if (statusPm === "leave" && !hasApprovedPm) {
-    statusPm = "absent"
+    statusPm = isFuture ? "" : "absent"
     notePm = ""
   }
 
-  approvedRequests.forEach(req => {
-    const session = req.session ? req.session.toLowerCase() : "all"
-    if (session === "all") {
-      if (morningIn === "--" || !morningIn) {
-        statusAm = "leave"
-        noteAm = req.reason || "Nghỉ phép"
-      }
-      if (afternoonIn === "--" || !afternoonIn) {
-        statusPm = "leave"
-        notePm = req.reason || "Nghỉ phép"
-      }
-    } else if (session === "sang" || session === "morning") {
-      if (morningIn === "--" || !morningIn) {
-        statusAm = "leave"
-        noteAm = req.reason || "Nghỉ phép"
-      }
-    } else if (session === "chieu" || session === "afternoon") {
-      if (afternoonIn === "--" || !afternoonIn) {
-        statusPm = "leave"
-        notePm = req.reason || "Nghỉ phép"
-      }
-    }
-  })
+  if (leaveForDate.sang && (morningIn === "--" || !morningIn)) {
+    statusAm = "leave"
+    noteAm = leaveForDate.sang
+  }
+  if (leaveForDate.chieu && (afternoonIn === "--" || !afternoonIn)) {
+    statusPm = "leave"
+    notePm = leaveForDate.chieu
+  }
 
-  if (statusAm !== "leave" && statusAm !== "absent") {
+  if (statusAm !== "leave" && statusAm !== "absent" && statusAm !== "") {
     const morningStart = sysConfig.morningStart || "09:00"
     const morningEnd = sysConfig.morningEnd || "12:00"
     const sessionConfig = { ...sysConfig, morningStart, morningEnd }
@@ -398,7 +493,7 @@ function withEmployee(record) {
     noteAm = "Vắng sáng"
   }
 
-  if (statusPm !== "leave" && statusPm !== "absent") {
+  if (statusPm !== "leave" && statusPm !== "absent" && statusPm !== "") {
     const afternoonStart = sysConfig.afternoonStart || "13:30"
     const afternoonEnd = sysConfig.afternoonEnd || "17:00"
     const sessionConfig = { ...sysConfig, afternoonStart, afternoonEnd }
@@ -411,28 +506,13 @@ function withEmployee(record) {
     notePm = "Vắng chiều"
   }
 
-  // Đánh giá ghi chú hiển thị tổng quan theo spec Intern:
-  let finalNoteParts = []
-  if (morningIn !== "--" && noteAm && noteAm !== "Đúng giờ") finalNoteParts.push(noteAm)
-  if (afternoonIn !== "--" && notePm && notePm !== "Đúng giờ") finalNoteParts.push(notePm)
-  
-  // Nếu có đi làm cả 2 ca hoặc chỉ 1 ca, và đều đúng giờ
-  let finalNote = finalNoteParts.join(", ")
-  if (!finalNote) {
-    if (morningIn === "--" && afternoonIn === "--") {
-      finalNote = "Vắng"
-    } else if (morningIn !== "--" && afternoonIn === "--") {
-      finalNote = "Nửa ngày sáng"
-    } else if (morningIn === "--" && afternoonIn !== "--") {
-      finalNote = "Nửa ngày chiều"
-    } else {
-      finalNote = "Đúng giờ"
-    }
+  let finalNote = buildInternDayNote(statusAm, statusPm, noteAm, notePm)
+  if (!finalNote && morningIn === "--" && afternoonIn === "--") {
+    finalNote = isFuture ? "" : "Vắng"
   }
 
-  // Cờ tự điền trưa
   if (record.autoFilled) {
-    finalNote = "⚡ Tự điền trưa" + (finalNoteParts.length > 0 ? `, ${finalNote}` : "")
+    finalNote = "Làm cả ngày " + (finalNote ? ` · ${finalNote}` : "")
   }
 
   const workingHours = calcInternWorkingHours(morningIn, morningOut, afternoonIn, afternoonOut)
@@ -441,8 +521,10 @@ function withEmployee(record) {
     ...record,
     employeeName: emp?.name ?? "—",
     department: emp?.department ?? "—",
-    employeeStatus: emp?.status ?? "intern",
+    employeeStatus: "intern",
     workingHours,
+    checkIn: morningIn !== "--" ? morningIn : afternoonIn,
+    checkOut: afternoonOut !== "--" ? afternoonOut : morningOut,
     checkInAm: morningIn,
     checkOutAm: morningOut,
     checkInPm: afternoonIn,
@@ -451,44 +533,177 @@ function withEmployee(record) {
     statusPm,
     noteAm,
     notePm,
-    status: (statusAm === "leave" || statusPm === "leave") ? "leave" :
-      (statusAm === "absent" && statusPm === "absent") ? "absent" :
-        (statusAm === "absent" || statusPm === "absent") ? "absent" :
-          (statusAm === "late_early" || statusPm === "late_early") ? "late_early" :
-            (statusAm === "late" || statusPm === "late") ? "late" :
-              (statusAm === "early" || statusPm === "early") ? "early" : "on-time",
+    status: deriveInternDayStatus(statusAm, statusPm),
     note: finalNote
   }
 }
 
 export function listAttendance(filter) {
-  let records = repo.getAll(filter)
-  if (filter.startDate && filter.startDate === filter.endDate) {
-    const targetDate = filter.startDate
+  let records = repo.getAll()
+  records = records.filter(r => !["0000000000", "1111111111", "2222222222"].includes(r.employeeId))
+
+  const recordKeys = new Set(records.map(r => `${r.employeeId}_${r.date}`))
+
+  try {
+    const approvedLeaves = requestRepo.getAll({ status: "approved" })
+    const vnToIsoDate = (vnStr) => {
+      if (!vnStr) return ""
+      const parts = vnStr.split("/")
+      if (parts.length !== 3) return ""
+      return `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`
+    }
+
+    approvedLeaves.forEach(leave => {
+      const dates = []
+      if (leave.scope === "date_range" && leave.startDate && leave.endDate) {
+        const startIso = vnToIsoDate(leave.startDate)
+        const endIso = vnToIsoDate(leave.endDate)
+        if (startIso && endIso) {
+          const start = new Date(startIso)
+          const end = new Date(endIso)
+          let curr = new Date(start)
+          while (curr <= end) {
+            const day = curr.getDay()
+            const isWeekend = day === 0 || day === 6
+            if (!isWeekend) {
+              dates.push(curr.toISOString().split("T")[0])
+            }
+            curr.setDate(curr.getDate() + 1)
+          }
+        }
+      } else if (leave.scope === "multi_session" && leave.sessions && Array.isArray(leave.sessions)) {
+        leave.sessions.forEach(s => {
+          const iso = vnToIsoDate(s.date)
+          if (iso) {
+            const dateParts = iso.split("-").map(Number)
+            const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
+            const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6
+            if (!isWeekend) {
+              dates.push(iso)
+            }
+          }
+        })
+      } else {
+        const iso = vnToIsoDate(leave.startDate)
+        if (iso) {
+          const dateParts = iso.split("-").map(Number)
+          const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
+          const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6
+          if (!isWeekend) {
+            dates.push(iso)
+          }
+        }
+      }
+
+      dates.forEach(dateStr => {
+        const exists = recordKeys.has(`${leave.employeeId}_${dateStr}`)
+        if (!exists) {
+          const emp = empRepo.getById(leave.employeeId)
+          const isIntern = getContractTypeForDate(emp, dateStr) === "intern"
+          const blank = {
+            id: `TEMP_${leave.employeeId}_${dateStr}`,
+            employeeId: leave.employeeId,
+            date: dateStr,
+            status: "leave",
+            note: leave.reason || "Nghỉ phép",
+            contractType: isIntern ? "intern" : "staff",
+            ...(isIntern ? {
+              checkInAm: "--",
+              checkOutAm: "--",
+              checkInPm: "--",
+              checkOutPm: "--"
+            } : {
+              checkIn: "--",
+              checkOut: "--"
+            })
+          }
+          records.push(blank)
+          recordKeys.add(`${leave.employeeId}_${dateStr}`)
+        }
+      })
+    })
+  } catch (err) {
+    console.error("Error generating virtual leave records:", err)
+  }
+
+  if (filter.startDate && filter.endDate) {
+    const startParts = filter.startDate.split("-").map(Number)
+    const endParts = filter.endDate.split("-").map(Number)
+    const start = new Date(startParts[0], startParts[1] - 1, startParts[2])
+    const end = new Date(endParts[0], endParts[1] - 1, endParts[2])
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const dateList = []
+    let curr = new Date(start)
+    while (curr <= end) {
+      const y = curr.getFullYear()
+      const m = String(curr.getMonth() + 1).padStart(2, "0")
+      const d = String(curr.getDate()).padStart(2, "0")
+      dateList.push(`${y}-${m}-${d}`)
+      curr.setDate(curr.getDate() + 1)
+    }
+
     let employees = empRepo.getAll()
+    employees = employees.filter(e => !["0000000000", "1111111111", "2222222222"].includes(e.id))
+
+    if (filter.employeeId) {
+      employees = employees.filter(e => e.id === filter.employeeId)
+    }
     if (filter.branchId && filter.branchId !== "all") {
       employees = employees.filter(e => e.branchId === filter.branchId)
     }
     if (filter.department && filter.department !== "all") {
       employees = employees.filter(e => e.department === filter.department)
     }
-    
+
     employees.forEach(emp => {
-      const exists = records.some(r => r.employeeId === emp.id && r.date === targetDate)
-      if (!exists) {
-        records.push({
-          id: `TEMP_${emp.id}_${targetDate}`,
-          employeeId: emp.id,
-          date: targetDate,
-          checkIn: "--",
-          checkOut: "--",
-          status: "absent",
-          note: ""
-        })
-      }
+      dateList.forEach(dateStr => {
+        const exists = recordKeys.has(`${emp.id}_${dateStr}`)
+        if (!exists) {
+          const dateParts = dateStr.split("-").map(Number)
+          const dateObj = new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
+          const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6
+
+          const compareDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
+          compareDate.setHours(0, 0, 0, 0)
+
+          if (compareDate < today && !isWeekend) {
+            const isIntern = getContractTypeForDate(emp, dateStr) === "intern"
+            const blank = {
+              id: `TEMP_${emp.id}_${dateStr}`,
+              employeeId: emp.id,
+              date: dateStr,
+              status: "absent",
+              note: "",
+              contractType: isIntern ? "intern" : "staff",
+              ...(isIntern ? {
+                checkInAm: "--",
+                checkOutAm: "--",
+                checkInPm: "--",
+                checkOutPm: "--"
+              } : {
+                checkIn: "--",
+                checkOut: "--"
+              })
+            }
+            records.push(blank)
+            recordKeys.add(`${emp.id}_${dateStr}`)
+          }
+        }
+      })
     })
   }
 
+  if (filter.startDate) {
+    records = records.filter(r => r.date >= filter.startDate)
+  }
+  if (filter.endDate) {
+    records = records.filter(r => r.date <= filter.endDate)
+  }
+  if (filter.employeeId) {
+    records = records.filter(r => r.employeeId === filter.employeeId)
+  }
   if (filter.branchId && filter.branchId !== "all") {
     records = records.filter(r => {
       const emp = empRepo.getById(r.employeeId)
@@ -501,38 +716,43 @@ export function listAttendance(filter) {
       return emp?.department === filter.department
     })
   }
+
   return records.map(withEmployee)
+}
+
+function addSessionStat(status, counts) {
+  if (status === "on-time") counts.onTime += 0.5
+  else if (status === "late" || status === "late_early" || status === "early") counts.late += 0.5
+  else if (status === "absent") counts.absent += 0.5
+  else if (status === "leave") counts.leave += 0.5
+}
+
+function addDayStat(status, counts) {
+  if (status === "on-time") counts.onTime += 1
+  else if (status === "late" || status === "late_early" || status === "early") counts.late += 1
+  else if (status === "absent") counts.absent += 1
+  else if (status === "leave") counts.leave += 1
 }
 
 export function getAttendanceStats(filter = {}) {
   const records = listAttendance(filter)
-  let onTime = 0
-  let late = 0
-  let absent = 0
-  let leave = 0
+  const counts = { onTime: 0, late: 0, absent: 0, leave: 0 }
 
   records.forEach(r => {
-    // Sáng
-    if (r.statusAm === "on-time") onTime += 0.5
-    else if (r.statusAm === "late" || r.statusAm === "late_early") late += 0.5
-    else if (r.statusAm === "early") late += 0.5
-    else if (r.statusAm === "absent") absent += 0.5
-    else if (r.statusAm === "leave") leave += 0.5
-
-    // Chiều
-    if (r.statusPm === "on-time") onTime += 0.5
-    else if (r.statusPm === "late" || r.statusPm === "late_early") late += 0.5
-    else if (r.statusPm === "early") late += 0.5
-    else if (r.statusPm === "absent") absent += 0.5
-    else if (r.statusPm === "leave") leave += 0.5
+    if (r.employeeStatus === "intern") {
+      addSessionStat(r.statusAm, counts)
+      addSessionStat(r.statusPm, counts)
+    } else {
+      addDayStat(r.status, counts)
+    }
   })
 
   return {
-    onTime: Math.round(onTime * 10) / 10,
-    late: Math.round(late * 10) / 10,
-    absent: Math.round(absent * 10) / 10,
-    leave: Math.round(leave * 10) / 10,
-    total: records.length
+    onTime: Math.round(counts.onTime * 10) / 10,
+    late: Math.round(counts.late * 10) / 10,
+    absent: Math.round(counts.absent * 10) / 10,
+    leave: Math.round(counts.leave * 10) / 10,
+    total: records.length,
   }
 }
 
@@ -543,7 +763,17 @@ export function getAttendance(id) {
 }
 
 export function createAttendance(data) {
-  // Validate IP
+  if (data.date) {
+    const dateParts = data.date.split("-").map(Number)
+    const dayOfWeek = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]).getDay()
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      const isReqUserAdmin = data.reqUser?.roleId === "role-super-admin" || data.reqUser?.roleId === "role-admin"
+      if (!isReqUserAdmin) {
+        return { error: "Không được phép chấm công vào Thứ Bảy và Chủ Nhật!", status: 400 }
+      }
+    }
+  }
+
   const ipCheck = validateClientIP(data.employeeId, data.ip, data.reqUser)
   if (!ipCheck.valid) {
     return { error: ipCheck.error, status: 403 }
@@ -553,7 +783,7 @@ export function createAttendance(data) {
   if (existing) return { error: "Đã có bản ghi chấm công cho nhân viên này hôm nay", status: 409 }
 
   const emp = empRepo.getById(data.employeeId)
-  const isIntern = emp?.status === "intern"
+  const isIntern = getContractTypeForDate(emp, data.date) === "intern"
   const sysConfig = getSystemConfig()
   const noonBoundary = sysConfig.noonBoundary || "14:00"
 
@@ -561,21 +791,20 @@ export function createAttendance(data) {
     employeeId: data.employeeId,
     date: data.date,
     status: data.status || "on-time",
-    note: data.note || ""
+    note: data.note || "",
+    contractType: isIntern ? "intern" : "staff"
   }
 
   if (!isIntern) {
     recordFields.checkIn = data.checkIn || "--"
     recordFields.checkOut = data.checkOut || "--"
   } else {
-    // Nếu FE truyền rõ checkInAm hoặc checkInPm thì ưu tiên dùng luôn
     if (data.checkInAm !== undefined || data.checkOutAm !== undefined || data.checkInPm !== undefined || data.checkOutPm !== undefined) {
       recordFields.checkInAm = data.checkInAm || "--"
       recordFields.checkOutAm = data.checkOutAm || "--"
       recordFields.checkInPm = data.checkInPm || "--"
       recordFields.checkOutPm = data.checkOutPm || "--"
     } else {
-      // Fallback: FE gửi checkIn chung → tự phân ca theo noonBoundary
       const timeStr = data.checkIn || "--"
       if (timeStr < noonBoundary) {
         recordFields.checkInAm = timeStr
@@ -601,19 +830,31 @@ export function createAttendance(data) {
 }
 
 export function updateAttendance(id, patch) {
-  // Tìm employeeId của bản ghi để check IP
   let employeeId = null
   let record = null
+  let dateStr = ""
   if (id.startsWith("TEMP_")) {
     const parts = id.split("_")
     employeeId = parts[1]
+    dateStr = parts[2]
   } else {
     record = repo.getById(id)
     employeeId = record?.employeeId
+    dateStr = record?.date || ""
+  }
+
+  if (dateStr) {
+    const dateParts = dateStr.split("-").map(Number)
+    const dayOfWeek = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]).getDay()
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      const isReqUserAdmin = patch.reqUser?.roleId === "role-super-admin" || patch.reqUser?.roleId === "role-admin"
+      if (!isReqUserAdmin) {
+        return { error: "Không được phép chấm công vào Thứ Bảy và Chủ Nhật!", status: 400 }
+      }
+    }
   }
 
   if (employeeId) {
-    // Validate IP
     const ipCheck = validateClientIP(employeeId, patch.ip, patch.reqUser)
     if (!ipCheck.valid) {
       return { error: ipCheck.error, status: 403 }
@@ -621,7 +862,7 @@ export function updateAttendance(id, patch) {
   }
 
   const emp = employeeId ? empRepo.getById(employeeId) : null
-  const isIntern = emp?.status === "intern"
+  const isIntern = getContractTypeForDate(emp, dateStr) === "intern"
   const sysConfig = getSystemConfig()
 
   if (id.startsWith("TEMP_")) {
@@ -650,14 +891,13 @@ export function updateAttendance(id, patch) {
       date,
       ...initialFields,
       status: "on-time",
-      note: ""
+      note: "",
+      contractType: isIntern ? "intern" : "staff"
     })
     return withEmployee(record)
   }
 
-  // Đối với bản ghi thực sự đang tồn tại
   if (!isIntern) {
-    // Nhân viên chính thức
     if (patch.checkOut && patch.checkOut !== "--") {
       if (record.checkOut && record.checkOut !== "--") {
         return { error: "Bạn đã hoàn thành chấm công ngày hôm nay!", status: 400 }
@@ -667,8 +907,7 @@ export function updateAttendance(id, patch) {
     const safe = Object.fromEntries(Object.entries(patch).filter(([k]) => ALLOWED.includes(k)))
     record = repo.update(id, safe)
   } else {
-    // Thực tập sinh
-    // Chặn bấm lần 5
+  
     const cia = record.checkInAm && record.checkInAm !== "--"
     const coa = record.checkOutAm && record.checkOutAm !== "--"
     const cip = record.checkInPm && record.checkInPm !== "--"
@@ -690,8 +929,6 @@ export function updateAttendance(id, patch) {
           return { error: "Đã hoàn thành ca Sáng!", status: 400 }
         }
       } else {
-        // Sau noonBoundary
-        // Kiểm tra case quên bấm trưa (làm thông)
         const hasInAm = record.checkInAm && record.checkInAm !== "--"
         const hasOutAm = record.checkOutAm && record.checkOutAm !== "--"
         const hasInPm = record.checkInPm && record.checkInPm !== "--"
@@ -715,11 +952,9 @@ export function updateAttendance(id, patch) {
       }
     }
 
-    // Cho phép Admin chỉnh sửa trực tiếp các trường cụ thể bằng tay
     const ADMIN_ALLOWED = ["checkInAm", "checkOutAm", "checkInPm", "checkOutPm", "statusAm", "statusPm", "noteAm", "notePm", "status", "note", "autoFilled"]
     const adminSafe = Object.fromEntries(Object.entries(patch).filter(([k]) => ADMIN_ALLOWED.includes(k)))
 
-    // Nếu có updateFields tự động thì dùng, không thì dùng adminSafe
     const finalUpdate = Object.keys(updateFields).length > 0 ? updateFields : adminSafe
     record = repo.update(id, finalUpdate)
   }

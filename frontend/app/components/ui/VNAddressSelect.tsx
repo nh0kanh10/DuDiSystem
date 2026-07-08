@@ -20,7 +20,8 @@ export function VNAddressSelect({
   onChange,
   lblClass,
   selClass,
-  inpClass
+  inpClass,
+  disabled = false,
 }: {
   province: string
   district: string
@@ -29,6 +30,7 @@ export function VNAddressSelect({
   lblClass?: string
   selClass?: string
   inpClass?: string
+  disabled?: boolean
 }) {
   const [provinces, setProvinces] = useState<VNUnit[]>([])
   const [districts, setDistricts] = useState<VNUnit[]>([])
@@ -119,14 +121,17 @@ export function VNAddressSelect({
   }, [currentDistrictCode])
 
   const handleProvinceSelect = (name: string) => {
+    if (disabled) return
     onChange({ province: name, district: "", ward: "" })
   }
 
   const handleDistrictSelect = (name: string) => {
+    if (disabled) return
     onChange({ province, district: name, ward: "" })
   }
 
   const handleWardSelect = (name: string) => {
+    if (disabled) return
     onChange({ province, district, ward: name })
   }
 
@@ -139,7 +144,7 @@ export function VNAddressSelect({
             value={province}
             onChange={handleProvinceSelect}
             options={provinces.map(p => ({ value: p.name, label: p.name }))}
-            disabled={loadingProvinces}
+            disabled={disabled || loadingProvinces}
             className="w-full"
             heightClass="h-[42px]"
           />
@@ -149,6 +154,7 @@ export function VNAddressSelect({
             onChange={e => onChange({ province: e.target.value, district: "", ward: "" })}
             placeholder="Tỉnh / Thành phố..."
             className={inpClass}
+            disabled={disabled}
           />
         )}
       </div>
@@ -160,7 +166,7 @@ export function VNAddressSelect({
             value={district}
             onChange={handleDistrictSelect}
             options={districts.map(d => ({ value: d.name, label: d.name }))}
-            disabled={loadingDistricts || !province}
+            disabled={disabled || loadingDistricts || !province}
             className="w-full"
             heightClass="h-[42px]"
           />
@@ -170,7 +176,7 @@ export function VNAddressSelect({
             onChange={e => onChange({ province, district: e.target.value, ward: "" })}
             placeholder="Quận / Huyện..."
             className={inpClass}
-            disabled={!province}
+            disabled={disabled || !province}
           />
         )}
       </div>
@@ -182,7 +188,7 @@ export function VNAddressSelect({
             value={ward}
             onChange={handleWardSelect}
             options={wards.map(w => ({ value: w.name, label: w.name }))}
-            disabled={loadingWards || !district}
+            disabled={disabled || loadingWards || !district}
             className="w-full"
             heightClass="h-[42px]"
           />
@@ -192,7 +198,7 @@ export function VNAddressSelect({
             onChange={e => onChange({ province, district, ward: e.target.value })}
             placeholder="Phường / Xã..."
             className={inpClass}
-            disabled={!district}
+            disabled={disabled || !district}
           />
         )}
       </div>

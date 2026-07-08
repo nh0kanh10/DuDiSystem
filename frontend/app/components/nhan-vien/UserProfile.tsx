@@ -179,7 +179,8 @@ export default function UserProfile({ emp, onEdit, onClose }: { emp: Employee; o
                                 }}
                             >
                                 <span className="w-2 h-2 rounded-full bg-green-400" />
-                                {emp.status === "active" ? "Đang làm" : emp.status === "intern" ? "Thực tập" : "Nghỉ việc"}
+                                {emp.status === "active" ? "Đang làm" : emp.status === "suspended" ? "Tạm nghỉ" : "Nghỉ việc"}
+                                {emp.contractType === "intern" && <span className="ml-1 text-yellow-300">(TT)</span>}
                             </span>
                         </div>
                     </div>

@@ -8,7 +8,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Legend
 } from "recharts"
 import { Employee, AttendanceRecord, LeaveRequest, Page } from "../../types"
-import { Badge } from "../ui/Badge"
+import { Badge } from "../ui/badge"
 import { AvatarCircle } from "../ui/AvatarCircle"
 import { StatCard } from "../ui/StatCard"
 import { CalendarWidget } from "../ui/CalendarWidget"

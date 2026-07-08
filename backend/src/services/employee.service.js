@@ -1,25 +1,21 @@
 import * as repo from "../repositories/employee.repository.js"
+import * as userRepo from "../repositories/user.repository.js"
+import * as orgNodeRepo from "../repositories/orgNode.repository.js"
 import { createUser } from "./user.service.js"
-
-function generateId(existing) {
-  const d = new Date()
-  const yy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, "0")
-  const dd = String(d.getDate()).padStart(2, "0")
-  const min = String(d.getMinutes()).padStart(2, "0")
-  const baseId = `${yy}${mm}${dd}${min}`
-  let candidate = baseId
-  let count = 1
-  while (existing.some(e => e.id === candidate)) {
-    candidate = `${baseId}-${count}`
-    count++
-  }
-  return candidate
-}
+import { syncEmployeeOrgFields } from "../utils/orgUtils.js"
+import { generateEmployeeId, collectTakenEmployeeIds } from "../utils/employeeId.js"
 
 function todayVN() {
   const d = new Date()
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+}
+
+function applyOrgSync(patch) {
+  if (!patch.orgNodeId) return patch
+  const nodes = orgNodeRepo.getAll()
+  const node = nodes.find(n => n.id === patch.orgNodeId)
+  if (!node) throw new Error("Đơn vị tổ chức không tồn tại")
+  return syncEmployeeOrgFields(patch, patch.orgNodeId, nodes)
 }
 
 export function listEmployees(filter = {}) {
@@ -36,17 +32,65 @@ export function getEmployee(id) {
 }
 
 export async function createEmployee(data) {
-  const existing = repo.getAll()
-  const employee = repo.create({
-    id: generateId(existing),
+  const email = (data.email || "").trim()
+  if (!email) {
+    throw new Error("Email không được để trống")
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    throw new Error("Email không đúng định dạng")
+  }
+  const existingEmail = repo.getByEmail(email)
+  if (existingEmail) {
+    throw new Error(`Email "${email}" đã tồn tại trong hệ thống`)
+  }
+
+  const phone = (data.phone || "").trim()
+  if (phone) {
+    const phoneRegex = /^[0-9]+$/
+    if (!phoneRegex.test(phone)) {
+      throw new Error("Số điện thoại chỉ được chứa ký số")
+    }
+    if (phone.length < 10 || phone.length > 11) {
+      throw new Error("Số điện thoại phải từ 10 đến 11 ký số")
+    }
+  }
+
+  const cccd = (data.cccd || "").trim()
+  if (cccd) {
+    const cccdRegex = /^[0-9]+$/
+    if (!cccdRegex.test(cccd)) {
+      throw new Error("Số CCCD chỉ được chứa ký số")
+    }
+    if (cccd.length !== 9 && cccd.length !== 12) {
+      throw new Error("Số CCCD phải có độ dài là 9 hoặc 12 ký số")
+    }
+    const existingCccd = repo.getAll().find(e => e.cccd && e.cccd.trim() === cccd)
+    if (existingCccd) {
+      throw new Error(`Số CCCD "${cccd}" đã tồn tại trong hệ thống`)
+    }
+  }
+
+  const bankAccount = (data.bankAccount || "").trim()
+  if (bankAccount) {
+    const bankAccRegex = /^[0-9]+$/
+    if (!bankAccRegex.test(bankAccount)) {
+      throw new Error("Số tài khoản ngân hàng chỉ được chứa ký số")
+    }
+  }
+
+  const takenIds = collectTakenEmployeeIds(repo, userRepo)
+  let fields = {
+    id: generateEmployeeId(takenIds),
     name: data.name || "",
     email: data.email || "",
     phone: data.phone || "",
     department: data.department || "",
     position: data.position || "",
+    positionId: data.positionId || "",
     joinDate: data.joinDate || todayVN(),
     status: data.status || "active",
-    contractType: data.contractType || "Chính thức",
+    contractType: data.contractType || "staff",
     branchId: data.branchId || "",
     orgNodeId: data.orgNodeId || "",
     cccd: data.cccd || "",
@@ -71,14 +115,27 @@ export async function createEmployee(data) {
     university: data.university || "",
     notes: data.notes || "",
     resignDate: data.resignDate || "",
-  })
+    contractHistory: [
+      {
+        contractType: data.contractType || "staff",
+        startDate: data.joinDate || todayVN(),
+        endDate: ""
+      }
+    ]
+  }
+
+  if (fields.orgNodeId) {
+    fields = applyOrgSync(fields)
+  }
+
+  const employee = repo.create(fields)
 
   try {
     await createUser({
-      email: employee.id,
+      loginId: employee.id,
       roleId: "role-user",
       employeeId: employee.id,
-      status: "active"
+      status: "active",
     })
   } catch (err) {
     console.error("Lỗi tự động tạo tài khoản khi thêm nhân sự:", err)
@@ -88,7 +145,91 @@ export async function createEmployee(data) {
 }
 
 export function updateEmployee(id, patch) {
-  return repo.update(id, patch)
+  if (patch.email !== undefined) {
+    const email = (patch.email || "").trim()
+    if (!email) {
+      throw new Error("Email không được để trống")
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      throw new Error("Email không đúng định dạng")
+    }
+    const existingEmail = repo.getByEmail(email)
+    if (existingEmail && existingEmail.id !== id) {
+      throw new Error(`Email "${email}" đã tồn tại trong hệ thống`)
+    }
+    patch.email = email
+  }
+
+  if (patch.phone !== undefined) {
+    const phone = (patch.phone || "").trim()
+    if (phone) {
+      const phoneRegex = /^[0-9]+$/
+      if (!phoneRegex.test(phone)) {
+        throw new Error("Số điện thoại chỉ được chứa ký số")
+      }
+      if (phone.length < 10 || phone.length > 11) {
+        throw new Error("Số điện thoại phải từ 10 đến 11 ký số")
+      }
+    }
+  }
+
+  if (patch.cccd !== undefined) {
+    const cccd = (patch.cccd || "").trim()
+    if (cccd) {
+      const cccdRegex = /^[0-9]+$/
+      if (!cccdRegex.test(cccd)) {
+        throw new Error("Số CCCD chỉ được chứa ký số")
+      }
+      if (cccd.length !== 9 && cccd.length !== 12) {
+        throw new Error("Số CCCD phải có độ dài là 9 hoặc 12 ký số")
+      }
+      const existingCccd = repo.getAll().find(e => e.cccd && e.cccd.trim() === cccd)
+      if (existingCccd && existingCccd.id !== id) {
+        throw new Error(`Số CCCD "${cccd}" đã tồn tại trong hệ thống`)
+      }
+    }
+  }
+
+  if (patch.bankAccount !== undefined) {
+    const bankAccount = (patch.bankAccount || "").trim()
+    if (bankAccount) {
+      const bankAccRegex = /^[0-9]+$/
+      if (!bankAccRegex.test(bankAccount)) {
+        throw new Error("Số tài khoản ngân hàng chỉ được chứa ký số")
+      }
+    }
+  }
+
+  let safe = { ...patch }
+  if (safe.orgNodeId !== undefined) {
+    safe = applyOrgSync(safe)
+  }
+
+  const oldEmp = repo.getById(id)
+  if (oldEmp && patch.contractType !== undefined && patch.contractType !== oldEmp.contractType) {
+    const history = oldEmp.contractHistory && oldEmp.contractHistory.length > 0
+      ? oldEmp.contractHistory
+      : [{ contractType: oldEmp.contractType || "staff", startDate: oldEmp.joinDate || todayVN(), endDate: "" }]
+    
+    const today = todayVN()
+    const updatedHistory = history.map((item, index) => {
+      if (index === history.length - 1) {
+        return { ...item, endDate: today }
+      }
+      return item
+    })
+    
+    updatedHistory.push({
+      contractType: patch.contractType,
+      startDate: today,
+      endDate: ""
+    })
+    
+    safe.contractHistory = updatedHistory
+  }
+
+  return repo.update(id, safe)
 }
 
 export function deleteEmployee(id) {

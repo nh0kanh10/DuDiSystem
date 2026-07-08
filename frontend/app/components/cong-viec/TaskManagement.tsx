@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { createPortal } from "react-dom"
 import { 
-  CheckSquare, Plus, Edit2, Trash2, RefreshCw, Briefcase
+  CheckSquare, Plus, Edit2, Trash2, RefreshCw, Briefcase, X
 } from "lucide-react"
 import { Employee, OrgNode } from "../../types"
 import { api } from "@/lib/api"
+import { mergeTaskList, subscribeTaskSocket } from "@/lib/taskSocket"
+import { useToast } from "@/app/hooks/useToast"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomDatePicker } from "../ui/CustomDatePicker"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
@@ -12,6 +14,7 @@ import ConfirmModal from "../ui/ConfirmModal"
 
 export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   const [tasks, setTasks] = useState<any[]>([])
+  const { showToast } = useToast()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [orgNodes, setOrgNodes] = useState<OrgNode[]>([])
   const [loading, setLoading] = useState(false)
@@ -20,6 +23,8 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
   const [selectedDept, setSelectedDept] = useState("all")
   const [selectedEmp, setSelectedEmp] = useState("all")
+  const [selectedStatus, setSelectedStatus] = useState<"all" | "todo" | "in-progress" | "done" | "no-deadline">("all")
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   
   const getTodayVnStr = () => {
     const d = new Date()
@@ -38,7 +43,8 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     return `${day}/${month}/${year}`
   }
 
-  const [viewMode, setViewMode] = useState<"day" | "range">("day")
+  const [viewMode, setViewMode] = useState<"all" | "day" | "range">("day")
+  const [dateBasis, setDateBasis] = useState<"due" | "created" | "assigned">("due")
   const [selectedDate, setSelectedDate] = useState(getTodayVnStr())
   const [startDate, setStartDate] = useState(getTodayVnStr())
   const [endDate, setEndDate] = useState(getFutureVnStr(6))
@@ -54,14 +60,12 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     status: "todo" as "todo" | "in-progress" | "done"
   })
 
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
-  const showToast = (message: string, type: "success" | "error" = "success") => {
-    setToast({ message, type })
-    setTimeout(() => setToast(null), 3000)
-  }
+
 
   const parseVnDate = (s: string) => {
+    if (!s) return null
     const parts = s.split("/").map(Number)
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return null
     return new Date(parts[2], parts[1] - 1, parts[0])
   }
 
@@ -69,6 +73,9 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     try {
       const da = parseVnDate(a)
       const db = parseVnDate(b)
+      if (!da && !db) return 0
+      if (!da) return 1
+      if (!db) return -1
       da.setHours(0, 0, 0, 0)
       db.setHours(0, 0, 0, 0)
       return da.getTime() - db.getTime()
@@ -96,6 +103,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
       const d = parseVnDate(dateStr)
       const start = parseVnDate(startStr)
       const end = parseVnDate(endStr)
+      if (!d || !start || !end) return false
       d.setHours(0, 0, 0, 0)
       start.setHours(0, 0, 0, 0)
       end.setHours(0, 0, 0, 0)
@@ -127,6 +135,15 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     loadData()
   }, [])
 
+  useEffect(() => {
+    const unsub = subscribeTaskSocket({
+      onChange: ({ action, task }) => {
+        setTasks(prev => mergeTaskList(prev, { action, task }))
+      },
+    })
+    return () => { unsub() }
+  }, [])
+
   const departments = useMemo(() => {
     const branchEmps = employees.filter(e => selectedBranch === "all" || e.branchId === selectedBranch)
     const set = new Set(branchEmps.map(e => e.department).filter(Boolean))
@@ -135,6 +152,9 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
   const filteredEmployeesList = useMemo(() => {
     return employees.filter(e => {
+      // Bảng công việc lấy cả nhân viên chính thức + thực tập.
+      // Chỉ ẩn nhân sự đã nghỉ việc khỏi danh sách thao tác.
+      if (e.status === "inactive") return false
       if (selectedBranch !== "all" && e.branchId !== selectedBranch) return false
       if (selectedDept !== "all" && e.department !== selectedDept) return false
       return true
@@ -153,6 +173,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
   const displayEmployees = useMemo(() => {
     return employees.filter(e => {
+      // Hiển thị cả staff và intern; chỉ loại nhân sự nghỉ việc.
       if (e.status === "inactive") return false
       if (selectedBranch !== "all" && e.branchId !== selectedBranch) return false
       if (selectedDept !== "all" && e.department !== selectedDept) return false
@@ -164,6 +185,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   const handleReloadWithReset = async () => {
     setSelectedDept("all")
     setSelectedEmp("all")
+    setSelectedStatus("all")
     if (viewMode === "day") {
       setSelectedDate(getTodayVnStr())
     } else {
@@ -173,9 +195,30 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     await loadData()
   }
 
+  const handleClearFiltersToToday = async () => {
+    setViewMode("day")
+    setSelectedDept("all")
+    setSelectedEmp("all")
+    setSelectedStatus("all")
+    setSelectedDate(getTodayVnStr())
+    setStartDate(getTodayVnStr())
+    setEndDate(getFutureVnStr(6))
+    await loadData()
+  }
+
+  const handleViewAllTasks = () => {
+    setViewMode("all")
+    setSelectedDept("all")
+    setSelectedEmp("all")
+    setSelectedStatus("all")
+  }
+
+  const isPendingTask = (status?: string) => status === "todo" || status === "in-progress" || !status
+
   const getVnDayOfWeek = (dateStr: string) => {
     try {
       const d = parseVnDate(dateStr)
+      if (!d) return ""
       const days = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"]
       return days[d.getDay()]
     } catch {
@@ -183,14 +226,45 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     }
   }
 
+  const isoToVnDate = (raw?: string) => {
+    if (!raw) return ""
+    const str = String(raw)
+    if (str.includes("/")) return str
+    const d = new Date(str)
+    if (Number.isNaN(d.getTime())) return ""
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+  }
+
+  const getTaskDateByBasis = (t: any) => {
+    if (dateBasis === "created") return isoToVnDate(t.createdAt)
+    if (dateBasis === "assigned") return isoToVnDate(t.assignedAt || t.assignedDate || t.createdAt)
+    return t.dueDate || ""
+  }
+
+  const dateBasisLabel = dateBasis === "due"
+    ? "Hạn hoàn thành"
+    : dateBasis === "created"
+      ? "Ngày tạo"
+      : "Ngày giao"
+
+  const matchesDateFilter = (taskDate: string) => {
+    if (viewMode === "all") return true
+    if (viewMode === "day") return compareVnDates(taskDate, selectedDate) === 0
+    return isDateBetween(taskDate, startDate, endDate)
+  }
+
   const renderTaskCells = (t: any, tIdx: number, allTasks: any[], empId: string, bgClass: string) => {
     const isDone = t.status === "done"
     const isInProgress = t.status === "in-progress"
-    const isFirstOfGroup = tIdx === 0 || allTasks[tIdx - 1].dueDate !== t.dueDate
+    const dueDate = parseVnDate(t.dueDate)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const isOverdue = !!dueDate && !isDone && dueDate.getTime() < today.getTime()
+    const isFirstOfGroup = tIdx === 0 || allTasks[tIdx - 1]._displayDate !== t._displayDate
     let dateGroupLength = 0
     if (isFirstOfGroup) {
       for (let i = tIdx; i < allTasks.length; i++) {
-        if (allTasks[i].dueDate === t.dueDate) {
+        if (allTasks[i]._displayDate === t._displayDate) {
           dateGroupLength++
         } else {
           break
@@ -203,8 +277,8 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
         {isFirstOfGroup && (
           <td rowSpan={dateGroupLength} className={`px-5 py-3 border-r border-gray-100 align-middle text-left ${bgClass}`}>
             <div className="flex flex-col text-xs font-bold gap-0.5">
-              <span className="text-gray-800 font-mono tracking-tight">{t.dueDate}</span>
-              <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(t.dueDate)}</span>
+              <span className="text-gray-800 font-mono tracking-tight">{t._displayDate || "—"}</span>
+              {t._displayDate && <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(t._displayDate)}</span>}
             </div>
           </td>
         )}
@@ -212,7 +286,8 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
         <td className="px-5 py-3 border-r border-gray-100 align-middle">
           <div
             className={`h-[38px] px-3 flex items-center border rounded-xl text-xs font-bold w-full truncate transition-all ${
-              isDone ? "bg-emerald-50/25 hover:bg-emerald-50/45 border-emerald-200 text-emerald-800"
+              isOverdue ? "bg-red-50/60 hover:bg-red-50 border-red-200 text-red-800"
+              : isDone ? "bg-emerald-50/25 hover:bg-emerald-50/45 border-emerald-200 text-emerald-800"
               : isInProgress ? "bg-orange-50/20 hover:bg-orange-50/40 border-orange-200 text-orange-850"
               : "bg-gray-50/45 hover:bg-gray-50/80 border-gray-200 text-gray-700"
             }`}
@@ -234,11 +309,12 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
         <td className="px-5 py-3 border-r border-gray-100 align-middle text-left">
           <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-            isDone ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+            isOverdue ? "bg-red-50 text-red-700 border-red-100"
+            : isDone ? "bg-emerald-50 text-emerald-700 border-emerald-100"
             : isInProgress ? "bg-orange-50 text-orange-600 border-orange-100"
             : "bg-gray-150 text-gray-650 border-gray-200"
           }`}>
-            {isDone ? "Đã xong" : isInProgress ? "Đang làm" : "Chưa làm"}
+            {isOverdue ? "Quá hạn" : isDone ? "Đã xong" : isInProgress ? "Đang làm" : "Chưa làm"}
           </span>
         </td>
 
@@ -307,11 +383,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
       showToast("Vui lòng chọn người thực hiện", "error")
       return
     }
-    if (!form.dueDate) {
-      showToast("Vui lòng chọn ngày giao việc", "error")
-      return
-    }
-
     try {
       if (editingTask) {
         setProcessingId(editingTask.id)
@@ -352,13 +423,6 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
   return (
     <div className="space-y-5">
-      {toast && createPortal(
-        <div className={`fixed bottom-6 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] border backdrop-blur-sm animate-in slide-in-from-right duration-300
-          ${toast.type === "success" ? "bg-gray-900/95 text-white border-white/10" : "bg-red-900/95 text-white border-red-500/20"}`}>
-          <div className={`w-2.5 h-2.5 rounded-full ${toast.type === "success" ? "bg-emerald-400" : "bg-red-400"} animate-pulse`} />
-          <span className="text-sm font-semibold">{toast.message}</span>
-        </div>
-      , document.body)}
 
       <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
         <div className="flex items-center">
@@ -377,41 +441,47 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
       </div>
 
       <div className="bg-white rounded-2xl p-5 border border-black/5 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 items-end">
-          <div>
-            <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Lọc theo phòng ban</label>
-            <CustomSelect
-              value={selectedDept}
-              onChange={(val) => {
-                setSelectedDept(val)
-                setSelectedEmp("all")
-              }}
-              options={departmentOptions}
-              heightClass="h-[42px]"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Chọn nhân viên</label>
-            <CustomSelect
-              value={selectedEmp}
-              onChange={setSelectedEmp}
-              options={employeeOptions}
-              heightClass="h-[42px]"
-              searchable={true}
-            />
-          </div>
-
-          {viewMode === "day" ? (
-            <div className="md:col-span-2 flex items-end gap-2">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+          {viewMode === "all" ? (
+            <div className="lg:col-span-8 flex items-end gap-2">
+              <div className="flex-1 h-[42px] px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-500 bg-gray-50 flex items-center">
+                Đang hiển thị tất cả công việc (không lọc theo ngày)
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewMode("day")}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Chuyển sang xem theo ngày cụ thể"
+              >
+                Theo ngày
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("range")}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Chuyển sang xem theo khoảng ngày"
+              >
+                Khoảng ngày
+              </button>
+            </div>
+          ) : viewMode === "day" ? (
+            <div className="lg:col-span-8 flex items-end gap-2">
               <div className="flex-1">
-                <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Chọn ngày</label>
+                <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">{`Lọc theo ${dateBasisLabel.toLowerCase()}`}</label>
                 <CustomDatePicker
                   value={selectedDate}
                   onChange={setSelectedDate}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 bg-white h-[42px] focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50/50 transition-all"
                 />
               </div>
+              <button
+                type="button"
+                onClick={handleViewAllTasks}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Xem tất cả công việc"
+              >
+                All
+              </button>
               <button
                 type="button"
                 onClick={() => setViewMode("range")}
@@ -422,7 +492,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
               </button>
             </div>
           ) : (
-            <div className="md:col-span-2 flex items-end gap-2">
+            <div className="lg:col-span-8 flex items-end gap-2">
               <div className="flex-1">
                 <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Từ ngày</label>
                 <CustomDatePicker
@@ -441,6 +511,14 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
               </div>
               <button
                 type="button"
+                onClick={handleViewAllTasks}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Xem tất cả công việc"
+              >
+                All
+              </button>
+              <button
+                type="button"
                 onClick={() => setViewMode("day")}
                 className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
                 title="Chuyển sang xem theo ngày cụ thể"
@@ -450,17 +528,92 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
             </div>
           )}
 
-          <div className="flex justify-end">
+          <div className="lg:col-span-4 flex items-center justify-end gap-2">
+            <div className="w-[150px]">
+              <CustomSelect
+                value={dateBasis}
+                onChange={(val) => setDateBasis(val as "due" | "created" | "assigned")}
+                options={[
+                  { value: "due", label: "Theo hạn hoàn thành" },
+                  { value: "created", label: "Theo ngày tạo" },
+                  { value: "assigned", label: "Theo ngày giao" },
+                ]}
+                heightClass="h-[42px]"
+              />
+            </div>
+            <button
+              onClick={() => setShowAdvancedFilters(v => !v)}
+              className={`h-[42px] px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer ${
+                showAdvancedFilters
+                  ? "border-[#C62828] bg-red-50 text-[#C62828]"
+                  : "border-gray-200 bg-white text-gray-650 hover:bg-gray-50"
+              }`}
+              title="Mở/đóng bộ lọc nâng cao"
+            >
+              {showAdvancedFilters ? "Ẩn lọc nâng cao" : "Lọc nâng cao"}
+            </button>
+            <button
+              onClick={handleClearFiltersToToday}
+              disabled={loading}
+              className="w-[42px] h-[42px] flex items-center justify-center border border-gray-200 hover:bg-gray-50 disabled:bg-gray-100 text-gray-600 rounded-xl transition-all active:scale-95 cursor-pointer shrink-0"
+              title="Xóa lọc, trở về hôm nay mặc định"
+            >
+              <X size={15} />
+            </button>
             <button
               onClick={handleReloadWithReset}
               disabled={loading}
               className="w-[42px] h-[42px] flex items-center justify-center bg-[#C62828] hover:bg-[#B71C1C] disabled:bg-gray-200 text-white rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer shrink-0"
-              title="Đặt lại bộ lọc & Làm mới"
+              title="Làm mới dữ liệu"
             >
               <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
             </button>
           </div>
         </div>
+
+        {showAdvancedFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Lọc theo phòng ban</label>
+              <CustomSelect
+                value={selectedDept}
+                onChange={(val) => {
+                  setSelectedDept(val)
+                  setSelectedEmp("all")
+                }}
+                options={departmentOptions}
+                heightClass="h-[42px]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Chọn nhân viên</label>
+              <CustomSelect
+                value={selectedEmp}
+                onChange={setSelectedEmp}
+                options={employeeOptions}
+                heightClass="h-[42px]"
+                searchable={true}
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Lọc trạng thái</label>
+              <CustomSelect
+                value={selectedStatus}
+                onChange={(val) => setSelectedStatus(val as any)}
+                options={[
+                  { value: "all", label: "-- Tất cả trạng thái --" },
+                  { value: "todo", label: "Chưa làm" },
+                  { value: "in-progress", label: "Đang làm" },
+                  { value: "done", label: "Đã xong" },
+                  { value: "no-deadline", label: "Không deadline" },
+                ]}
+                heightClass="h-[42px]"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
@@ -471,7 +624,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                 <th className="px-5 py-3.5 text-left font-black w-16">STT</th>
                 <th className="px-5 py-3.5 text-left font-black w-28">Mã NV</th>
                 <th className="px-5 py-3.5 text-left font-black w-48">Họ Tên</th>
-                <th className="px-5 py-3.5 text-left font-black w-44">Ngày</th>
+                <th className="px-5 py-3.5 text-left font-black w-44">{dateBasisLabel}</th>
                 <th className="px-5 py-3.5 text-left font-black">Công việc</th>
                 <th className="px-5 py-3.5 text-left font-black w-40">Trạng thái</th>
                 <th className="px-5 py-3.5 text-center font-black w-36">Thao tác</th>
@@ -495,11 +648,17 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                 displayEmployees.flatMap((emp, index) => {
                   const empTasks = tasks.filter(t => {
                     if (t.assigneeId !== emp.id) return false
-                    if (viewMode === "day") {
-                      return t.dueDate === selectedDate
-                    } else {
-                      return isDateBetween(t.dueDate, startDate, endDate)
+                    const taskDate = getTaskDateByBasis(t)
+
+                    // Lọc trạng thái trước: "no-deadline" là case riêng.
+                    if (selectedStatus === "no-deadline") {
+                      if (t.dueDate) return false
+                      return viewMode === "all" ? true : matchesDateFilter(taskDate)
                     }
+                    if (selectedStatus !== "all" && (t.status || "todo") !== selectedStatus) return false
+
+                    // "Tất cả trạng thái" thực sự là tất cả trạng thái, không tự loại "đã xong".
+                    return matchesDateFilter(taskDate)
                   })
                   
                   const empBgClass = index % 2 === 0 ? "bg-white" : "bg-gray-50/45"
@@ -512,8 +671,10 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                         <td className="px-5 py-4 font-bold text-gray-800 border-r border-gray-100">{emp.name}</td>
                         <td className="px-5 py-4 text-gray-500 font-bold text-xs border-r border-gray-100">
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-gray-800 font-mono">{viewMode === "day" ? selectedDate : startDate}</span>
-                            <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(viewMode === "day" ? selectedDate : startDate)}</span>
+                            <span className="text-gray-800 font-mono">{viewMode === "all" ? "Tất cả" : (viewMode === "day" ? selectedDate : startDate)}</span>
+                            {viewMode !== "all" && (
+                              <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(viewMode === "day" ? selectedDate : startDate)}</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-5 py-4 border-r border-gray-100">
@@ -539,7 +700,9 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                     )
                   }
 
-                  const sortedTasks = [...empTasks].sort((a, b) => compareVnDates(a.dueDate, b.dueDate))
+                  const sortedTasks = [...empTasks]
+                    .map(t => ({ ...t, _displayDate: getTaskDateByBasis(t) }))
+                    .sort((a, b) => compareVnDates(a._displayDate, b._displayDate))
 
                   return sortedTasks.map((t, tIdx) => {
                     const isLast = tIdx === sortedTasks.length - 1
@@ -599,12 +762,21 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
               </div>
 
               <div>
-                <label className="text-xs font-black text-gray-500 mb-1.5 block uppercase tracking-wider">Ngày giao việc</label>
+                <label className="text-xs font-black text-gray-500 mb-1.5 block uppercase tracking-wider">Hạn hoàn thành (deadline)</label>
                 <CustomDatePicker
                   value={form.dueDate}
                   onChange={val => setForm(p => ({ ...p, dueDate: val }))}
                   className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-750 bg-white h-[42px] focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50/50 transition-all"
                 />
+                <label className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-gray-500 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!form.dueDate}
+                    onChange={e => setForm(p => ({ ...p, dueDate: e.target.checked ? "" : getTodayVnStr() }))}
+                    className="w-4 h-4 accent-[#C62828]"
+                  />
+                  Không đặt deadline cho việc này
+                </label>
               </div>
 
               <div>

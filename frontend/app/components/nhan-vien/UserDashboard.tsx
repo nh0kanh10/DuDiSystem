@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { User, Calendar, CheckSquare, Settings, Fingerprint, MessageCircle } from "lucide-react"
 import type { UserPage } from "./types"
-import { ME } from "./types"
+import { getStoredUser } from "./types"
 
 interface Props {
     onNavigate: (p: UserPage) => void
@@ -40,6 +40,7 @@ function BubbleButton({
 }
 
 export default function UserDashboard({ onNavigate, onLogout }: Props) {
+    const me = getStoredUser()
     const [now, setNow] = useState(new Date())
     const [checkedIn, setCheckedIn] = useState(false)
     const [checkInTime, setCheckInTime] = useState<string | null>(null)
@@ -176,7 +177,6 @@ export default function UserDashboard({ onNavigate, onLogout }: Props) {
                     <span style={{ fontSize: 32, lineHeight: 1 }}>🏖️</span>
                 </BubbleButton>
 
-                {/* ── Công việc ── bottom-left */}
                 <BubbleButton
                     label="Công việc" size={110}
                     borderColor="rgba(37,99,235,0.45)" bgGradient="radial-gradient(circle at 50% 30%, #09153d, #04091a)"
@@ -186,7 +186,6 @@ export default function UserDashboard({ onNavigate, onLogout }: Props) {
                     <CheckSquare size={30} className="text-blue-400/90 group-hover:text-blue-300 transition-colors" />
                 </BubbleButton>
 
-                {/* ── Cài đặt ── bottom-right */}
                 <BubbleButton
                     label="Cài đặt" size={110}
                     borderColor="rgba(100,100,100,0.4)" bgGradient="radial-gradient(circle at 50% 30%, #1a1a1a, #0a0a0a)"
@@ -196,7 +195,6 @@ export default function UserDashboard({ onNavigate, onLogout }: Props) {
                     <Settings size={30} className="text-gray-400/90 group-hover:text-gray-300 transition-colors" />
                 </BubbleButton>
 
-                {/* ── Chat nội bộ ── middle-right far edge */}
                 <BubbleButton
                     label="Chat" size={90}
                     borderColor="rgba(16,185,129,0.4)" bgGradient="radial-gradient(circle at 50% 30%, #063825, #02140d)"
@@ -224,11 +222,11 @@ export default function UserDashboard({ onNavigate, onLogout }: Props) {
             {/* ── User greeting (top-left) ── */}
             <div className="absolute top-3 left-4 z-20 flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-black">
-                    {ME.name.split(" ").pop()?.charAt(0)}
+                    {me.name.split(" ").pop()?.charAt(0)}
                 </div>
                 <div>
-                    <p className="text-white/80 text-xs font-semibold leading-none">{ME.name.split(" ").slice(-2).join(" ")}</p>
-                    <p className="text-white/35 text-[10px] font-mono mt-0.5">{ME.id} · {ME.position}</p>
+                    <p className="text-white/80 text-xs font-semibold leading-none">{me.name.split(" ").slice(-2).join(" ")}</p>
+                    <p className="text-white/35 text-[10px] font-mono mt-0.5">{me.id} · {me.position}</p>
                 </div>
             </div>
         </div>

@@ -1,20 +1,10 @@
-import React, { useState } from "react"
-import { CheckSquare, Circle, Clock, Flag, Plus, X } from "lucide-react"
+import React, { useMemo, useState } from "react"
+import { getStoredUser } from "./types"
+import { useMyTasks } from "../../hooks/useMyTasks"
+import { api } from "@/lib/api"
 
 type Priority = "high" | "medium" | "low"
 type Status = "todo" | "in-progress" | "done"
-
-interface Task {
-    id: string; title: string; dueDate: string; priority: Priority; status: Status; note?: string
-}
-
-const INIT_TASKS: Task[] = [
-    { id: "T1", title: "Redesign dashboard UI component", dueDate: "30/06/2026", priority: "high", status: "in-progress", note: "Làm theo mockup mới từ design team" },
-    { id: "T2", title: "Review code module Nhân sự", dueDate: "28/06/2026", priority: "medium", status: "todo" },
-    { id: "T3", title: "Viết unit test cho AttendanceAPI", dueDate: "27/06/2026", priority: "high", status: "todo" },
-    { id: "T4", title: "Cập nhật tài liệu onboarding", dueDate: "01/07/2026", priority: "low", status: "done" },
-    { id: "T5", title: "Fix bug hiển thị chart tuần", dueDate: "26/06/2026", priority: "high", status: "done" },
-]
 
 const PRIORITY_MAP = {
     high: { label: "Cao", color: "text-red-600", bg: "bg-red-100", dot: "bg-red-500" },
@@ -28,105 +18,230 @@ const STATUS_MAP = {
     done: { label: "Hoàn thành", color: "text-green-700", bg: "bg-green-100" },
 }
 
-export default function UserTasks() {
-    const [tasks, setTasks] = useState<Task[]>(INIT_TASKS)
+function parseVnDate(value?: string) {
+    if (!value) return null
+    const parts = value.split("/").map(Number)
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return null
+    return new Date(parts[2], parts[1] - 1, parts[0])
+}
+
+export default function UserTasks({ variant = "default" }: { variant?: "default" | "portal" }) {
+    const portal = variant === "portal"
+    const me = getStoredUser()
+    const { tasks, loading, error, reload, stats } = useMyTasks(me.id)
     const [filter, setFilter] = useState<Status | "all">("all")
+    const [query, setQuery] = useState("")
     const [showAdd, setShowAdd] = useState(false)
     const [newTitle, setNewTitle] = useState("")
+    const [newDescription, setNewDescription] = useState("")
     const [newDate, setNewDate] = useState("")
+    const [noDeadline, setNoDeadline] = useState(false)
     const [newPriority, setNewPriority] = useState<Priority>("medium")
+    const [actionLoading, setActionLoading] = useState(false)
+    const getTodayVn = () => {
+        const d = new Date()
+        return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+    }
 
-    const filtered = filter === "all" ? tasks : tasks.filter(t => t.status === filter)
+    const filtered = useMemo(() => {
+        const q = query.trim().toLowerCase()
+        return tasks
+            .filter(t => filter === "all" ? true : (t.status || "todo") === filter)
+            .filter(t => {
+                if (!q) return true
+                return `${t.title || ""} ${t.description || ""}`.toLowerCase().includes(q)
+            })
+            .sort((a, b) => {
+                const aDone = (a.status || "todo") === "done"
+                const bDone = (b.status || "todo") === "done"
+                if (aDone !== bDone) return aDone ? 1 : -1
+                const aDate = parseVnDate(a.dueDate)
+                const bDate = parseVnDate(b.dueDate)
+                if (aDate && bDate) return aDate.getTime() - bDate.getTime()
+                if (aDate) return -1
+                if (bDate) return 1
+                return (a.title || "").localeCompare(b.title || "")
+            })
+    }, [tasks, filter, query])
 
-    const toggleDone = (id: string) => setTasks(prev => prev.map(t =>
-        t.id === id ? { ...t, status: t.status === "done" ? "todo" : "done" } : t
-    ))
+    const todayStr = useMemo(() => {
+        const d = new Date()
+        return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+    }, [])
 
-    const addTask = () => {
+    const todayFocus = useMemo(
+        () => filtered.filter(t => (t.status || "todo") !== "done" && t.dueDate === todayStr),
+        [filtered, todayStr]
+    )
+
+    const overdueCount = useMemo(() => {
+        const now = new Date()
+        now.setHours(0, 0, 0, 0)
+        return tasks.filter(t => {
+            if ((t.status || "todo") === "done") return false
+            const due = parseVnDate(t.dueDate)
+            return !!due && due.getTime() < now.getTime()
+        }).length
+    }, [tasks])
+
+    const surface = portal ? "bg-white border-[#efd7da] text-[#241416]" : "bg-white border-black/5 text-gray-800"
+    const muted = portal ? "text-[#7f5f63]" : "text-gray-600"
+
+    const setTaskStatus = async (id: string, nextStatus: Status) => {
+        setActionLoading(true)
+        try {
+            await api.tasks.update(id, { status: nextStatus })
+            await reload()
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Thao tác thất bại")
+        } finally {
+            setActionLoading(false)
+        }
+    }
+
+    const addTask = async () => {
         if (!newTitle.trim()) return
-        setTasks(prev => [{
-            id: `T${Date.now()}`, title: newTitle,
-            dueDate: newDate ? newDate.split("-").reverse().join("/") : "–",
-            priority: newPriority, status: "todo",
-        }, ...prev])
-        setNewTitle(""); setNewDate(""); setNewPriority("medium"); setShowAdd(false)
+        setActionLoading(true)
+        try {
+            await api.tasks.create({
+                title: newTitle,
+                description: newDescription.trim(),
+                dueDate: noDeadline ? "" : (newDate ? newDate.split("-").reverse().join("/") : getTodayVn()),
+                priority: newPriority,
+                status: "todo",
+                assigneeId: me.id,
+                assigneeName: me.name
+            })
+            setNewTitle(""); setNewDescription(""); setNewDate(""); setNewPriority("medium"); setNoDeadline(false); setShowAdd(false)
+            await reload()
+        } catch (e) {
+            alert(e instanceof Error ? e.message : "Không thể thêm công việc")
+        } finally {
+            setActionLoading(false)
+        }
     }
 
-    const stats = {
-        total: tasks.length,
-        done: tasks.filter(t => t.status === "done").length,
-        todo: tasks.filter(t => t.status === "todo").length,
-        inProgress: tasks.filter(t => t.status === "in-progress").length,
-    }
+    const totalCount = tasks.length
 
     return (
-        <div className="space-y-5 max-w-3xl mx-auto">
+        <div className={`space-y-5 ${portal ? "w-full" : "max-w-3xl mx-auto"}`}>
+            {error && (
+                <div className={`p-3 rounded-xl text-sm font-medium ${portal ? "bg-red-50 border border-red-200 text-red-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
+                    {error}
+                </div>
+            )}
+
             {/* Stats */}
             <div className="grid grid-cols-4 gap-3">
                 {[
-                    { l: "Tổng cộng", v: stats.total, c: "text-gray-800", bg: "bg-white border border-black/5" },
-                    { l: "Đang làm", v: stats.inProgress, c: "text-orange-600", bg: "bg-orange-50" },
-                    { l: "Cần làm", v: stats.todo, c: "text-blue-600", bg: "bg-blue-50" },
-                    { l: "Hoàn thành", v: stats.done, c: "text-green-600", bg: "bg-green-50" },
+                    { l: "Tổng cộng", v: totalCount, c: portal ? "text-[#241416]" : "text-gray-800", bg: portal ? "bg-white border border-[#efd7da] shadow-sm" : "bg-white border border-black/5" },
+                    { l: "Đang làm", v: stats.inProgress, c: portal ? "text-[#d97706]" : "text-orange-600", bg: portal ? "bg-white border border-[#efd7da] shadow-sm" : "bg-orange-50" },
+                    { l: "Cần làm", v: stats.todo, c: portal ? "text-[#E8231A]" : "text-blue-600", bg: portal ? "bg-white border border-[#efd7da] shadow-sm" : "bg-blue-50" },
+                    { l: "Hoàn thành", v: stats.done, c: portal ? "text-emerald-600" : "text-green-600", bg: portal ? "bg-white border border-[#efd7da] shadow-sm" : "bg-green-50" },
                 ].map(s => (
                     <div key={s.l} className={`${s.bg} rounded-2xl p-4`}>
-                        <p className={`text-2xl font-black ${s.c}`}>{s.v}</p>
-                        <p className="text-xs font-semibold text-gray-600 mt-1">{s.l}</p>
+                        <p className={`text-2xl font-black ${s.c}`}>{loading ? "—" : s.v}</p>
+                        <p className={`text-xs font-semibold mt-1 ${muted}`}>{s.l}</p>
                     </div>
                 ))}
             </div>
 
+            <div className={`${surface} rounded-2xl p-4 border shadow-sm flex flex-wrap items-center justify-between gap-3`}>
+                <div>
+                    <p className={`text-sm font-black ${portal ? "text-[#241416]" : "text-gray-800"}`}>Kế hoạch hôm nay</p>
+                    <p className={`text-xs ${muted} mt-1`}>
+                        {todayFocus.length > 0
+                            ? `Bạn có ${todayFocus.length} việc đến hạn hôm nay.`
+                            : "Không có việc đến hạn hôm nay."}
+                        {overdueCount > 0 ? ` Có ${overdueCount} việc đang trễ hạn.` : ""}
+                    </p>
+                </div>
+                <button onClick={reload}
+                    disabled={actionLoading || loading}
+                    className="px-4 py-2 bg-white border border-[#e7c8cc] rounded-xl text-xs font-black text-[#7a1d22] hover:bg-[#fff1f2] disabled:opacity-50">
+                    Làm mới danh sách
+                </button>
+            </div>
+
             {/* Actions row */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                <div className={`flex gap-1 rounded-xl p-1 ${portal ? "bg-[#fff1f2] border border-[#efd7da]" : "bg-gray-100"}`}>
                     {([["all", "Tất cả"], ["todo", "Cần làm"], ["in-progress", "Đang làm"], ["done", "Hoàn thành"]] as const).map(([k, l]) => (
                         <button key={k} onClick={() => setFilter(k)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all
-                ${filter === k ? "bg-white shadow text-gray-800" : "text-gray-500 hover:text-gray-700"}`}>
+                ${filter === k ? portal ? "bg-[#E8231A] text-white shadow-sm" : "bg-white shadow text-gray-800" : portal ? "text-[#7f5f63] hover:text-[#241416]" : "text-gray-500 hover:text-gray-700"}`}>
                             {l}
                         </button>
                     ))}
                 </div>
+                <div className="flex items-center gap-2">
+                    <input
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder="Tìm việc theo tiêu đề..."
+                        className={`w-56 px-3 py-2 border rounded-xl text-sm focus:outline-none ${portal ? "bg-white border-[#e7c8cc] text-[#241416] placeholder:text-[#8b6b70] focus:border-[#E8231A]" : "border-gray-200 focus:border-[#C62828]/40"}`}
+                    />
                 <button onClick={() => setShowAdd(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-sm font-bold transition-colors shadow-sm">
-                    <Plus size={15} /> Thêm việc
+                    disabled={actionLoading || loading}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-sm font-bold transition-colors shadow-sm disabled:opacity-50">
+                    Thêm việc
                 </button>
+                </div>
             </div>
 
             {/* Add task form */}
             {showAdd && (
-                <div className="bg-white rounded-2xl p-5 border border-[#C62828]/20 shadow-sm space-y-3">
+                <div className={`${surface} rounded-2xl p-5 border shadow-sm space-y-3`}>
                     <div className="flex items-center justify-between mb-1">
-                        <h4 className="font-bold text-gray-700">Thêm công việc mới</h4>
-                        <button onClick={() => setShowAdd(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X size={16} /></button>
+                        <h4 className={`font-bold ${portal ? "text-[#241416]" : "text-gray-700"}`}>Thêm công việc mới</h4>
+                        <button onClick={() => setShowAdd(false)} className={`px-2 py-1 text-xs font-bold rounded-lg ${portal ? "text-[#7f5f63] hover:bg-[#fff1f2]" : "text-gray-500 hover:bg-gray-100"}`}>Đóng</button>
                     </div>
                     <input value={newTitle} onChange={e => setNewTitle(e.target.value)}
                         placeholder="Tên công việc..."
-                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40" />
+                        disabled={actionLoading}
+                        className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none ${portal ? "bg-white border-[#e7c8cc] text-[#241416] placeholder:text-[#8b6b70] focus:border-[#E8231A]" : "border-gray-200 focus:border-[#C62828]/40"}`} />
+                    <textarea value={newDescription} onChange={e => setNewDescription(e.target.value)}
+                        placeholder="Mô tả ngắn mục tiêu cần làm..."
+                        rows={2}
+                        disabled={actionLoading}
+                        className={`w-full px-3 py-2.5 border rounded-xl text-sm focus:outline-none resize-none ${portal ? "bg-white border-[#e7c8cc] text-[#241416] placeholder:text-[#8b6b70] focus:border-[#E8231A]" : "border-gray-200 focus:border-[#C62828]/40"}`} />
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="text-xs font-bold text-gray-500 mb-1 block">Hạn chót</label>
+                            <label className={`text-xs font-bold mb-1 block ${muted}`}>Hạn chót</label>
                             <input type="date" value={newDate} onChange={e => setNewDate(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40" />
+                                disabled={actionLoading || noDeadline}
+                                className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${portal ? "bg-white border-[#e7c8cc] text-[#241416] focus:border-[#E8231A]" : "border-gray-200 focus:border-[#C62828]/40"}`} />
+                            <label className={`mt-2 inline-flex items-center gap-2 text-xs font-semibold ${muted}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={noDeadline}
+                                    onChange={e => setNoDeadline(e.target.checked)}
+                                    className="w-4 h-4 accent-[#C62828]"
+                                />
+                                Không đặt deadline
+                            </label>
                         </div>
                         <div>
-                            <label className="text-xs font-bold text-gray-500 mb-1 block">Ưu tiên</label>
+                            <label className={`text-xs font-bold mb-1 block ${muted}`}>Ưu tiên</label>
                             <select value={newPriority} onChange={e => setNewPriority(e.target.value as Priority)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none">
-                                <option value="high">🔴 Cao</option>
-                                <option value="medium">🟡 Trung bình</option>
-                                <option value="low">🔵 Thấp</option>
+                                disabled={actionLoading}
+                                className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none ${portal ? "bg-white border-[#e7c8cc] text-[#241416]" : "border-gray-200"}`}>
+                                <option value="high">Cao - làm trước</option>
+                                <option value="medium">Trung bình</option>
+                                <option value="low">Thấp - làm sau</option>
                             </select>
                         </div>
                     </div>
                     <div className="flex gap-2 pt-1">
                         <button onClick={() => setShowAdd(false)}
-                            className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                            disabled={actionLoading}
+                            className={`flex-1 py-2.5 border rounded-xl text-sm font-semibold ${portal ? "border-[#e7c8cc] text-[#7f5f63] hover:bg-[#fff1f2]" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
                             Hủy
                         </button>
                         <button onClick={addTask}
-                            className="flex-1 py-2.5 bg-[#C62828] text-white rounded-xl text-sm font-bold hover:bg-[#B71C1C]">
-                            Thêm
+                            disabled={actionLoading}
+                            className="flex-1 py-2.5 bg-[#C62828] text-white rounded-xl text-sm font-bold hover:bg-[#B71C1C] flex items-center justify-center gap-1.5">
+                            {actionLoading ? "Đang thêm..." : "Thêm"}
                         </button>
                     </div>
                 </div>
@@ -134,47 +249,101 @@ export default function UserTasks() {
 
             {/* Task list */}
             <div className="space-y-3">
-                {filtered.length === 0 && (
-                    <div className="bg-white rounded-2xl p-10 text-center text-gray-400 border border-black/5 shadow-sm">
-                        <CheckSquare size={32} className="mx-auto mb-2 opacity-30" />
-                        <p className="text-sm">Không có công việc nào</p>
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                        <span className="text-xs font-medium">Đang tải danh sách công việc...</span>
                     </div>
-                )}
-                {filtered.map(task => {
-                    const p = PRIORITY_MAP[task.priority]
-                    const s = STATUS_MAP[task.status]
-                    return (
-                        <div key={task.id}
-                            className={`bg-white rounded-2xl p-5 border shadow-sm flex items-start gap-4 transition-all
-                ${task.status === "done" ? "border-green-100 opacity-70" : "border-black/5 hover:border-[#C62828]/20"}`}>
-                            <button onClick={() => toggleDone(task.id)} className="flex-shrink-0 mt-0.5 transition-transform hover:scale-110">
-                                {task.status === "done"
-                                    ? <CheckSquare size={22} className="text-green-500" />
-                                    : <Circle size={22} className="text-gray-300 hover:text-[#C62828] transition-colors" />
-                                }
-                            </button>
-                            <div className="flex-1 min-w-0">
-                                <p className={`font-semibold text-sm ${task.status === "done" ? "line-through text-gray-400" : "text-gray-800"}`}>
-                                    {task.title}
-                                </p>
-                                {task.note && <p className="text-xs text-gray-400 mt-0.5 italic">{task.note}</p>}
-                                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${s.bg} ${s.color}`}>
-                                        {s.label}
+                ) : filtered.length === 0 ? (
+                    <div className={`${surface} rounded-2xl p-10 text-center shadow-sm`}>
+                        <p className="text-sm font-bold">Không có công việc nào</p>
+                    </div>
+                ) : (
+                    filtered.map(task => {
+                        const priorityKey = (task.priority || "medium") as Priority
+                        const statusKey = (task.status || "todo") as Status
+                        const p = PRIORITY_MAP[priorityKey] ?? PRIORITY_MAP.medium
+                        const s = STATUS_MAP[statusKey] ?? STATUS_MAP.todo
+                        const due = parseVnDate(task.dueDate)
+                        const today = new Date()
+                        today.setHours(0, 0, 0, 0)
+                        const isOverdue = !!due && statusKey !== "done" && due.getTime() < today.getTime()
+                        const isToday = task.dueDate === todayStr
+                        return (
+                            <div key={task.id}
+                                className={`${surface} rounded-2xl p-5 border shadow-sm flex items-start gap-4 transition-all
+                    ${statusKey === "done" ? portal ? "opacity-75" : "border-green-100 opacity-70" : portal ? "hover:border-[#E8231A]/30" : "border-black/5 hover:border-[#C62828]/20"}`}>
+                                <div className="flex-shrink-0 mt-0.5">
+                                    <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-[10px] font-black ${statusKey === "done" ? "border-green-400 bg-green-50 text-green-600" : statusKey === "in-progress" ? "border-orange-300 bg-orange-50 text-orange-600" : "border-gray-300 text-gray-400"}`}>
+                                        {statusKey === "done" ? "OK" : statusKey === "in-progress" ? "▶" : "•"}
                                     </span>
-                                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${p.bg} ${p.color}`}>
-                                        <Flag size={10} /> {p.label}
-                                    </span>
-                                    {task.dueDate !== "–" && (
-                                        <span className="flex items-center gap-1 text-xs text-gray-400">
-                                            <Clock size={11} /> {task.dueDate}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className={`font-semibold text-sm ${statusKey === "done" ? portal ? "line-through text-[#8b6b70]" : "line-through text-gray-400" : portal ? "text-[#241416]" : "text-gray-800"}`}>
+                                        {task.title}
+                                    </p>
+                                    {task.description && <p className={`text-xs mt-0.5 italic ${portal ? "text-[#7f5f63]" : "text-gray-400"}`}>{task.description}</p>}
+                                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${s.bg} ${s.color}`}>
+                                            {s.label}
                                         </span>
+                                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${p.bg} ${p.color}`}>
+                                            {p.label}
+                                        </span>
+                                        {task.dueDate && task.dueDate !== "–" && (
+                                            <span className={`flex items-center gap-1 text-xs ${portal ? "text-[#7f5f63]" : "text-gray-400"}`}>
+                                                {task.dueDate}
+                                            </span>
+                                        )}
+                                        {!task.dueDate && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-50 text-gray-500 border border-gray-200">
+                                                Không deadline
+                                            </span>
+                                        )}
+                                        {isToday && statusKey !== "done" && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">
+                                                Hôm nay
+                                            </span>
+                                        )}
+                                        {isOverdue && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600 border border-red-100">
+                                                Trễ hạn
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    {statusKey === "todo" && (
+                                        <button
+                                            onClick={() => setTaskStatus(task.id, "in-progress")}
+                                            disabled={actionLoading}
+                                            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 disabled:opacity-50"
+                                        >
+                                            Bắt đầu
+                                        </button>
+                                    )}
+                                    {statusKey !== "done" && (
+                                        <button
+                                            onClick={() => setTaskStatus(task.id, "done")}
+                                            disabled={actionLoading}
+                                            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50"
+                                        >
+                                            Hoàn thành
+                                        </button>
+                                    )}
+                                    {statusKey === "done" && (
+                                        <button
+                                            onClick={() => setTaskStatus(task.id, "todo")}
+                                            disabled={actionLoading}
+                                            className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 disabled:opacity-50"
+                                        >
+                                            Mở lại
+                                        </button>
                                     )}
                                 </div>
                             </div>
-                        </div>
-                    )
-                })}
+                        )
+                    })
+                )}
             </div>
         </div>
     )
