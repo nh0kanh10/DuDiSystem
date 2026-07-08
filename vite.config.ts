@@ -9,6 +9,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  envDir: './frontend',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './frontend'),
