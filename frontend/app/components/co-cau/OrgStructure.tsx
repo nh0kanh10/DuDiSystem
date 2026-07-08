@@ -11,6 +11,7 @@ import PositionManagement from "../vi-tri/PositionManagement"
 import { api } from "@/lib/api"
 import { CustomSelect } from "../ui/CustomSelect"
 import { applyOrgFieldsToEmployee, buildOrgSnapshot, findBranchForNode, deriveOrgFields } from "../../utils/orgUtils"
+import { removeVietnameseTones } from "../../utils"
 import { useToast } from "@/app/hooks/useToast"
 
 type RowItem = 
@@ -592,8 +593,11 @@ export default function OrgStructure({
 
   const filteredNodes = useMemo<RowItem[]>(() => {
     const matchedItems: RowItem[] = []
+    const sq = removeVietnameseTones(searchQuery.toLowerCase())
     nodesToRender.forEach(n => {
-      const matchesSearch = n.name.toLowerCase().includes(searchQuery.toLowerCase()) || (n.code ?? "").toLowerCase().includes(searchQuery.toLowerCase())
+      const nameStr = removeVietnameseTones(n.name.toLowerCase())
+      const codeStr = (n.code ?? "").toLowerCase()
+      const matchesSearch = nameStr.includes(sq) || codeStr.includes(sq)
       const matchesType = filterType === "all" || n.type === filterType
       if (matchesSearch && matchesType) {
         matchedItems.push({ type: "node", data: n })
@@ -602,7 +606,9 @@ export default function OrgStructure({
     
     if (filterType === "all") {
       employees.forEach(emp => {
-        const matchesSearch = emp.name.toLowerCase().includes(searchQuery.toLowerCase()) || emp.id.toLowerCase().includes(searchQuery.toLowerCase())
+        const empName = removeVietnameseTones(emp.name.toLowerCase())
+        const empId = emp.id.toLowerCase()
+        const matchesSearch = empName.includes(sq) || empId.includes(sq)
         if (matchesSearch) {
           const activeAs = assignments.find(as => as.employeeId === emp.id && as.status === "active")
           const nodeId = emp.orgNodeId || activeAs?.nodeId
@@ -649,12 +655,6 @@ export default function OrgStructure({
             className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold text-white transition-colors cursor-pointer"
           >
             <Download size={14} /> Xuất sơ đồ
-          </button>
-          <button
-            onClick={onAddEmployee}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold text-white transition-colors cursor-pointer"
-          >
-            <UserPlus size={14} /> Thêm nhân viên
           </button>
           <button
             onClick={handleOpenAdd}

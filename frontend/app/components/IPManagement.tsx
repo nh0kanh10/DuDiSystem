@@ -110,7 +110,7 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editIp, setEditIp] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [editOrgNodeId, setEditOrgNodeId] = useState<string>(" ");
+  const [editOrgNodeId, setEditOrgNodeId] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [currentIP, setCurrentIP] = useState<string | null>(null);
   const [serverIPs, setServerIPs] = useState<string[]>([]);
@@ -275,7 +275,7 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
       await api.allowedIPs.update(editingId, {
         ip: editIp.trim(),
         description: editDescription.trim(),
-        orgNodeId: editOrgNodeId || undefined,
+        orgNodeId: editOrgNodeId || null,
       });
       handleCancelEdit();
       await fetchIPs();
@@ -415,7 +415,7 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
               disabled={selectedBranch !== "all"}
               heightClass="h-[46px]"
               options={[
-                ...(selectedBranch === "all" ? [{ value: "", label: "Chọn chi nhánh" }] : []),
+                ...(selectedBranch === "all" ? [{ value: "", label: "Tất cả chi nhánh" }] : []),
                 ...orgNodes.map((node: any) => ({ value: node.id, label: node.name }))
               ]}
             />
@@ -562,19 +562,16 @@ export default function IPManagement({ selectedBranch = "all" }: { selectedBranc
                       />
                     </div>
                     <div className="col-span-2">
-                      <select
+                      <CustomSelect
                         value={editOrgNodeId}
-                        onChange={(e) => setEditOrgNodeId(e.target.value)}
+                        onChange={setEditOrgNodeId}
                         disabled={selectedBranch !== "all"}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#C62828] focus:ring-2 focus:ring-[#C62828]/10 transition-all disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-                      >
-                        {selectedBranch === "all" && <option value="">Chọn chi nhánh</option>}
-                        {orgNodes.map((node) => (
-                          <option key={node.id} value={node.id}>
-                            {node.name}
-                          </option>
-                        ))}
-                      </select>
+                        heightClass="h-[38px]"
+                        options={[
+                          ...(selectedBranch === "all" ? [{ value: "", label: "Tất cả chi nhánh" }] : []),
+                          ...orgNodes.map((node) => ({ value: node.id, label: node.name }))
+                        ]}
+                      />
                     </div>
                     <div className="col-span-2">
                       {ip.status === "active" ? (

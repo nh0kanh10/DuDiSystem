@@ -3,14 +3,14 @@ import { Employee, OrgNode, Assignment, AttendanceRecord, LeaveRequest, TaskItem
 export const avatarImg = `https://ui-avatars.com/api/?name=T&background=C62828&color=fff&bold=true`
 
 export const INIT_EMPLOYEES: Employee[] = [
-  { id: "0000000001", name: "Trần Thị Bích Liên", email: "lien.tran@dudi.vn", phone: "0901 234 567", department: "Frontend", position: "Senior Developer", joinDate: "28/05/2026", status: "active", contractType: "Chính thức" },
-  { id: "0000000002", name: "Nguyễn Văn Minh", email: "minh.nguyen@dudi.vn", phone: "0912 345 678", department: "Backend", position: "Lead Developer", joinDate: "12/03/2024", status: "active", contractType: "Chính thức" },
-  { id: "0000000003", name: "Lê Thu Hương", email: "huong.le@dudi.vn", phone: "0923 456 789", department: "Design", position: "UI/UX Designer", joinDate: "15/08/2023", status: "active", contractType: "Chính thức" },
-  { id: "0000000004", name: "Phạm Đức Thành", email: "thanh.pham@dudi.vn", phone: "0934 567 890", department: "PM", position: "Project Manager", joinDate: "28/01/2025", status: "active", contractType: "Chính thức" },
-  { id: "0000000005", name: "Hoàng Thị Mai", email: "admin@dudi.vn", phone: "0945 678 901", department: "HR", position: "HR Manager", joinDate: "12/09/2024", status: "active", contractType: "Chính thức" },
+  { id: "0000000001", name: "Trần Thị Bích Liên", email: "lien.tran@dudi.vn", phone: "0901 234 567", department: "Frontend", position: "Senior Developer", joinDate: "28/05/2026", status: "active", contractType: "staff" },
+  { id: "0000000002", name: "Nguyễn Văn Minh", email: "minh.nguyen@dudi.vn", phone: "0912 345 678", department: "Backend", position: "Lead Developer", joinDate: "12/03/2024", status: "active", contractType: "staff" },
+  { id: "0000000003", name: "Lê Thu Hương", email: "huong.le@dudi.vn", phone: "0923 456 789", department: "Design", position: "UI/UX Designer", joinDate: "15/08/2023", status: "active", contractType: "staff" },
+  { id: "0000000004", name: "Phạm Đức Thành", email: "thanh.pham@dudi.vn", phone: "0934 567 890", department: "PM", position: "Project Manager", joinDate: "28/01/2025", status: "active", contractType: "staff" },
+  { id: "0000000005", name: "Hoàng Thị Mai", email: "admin@dudi.vn", phone: "0945 678 901", department: "HR", position: "HR Manager", joinDate: "12/09/2024", status: "active", contractType: "staff" },
   { id: "0000000006", name: "Võ Minh Tuấn", email: "tuan.vo@dudi.vn", phone: "0956 789 012", department: "Backend", position: "Developer", joinDate: "01/06/2025", status: "active", contractType: "intern" },
   { id: "0000000007", name: "Đinh Thị Lan Anh", email: "lanh.dinh@dudi.vn", phone: "0967 890 123", department: "Frontend", position: "Developer", joinDate: "15/07/2025", status: "active", contractType: "intern" },
-  { id: "0000000008", name: "Bùi Văn Hùng", email: "hung.bui@dudi.vn", phone: "0978 901 234", department: "DevOps", position: "DevOps Engineer", joinDate: "20/11/2024", status: "inactive", contractType: "Chính thức" },
+  { id: "0000000008", name: "Bùi Văn Hùng", email: "hung.bui@dudi.vn", phone: "0978 901 234", department: "DevOps", position: "DevOps Engineer", joinDate: "20/11/2024", status: "inactive", contractType: "staff" },
 ]
 
 export const INIT_ORG_NODES: OrgNode[] = [

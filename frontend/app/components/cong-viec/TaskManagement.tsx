@@ -44,6 +44,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   }
 
   const [viewMode, setViewMode] = useState<"all" | "day" | "range">("day")
+  const [dateBasis, setDateBasis] = useState<"due" | "created" | "assigned">("due")
   const [selectedDate, setSelectedDate] = useState(getTodayVnStr())
   const [startDate, setStartDate] = useState(getTodayVnStr())
   const [endDate, setEndDate] = useState(getFutureVnStr(6))
@@ -151,6 +152,9 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
   const filteredEmployeesList = useMemo(() => {
     return employees.filter(e => {
+      // Bảng công việc lấy cả nhân viên chính thức + thực tập.
+      // Chỉ ẩn nhân sự đã nghỉ việc khỏi danh sách thao tác.
+      if (e.status === "inactive") return false
       if (selectedBranch !== "all" && e.branchId !== selectedBranch) return false
       if (selectedDept !== "all" && e.department !== selectedDept) return false
       return true
@@ -169,6 +173,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
 
   const displayEmployees = useMemo(() => {
     return employees.filter(e => {
+      // Hiển thị cả staff và intern; chỉ loại nhân sự nghỉ việc.
       if (e.status === "inactive") return false
       if (selectedBranch !== "all" && e.branchId !== selectedBranch) return false
       if (selectedDept !== "all" && e.department !== selectedDept) return false
@@ -221,6 +226,33 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     }
   }
 
+  const isoToVnDate = (raw?: string) => {
+    if (!raw) return ""
+    const str = String(raw)
+    if (str.includes("/")) return str
+    const d = new Date(str)
+    if (Number.isNaN(d.getTime())) return ""
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+  }
+
+  const getTaskDateByBasis = (t: any) => {
+    if (dateBasis === "created") return isoToVnDate(t.createdAt)
+    if (dateBasis === "assigned") return isoToVnDate(t.assignedAt || t.assignedDate || t.createdAt)
+    return t.dueDate || ""
+  }
+
+  const dateBasisLabel = dateBasis === "due"
+    ? "Hạn hoàn thành"
+    : dateBasis === "created"
+      ? "Ngày tạo"
+      : "Ngày giao"
+
+  const matchesDateFilter = (taskDate: string) => {
+    if (viewMode === "all") return true
+    if (viewMode === "day") return compareVnDates(taskDate, selectedDate) === 0
+    return isDateBetween(taskDate, startDate, endDate)
+  }
+
   const renderTaskCells = (t: any, tIdx: number, allTasks: any[], empId: string, bgClass: string) => {
     const isDone = t.status === "done"
     const isInProgress = t.status === "in-progress"
@@ -228,11 +260,11 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const isOverdue = !!dueDate && !isDone && dueDate.getTime() < today.getTime()
-    const isFirstOfGroup = tIdx === 0 || allTasks[tIdx - 1].dueDate !== t.dueDate
+    const isFirstOfGroup = tIdx === 0 || allTasks[tIdx - 1]._displayDate !== t._displayDate
     let dateGroupLength = 0
     if (isFirstOfGroup) {
       for (let i = tIdx; i < allTasks.length; i++) {
-        if (allTasks[i].dueDate === t.dueDate) {
+        if (allTasks[i]._displayDate === t._displayDate) {
           dateGroupLength++
         } else {
           break
@@ -245,8 +277,8 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
         {isFirstOfGroup && (
           <td rowSpan={dateGroupLength} className={`px-5 py-3 border-r border-gray-100 align-middle text-left ${bgClass}`}>
             <div className="flex flex-col text-xs font-bold gap-0.5">
-              <span className="text-gray-800 font-mono tracking-tight">{t.dueDate || "Không deadline"}</span>
-              {t.dueDate && <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(t.dueDate)}</span>}
+              <span className="text-gray-800 font-mono tracking-tight">{t._displayDate || "—"}</span>
+              {t._displayDate && <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(t._displayDate)}</span>}
             </div>
           </td>
         )}
@@ -435,7 +467,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
           ) : viewMode === "day" ? (
             <div className="lg:col-span-8 flex items-end gap-2">
               <div className="flex-1">
-                <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Lọc theo hạn</label>
+                <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">{`Lọc theo ${dateBasisLabel.toLowerCase()}`}</label>
                 <CustomDatePicker
                   value={selectedDate}
                   onChange={setSelectedDate}
@@ -497,6 +529,18 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
           )}
 
           <div className="lg:col-span-4 flex items-center justify-end gap-2">
+            <div className="w-[150px]">
+              <CustomSelect
+                value={dateBasis}
+                onChange={(val) => setDateBasis(val as "due" | "created" | "assigned")}
+                options={[
+                  { value: "due", label: "Theo hạn hoàn thành" },
+                  { value: "created", label: "Theo ngày tạo" },
+                  { value: "assigned", label: "Theo ngày giao" },
+                ]}
+                heightClass="h-[42px]"
+              />
+            </div>
             <button
               onClick={() => setShowAdvancedFilters(v => !v)}
               className={`h-[42px] px-3.5 border rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer ${
@@ -580,7 +624,7 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                 <th className="px-5 py-3.5 text-left font-black w-16">STT</th>
                 <th className="px-5 py-3.5 text-left font-black w-28">Mã NV</th>
                 <th className="px-5 py-3.5 text-left font-black w-48">Họ Tên</th>
-                <th className="px-5 py-3.5 text-left font-black w-44">Hạn hoàn thành</th>
+                <th className="px-5 py-3.5 text-left font-black w-44">{dateBasisLabel}</th>
                 <th className="px-5 py-3.5 text-left font-black">Công việc</th>
                 <th className="px-5 py-3.5 text-left font-black w-40">Trạng thái</th>
                 <th className="px-5 py-3.5 text-center font-black w-36">Thao tác</th>
@@ -604,20 +648,17 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                 displayEmployees.flatMap((emp, index) => {
                   const empTasks = tasks.filter(t => {
                     if (t.assigneeId !== emp.id) return false
+                    const taskDate = getTaskDateByBasis(t)
+
+                    // Lọc trạng thái trước: "no-deadline" là case riêng.
                     if (selectedStatus === "no-deadline") {
-                      return !t.dueDate
+                      if (t.dueDate) return false
+                      return viewMode === "all" ? true : matchesDateFilter(taskDate)
                     }
                     if (selectedStatus !== "all" && (t.status || "todo") !== selectedStatus) return false
-                    if (viewMode === "all") {
-                      return true
-                    }
-                    if (viewMode === "day") {
-                      // Daily operation board: default to actionable work (not done), not strict by deadline date.
-                      if (selectedStatus === "all") return isPendingTask(t.status)
-                      return true
-                    } else {
-                      return isDateBetween(t.dueDate, startDate, endDate)
-                    }
+
+                    // "Tất cả trạng thái" thực sự là tất cả trạng thái, không tự loại "đã xong".
+                    return matchesDateFilter(taskDate)
                   })
                   
                   const empBgClass = index % 2 === 0 ? "bg-white" : "bg-gray-50/45"
@@ -659,7 +700,9 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                     )
                   }
 
-                  const sortedTasks = [...empTasks].sort((a, b) => compareVnDates(a.dueDate, b.dueDate))
+                  const sortedTasks = [...empTasks]
+                    .map(t => ({ ...t, _displayDate: getTaskDateByBasis(t) }))
+                    .sort((a, b) => compareVnDates(a._displayDate, b._displayDate))
 
                   return sortedTasks.map((t, tIdx) => {
                     const isLast = tIdx === sortedTasks.length - 1

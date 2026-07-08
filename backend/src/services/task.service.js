@@ -2,6 +2,11 @@ import * as repo from "../repositories/task.repository.js"
 import * as empRepo from "../repositories/employee.repository.js"
 import { emitTaskChanged } from "../socket/chat.socket.js"
 
+function todayVn() {
+  const d = new Date()
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+}
+
 function withEmployee(task) {
   const emp = empRepo.getById(task.assigneeId)
   return {
@@ -43,6 +48,8 @@ export function getTask(id) {
 
 export function createTask(data) {
   const count = repo.count()
+  const createdAt = data.createdAt || todayVn()
+  const assignedAt = data.assignedAt || createdAt
   const task = repo.create({
     id: `T${count + 1}`,
     title: data.title,
@@ -58,6 +65,8 @@ export function createTask(data) {
     status: data.status || "todo",
     projectId: data.projectId || "",
     parentId: data.parentId || "",
+    createdAt,
+    assignedAt,
   })
   publishTask("created", task)
   if (task.parentId) syncParentStatus(task.parentId)
@@ -67,10 +76,13 @@ export function createTask(data) {
 export function updateTask(id, patch) {
   const ALLOWED = [
     "title", "taskDetail", "description", "assigneeId", "startDate", "dueDate",
-    "resourceUrl", "notes", "category", "priority", "status", "projectId", "parentId",
+    "resourceUrl", "notes", "category", "priority", "status", "projectId", "parentId", "createdAt", "assignedAt",
   ]
   const safe = Object.fromEntries(Object.entries(patch).filter(([k]) => ALLOWED.includes(k)))
   const before = repo.getById(id)
+  if (before?.assigneeId && safe.assigneeId && safe.assigneeId !== before.assigneeId && !safe.assignedAt) {
+    safe.assignedAt = todayVn()
+  }
   const task = repo.update(id, safe)
   if (!task) return null
   if (before?.assigneeId && before.assigneeId !== task.assigneeId) {

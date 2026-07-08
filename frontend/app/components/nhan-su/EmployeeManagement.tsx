@@ -1,17 +1,17 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
-import {
-  Plus, Search, Edit2, Trash2, X, Download, MoreHorizontal, Eye, Users,
+import { Plus, Search, Edit2, Trash2, X, Download, MoreHorizontal, Eye, Users,
   Building2, Paperclip, Briefcase, ExternalLink, FileText, Image as ImageIcon,
   File, Link2, AlertCircle, CheckCircle2, UserPlus, UserMinus, ArrowRightLeft,
   TrendingUp, RefreshCw, ChevronLeft, ChevronRight, Maximize2,
   User, Camera, ClipboardList, Upload, Calendar
 } from "lucide-react"
+import * as XLSX from "xlsx"
 import { Employee, EmpExtForm, WorkHistoryEntry, WorkHistoryType, Attachment, OrgNode } from "../../types"
 import { api } from "@/lib/api"
 import { useToast } from "@/app/hooks/useToast"
 import { Badge } from "../ui/badge"
-import { initials } from "../../utils"
+import { initials, removeVietnameseTones } from "../../utils"
 import { deriveOrgFields, isOrgPlacementChanged, buildOrgSnapshot } from "../../utils/orgUtils"
 import { previewEmployeeId } from "../../utils/employeeId"
 import UserProfile from "../nhan-vien/UserProfile"
@@ -587,7 +587,7 @@ function PersonalTab({ form, sf, inp, sel, lbl, readonly = false }: {
                 const parts = val.split("/").map(Number)
                 const d = new Date(parts[2], parts[1] - 1, parts[0])
                 const today = new Date(); today.setHours(0,0,0,0)
-                if (d > today) return // không cho phép ngày trong tương lai
+                if (d > today) return 
               }
               sf("dob", val)
             }
@@ -621,7 +621,7 @@ function PersonalTab({ form, sf, inp, sel, lbl, readonly = false }: {
                 const parts = val.split("/").map(Number)
                 const d = new Date(parts[2], parts[1] - 1, parts[0])
                 const today = new Date(); today.setHours(0,0,0,0)
-                if (d > today) return // ngày cấp không thể ở tương lai
+                if (d > today) return
               }
               sf("cccdDate", val)
             }
@@ -1221,8 +1221,12 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
 
   const filtered = useMemo(() => employees.filter(e => {
     if (["0000000000", "1111111111", "2222222222"].includes(e.id)) return false
-    const q = search.toLowerCase()
-    const matchQ = !q || e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
+    const q = removeVietnameseTones(search.toLowerCase())
+    const nameStr = removeVietnameseTones(e.name.toLowerCase())
+    const idStr = e.id.toLowerCase()
+    const emailStr = e.email.toLowerCase()
+    const phoneStr = e.phone.toLowerCase()
+    const matchQ = !q || nameStr.includes(q) || idStr.includes(q) || emailStr.includes(q) || phoneStr.includes(q)
     const matchS = filterStatus === "all"
       || e.status === filterStatus
       || (filterStatus === "intern" && e.contractType === "intern")
@@ -1373,7 +1377,43 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
+          <button onClick={() => {
+            const header = ["Mã NV", "Họ tên", "Email", "SĐT", "Chi nhánh", "Phòng ban", "Vị trí", "Hợp đồng", "Ngày vào", "Trạng thái"]
+            const dataRow = filtered.map(emp => {
+              const branchName = branches.find(b => b.id === (emp as any).branchId)?.name || ""
+              const contractLabel = CONTRACT_TYPES.find(c => c.value === emp.contractType)?.label || emp.contractType
+              const statusLabel = emp.status === "active" ? "Đang làm" : emp.status === "inactive" ? "Nghỉ việc" : emp.status === "suspended" ? "Tạm nghỉ" : emp.status
+              return [
+                emp.id,
+                emp.name,
+                emp.email,
+                emp.phone,
+                branchName,
+                emp.department,
+                emp.position,
+                contractLabel,
+                emp.joinDate,
+                statusLabel
+              ]
+            })
+            
+            const wsData = [header, ...dataRow]
+            const ws = XLSX.utils.aoa_to_sheet(wsData)
+            
+            
+            const colsWidth = header.map((_, colIndex) => {
+              const maxLen = wsData.reduce((max, row) => {
+                const cellValue = row[colIndex] ? String(row[colIndex]) : ""
+                return Math.max(max, cellValue.length)
+              }, 0)
+              return { wch: Math.max(maxLen + 2, 10) } 
+            })
+            ws['!cols'] = colsWidth
+
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, "Nhân viên")
+            XLSX.writeFile(wb, `danh-sach-nhan-vien-${new Date().toISOString().slice(0, 10)}.xlsx`)
+          }} className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
             <Download size={14} /> Xuất Excel
           </button>
           <button onClick={openAdd}
@@ -1463,7 +1503,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                       <p className="text-xs font-semibold text-gray-700 whitespace-nowrap">{emp.department}</p>
                       <p className="text-[11px] text-gray-400">{emp.position}</p>
                     </td>
-                    <td className="px-4 py-4 text-gray-400 text-xs whitespace-nowrap">{emp.contractType}</td>
+                    <td className="px-4 py-4 text-gray-400 text-xs whitespace-nowrap">{CONTRACT_TYPES.find(c => c.value === emp.contractType)?.label || emp.contractType}</td>
                     <td className="px-4 py-4 text-gray-400 text-xs font-mono whitespace-nowrap">{emp.joinDate}</td>
                     <td className="px-4 py-4"><Badge status={emp.status} /></td>
                     <td className="px-4 py-4 sticky right-0 bg-white z-10">
@@ -1874,16 +1914,19 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/10 transition-all text-gray-700 bg-white resize-none"
                 autoFocus
+                autoComplete="off"
               />
             </div>
             <div className="flex justify-end gap-2.5">
               <button
+                type="button"
                 onClick={() => setInputModal(null)}
                 className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors"
               >
                 Hủy
               </button>
               <button
+                type="button"
                 onClick={() => {
                   const val = (document.getElementById("modal-input-textarea") as HTMLTextAreaElement)?.value || "";
                   inputModal.onConfirm(val);

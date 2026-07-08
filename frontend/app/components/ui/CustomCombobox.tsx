@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 import { Search, X, ChevronDown } from "lucide-react"
+import { removeVietnameseTones } from "../../utils"
 
 interface Option {
   value: string
@@ -37,7 +38,9 @@ export function CustomCombobox({
   const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(null)
   const lastRectRef = useRef<{ top: number; left: number; width: number } | null>(null)
 
-  const activeOption = options.find(opt => opt.value === value)
+  const activeOptionLabel = React.useMemo(() => {
+    return options.find(opt => opt.value === value)?.label ?? ""
+  }, [options, value])
 
   const calcMenuRect = () => {
     const baseEl = containerRef.current || triggerRef.current
@@ -57,12 +60,8 @@ export function CustomCombobox({
   }
 
   useEffect(() => {
-    if (activeOption) {
-      setInputValue(activeOption.label)
-    } else {
-      setInputValue("")
-    }
-  }, [value, activeOption])
+    setInputValue(activeOptionLabel)
+  }, [value, activeOptionLabel])
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -71,18 +70,14 @@ export function CustomCombobox({
       const inMenu = !!menuRef.current && menuRef.current.contains(target)
       if (!inTrigger && !inMenu) {
         setIsOpen(false)
-        if (activeOption) {
-          setInputValue(activeOption.label)
-        } else {
-          setInputValue("")
-        }
+        setInputValue(activeOptionLabel)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [activeOption])
+  }, [activeOptionLabel])
 
   useEffect(() => {
     if (!isOpen) {
@@ -117,17 +112,17 @@ export function CustomCombobox({
   }, [isOpen, portal])
 
   const filteredOptions = React.useMemo(() => {
-    const query = inputValue.trim().toLowerCase()
-    if (activeOption && query === activeOption.label.toLowerCase()) {
+    const query = removeVietnameseTones(inputValue.trim().toLowerCase())
+    if (activeOptionLabel && query === removeVietnameseTones(activeOptionLabel.toLowerCase())) {
       return options
     }
     if (!query) return options
     return options.filter(opt =>
-      opt.label.toLowerCase().includes(query) ||
-      opt.value.toLowerCase().includes(query) ||
-      (opt.desc && opt.desc.toLowerCase().includes(query))
+      removeVietnameseTones(opt.label.toLowerCase()).includes(query) ||
+      removeVietnameseTones(opt.value.toLowerCase()).includes(query) ||
+      (opt.desc && removeVietnameseTones(opt.desc.toLowerCase()).includes(query))
     )
-  }, [options, inputValue, activeOption])
+  }, [options, inputValue, activeOptionLabel])
 
   const hasWidth = className.split(" ").some(c => c.startsWith("w-") || c.startsWith("flex-1"))
 

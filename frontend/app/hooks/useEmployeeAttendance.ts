@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { api } from "@/lib/api"
+import { api, detectPublicIP } from "@/lib/api"
 import type { AttendanceRecord } from "../types"
 import {
   getPunchLabel,
@@ -13,7 +13,8 @@ function pad(n: number) {
 }
 
 export function todayISO() {
-  return new Date().toISOString().split("T")[0]
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
 export function formatTimeNow() {
@@ -51,21 +52,15 @@ export function useEmployeeAttendance() {
   const [ipStatus, setIpStatus] = useState<{ valid: boolean; ip: string; message: string } | null>(null)
   const [publicIP, setPublicIP] = useState("")
 
-  const detectPublicIP = useCallback(async () => {
-    try {
-      const res = await fetch("https://api.ipify.org?format=json")
-      const json = (await res.json()) as { ip?: string }
-      const ip = (json.ip || "").trim()
-      if (ip) setPublicIP(ip)
-      return ip
-    } catch {
-      return ""
-    }
+  const fetchAndSaveIP = useCallback(async () => {
+    const ip = await detectPublicIP()
+    if (ip) setPublicIP(ip)
+    return ip
   }, [])
 
   const verifyWifi = useCallback(async () => {
     try {
-      const ip = publicIP || (await detectPublicIP())
+      const ip = publicIP || (await fetchAndSaveIP())
       const data = await api.attendance.checkIP(ip || undefined)
       setIpStatus({ valid: true, ip: data.ip, message: data.message })
     } catch (e) {
@@ -75,7 +70,7 @@ export function useEmployeeAttendance() {
         message: e instanceof Error ? e.message : "Không xác thực được WiFi",
       })
     }
-  }, [detectPublicIP, publicIP])
+  }, [fetchAndSaveIP, publicIP])
 
   const today = todayISO()
   const monthStart = useMemo(() => {
@@ -119,7 +114,6 @@ export function useEmployeeAttendance() {
       setTodayRecord(todayMine)
       setHistory(
         (historyRows as AttendanceRecord[])
-          .filter(r => !String(r.id).startsWith("TEMP_"))
           .sort((a, b) => b.date.localeCompare(a.date))
       )
       setMonthStats(stats)
@@ -140,10 +134,16 @@ export function useEmployeeAttendance() {
     const punchInfo = getPunchLabel(todayRecord, isIntern)
     if (punchInfo.done) return
 
+    const dayOfWeek = new Date().getDay()
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      setError("Hệ thống không cho phép chấm công vào Thứ Bảy và Chủ Nhật!")
+      return
+    }
+
     setPunching(true)
     setError(null)
     try {
-      const ip = publicIP || (await detectPublicIP())
+      const ip = publicIP || (await fetchAndSaveIP())
       await api.attendance.checkIP(ip || undefined)
       await verifyWifi()
       const time = formatTimeNow()
@@ -174,7 +174,7 @@ export function useEmployeeAttendance() {
     } finally {
       setPunching(false)
     }
-  }, [detectPublicIP, employeeId, isIntern, load, publicIP, today, todayRecord, verifyWifi])
+  }, [fetchAndSaveIP, employeeId, isIntern, load, publicIP, today, todayRecord, verifyWifi])
 
   const punchLabel = getPunchLabel(todayRecord, isIntern)
   const statusText = getTodayStatusText(todayRecord, isIntern)

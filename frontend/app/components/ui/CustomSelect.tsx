@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 import { ChevronDown, Search } from "lucide-react"
+import { removeVietnameseTones } from "../../utils"
 
 interface Option {
   value: string
@@ -117,7 +118,7 @@ export function CustomSelect({
   const selectedOption = options.find(opt => opt.value === value)
 
   const filteredOptions = options.filter(opt =>
-    opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+    removeVietnameseTones(opt.label.toLowerCase()).includes(removeVietnameseTones(searchTerm.toLowerCase()))
   )
 
   const hasWidth = className.split(" ").some(c => c.startsWith("w-") || c.startsWith("flex-1"))

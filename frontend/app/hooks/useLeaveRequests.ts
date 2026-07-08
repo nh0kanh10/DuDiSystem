@@ -56,5 +56,11 @@ export function useLeaveRequests(employeeId?: string) {
     await load()
   }
 
-  return { requests, loading, error, reload: load, submit, cancel }
+  const update = async (id: string, payload: unknown) => {
+    const updated = await api.requests.update(id, payload) as LeaveRequestRecord
+    await load()
+    return updated
+  }
+
+  return { requests, loading, error, reload: load, submit, cancel, update }
 }

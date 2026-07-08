@@ -46,10 +46,11 @@ import UserTasks from "./UserTasks";
 import UserChatWidget from "./UserChatWidget";
 import LeaveRequestPanel from "../nghi-phep/LeaveRequestPanel";
 import type { Announcement, Employee, WorkHistoryEntry } from "../../types";
-import { api } from "@/lib/api";
+import { api, detectPublicIP } from "@/lib/api";
 import { CrmStaffPage } from "../crm/CrmStaffPage";
 import { Modal, ModalCancelButton } from "../ui/Modal";
 import { EmployeeModal } from "../nhan-su/EmployeeManagement";
+import { removeVietnameseTones } from "../../utils";
 const BRAND = "#E8231A"; 
 const CRIMSON = "#C01525"; 
 const GOLD = "#FF8800"; 
@@ -941,13 +942,17 @@ function DirectoryContent() {
   const [search, setSearch] = useState("");
   const { employees, loading, error, reload } = useEmployeeDirectory();
   const list = employees.filter((e) => {
-    const q = search.trim().toLowerCase();
+    const q = removeVietnameseTones(search.trim().toLowerCase());
     if (!q) return true;
+    const nameStr = removeVietnameseTones(e.name.toLowerCase());
+    const deptStr = removeVietnameseTones(e.department.toLowerCase());
+    const posStr = removeVietnameseTones(e.position.toLowerCase());
+    const emailStr = (e.email || "").toLowerCase();
     return (
-      e.name.toLowerCase().includes(q) ||
-      e.department.toLowerCase().includes(q) ||
-      e.position.toLowerCase().includes(q) ||
-      (e.email || "").toLowerCase().includes(q)
+      nameStr.includes(q) ||
+      deptStr.includes(q) ||
+      posStr.includes(q) ||
+      emailStr.includes(q)
     );
   });
   return (
@@ -2651,6 +2656,7 @@ export default function UserPortalApp({
   const [defaultAnnouncement, setDefaultAnnouncement] = useState("");
   const { unread: notifUnread } = useNotifications();
   const [adminReqCount, setAdminReqCount] = useState(0);
+  const [checkingIP, setCheckingIP] = useState(false);
 
   useEffect(() => {
     if (!employee?.id) return;
@@ -2702,7 +2708,7 @@ export default function UserPortalApp({
           position: userObj.roleName || "Quản trị viên",
           joinDate: userObj.joinDate || new Date().toLocaleDateString("vi-VN"),
           status: "active",
-          contractType: "Chính thức",
+          contractType: "staff",
           workHistory: [],
         } as any;
         setEmployee(fallback);
@@ -2755,6 +2761,7 @@ export default function UserPortalApp({
     };
   }, []);
   const handleBubbleClick = async (id: BubbleId) => {
+    if (checkingIP) return;
     if (id === "checkin") {
       const rawUser = localStorage.getItem("dudi_user");
       const parsedUser = rawUser ? JSON.parse(rawUser) : null;
@@ -2764,8 +2771,16 @@ export default function UserPortalApp({
         return;
       }
 
+      const dayOfWeek = new Date().getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        showToast("Hệ thống không cho phép chấm công vào Thứ Bảy và Chủ Nhật!", "error");
+        return;
+      }
+
+      setCheckingIP(true);
       try {
-        const res = await api.attendance.checkIP();
+        const clientIp = await detectPublicIP();
+        const res = await api.attendance.checkIP(clientIp || undefined);
         if (res && res.valid) {
           setActivePage(id);
         } else {
@@ -2773,6 +2788,8 @@ export default function UserPortalApp({
         }
       } catch (e) {
         showToast("Vui lòng kết nối wifi công ty để chấm công.", "error");
+      } finally {
+        setCheckingIP(false);
       }
       return;
     }
@@ -2783,6 +2800,11 @@ export default function UserPortalApp({
     if (!LIVE_STAFF_BUBBLES.has(b.id)) return false;
     const moduleKey = BUBBLE_MODULE_MAP[b.id];
     return hasStaffModule(staffModules, moduleKey);
+  }).map((b) => {
+    if (b.id === "checkin" && checkingIP) {
+      return { ...b, label: "Đang kiểm tra..." };
+    }
+    return b;
   });
   const floatKeyframes = allowedBubbles
     .map(
@@ -2902,10 +2924,12 @@ export default function UserPortalApp({
           }
         }
         @keyframes portalNoticeMarquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+          0% { left: 0; transform: translateX(-100%); }
+          100% { left: 100%; transform: translateX(0); }
         }
         .portal-notice-track {
+          position: absolute;
+          white-space: nowrap;
           animation: portalNoticeMarquee var(--notice-duration, 30s) linear infinite;
         }
         .portal-notice-bar:hover .portal-notice-track {
@@ -2932,7 +2956,51 @@ export default function UserPortalApp({
           align-items: center;
           justify-content: center;
         }
-        @media (max-width: 1024px) {
+        @media (max-height: 860px) {
+          .portal-dashboard {
+            padding: 16px 36px 20px !important;
+            gap: 16px 24px !important;
+          }
+          .portal-dashboard-aside {
+            min-height: auto !important;
+            padding-right: 20px !important;
+          }
+          .portal-aside-hero {
+            margin-top: 10px !important;
+          }
+          .portal-aside-hero > div:first-child {
+            margin-bottom: 12px !important;
+          }
+          .portal-aside-hero h1 {
+            font-size: 38px !important;
+          }
+          .portal-aside-hero p {
+            margin-top: 10px !important;
+            font-size: 15px !important;
+            line-height: 1.5 !important;
+          }
+          .portal-aside-clock {
+            min-height: 140px !important;
+            padding: 10px 0 !important;
+          }
+          .portal-aside-clock div span:nth-child(1),
+          .portal-aside-clock div span:nth-child(2),
+          .portal-aside-clock div span:nth-child(3) {
+            font-size: 48px !important;
+          }
+          .portal-aside-clock div span:nth-child(4) {
+            font-size: 16px !important;
+          }
+          .portal-aside-clock p {
+            font-size: 11px !important;
+            margin-bottom: 6px !important;
+          }
+          .portal-logout-button {
+            padding: 8px 18px !important;
+            font-size: 13px !important;
+          }
+        }
+        @media (max-width: 1280px) {
           .user-portal-shell:not(.embedded) {
             height: auto !important;
             min-height: 100dvh !important;
@@ -3667,10 +3735,9 @@ function PortalNoticeBar({
             },
           ]
         : [];
-  const repeatedNotices = notices.length > 0 ? [...notices, ...notices] : [];
   const duration = Math.max(
-    24,
-    notices.reduce((sum, item) => sum + item.text.length, 0) * 0.28,
+    18,
+    notices.reduce((sum, item) => sum + item.text.length, 0) * 0.45,
   );
   return (
     <div
@@ -3692,11 +3759,12 @@ function PortalNoticeBar({
         alt="DUDI Software"
         style={{ width: 48, height: 48, borderRadius: 14, objectFit: "contain" }}
       />
-      <div style={{ minWidth: 0, overflow: "hidden", position: "relative" }}>
-        {repeatedNotices.length > 0 && (
+      <div style={{ minWidth: 0, overflow: "hidden", position: "relative", height: 24, display: "flex", alignItems: "center" }}>
+        {notices.length > 0 && (
           <div
             className="portal-notice-track"
             style={{
+              position: "absolute",
               display: "inline-flex",
               alignItems: "center",
               gap: 72,
@@ -3705,7 +3773,7 @@ function PortalNoticeBar({
               ["--notice-duration" as any]: `${duration}s`,
             }}
           >
-            {repeatedNotices.map((notice, index) => (
+            {notices.map((notice, index) => (
               <div
                 key={`${notice.id}-${index}`}
                 style={{

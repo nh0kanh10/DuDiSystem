@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react"
+import { createPortal } from "react-dom"
 import {
   Search, Download, Edit2, UserCheck, Clock, UserX, CalendarDays,
   BarChart3, X, Check, ChevronLeft, ChevronRight, Plus, Loader2,
@@ -25,12 +26,13 @@ import {
   type MonthTimeRow,
 } from "./attendanceModel"
 import { CustomSelect } from "../ui/CustomSelect"
+import { CustomTimePicker } from "../ui/CustomTimePicker"
 
 const STATUS_MAP = {
   "on-time": { label: "Đúng giờ",  bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500"  },
   "late":    { label: "Đi trễ",    bg: "bg-orange-100", text: "text-orange-700", dot: "bg-orange-500" },
   "early":   { label: "Về sớm",    bg: "bg-amber-100",  text: "text-amber-700",  dot: "bg-amber-500"  },
-  "late_early": { label: "Trễ & sớm", bg: "bg-orange-100", text: "text-orange-800", dot: "bg-orange-600" },
+  "late_early": { label: "Vào trễ, ra sớm", bg: "bg-orange-100", text: "text-orange-800", dot: "bg-orange-600" },
   "absent":  { label: "Vắng mặt",  bg: "bg-red-100",    text: "text-red-700",    dot: "bg-red-500"    },
   "leave":   { label: "Nghỉ phép", bg: "bg-violet-100", text: "text-violet-700", dot: "bg-violet-500" },
 } as const
@@ -187,35 +189,27 @@ function EditModal({ record, onClose, onSave }: {
     checkOutAm: emptyTimeFormValue(record.checkOutAm),
     checkInPm: emptyTimeFormValue(record.checkInPm),
     checkOutPm: emptyTimeFormValue(record.checkOutPm),
-    status: record.status,
-    note: record.note ?? "",
   } : {
     checkIn: emptyTimeFormValue(record.checkIn),
     checkOut: emptyTimeFormValue(record.checkOut),
-    status: record.status,
-    note: record.note ?? "",
   })
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
     setSaving(true)
     if (isIntern) {
-      const f = form as { checkInAm: string; checkOutAm: string; checkInPm: string; checkOutPm: string; status: string; note: string }
+      const f = form as { checkInAm: string; checkOutAm: string; checkInPm: string; checkOutPm: string }
       await onSave(record.id, {
         checkInAm: toApiTime(f.checkInAm),
         checkOutAm: toApiTime(f.checkOutAm),
         checkInPm: toApiTime(f.checkInPm),
         checkOutPm: toApiTime(f.checkOutPm),
-        status: f.status as AttStatus,
-        note: f.note,
       })
     } else {
-      const f = form as { checkIn: string; checkOut: string; status: string; note: string }
+      const f = form as { checkIn: string; checkOut: string }
       await onSave(record.id, {
         checkIn: toApiTime(f.checkIn),
         checkOut: toApiTime(f.checkOut),
-        status: f.status as AttStatus,
-        note: f.note,
       })
     }
     setSaving(false)
@@ -225,12 +219,11 @@ function EditModal({ record, onClose, onSave }: {
   const timeInput = (label: string, key: string, value: string) => (
     <div>
       <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">{label}</label>
-      <input type="time" value={value} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
-        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-gray-800 focus:outline-none focus:border-[#C62828]/50 focus:ring-2 focus:ring-[#C62828]/10" />
+      <CustomTimePicker value={value} onChange={val => setForm(p => ({ ...p, [key]: val }))} />
     </div>
   )
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
@@ -259,23 +252,6 @@ function EditModal({ record, onClose, onSave }: {
               {timeInput("Giờ Check-out", "checkOut", (form as any).checkOut)}
             </div>
           )}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Trạng thái</label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(STATUS_MAP).map(([k, v]) => (
-                <button key={k} onClick={() => setForm(p => ({ ...p, status: k as AttStatus }))}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${form.status === k ? `border-current ${v.bg} ${v.text}` : "border-gray-100 text-gray-500 hover:border-gray-200 bg-gray-50"}`}>
-                  <span className={`w-2 h-2 rounded-full ${v.dot}`} />{v.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Ghi chú</label>
-            <textarea rows={2} value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))}
-              placeholder="Lý do đi trễ, vắng mặt..."
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 resize-none focus:outline-none focus:border-[#C62828]/50 focus:ring-2 focus:ring-[#C62828]/10 transition-all" />
-          </div>
         </div>
         <div className="px-6 pb-6 flex gap-2">
           <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">Hủy</button>
@@ -285,7 +261,8 @@ function EditModal({ record, onClose, onSave }: {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -315,8 +292,6 @@ function AddModal({ date, employees, onClose, onSave }: {
         checkOutAm: form.checkOutAm,
         checkInPm: form.checkInPm,
         checkOutPm: form.checkOutPm,
-        status: form.status,
-        note: form.note,
       })
     } else {
       await onSave({
@@ -324,8 +299,6 @@ function AddModal({ date, employees, onClose, onSave }: {
         date,
         checkIn: form.checkIn,
         checkOut: form.checkOut,
-        status: form.status,
-        note: form.note,
       })
     }
     setSaving(false)
@@ -340,7 +313,7 @@ function AddModal({ date, employees, onClose, onSave }: {
     })),
   ], [employees])
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in zoom-in-95 duration-200">
@@ -371,23 +344,19 @@ function AddModal({ date, employees, onClose, onSave }: {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Vào sáng</label>
-                  <input type="time" value={form.checkInAm} onChange={e => setForm(p => ({ ...p, checkInAm: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10" />
+                  <CustomTimePicker value={form.checkInAm} onChange={val => setForm(p => ({ ...p, checkInAm: val }))} />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Ra sáng</label>
-                  <input type="time" value={form.checkOutAm} onChange={e => setForm(p => ({ ...p, checkOutAm: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10" />
+                  <CustomTimePicker value={form.checkOutAm} onChange={val => setForm(p => ({ ...p, checkOutAm: val }))} />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Vào chiều</label>
-                  <input type="time" value={form.checkInPm} onChange={e => setForm(p => ({ ...p, checkInPm: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10" />
+                  <CustomTimePicker value={form.checkInPm} onChange={val => setForm(p => ({ ...p, checkInPm: val }))} />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Ra chiều</label>
-                  <input type="time" value={form.checkOutPm} onChange={e => setForm(p => ({ ...p, checkOutPm: e.target.value }))}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10" />
+                  <CustomTimePicker value={form.checkOutPm} onChange={val => setForm(p => ({ ...p, checkOutPm: val }))} />
                 </div>
               </div>
             </div>
@@ -395,32 +364,14 @@ function AddModal({ date, employees, onClose, onSave }: {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Check-in</label>
-              <input type="time" value={form.checkIn} onChange={e => setForm(p => ({ ...p, checkIn: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10" />
+              <CustomTimePicker value={form.checkIn} onChange={val => setForm(p => ({ ...p, checkIn: val }))} />
             </div>
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Check-out</label>
-              <input type="time" value={form.checkOut} onChange={e => setForm(p => ({ ...p, checkOut: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10" />
+              <CustomTimePicker value={form.checkOut} onChange={val => setForm(p => ({ ...p, checkOut: val }))} />
             </div>
           </div>
           )}
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Trạng thái</label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(STATUS_MAP).map(([k, v]) => (
-                <button key={k} onClick={() => setForm(p => ({ ...p, status: k as AttStatus }))}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-xs font-bold transition-all ${form.status === k ? `border-current ${v.bg} ${v.text}` : "border-gray-100 text-gray-400 hover:border-gray-200"}`}>
-                  <span className={`w-2 h-2 rounded-full ${v.dot}`} />{v.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Ghi chú</label>
-            <input value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))} placeholder="Ghi chú..."
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#C62828]/50 focus:ring-2 focus:ring-[#C62828]/10" />
-          </div>
         </div>
         <div className="px-6 pb-6 flex gap-2">
           <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50">Hủy</button>
@@ -430,12 +381,18 @@ function AddModal({ date, employees, onClose, onSave }: {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
+function getLocalTodayISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
 function DailyTab({ selectedBranch }: { selectedBranch: string }) {
-  const todayISO = new Date().toISOString().split("T")[0]
+  const todayISO = getLocalTodayISO()
   const [selectedDate, setSelectedDate] = useState(todayISO)
   const [filterEmployee, setFilterEmployee] = useState("all")
   const [search, setSearch] = useState("")
@@ -490,7 +447,7 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
   const shiftDate = (days: number) => {
     const s = new Date(selectedDate)
     s.setDate(s.getDate() + days)
-    setSelectedDate(s.toISOString().split("T")[0])
+    setSelectedDate(`${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(s.getDate()).padStart(2, "0")}`)
   }
 
   const handleSaveEdit = async (id: string, data: Partial<AttendanceRecord>) => {
@@ -757,7 +714,6 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
   const [allEmployees, setAllEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [filterDept, setFilterDept] = useState("all")
-  const [hoverCell, setHoverCell] = useState<{ empId: string; date: string; rowId: string } | null>(null)
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null)
 
@@ -834,86 +790,6 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
     ...departments.map(d => ({ value: d, label: d })),
   ], [departments])
 
-  const renderTimeCell = (
-    emp: Employee,
-    d: number,
-    row: MonthTimeRow,
-    rowBg: string,
-  ) => {
-    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
-    const raw = lookup.get(`${emp.id}_${dateStr}`)
-    const rec = raw ? enrichAttendanceRecord(raw, emp) : undefined
-    const dateObj = new Date(year, month - 1, d)
-    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6
-    const isToday = dateObj.toDateString() === new Date().toDateString()
-    const isHov = hoverCell?.empId === emp.id && hoverCell?.date === dateStr && hoverCell?.rowId === row.id
-    const baseTd = `border-b border-r border-gray-100 p-0 min-w-[60px] ${isWeekend ? "bg-gray-100/50" : ""} ${isToday ? "ring-1 ring-inset ring-[#C62828]/20" : ""}`
-
-    if (!rec) {
-      return (
-        <td key={`${d}-${row.id}`} className={baseTd} style={{ height: MONTH_SUB_ROW_H }}>
-          <div className={`w-full h-full flex items-center justify-center ${rowBg}`}>
-            <span className="text-gray-200 text-sm select-none">·</span>
-          </div>
-        </td>
-      )
-    }
-
-    const sessionStatus = internSessionStatusForRow(rec, row.session) ?? rec.status
-    const heat = heatForStatus(sessionStatus)
-    const time = monthRowTime(rec, row)
-    const tipSession = sessionLabel(row.session)
-    const kindLabel = row.kind === "in" ? "Vào" : "Ra"
-    const sessionNote = row.session === "am" ? rec.noteAm : row.session === "pm" ? rec.notePm : rec.note
-    const label = STATUS_MAP[sessionStatus as AttStatus]?.label ?? sessionStatus
-    const tip = [
-      tipSession && `${tipSession} · ${kindLabel}`,
-      !tipSession && kindLabel,
-      time || label,
-      sessionNote && formatAttendanceNote(sessionNote),
-      !sessionNote && rec.note && formatAttendanceNote(rec.note),
-    ].filter(Boolean).join(" · ")
-
-    const inStyle = { borderColor: "#10b981", bg: "#ecfdf5", text: "#047857" }
-    const outStyle = { borderColor: "#64748b", bg: "#f8fafc", text: "#475569" }
-    const style = row.kind === "in" ? inStyle : outStyle
-
-    const sessionEmptyLabel = (status?: string) => {
-      if (status === "leave") return <span className="text-[10px] font-bold text-violet-600">Phép</span>
-      if (status === "absent") return <span className="text-[10px] font-bold text-red-400">Vắng</span>
-      if (status === "late") return <span className="text-[10px] font-bold text-orange-500">Trễ</span>
-      if (status === "early") return <span className="text-[10px] font-bold text-amber-500">Sớm</span>
-      if (status === "late_early") return <span className="text-[10px] font-bold text-orange-600">T&amp;S</span>
-      return null
-    }
-
-    return (
-      <td key={`${d}-${row.id}`} className={baseTd} style={{ height: MONTH_SUB_ROW_H }}>
-        <button
-          type="button"
-          title={tip}
-          onClick={() => setEditRecord(rec)}
-          onMouseEnter={() => setHoverCell({ empId: emp.id, date: dateStr, rowId: row.id })}
-          onMouseLeave={() => setHoverCell(null)}
-          className={`w-full h-full flex items-center justify-center transition-all cursor-pointer select-none border-l-[3px] ${isHov ? "ring-2 ring-inset ring-[#C62828]/30 z-[1] relative" : ""}`}
-          style={{
-            borderLeftColor: time ? style.borderColor : heat.text,
-            background: time ? style.bg : heat.bg + "35",
-          }}>
-          {time ? (
-            <span className="text-xs font-bold tabular-nums px-1" style={{ color: style.text }}>{time}</span>
-          ) : row.kind === "in" && !row.session ? (
-            sessionEmptyLabel(rec.status) ?? <span className="text-gray-300 text-sm">—</span>
-          ) : row.kind === "in" && row.session ? (
-            sessionEmptyLabel(sessionStatus) ?? <span className="text-gray-300 text-sm">—</span>
-          ) : (
-            <span className="text-gray-300 text-sm">—</span>
-          )}
-        </button>
-      </td>
-    )
-  }
-
   return (
     <div className="space-y-5">
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
@@ -972,9 +848,6 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
                   <th className="sticky left-0 z-30 bg-[#C62828] border-b border-r border-white/15 py-3 px-4 text-left font-bold min-w-[160px] shadow-[4px_0_8px_-2px_rgba(0,0,0,0.12)]">
                     Nhân viên
                   </th>
-                  <th className="bg-[#C62828] border-b border-r border-white/15 py-3 px-2 text-center font-bold min-w-[56px]">
-                    Loại
-                  </th>
                   {dayNumbers.map(d => {
                     const dateObj = new Date(year, month - 1, d)
                     const dow = dateObj.getDay()
@@ -982,7 +855,7 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
                     const isToday = dateObj.toDateString() === new Date().toDateString()
                     return (
                       <th key={d}
-                        className={`border-b border-white/15 py-2 px-0.5 text-center font-semibold min-w-[60px] ${isToday ? "bg-white/15" : ""}`}>
+                        className={`border-b border-white/15 py-2 px-0.5 text-center font-semibold min-w-[70px] ${isToday ? "bg-white/15" : ""}`}>
                         <div className={`text-sm leading-none ${isToday ? "font-black" : ""}`}>{d}</div>
                         <div className={`text-[10px] mt-0.5 font-medium ${isWeekend ? "text-white/50" : "text-white/80"}`}>
                           {["CN", "T2", "T3", "T4", "T5", "T6", "T7"][dow]}
@@ -997,7 +870,6 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
               </thead>
               <tbody>
                 {employees.map((emp, empIdx) => {
-                  const timeRows = monthRowsForEmployee(emp)
                   const empRecords = dayNumbers.map(d => {
                     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
                     return lookup.get(`${emp.id}_${dateStr}`)
@@ -1007,52 +879,145 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
                   const absent  = empRecords.filter(r => r && r.status === "absent").length
                   const rowBg = empIdx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"
                   const stickyBg = empIdx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"
-                  const blockH = MONTH_SUB_ROW_H * timeRows.length
-                  const kindMeta = employeeKindMeta(emp.status)
-                  const isIntern = isInternEmployee(emp)
 
                   return (
-                    <React.Fragment key={emp.id}>
-                      {timeRows.map((timeRow, rowIdx) => (
-                        <tr key={`${emp.id}-${timeRow.id}`} className={`group ${rowBg}`}>
-                          {rowIdx === 0 && (
-                            <td rowSpan={timeRows.length}
-                              className={`sticky left-0 z-10 border-b border-r border-gray-100 px-4 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] group-hover:bg-red-50/40 align-middle ${stickyBg}`}
-                              style={{ minWidth: 160, height: blockH }}>
-                              <div className="flex items-start gap-2 py-2">
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-bold text-gray-800 whitespace-nowrap text-sm leading-tight">{emp.name}</div>
-                                  <div className="text-[11px] text-gray-400 font-mono">{emp.id}</div>
-                                  {emp.department && <div className="text-[10px] text-gray-400 mt-1 truncate max-w-[120px]">{emp.department}</div>}
-                                </div>
-                                <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black ${kindMeta.badgeClass}`}>
-                                  {kindMeta.badge}
-                                </span>
+                    <tr key={emp.id} className={`group ${rowBg}`}>
+                      <td className={`sticky left-0 z-10 border-b border-r border-gray-100 px-4 py-3 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] group-hover:bg-red-50/40 align-middle ${stickyBg}`}
+                        style={{ minWidth: 160 }}>
+                        <div className="flex items-start gap-2 py-1">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-gray-800 whitespace-nowrap text-sm leading-tight">{emp.name}</div>
+                            <div className="text-[11px] text-gray-400 font-mono">{emp.id}</div>
+                            {emp.department && <div className="text-[10px] text-gray-400 mt-1 truncate max-w-[120px]">{emp.department}</div>}
+                          </div>
+                          <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black ${emp.contractType === "intern" ? "bg-purple-100 text-purple-700" : "bg-blue-50 text-blue-700"}`}>
+                            {emp.contractType === "intern" ? "TT" : "CT"}
+                          </span>
+                        </div>
+                      </td>
+
+                      {dayNumbers.map(d => {
+                        const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+                        const raw = lookup.get(`${emp.id}_${dateStr}`)
+                        const dateObj = new Date(year, month - 1, d)
+                        const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6
+                        const isToday = dateObj.toDateString() === new Date().toDateString()
+                        const todayISO = getLocalTodayISO()
+
+                        let rec = raw ? enrichAttendanceRecord(raw, emp) : undefined
+                        if (!rec && dateStr < todayISO && !isWeekend) {
+                          rec = {
+                            id: `TEMP_${emp.id}_${dateStr}`,
+                            employeeId: emp.id,
+                            employeeName: emp.name,
+                            department: emp.department || "",
+                            employeeStatus: isInternEmployee(emp) ? "intern" : "staff",
+                            date: dateStr,
+                            status: "absent",
+                            statusAm: "absent",
+                            statusPm: "absent",
+                            checkIn: "--",
+                            checkOut: "--",
+                            checkInAm: "--",
+                            checkOutAm: "--",
+                            checkInPm: "--",
+                            checkOutPm: "--",
+                            note: ""
+                          }
+                        }
+
+                        const baseTd = `border-b border-r border-gray-100 p-1 min-w-[70px] ${isWeekend ? "bg-gray-100/50" : ""} ${isToday ? "ring-1 ring-inset ring-[#C62828]/20" : ""}`
+
+                        if (!rec) {
+                          return (
+                            <td key={d} className={baseTd}>
+                              <div className="w-full h-full flex items-center justify-center min-h-[44px]">
+                                <span className="text-gray-200 text-sm select-none">·</span>
                               </div>
                             </td>
-                          )}
-                          <td className={`border-b border-r border-gray-100 px-1 text-center ${stickyBg} ${timeRow.kind === "in" ? "group-hover:bg-emerald-50/60" : "group-hover:bg-slate-50"}`}
-                            style={{ height: MONTH_SUB_ROW_H }}>
-                            <span className={`inline-flex items-center justify-center w-full h-full text-[10px] font-black rounded-md mx-0.5 ${timeRow.labelClass}`}>
-                              {timeRow.label}
-                            </span>
+                          )
+                        }
+
+                        const isCellIntern = rec.employeeStatus === "intern"
+                        const cellRows: MonthTimeRow[] = isCellIntern ? [
+                          { id: "am-in", session: "am", kind: "in", label: "S·Vào", labelClass: "" },
+                          { id: "am-out", session: "am", kind: "out", label: "S·Ra", labelClass: "" },
+                          { id: "pm-in", session: "pm", kind: "in", label: "C·Vào", labelClass: "" },
+                          { id: "pm-out", session: "pm", kind: "out", label: "C·Ra", labelClass: "" },
+                        ] : [
+                          { id: "in", kind: "in", label: "Vào", labelClass: "" },
+                          { id: "out", kind: "out", label: "Ra", labelClass: "" },
+                        ]
+
+                        return (
+                          <td key={d} className={baseTd}>
+                            <div className="flex flex-col gap-[2px] w-full">
+                              {cellRows.map(row => {
+                                const isFuture = dateStr > todayISO
+                                const sessionStatus = (row.session ? (row.session === "am" ? rec.statusAm : rec.statusPm) : rec.status) || (isFuture ? "" : "absent")
+                                const heat = heatForStatus(sessionStatus)
+                                const timeRaw = row.session 
+                                  ? (row.session === "am" ? (row.kind === "in" ? rec.checkInAm : rec.checkOutAm) : (row.kind === "in" ? rec.checkInPm : rec.checkOutPm))
+                                  : (row.kind === "in" ? rec.checkIn : rec.checkOut)
+                                const time = shortClock(timeRaw)
+                                const hasTime = time && time !== "--"
+                                const kindLabel = row.label
+                                const sessionNote = row.session === "am" ? rec.noteAm : row.session === "pm" ? rec.notePm : rec.note
+                                const label = STATUS_MAP[sessionStatus as AttStatus]?.label ?? sessionStatus
+                                const tip = [
+                                  kindLabel,
+                                  hasTime ? time : label,
+                                  sessionNote && formatAttendanceNote(sessionNote),
+                                  !sessionNote && rec.note && formatAttendanceNote(rec.note),
+                                ].filter(Boolean).join(" · ")
+
+                                const inStyle = { borderColor: "#10b981", bg: "#ecfdf5", text: "#047857" }
+                                const outStyle = { borderColor: "#64748b", bg: "#f8fafc", text: "#475569" }
+                                const style = row.kind === "in" ? inStyle : outStyle
+
+                                const sessionEmptyLabel = (status?: string) => {
+                                  if (status === "leave") return <span className="text-[9px] font-black text-violet-600">Phép</span>
+                                  if (status === "absent") return <span className="text-[9px] font-black text-red-400">Vắng</span>
+                                  if (status === "late") return <span className="text-[9px] font-black text-orange-500">Trễ</span>
+                                  if (status === "early") return <span className="text-[9px] font-black text-amber-500">Sớm</span>
+                                  if (status === "late_early") return <span className="text-[9px] font-black text-orange-600">T&amp;S</span>
+                                  return null
+                                }
+
+                                return (
+                                  <button
+                                    key={row.id}
+                                    type="button"
+                                    title={tip}
+                                    onClick={() => setEditRecord(rec)}
+                                    className="w-full h-[20px] flex items-center justify-between transition-all cursor-pointer select-none border-l-[3px] rounded-[3px] px-1 text-[10px] hover:scale-[1.02] hover:shadow-sm"
+                                    style={{
+                                      borderLeftColor: hasTime ? style.borderColor : heat.text,
+                                      background: hasTime ? style.bg : heat.bg + "35",
+                                    }}>
+                                    <span className="text-gray-400 font-medium scale-90 origin-left">{row.label}</span>
+                                    {hasTime ? (
+                                      <span className="font-bold tabular-nums" style={{ color: style.text }}>{time}</span>
+                                    ) : (
+                                      sessionEmptyLabel(sessionStatus) ?? <span className="text-gray-300">—</span>
+                                    )}
+                                  </button>
+                                )
+                              })}
+                            </div>
                           </td>
-                          {dayNumbers.map(d => renderTimeCell(emp, d, timeRow, rowBg))}
-                          {rowIdx === 0 && (
-                            <td rowSpan={timeRows.length}
-                              className={`sticky right-0 z-10 border-b border-l border-gray-100 py-3 px-3 text-center shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)] group-hover:bg-red-50/40 align-middle ${stickyBg}`}
-                              style={{ height: blockH }}>
-                              <div className="text-sm font-bold text-emerald-700 tabular-nums">{present}</div>
-                              <div className="text-[10px] text-gray-400 mt-0.5">{isIntern ? "buổi/ngày" : "ngày công"}</div>
-                              <div className="flex flex-col items-center gap-0.5 mt-2">
-                                {late > 0 && <span className="text-[10px] font-semibold text-orange-600">{late} trễ</span>}
-                                {absent > 0 && <span className="text-[10px] font-semibold text-red-500">{absent} vắng</span>}
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </React.Fragment>
+                        )
+                      })}
+
+                      <td className={`sticky right-0 z-10 border-b border-l border-gray-100 py-3 px-3 text-center shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)] group-hover:bg-red-50/40 align-middle ${stickyBg}`}>
+                        <div className="text-sm font-bold text-emerald-700 tabular-nums">{present}</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">{emp.contractType === "intern" ? "buổi/ngày" : "ngày công"}</div>
+                        <div className="flex flex-col items-center gap-0.5 mt-2">
+                          {late > 0 && <span className="text-[10px] font-semibold text-orange-600">{late} trễ</span>}
+                          {absent > 0 && <span className="text-[10px] font-semibold text-red-500">{absent} vắng</span>}
+                        </div>
+                      </td>
+                    </tr>
                   )
                 })}
               </tbody>

@@ -34,6 +34,14 @@ function isDateInPast(dateStr) {
   return d < today
 }
 
+function isWeekend(dateStr) {
+  const d = parseVnDate(dateStr)
+  if (!d) return false
+  const day = d.getDay()
+  return day === 0 || day === 6
+}
+
+
 const VALID_SCOPES = ["full_day", "date_range", "half_session", "multi_session"]
 const VALID_SESSIONS = ["sang", "chieu"]
 const VALID_CATEGORIES = ["leave", "timeoff"]
@@ -56,6 +64,7 @@ function validateCreateData(data, options = {}) {
     case "full_day":
       if (!data.startDate) return "Vui lòng chọn ngày nghỉ"
       if (!skipPastDate && isDateInPast(data.startDate)) return "Không thể đăng ký ngày đã qua"
+      if (isWeekend(data.startDate)) return "Không thể xin nghỉ vào Thứ Bảy, Chủ Nhật"
       break
     case "date_range":
       if (!data.startDate || !data.endDate) return "Vui lòng chọn đủ ngày bắt đầu và kết thúc"
@@ -66,6 +75,7 @@ function validateCreateData(data, options = {}) {
       if (!data.startDate) return "Vui lòng chọn ngày nghỉ"
       if (!VALID_SESSIONS.includes(data.session)) return "Vui lòng chọn buổi sáng hoặc chiều"
       if (!skipPastDate && isDateInPast(data.startDate)) return "Không thể đăng ký ngày đã qua"
+      if (isWeekend(data.startDate)) return "Không thể xin nghỉ vào Thứ Bảy, Chủ Nhật"
       break
     case "multi_session": {
       const sessions = data.sessions
@@ -73,12 +83,16 @@ function validateCreateData(data, options = {}) {
       for (const slot of sessions) {
         if (!slot.date || !VALID_SESSIONS.includes(slot.session)) return "Dữ liệu buổi nghỉ không hợp lệ"
         if (!skipPastDate && isDateInPast(slot.date)) return "Không thể chọn buổi đã qua"
+        if (isWeekend(slot.date)) return `Không thể xin nghỉ vào Thứ Bảy, Chủ Nhật (${slot.date})`
       }
       break
     }
     default:
       return "Hình thức nghỉ không hợp lệ"
   }
+
+  const slots = expandRequestToSlots(data)
+  if (slots.length === 0) return "Khoảng thời gian chọn không có ngày làm việc nào"
 
   return null
 }
@@ -268,5 +282,8 @@ export function cancelRequest(id, employeeId) {
 }
 
 export function deleteRequest(id) {
+  const req = repo.getById(id)
+  if (!req) return null
+  if (req.status === "approved") return { error: "Không thể xóa đơn đã được duyệt", status: 400 }
   return repo.remove(id)
 }

@@ -191,7 +191,7 @@ export function LeadManagement({
             <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150" />
           </div>
           <div>
-            <h2 className="text-xl font-black tracking-tight">Trước dự án</h2>
+            <h2 className="text-xl font-black tracking-tight">Cơ hội</h2>
             <p className="text-xs text-white/80 mt-1">Theo dõi khách hàng tiềm năng từ đầu đến khi thành dự án</p>
           </div>
         </div>

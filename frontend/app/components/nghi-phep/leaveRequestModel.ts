@@ -82,7 +82,7 @@ export function getWeekdayDateRange(startStr: string, endStr: string): Date[] {
   return dates
 }
 
-export function expandRequestToSlots(req: LeaveRequestRecord): { date: Date; session: LeaveSession }[] {
+export function expandRequestToSlots(req: Pick<LeaveRequestRecord, "scope" | "startDate" | "endDate" | "session" | "sessions">): { date: Date; session: LeaveSession }[] {
   const result: { date: Date; session: LeaveSession }[] = []
   switch (req.scope) {
     case "full_day":
@@ -304,12 +304,15 @@ export function expandFormToSlots(form: LeaveFormState): LeaveSessionSlot[] {
 export function findSlotConflict(
   newSlots: LeaveSessionSlot[],
   requests: LeaveRequestRecord[],
+  excludeId?: string | null,
 ): { slot: LeaveSessionSlot; existing: LeaveRequestRecord } | null {
   const occupied = new Map<string, LeaveRequestRecord>()
   for (const req of requests) {
+    if (excludeId && req.id === excludeId) continue
     if (!isActiveLeaveRequest(req)) continue
     for (const slot of expandRequestToSlots(req)) {
-      occupied.set(`${slot.date}|${slot.session}`, req)
+      const dateStr = `${String(slot.date.getDate()).padStart(2, "0")}/${String(slot.date.getMonth() + 1).padStart(2, "0")}/${slot.date.getFullYear()}`
+      occupied.set(`${dateStr}|${slot.session}`, req)
     }
   }
   for (const slot of newSlots) {

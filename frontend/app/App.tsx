@@ -198,205 +198,205 @@ function AppContent() {
       const target = hasPageAccess(activeRolePermissions, "dashboard") ? "/dashboard" : "/staff-portal"
       navigate(target)
     }
-  }, [isLoggedIn, location.pathname, navigate, activeRolePermissions])
+    }, [isLoggedIn, location.pathname, navigate, activeRolePermissions])
 
-  useEffect(() => {
-    const handleUnauthorized = () => {
-      handleLogout()
-      setSessionAlertMsg("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
-    }
-    window.addEventListener("dudi_unauthorized", handleUnauthorized)
-    return () => {
-      window.removeEventListener("dudi_unauthorized", handleUnauthorized)
-    }
-  }, [])
+    useEffect(() => {
+      const handleUnauthorized = () => {
+        handleLogout()
+        setSessionAlertMsg("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+      }
+      window.addEventListener("dudi_unauthorized", handleUnauthorized)
+      return () => {
+        window.removeEventListener("dudi_unauthorized", handleUnauthorized)
+      }
+    }, [])
 
-  const lastActivityRef = useRef<number>(Date.now())
+    const lastActivityRef = useRef<number>(Date.now())
 
-  useEffect(() => {
-    if (!isLoggedIn) return
+    useEffect(() => {
+      if (!isLoggedIn) return
 
-    const SESSION_MS = sessionTimeout * 60 * 1000
-    let idleTimeoutId: ReturnType<typeof setTimeout> | undefined
+      const SESSION_MS = sessionTimeout * 60 * 1000
+      let idleTimeoutId: ReturnType<typeof setTimeout> | undefined
 
-    const scheduleIdleCheck = () => {
-      if (idleTimeoutId) clearTimeout(idleTimeoutId)
-      const remaining = SESSION_MS - (Date.now() - lastActivityRef.current)
-      idleTimeoutId = setTimeout(() => {
-        const idleDuration = Date.now() - lastActivityRef.current
-        if (idleDuration >= SESSION_MS) {
-          handleLogout()
-          setSessionAlertMsg(
-            `Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`
-          )
-        } else {
-          scheduleIdleCheck()
-        }
-      }, Math.max(remaining, 1000))
-    }
+      const scheduleIdleCheck = () => {
+        if (idleTimeoutId) clearTimeout(idleTimeoutId)
+        const remaining = SESSION_MS - (Date.now() - lastActivityRef.current)
+        idleTimeoutId = setTimeout(() => {
+          const idleDuration = Date.now() - lastActivityRef.current
+          if (idleDuration >= SESSION_MS) {
+            handleLogout()
+            setSessionAlertMsg(
+              `Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`
+            )
+          } else {
+            scheduleIdleCheck()
+          }
+        }, Math.max(remaining, 1000))
+      }
 
-    const onActivity = () => {
+      const onActivity = () => {
+        lastActivityRef.current = Date.now()
+        touchSession()
+        scheduleIdleCheck()
+      }
+
+      const events = ["mousedown", "keydown", "scroll", "touchstart", "click"] as const
+
       lastActivityRef.current = Date.now()
       touchSession()
       scheduleIdleCheck()
-    }
 
-    const events = ["mousedown", "keydown", "scroll", "touchstart", "click"] as const
-
-    lastActivityRef.current = Date.now()
-    touchSession()
-    scheduleIdleCheck()
-
-    events.forEach(event => {
-      window.addEventListener(event, onActivity, { capture: true, passive: true })
-    })
-
-    return () => {
-      if (idleTimeoutId) clearTimeout(idleTimeoutId)
       events.forEach(event => {
-        window.removeEventListener(event, onActivity, { capture: true })
+        window.addEventListener(event, onActivity, { capture: true, passive: true })
       })
-    }
-  }, [isLoggedIn, sessionTimeout])
 
-  const [employees, setEmployees] = useState<Employee[]>(INIT_EMPLOYEES)
-  const [orgNodes, setOrgNodes] = useState<OrgNode[]>(INIT_ORG_NODES)
-  const [assignments, setAssignments] = useState<Assignment[]>(INIT_ASSIGNMENTS)
-  const [requests, setRequests] = useState<any[]>([])
-
-  const pendingRequestsCount = useMemo(() => {
-    const currentWeekVal = `W${getISOWeek(new Date())}`
-    return requests.filter(r => {
-      if (r.status !== "pending") return false
-      try {
-        const dates = getDateRange(r.startDate, r.endDate)
-        return dates.some(d => `W${getISOWeek(d)}` === currentWeekVal)
-      } catch {
-        return false
+      return () => {
+        if (idleTimeoutId) clearTimeout(idleTimeoutId)
+        events.forEach(event => {
+          window.removeEventListener(event, onActivity, { capture: true })
+        })
       }
-    }).length
-  }, [requests])
-  const [loginError, setLoginError] = useState<string | null>(null)
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-  const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
-  const {
-    unread: unreadNotifs,
-    latest: notifPreview,
-    reload: reloadNotificationsCount,
-    setLatest: setNotifPreview,
-    setUnread: setUnreadNotifCount,
-  } = useNotificationBadge(isLoggedIn)
-  const [profileUpdates, setProfileUpdates] = useState<any[]>([])
-  const [autoOpenUpdateReqId, setAutoOpenUpdateReqId] = useState<string | null>(null)
+    }, [isLoggedIn, sessionTimeout])
 
-  const reloadProfileUpdates = () => {
-    if (isLoggedIn) {
-      api.profileUpdates.list().then(d => {
-        if (d && Array.isArray(d)) setProfileUpdates(d as any[])
-      }).catch(err => console.error("Lỗi tải profile updates:", err))
-    }
-  }
+    const [employees, setEmployees] = useState<Employee[]>(INIT_EMPLOYEES)
+    const [orgNodes, setOrgNodes] = useState<OrgNode[]>(INIT_ORG_NODES)
+    const [assignments, setAssignments] = useState<Assignment[]>(INIT_ASSIGNMENTS)
+    const [requests, setRequests] = useState<any[]>([])
 
-  const [selectedBranch, setSelectedBranch] = useState(() => {
-    const saved = localStorage.getItem("dudi_user")
-    if (saved) {
-      try {
-        const u = JSON.parse(saved)
-        return u.branchId || "all"
-      } catch {
-        return "all"
-      }
-    }
-    return "all"
-  })
-
-  const branches = orgNodes.filter(n => n.type === "branch")
-
-  const fetchRequests = () => {
-    if (isLoggedIn) {
-      api.requests.list().then(d => {
-        if (d && Array.isArray(d)) setRequests(d as any[])
-      }).catch(err => console.error("Lỗi tải requests:", err))
-    }
-  }
-
-  const reloadPermissionsAndRoles = () => {
-    api.roles.list().then(d => {
-      if (d && Array.isArray(d)) setRolesList(d as RoleDefinition[])
-    }).catch(err => console.error("Lỗi tải roles:", err))
-
-    api.auth.me().then(user => {
-      if (user) {
-        localStorage.setItem("dudi_user", JSON.stringify(user))
-        setRole(user.roleId || "role-admin")
-        setLoggedEmail(user.employeeId || user.email || "")
-        if (Array.isArray((user as any).effectivePermissions)) {
-          setEffectivePermissions((user as any).effectivePermissions)
+    const pendingRequestsCount = useMemo(() => {
+      const currentWeekVal = `W${getISOWeek(new Date())}`
+      return requests.filter(r => {
+        if (r.status !== "pending") return false
+        try {
+          const dates = getDateRange(r.startDate, r.endDate)
+          return dates.some(d => `W${getISOWeek(d)}` === currentWeekVal)
+        } catch {
+          return false
         }
-      }
-    }).catch(err => console.error("Lỗi tải thông tin tài khoản:", err))
-  }
+      }).length
+    }, [requests])
+    const [loginError, setLoginError] = useState<string | null>(null)
+    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+    const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
+    const {
+      unread: unreadNotifs,
+      latest: notifPreview,
+      reload: reloadNotificationsCount,
+      setLatest: setNotifPreview,
+      setUnread: setUnreadNotifCount,
+    } = useNotificationBadge(isLoggedIn)
+    const [profileUpdates, setProfileUpdates] = useState<any[]>([])
+    const [autoOpenUpdateReqId, setAutoOpenUpdateReqId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (isLoggedIn) {
-      reloadPermissionsAndRoles()
-
-      api.systemConfig.get().then(res => {
-        if (res && res.sessionTimeoutMinutes) {
-          setSessionTimeout(Number(res.sessionTimeoutMinutes))
-        }
-      }).catch(err => console.error("Lỗi tải cấu hình session:", err))
-
-      Promise.all([
-        api.employees.list().then(d => {
-          if (d && Array.isArray(d)) setEmployees(d as Employee[])
-        }),
-        api.orgNodes.list().then(d => {
-          if (d && Array.isArray(d)) setOrgNodes(d as OrgNode[])
-        }),
-        api.assignments.list().then(d => {
-          if (d && Array.isArray(d)) setAssignments(d as Assignment[])
-        }),
-        api.requests.list().then(d => {
-          if (d && Array.isArray(d)) setRequests(d as any[])
-        }),
+    const reloadProfileUpdates = () => {
+      if (isLoggedIn) {
         api.profileUpdates.list().then(d => {
           if (d && Array.isArray(d)) setProfileUpdates(d as any[])
-        }).catch(() => {})
-      ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
-    }
-  }, [isLoggedIn])
-
-  useEffect(() => {
-    if (!isLoggedIn) {
-      resetChatSocket()
-      return
-    }
-    connectChatSocket()
-    const heartbeat = setInterval(() => {
-      if (getChatSocketStatus() === "connected") {
-        chatHeartbeat()
-      } else {
-        api.staffChat.heartbeat().catch(() => {})
+        }).catch(err => console.error("Lỗi tải profile updates:", err))
       }
-    }, 25_000)
-    return () => {
-      clearInterval(heartbeat)
-      releaseChatSocket()
     }
-  }, [isLoggedIn])
 
-  useEffect(() => {
-    const handleUpdate = () => {
+    const [selectedBranch, setSelectedBranch] = useState(() => {
+      const saved = localStorage.getItem("dudi_user")
+      if (saved) {
+        try {
+          const u = JSON.parse(saved)
+          return u.branchId || "all"
+        } catch {
+          return "all"
+        }
+      }
+      return "all"
+    })
+
+    const branches = orgNodes.filter(n => n.type === "branch")
+
+    const fetchRequests = () => {
+      if (isLoggedIn) {
+        api.requests.list().then(d => {
+          if (d && Array.isArray(d)) setRequests(d as any[])
+        }).catch(err => console.error("Lỗi tải requests:", err))
+      }
+    }
+
+    const reloadPermissionsAndRoles = () => {
+      api.roles.list().then(d => {
+        if (d && Array.isArray(d)) setRolesList(d as RoleDefinition[])
+      }).catch(err => console.error("Lỗi tải roles:", err))
+
+      api.auth.me().then(user => {
+        if (user) {
+          localStorage.setItem("dudi_user", JSON.stringify(user))
+          setRole(user.roleId || "role-admin")
+          setLoggedEmail(user.employeeId || user.email || "")
+          if (Array.isArray((user as any).effectivePermissions)) {
+            setEffectivePermissions((user as any).effectivePermissions)
+          }
+        }
+      }).catch(err => console.error("Lỗi tải thông tin tài khoản:", err))
+    }
+
+    useEffect(() => {
       if (isLoggedIn) {
         reloadPermissionsAndRoles()
-      }
-    }
-    window.addEventListener("dudi_permissions_updated", handleUpdate)
-    return () => window.removeEventListener("dudi_permissions_updated", handleUpdate)
-  }, [isLoggedIn])
 
-  useEffect(() => {
+        api.systemConfig.get().then(res => {
+          if (res && res.sessionTimeoutMinutes) {
+            setSessionTimeout(Number(res.sessionTimeoutMinutes))
+          }
+        }).catch(err => console.error("Lỗi tải cấu hình session:", err))
+
+        Promise.all([
+          api.employees.list().then(d => {
+            if (d && Array.isArray(d)) setEmployees(d as Employee[])
+          }),
+          api.orgNodes.list().then(d => {
+            if (d && Array.isArray(d)) setOrgNodes(d as OrgNode[])
+          }),
+          api.assignments.list().then(d => {
+            if (d && Array.isArray(d)) setAssignments(d as Assignment[])
+          }),
+          api.requests.list().then(d => {
+            if (d && Array.isArray(d)) setRequests(d as any[])
+          }),
+          api.profileUpdates.list().then(d => {
+            if (d && Array.isArray(d)) setProfileUpdates(d as any[])
+          }).catch(() => {})
+        ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
+      }
+    }, [isLoggedIn])
+
+    useEffect(() => {
+      if (!isLoggedIn) {
+        resetChatSocket()
+        return
+      }
+      connectChatSocket()
+      const heartbeat = setInterval(() => {
+        if (getChatSocketStatus() === "connected") {
+          chatHeartbeat()
+        } else {
+          api.staffChat.heartbeat().catch(() => {})
+        }
+      }, 25_000)
+      return () => {
+        clearInterval(heartbeat)
+        releaseChatSocket()
+      }
+    }, [isLoggedIn])
+
+    useEffect(() => {
+      const handleUpdate = () => {
+        if (isLoggedIn) {
+          reloadPermissionsAndRoles()
+        }
+      }
+      window.addEventListener("dudi_permissions_updated", handleUpdate)
+      return () => window.removeEventListener("dudi_permissions_updated", handleUpdate)
+    }, [isLoggedIn])
+
+    useEffect(() => {
     if (isLoggedIn && role === "role-manager" && orgNodes.length > 0) {
       const emp = employees.find(e =>
         (e.email || "").toLowerCase() === (loggedEmail || "").toLowerCase() ||
@@ -499,7 +499,7 @@ function AppContent() {
     position: profileUser.position || (isAdminRole ? "System Admin" : "Nhân sự"),
     joinDate: "—",
     status: "active" as "active" | "inactive" | "suspended",
-    contractType: "Chính thức",
+    contractType: "staff",
     orgNodeId: "branch-hcm"
   }
   const currentUserInfo = {
@@ -1033,12 +1033,12 @@ function UserAwareSidebar({
         <div className="relative w-full">
           <button
             onClick={openNotifs}
-            title="Quản lý thông báo"
+            title="Thông báo"
             className={`w-full flex items-center gap-2 rounded-xl hover:bg-white/8 transition-all text-white/55 hover:text-white/85 relative
               ${collapsed ? "justify-center p-2.5" : "px-3 py-2.5 text-sm"}`}
           >
             <Bell size={18} className="flex-shrink-0" />
-            {!collapsed && <span className="font-medium flex-1 text-left truncate">Quản lý thông báo</span>}
+            {!collapsed && <span className="font-medium flex-1 text-left truncate">Thông báo</span>}
             {notifBadge > 0 && (
               <span className={`min-w-[18px] h-[18px] bg-[#C62828] text-white text-[9px] font-extrabold rounded-full flex items-center justify-center border-2 border-[#160606] px-1
                 ${collapsed ? "absolute -top-0.5 -right-0.5" : ""}`}>
@@ -1150,15 +1150,14 @@ function UserAwareSidebar({
         )}
 
         {hasAccess("thong-ke") && <NavItem page="thong-ke" icon={BarChart3} label="Báo cáo thống kê" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Thông báo" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Quản lý thông báo" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("lead") && <NavItem page="lead" icon={User} label="Trước dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("lead") && <NavItem page="lead" icon={User} label="Cơ hội" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
 
-      {/* User */}
       <div className="p-2 border-t border-white/5">
         {currentUser && (
           <div>

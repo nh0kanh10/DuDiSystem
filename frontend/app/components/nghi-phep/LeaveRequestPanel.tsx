@@ -23,6 +23,7 @@ import {
   findSlotConflict,
   isActiveLeaveRequest,
   isRequestExpired,
+  getWeekdayDateRange,
   type LeaveCategory,
   type LeaveFormState,
   type LeaveRequestRecord,
@@ -48,8 +49,9 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
   const [formError, setFormError] = useState<string | null>(null)
   const [cancelId, setCancelId] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+  const [editId, setEditId] = useState<string | null>(null)
 
-  const { requests, loading, error, submit, cancel, reload } = useLeaveRequests(employee.id)
+  const { requests, loading, error, submit, cancel, reload, update } = useLeaveRequests(employee.id)
 
   const handleTabChange = (t: "register" | "history") => {
     if (t === "register") reload()
@@ -102,7 +104,7 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
       setFormError(err)
       return
     }
-    const conflict = findSlotConflict(expandFormToSlots(form), requests)
+    const conflict = findSlotConflict(expandFormToSlots(form), requests, editId)
     if (conflict) {
       const sessionLabel = LEAVE_SESSION[conflict.slot.session].short
       setFormError(`Trùng ${conflict.slot.date} buổi ${sessionLabel} với đơn ${conflict.existing.id} (${LEAVE_STATUS[conflict.existing.status].label.toLowerCase()})`)
@@ -111,9 +113,15 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
     setSubmitting(true)
     setFormError(null)
     try {
-      await submit(buildCreatePayload(employee.id, form))
+      if (editId && update) {
+        await update(editId, buildCreatePayload(employee.id, form))
+        setSuccessMsg("Đã cập nhật đơn xin nghỉ thành công")
+      } else {
+        await submit(buildCreatePayload(employee.id, form))
+        setSuccessMsg("Đã gửi đơn xin nghỉ — chờ quản lý duyệt tại mục Duyệt đơn")
+      }
       setForm(createLeaveForm(employee))
-      setSuccessMsg("Đã gửi đơn xin nghỉ — chờ quản lý duyệt tại mục Duyệt đơn")
+      setEditId(null)
       setTab("history")
       setTimeout(() => setSuccessMsg(null), 4000)
     } catch (e) {
@@ -244,15 +252,23 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
             )}
 
             {form.scope === "date_range" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className={labelCls}>Từ ngày</label>
-                  <CustomDatePicker value={form.startDate} onChange={v => patch({ startDate: v })} className={fieldInput} />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Từ ngày</label>
+                    <CustomDatePicker value={form.startDate} onChange={v => patch({ startDate: v })} className={fieldInput} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Đến ngày</label>
+                    <CustomDatePicker value={form.endDate} onChange={v => patch({ endDate: v })} className={fieldInput} />
+                  </div>
                 </div>
-                <div>
-                  <label className={labelCls}>Đến ngày</label>
-                  <CustomDatePicker value={form.endDate} onChange={v => patch({ endDate: v })} className={fieldInput} />
-                </div>
+                {form.startDate && form.endDate && (
+                  <div className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-600">Số ngày nghỉ (trừ T7/CN):</span>
+                    <span className="text-sm font-black text-[#C62828]">{getWeekdayDateRange(form.startDate, form.endDate).length} ngày</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -310,8 +326,22 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
               disabled={submitting}
               className={`w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-base font-black text-white disabled:opacity-50 shadow-md ${portal ? "bg-[#E8231A] hover:bg-[#B91C1C]" : "bg-[#C62828] hover:bg-[#B71C1C]"}`}
             >
-              {submitting ? "Đang gửi..." : "Gửi duyệt"}
+              {submitting ? "Đang xử lý..." : editId ? "Cập nhật" : "Gửi duyệt"}
             </button>
+            {editId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditId(null)
+                  setForm(createLeaveForm(employee))
+                  setTab("history")
+                }}
+                disabled={submitting}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-base font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 mt-3 sm:mt-0 sm:ml-3"
+              >
+                Hủy sửa
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -363,7 +393,26 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
             </div>
           )}
           {displayedRequests.map(r => (
-            <RequestHistoryCard key={r.id} req={r} onCancel={() => setCancelId(r.id)} portal={portal} />
+            <RequestHistoryCard 
+              key={r.id} 
+              req={r} 
+              onCancel={() => setCancelId(r.id)} 
+              onEdit={() => {
+                setEditId(r.id)
+                setForm({
+                  category: r.category,
+                  leaveType: r.leaveType,
+                  scope: r.scope,
+                  reason: r.reason,
+                  startDate: r.startDate,
+                  endDate: r.endDate || "",
+                  session: r.session || "sang",
+                  sessions: r.sessions || [],
+                })
+                setTab("register")
+              }}
+              portal={portal} 
+            />
           ))}
         </div>
       )}
@@ -391,7 +440,7 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
   )
 }
 
-function RequestHistoryCard({ req, onCancel, portal = false }: { req: LeaveRequestRecord; onCancel: () => void; portal?: boolean }) {
+function RequestHistoryCard({ req, onCancel, onEdit, portal = false }: { req: LeaveRequestRecord; onCancel: () => void; onEdit: () => void; portal?: boolean }) {
   const st = LEAVE_STATUS[req.status]
   const expiredPending = req.status === "pending" && isRequestExpired(req)
   const statusLabel =
@@ -425,14 +474,25 @@ function RequestHistoryCard({ req, onCancel, portal = false }: { req: LeaveReque
             </p>
           )}
         </div>
-        {req.status === "pending" && !expiredPending && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className={`flex-shrink-0 px-4 py-2 text-sm font-black rounded-lg ${portal ? "text-red-700 bg-red-50 border border-red-200 hover:bg-red-100" : "text-red-600 bg-red-50 border border-red-100 hover:bg-red-100"}`}
-          >
-            Hủy
-          </button>
+        {req.status === "pending" && (
+          <div className="flex flex-col gap-2">
+            {!expiredPending && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className={`flex-shrink-0 px-4 py-2 text-sm font-black rounded-lg ${portal ? "text-[#E8231A] bg-[#fff0f1] border border-[#efd7da] hover:bg-[#ffe1e3]" : "text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100"}`}
+              >
+                Sửa
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onCancel}
+              className={`flex-shrink-0 px-4 py-2 text-sm font-black rounded-lg ${portal ? "text-red-700 bg-red-50 border border-red-200 hover:bg-red-100" : "text-red-600 bg-red-50 border border-red-100 hover:bg-red-100"}`}
+            >
+              Hủy
+            </button>
+          </div>
         )}
       </div>
     </div>

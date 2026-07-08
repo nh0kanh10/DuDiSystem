@@ -133,8 +133,8 @@ export default function UserSettings({ onLogout }: Props) {
                     <div>
                         <label className="text-xs font-bold text-gray-500 mb-1.5 block">Mật khẩu hiện tại</label>
                         <div className="relative">
-                            <input type={showOld ? "text" : "password"} value={oldPass} onChange={e => setOldPass(e.target.value)} placeholder="••••••••" className={`${inp} pr-10`} />
-                            <button onClick={() => setShowOld(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            <input type={showOld ? "text" : "password"} value={oldPass} onChange={e => setOldPass(e.target.value)} placeholder="••••••••" className={`${inp} pr-10`} autoComplete="current-password" />
+                            <button type="button" onClick={() => setShowOld(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                                 {showOld ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
@@ -142,17 +142,17 @@ export default function UserSettings({ onLogout }: Props) {
                     <div>
                         <label className="text-xs font-bold text-gray-500 mb-1.5 block">Mật khẩu mới</label>
                         <div className="relative">
-                            <input type={showNew ? "text" : "password"} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Ít nhất 6 ký tự" className={`${inp} pr-10`} />
-                            <button onClick={() => setShowNew(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            <input type={showNew ? "text" : "password"} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Ít nhất 6 ký tự" className={`${inp} pr-10`} autoComplete="new-password" />
+                            <button type="button" onClick={() => setShowNew(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                                 {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
                     </div>
                     <div>
                         <label className="text-xs font-bold text-gray-500 mb-1.5 block">Xác nhận mật khẩu mới</label>
-                        <input type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} placeholder="••••••••" className={inp} />
+                        <input type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} placeholder="••••••••" className={inp} autoComplete="new-password" />
                     </div>
-                    <button onClick={handleChangePass}
+                    <button type="button" onClick={handleChangePass}
                         className="w-full bg-[#C62828] text-white py-3 rounded-xl font-bold hover:bg-[#B71C1C] text-sm transition-colors shadow-md shadow-red-900/20 flex items-center justify-center gap-2">
                         <Lock size={15} /> Đổi mật khẩu
                     </button>

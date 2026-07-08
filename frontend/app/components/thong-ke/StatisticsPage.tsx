@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo } from "react"
 import { Clock, TrendingUp, AlertCircle, Users, Download, Search, Award, Calendar, RefreshCw, User, Briefcase, X, ChevronDown, UserX, LogOut, LogIn, CheckCircle2, Timer } from "lucide-react"
+import * as XLSX from "xlsx"
 import { api } from "@/lib/api"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomCombobox } from "../ui/CustomCombobox"
 import { Modal } from "../ui/Modal"
 import { CustomDatePicker } from "../ui/CustomDatePicker"
+import { removeVietnameseTones } from "../../utils"
+import { ATT_STATUS_STYLE, formatCheckTime } from "../cham-cong/attendanceDisplay"
 
 const getDayOfWeekVN = (dateStr: string) => {
   const [y, m, d] = dateStr.split("-").map(Number)
@@ -22,6 +25,32 @@ const getDayOfWeekVN = (dateStr: string) => {
   }
 }
 
+type ExportPayload = {
+  filename: string
+  sheetName: string
+  headers: string[]
+  rows: (string | number)[][]
+}
+
+const exportXlsx = ({ filename, sheetName, headers, rows }: ExportPayload) => {
+  const wsData = [headers, ...rows]
+  const ws = XLSX.utils.aoa_to_sheet(wsData)
+  const colWidths = headers.map((_, colIndex) => {
+    const maxLen = wsData.reduce((max, row) => {
+      const cell = row[colIndex] == null ? "" : String(row[colIndex])
+      const longestLine = cell.split("\n").reduce((m, ln) => Math.max(m, ln.length), 0)
+      return Math.max(max, longestLine)
+    }, 8)
+    return { wch: Math.min(Math.max(maxLen + 2, 10), 50) }
+  })
+  ws["!cols"] = colWidths
+  ws["!rows"] = wsData.map((_, idx) => ({ hpt: idx === 0 ? 24 : 34 }))
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, sheetName)
+  XLSX.writeFile(wb, filename)
+}
+
 interface Employee {
   id: string
   name: string
@@ -32,6 +61,7 @@ interface Employee {
   joinDate: string
   status: "active" | "inactive" | "intern"
   contractType: string
+  contractHistory?: { contractType: string; startDate: string; endDate?: string }[]
   branchId?: string
   orgNodeId?: string
 }
@@ -39,13 +69,85 @@ interface Employee {
 interface AttendanceRecord {
   id: string
   employeeId: string
+  employeeStatus?: "staff" | "intern"
   checkIn: string
   checkOut: string
+  checkInAm?: string
+  checkOutAm?: string
+  checkInPm?: string
+  checkOutPm?: string
+  statusAm?: "on-time" | "late" | "absent" | "leave" | "early" | "late_early"
+  statusPm?: "on-time" | "late" | "absent" | "leave" | "early" | "late_early"
+  noteAm?: string
+  notePm?: string
   date: string
   status: "on-time" | "late" | "absent" | "leave" | "early" | "late_early"
   note: string
   employeeName?: string
   department?: string
+}
+
+const isInternContract = (contractType?: string) => contractType === "intern" || contractType === "Thực tập"
+const WORKED_STATUSES = new Set(["on-time", "late", "early", "late_early"])
+const hasPunchValue = (val?: string) => !!val && val !== "--" && val !== "-"
+
+const parseVnDate = (str?: string) => {
+  if (!str) return null
+  const parts = str.split("/")
+  if (parts.length !== 3) return null
+  const [d, m, y] = parts.map(Number)
+  if ([d, m, y].some(Number.isNaN)) return null
+  const date = new Date(y, m - 1, d)
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+const parseIsoDate = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number)
+  const date = new Date(y, m - 1, d)
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+const getContractTypeForDate = (emp: Employee, isoDate: string) => {
+  const history = emp.contractHistory || []
+  if (history.length === 0) return emp.contractType || "staff"
+  const target = parseIsoDate(isoDate)
+  for (const item of history) {
+    const start = parseVnDate(item.startDate)
+    if (!start) continue
+    if (item.endDate) {
+      const end = parseVnDate(item.endDate)
+      if (end && target >= start && target <= end) return item.contractType
+    } else if (target >= start) {
+      return item.contractType
+    }
+  }
+  return emp.contractType || "staff"
+}
+
+function addSessionToStats(
+  sessionStatus: string | undefined,
+  stats: { late: number; leave: number; absent: number; total: number; onTime: number }
+) {
+  const st = sessionStatus || "absent"
+  if (st === "late" || st === "late_early" || st === "early") {
+    stats.late += 1
+    stats.total += 1
+    return
+  }
+  if (st === "on-time") {
+    stats.onTime += 1
+    stats.total += 1
+    return
+  }
+  if (st === "leave") {
+    stats.leave += 1
+    return
+  }
+  if (st === "absent") {
+    stats.absent += 1
+  }
 }
 
 export default function StatisticsPage({ selectedBranch = "all", currentUserEmail = "", currentUserRole = "user", modules = [] as string[] }: { selectedBranch?: string; currentUserEmail?: string; currentUserRole?: string; modules?: string[] }) {
@@ -82,6 +184,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
     }[]
   } | null>(null)
   const [showFullRank, setShowFullRank] = useState<"late" | "leave" | "absent" | null>(null)
+  const [violationExport, setViolationExport] = useState<ExportPayload | null>(null)
   const [systemConfig, setSystemConfig] = useState<{
     morningStart: string
     morningEnd: string
@@ -148,19 +251,25 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
   const detailSuggestionsList = useMemo(() => {
     const baseList = employees.filter(e => {
-      const matchesType = activeTab === "official" ? e.contractType === "Chính thức" : e.contractType === "Thực tập"
+      const isIntern = e.contractType === "intern" || e.contractType === "Thực tập"
+      let matchesType = true
+      if (activeTab === "official") {
+        matchesType = !isIntern
+      } else if (activeTab === "intern") {
+        matchesType = isIntern
+      }
       if (!matchesType) return false
       const matchesBranch = selectedBranch === "all" || e.branchId === selectedBranch
       return matchesBranch
     })
-    
-    const query = searchQuery.trim().toLowerCase()
+
+    const query = removeVietnameseTones(searchQuery.trim().toLowerCase())
     if (!query) return baseList
-    
-    const exactMatch = baseList.some(e => e.name.toLowerCase() === query || e.id.toLowerCase() === query)
+
+    const exactMatch = baseList.some(e => removeVietnameseTones(e.name.toLowerCase()) === query || e.id.toLowerCase() === query)
     if (exactMatch) return baseList
-    
-    return baseList.filter(e => e.name.toLowerCase().includes(query) || e.id.toLowerCase().includes(query))
+
+    return baseList.filter(e => removeVietnameseTones(e.name.toLowerCase()).includes(query) || e.id.toLowerCase().includes(query))
   }, [employees, activeTab, selectedBranch, searchQuery])
 
   const handleYearChange = (val: string) => {
@@ -179,35 +288,35 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
     const year = selectedYear.length === 4 ? parseInt(selectedYear) : parseInt(currentYearStr)
     const month = parseInt(selectedMonth)
     if (isNaN(year) || isNaN(month)) return []
-    
+
     const options: { id: string; label: string; startDate: string; endDate: string }[] = []
     const firstDay = new Date(year, month - 1, 1)
     const lastDay = new Date(year, month, 0)
-    
+
     let currentStart = new Date(firstDay)
+    const firstDayOfWeek = currentStart.getDay() === 0 ? 7 : currentStart.getDay()
+    currentStart.setDate(currentStart.getDate() - (firstDayOfWeek - 1))
+
     let weekNum = 1
-    
+
     while (currentStart <= lastDay) {
-      const startStr = `${year}-${String(month).padStart(2, "0")}-${String(currentStart.getDate()).padStart(2, "0")}`
-      
       const currentEnd = new Date(currentStart)
-      const daysToSunday = 7 - (currentStart.getDay() === 0 ? 7 : currentStart.getDay())
-      currentEnd.setDate(currentStart.getDate() + daysToSunday)
-      
-      const actualEnd = currentEnd > lastDay ? lastDay : currentEnd
-      const endStr = `${year}-${String(month).padStart(2, "0")}-${String(actualEnd.getDate()).padStart(2, "0")}`
-      
-      const formattedStart = `${String(currentStart.getDate()).padStart(2, "0")}/${String(month).padStart(2, "0")}`
-      const formattedEnd = `${String(actualEnd.getDate()).padStart(2, "0")}/${String(month).padStart(2, "0")}`
-      
+      currentEnd.setDate(currentStart.getDate() + 6)
+
+      const startStr = `${currentStart.getFullYear()}-${String(currentStart.getMonth() + 1).padStart(2, "0")}-${String(currentStart.getDate()).padStart(2, "0")}`
+      const endStr = `${currentEnd.getFullYear()}-${String(currentEnd.getMonth() + 1).padStart(2, "0")}-${String(currentEnd.getDate()).padStart(2, "0")}`
+
+      const formattedStart = `${String(currentStart.getDate()).padStart(2, "0")}/${String(currentStart.getMonth() + 1).padStart(2, "0")}`
+      const formattedEnd = `${String(currentEnd.getDate()).padStart(2, "0")}/${String(currentEnd.getMonth() + 1).padStart(2, "0")}`
+
       options.push({
         id: `w${weekNum}`,
         label: `Tuần ${weekNum} (${formattedStart} - ${formattedEnd})`,
         startDate: startStr,
         endDate: endStr
       })
-      
-      currentStart = new Date(actualEnd)
+
+      currentStart = new Date(currentEnd)
       currentStart.setDate(currentStart.getDate() + 1)
       weekNum++
     }
@@ -227,7 +336,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
     if (!vnDate) return ""
     const [d, m, y] = vnDate.split("/")
     if (!d || !m || !y) return ""
-    return `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`
   }
 
   const dateRange = useMemo(() => {
@@ -239,7 +348,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       const end = parseVNtoISO(rangeEnd)
       if (start && end) return { start, end }
       if (start) return { start, end: start }
-      return { start: `${year}-${String(month).padStart(2,"0")}-01`, end: `${year}-${String(month).padStart(2,"0")}-01` }
+      return { start: `${year}-${String(month).padStart(2, "0")}-01`, end: `${year}-${String(month).padStart(2, "0")}-01` }
     }
 
     if (filterType === "week") {
@@ -284,24 +393,25 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
   const statsMap = useMemo(() => {
     const map: Record<string, { late: number; leave: number; absent: number; total: number; onTime: number }> = {}
-    
+
     const daysList: string[] = []
     if (dateRange.start && dateRange.end) {
       const [sy, sm, sd] = dateRange.start.split("-").map(Number)
       const [ey, em, ed] = dateRange.end.split("-").map(Number)
       let current = new Date(sy, sm - 1, sd)
       const end = new Date(ey, em - 1, ed)
-      const todayStr = new Date().toISOString().split("T")[0]
+      const nowLocal = new Date();
+      const todayStr = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`
 
       while (current <= end) {
         const yStr = current.getFullYear()
         const mStr = String(current.getMonth() + 1).padStart(2, "0")
         const dStr = String(current.getDate()).padStart(2, "0")
         const dayStr = `${yStr}-${mStr}-${dStr}`
-        
+
         const dt = new Date(yStr, current.getMonth(), current.getDate())
         const isWeekend = dt.getDay() === 0 || dt.getDay() === 6
-        
+
         if (!isWeekend && dayStr <= todayStr) {
           daysList.push(dayStr)
         }
@@ -311,23 +421,28 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
     employees.forEach(e => {
       map[e.id] = { late: 0, leave: 0, absent: 0, total: 0, onTime: 0 }
-      
+
       daysList.forEach(day => {
         const matched = attendance.find(r => r.employeeId === e.id && r.date === day)
         if (matched) {
-          if (matched.status === "late" || matched.status === "late_early") {
+          const isInternRecord = matched.employeeStatus === "intern" || isInternContract(getContractTypeForDate(e, day))
+          if (isInternRecord) {
+            addSessionToStats(matched.statusAm, map[e.id])
+            addSessionToStats(matched.statusPm, map[e.id])
+          } else if (matched.status === "late" || matched.status === "late_early" || matched.status === "early") {
             map[e.id].late += 1
             map[e.id].total += 1
           } else if (matched.status === "leave") {
             map[e.id].leave += 1
           } else if (matched.status === "absent") {
             map[e.id].absent += 1
-          } else if (matched.status === "on-time" || matched.status === "early") {
+          } else if (matched.status === "on-time") {
             map[e.id].onTime += 1
             map[e.id].total += 1
           }
         } else {
-          map[e.id].absent += 1
+          const isInternEmp = isInternContract(getContractTypeForDate(e, day))
+          map[e.id].absent += isInternEmp ? 2 : 1
         }
       })
     })
@@ -341,7 +456,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       if (!matchesBranch) return false
       const matchesDept = personalDept === "all" || e.department === personalDept
       if (!matchesDept) return false
-      const matchesType = activeTab === "official" ? e.contractType === "Chính thức" : e.contractType === "Thực tập"
+      const isIntern = e.contractType === "intern" || e.contractType === "Thực tập"
+      const matchesType = activeTab === "official" ? !isIntern : isIntern
       return matchesType
     })
   }, [employees, selectedBranch, personalDept, activeTab])
@@ -371,15 +487,21 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
   const filteredEmployeesList = useMemo(() => {
     const res = employees.filter(e => {
-      const matchesType = activeTab === "official" ? e.contractType === "Chính thức" : e.contractType === "Thực tập"
+      const isIntern = e.contractType === "intern" || e.contractType === "Thực tập"
+      let matchesType = true
+      if (activeTab === "official") {
+        matchesType = !isIntern
+      } else if (activeTab === "intern") {
+        matchesType = isIntern
+      }
       if (!matchesType) return false
       const matchesBranch = selectedBranch === "all" || e.branchId === selectedBranch
       if (!matchesBranch) return false
       const matchesDept = personalDept === "all" || e.department === personalDept
       if (!matchesDept) return false
       if (!searchQuery.trim()) return true
-      const query = searchQuery.toLowerCase()
-      return e.name.toLowerCase().includes(query) || e.id.toLowerCase().includes(query)
+      const query = removeVietnameseTones(searchQuery.toLowerCase())
+      return removeVietnameseTones(e.name.toLowerCase()).includes(query) || e.id.toLowerCase().includes(query)
     })
     return res
   }, [employees, activeTab, searchQuery, selectedBranch, personalDept])
@@ -450,6 +572,9 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
     return { list, topLateGroups, topLeaveGroups, topAbsentGroups }
   }, [filteredEmployeesList, statsMap])
 
+  const isInternStatsTab = activeTab === "intern"
+  const statsUnit = isInternStatsTab ? "buổi" : "ngày"
+
   const departmentOptions = useMemo(() => {
     const depts = new Set<string>()
     employees.forEach(e => {
@@ -493,14 +618,18 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
     const logs = daysList.map(day => {
       const matched = attendance.find(r => r.employeeId === empId && r.date === day)
+      const dayIsIntern = isInternContract(getContractTypeForDate(emp, day))
       const [y, m, d] = day.split("-").map(Number)
       const dt = new Date(y, m - 1, d)
       const isWeekend = dt.getDay() === 0 || dt.getDay() === 6
-      
+      const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const isFuture = dt > todayDate
+
       if (isWeekend) {
         return {
           id: `weekend-${day}`,
           date: day,
+          isIntern: dayIsIntern,
           checkIn: "",
           checkOut: "",
           status: "weekend" as const,
@@ -509,34 +638,71 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       }
 
       if (matched) {
-        let calculatedStatus = matched.status as any
-        if (matched.status === "on-time" && matched.checkOut && matched.checkOut !== "--" && matched.checkOut !== "") {
-          const parts = matched.checkOut.split(":")
-          if (parts.length === 2) {
-            const h = parseInt(parts[0])
-            const m = parseInt(parts[1])
-            if (!isNaN(h) && !isNaN(m)) {
-              if (h < 17 || (h === 17 && m < 30)) {
-                calculatedStatus = "early"
-              }
-            }
+        const matchedIsIntern = matched.employeeStatus
+          ? matched.employeeStatus === "intern"
+          : isInternContract(getContractTypeForDate(emp, day))
+        const hasActualPunch = matchedIsIntern
+          ? [matched.checkInAm, matched.checkOutAm, matched.checkInPm, matched.checkOutPm].some(v => hasPunchValue(v))
+          : [matched.checkIn, matched.checkOut].some(v => hasPunchValue(v))
+        const hasApprovedLeave = matched.status === "leave" || matched.statusAm === "leave" || matched.statusPm === "leave"
+
+        if (isFuture && !hasActualPunch && !hasApprovedLeave) {
+          return {
+            id: `pending-${day}`,
+            date: day,
+            isIntern: matchedIsIntern,
+            checkIn: "",
+            checkOut: "",
+            status: "pending" as any,
+            note: "Chưa đến ngày"
           }
         }
+
         return {
           id: matched.id,
           date: day,
+          isIntern: matchedIsIntern,
           checkIn: matched.checkIn,
           checkOut: matched.checkOut,
-          status: calculatedStatus,
+          checkInAm: matched.checkInAm,
+          checkOutAm: matched.checkOutAm,
+          checkInPm: matched.checkInPm,
+          checkOutPm: matched.checkOutPm,
+          statusAm: matched.statusAm,
+          statusPm: matched.statusPm,
+          noteAm: matched.noteAm,
+          notePm: matched.notePm,
+          status: matched.status as any,
           note: matched.note
+        }
+      }
+
+      if (isFuture) {
+        return {
+          id: `pending-${day}`,
+          date: day,
+          isIntern: isInternContract(getContractTypeForDate(emp, day)),
+          checkIn: "",
+          checkOut: "",
+          status: "pending" as any,
+          note: "Chưa đến ngày"
         }
       }
 
       return {
         id: `absent-${day}`,
         date: day,
+        isIntern: isInternContract(getContractTypeForDate(emp, day)),
         checkIn: "",
         checkOut: "",
+        checkInAm: isInternContract(getContractTypeForDate(emp, day)) ? "" : undefined,
+        checkOutAm: isInternContract(getContractTypeForDate(emp, day)) ? "" : undefined,
+        checkInPm: isInternContract(getContractTypeForDate(emp, day)) ? "" : undefined,
+        checkOutPm: isInternContract(getContractTypeForDate(emp, day)) ? "" : undefined,
+        statusAm: isInternContract(getContractTypeForDate(emp, day)) ? "absent" : undefined,
+        statusPm: isInternContract(getContractTypeForDate(emp, day)) ? "absent" : undefined,
+        noteAm: isInternContract(getContractTypeForDate(emp, day)) ? "Không có dữ liệu buổi sáng" : undefined,
+        notePm: isInternContract(getContractTypeForDate(emp, day)) ? "Không có dữ liệu buổi chiều" : undefined,
         status: "absent" as const,
         note: "Không có dữ liệu chấm công"
       }
@@ -545,13 +711,29 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
     let onTime = 0
     let late = 0
     let leave = 0
+    let totalUnits = 0
     logs.forEach(r => {
+      if (r.status === "weekend" || r.status === "pending") return
+      if (r.isIntern) {
+        totalUnits += 2
+        const sessionStatuses = [
+          r.statusAm ?? (WORKED_STATUSES.has(r.status) ? r.status : "absent"),
+          r.statusPm ?? (WORKED_STATUSES.has(r.status) ? r.status : "absent"),
+        ]
+        sessionStatuses.forEach(st => {
+          if (st === "late" || st === "late_early" || st === "early") late += 1
+          else if (st === "on-time") onTime += 1
+          else if (st === "leave" || st === "absent") leave += 1
+        })
+        return
+      }
+      totalUnits += 1
       if (r.status === "on-time") onTime += 1
-      else if (r.status === "late") late += 1
+      else if (r.status === "late" || r.status === "late_early" || r.status === "early") late += 1
       else if (r.status === "leave" || r.status === "absent") leave += 1
     })
 
-    const total = logs.filter(r => r.status !== "weekend").length
+    const total = totalUnits
     const onTimeRate = total > 0 ? Math.round((onTime / total) * 100) : 100
 
     return { emp, logs, onTime, late, leave, total, onTimeRate }
@@ -561,65 +743,61 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
     setExporting(true)
     setTimeout(() => {
       try {
-        let headers: string[] = []
-        let rows: (string | number)[][] = []
-        let filename = "bao-cao-thong-ke.csv"
+        let payload: ExportPayload | null = null
 
         if (activeTab === "official" || activeTab === "intern") {
-          headers = ["STT", "Mã nhân viên", "Họ và tên", "Phòng ban", "Số ngày đi trễ", "Nghỉ phép", "Vắng mặt"]
-          rows = rankData.list.map((emp, index) => [
-            index + 1,
-            emp.id,
-            emp.name,
-            emp.department,
-            emp.late,
-            emp.leave,
-            emp.absent
-          ])
-          filename = activeTab === "official" 
-            ? `thong-ke-nhan-vien-chinh-thuc-${selectedMonth}-${selectedYear}.csv`
-            : `thong-ke-thuc-tap-sinh-${selectedMonth}-${selectedYear}.csv`
-        } else if (activeTab === "personal" && personalStats) {
-          headers = ["STT", "Thứ", "Ngày", "Giờ vào", "Giờ ra", "Trạng thái", "Ghi chú"]
-          rows = personalStats.logs.map((log, index) => {
-            const dayName = getDayOfWeekVN(log.date)
-            const dateVN = log.date.split("-").reverse().join("/")
-            if (log.status === "weekend") {
-              return [
-                index + 1,
-                dayName,
-                dateVN,
-                "-",
-                "-",
-                "Lịch nghỉ",
-                "Lịch nghỉ cuối tuần"
-              ]
-            }
-            return [
+          payload = {
+            sheetName: activeTab === "official" ? "Thong ke chinh thuc" : "Thong ke thuc tap",
+            filename: activeTab === "official"
+              ? `thong-ke-nhan-vien-chinh-thuc-${selectedMonth}-${selectedYear}.xlsx`
+              : `thong-ke-thuc-tap-sinh-${selectedMonth}-${selectedYear}.xlsx`,
+            headers: ["STT", "Mã nhân viên", "Họ và tên", "Phòng ban", `Số ${statsUnit} đi trễ/về sớm`, "Nghỉ phép", "Vắng mặt"],
+            rows: rankData.list.map((emp, index) => [
               index + 1,
-              dayName,
-              dateVN,
-              log.checkIn || "-",
-              log.checkOut || "-",
-              formatStatus(log.status).label,
-              log.note || ""
-            ]
-          })
-          filename = `nhat-ky-cham-cong-${personalStats.emp.id}-${personalStats.emp.name}-${selectedMonth}-${selectedYear}.csv`
+              emp.id,
+              emp.name,
+              emp.department,
+              emp.late,
+              emp.leave,
+              emp.absent
+            ])
+          }
+        } else if (activeTab === "personal" && personalStats) {
+          payload = {
+            sheetName: "Nhat ky cham cong",
+            filename: `nhat-ky-cham-cong-${personalStats.emp.id}-${personalStats.emp.name}-${selectedMonth}-${selectedYear}.xlsx`,
+            headers: ["STT", "Thứ", "Ngày", "Giờ vào", "Giờ ra", "Trạng thái", "Ghi chú"],
+            rows: personalStats.logs.map((log, index) => {
+              const dayName = getDayOfWeekVN(log.date)
+              const dateVN = log.date.split("-").reverse().join("/")
+              if (log.status === "weekend") {
+                return [index + 1, dayName, dateVN, "-", "-", "Lịch nghỉ", "Lịch nghỉ cuối tuần"]
+              }
+              const timeIn = log.isIntern
+                ? `S: ${formatCheckTime(log.checkInAm)}\nC: ${formatCheckTime(log.checkInPm)}`
+                : (log.checkIn || "-")
+              const timeOut = log.isIntern
+                ? `S: ${formatCheckTime(log.checkOutAm)}\nC: ${formatCheckTime(log.checkOutPm)}`
+                : (log.checkOut || "-")
+              const statusLabel = log.isIntern
+                ? (log.status === "pending"
+                  ? "Chưa tới ngày"
+                  : `S: ${formatStatus(log.statusAm || "absent").label}\nC: ${formatStatus(log.statusPm || "absent").label}`)
+                : formatStatus(log.status).label
+              const noteLabel = log.isIntern
+                ? (log.status === "pending"
+                  ? "Chưa tới ngày"
+                  : `S: ${log.noteAm || "—"}\nC: ${log.notePm || "—"}`)
+                : (log.note || "")
+              return [index + 1, dayName, dateVN, timeIn, timeOut, statusLabel, noteLabel]
+            })
+          }
+        } else if (activeTab === "violation" && violationExport) {
+          payload = violationExport
         }
 
-        const csvContent = "\uFEFF" + [headers, ...rows]
-          .map(row => row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(","))
-          .join("\n")
-
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement("a")
-        link.href = url
-        link.setAttribute("download", filename)
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
+        if (!payload) return
+        exportXlsx(payload)
       } catch (err) {
         console.error("Lỗi xuất file:", err)
       } finally {
@@ -629,13 +807,16 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
   }
 
   const formatStatus = (status: string) => {
+    const sharedStyle = ATT_STATUS_STYLE[status]
+    if (sharedStyle) {
+      return {
+        label: sharedStyle.label,
+        class: `${sharedStyle.bg} ${sharedStyle.text} border border-transparent`
+      }
+    }
     switch (status) {
-      case "on-time": return { label: "Đúng giờ", class: "bg-emerald-50 text-emerald-700 border border-emerald-100" }
-      case "late": return { label: "Đi trễ", class: "bg-amber-50 text-amber-700 border border-amber-100" }
-      case "leave": return { label: "Nghỉ phép", class: "bg-purple-50 text-purple-700 border border-purple-100" }
-      case "absent": return { label: "Vắng mặt", class: "bg-rose-50 text-rose-700 border border-rose-100" }
-      case "early": return { label: "Về sớm", class: "bg-blue-50 text-blue-700 border border-blue-100" }
       case "weekend": return { label: "Lịch nghỉ", class: "bg-emerald-50 text-emerald-700 border border-emerald-100" }
+      case "pending": return { label: "Chưa tới", class: "bg-gray-100 text-gray-500 border border-gray-200" }
       default: return { label: "Không xác định", class: "bg-gray-50 text-gray-700 border border-gray-100" }
     }
   }
@@ -657,7 +838,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
         {(activeTab !== "personal" || personalStats) && (
           <button onClick={handleExport} disabled={exporting}
             className="flex items-center gap-2 px-4 py-2 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50 cursor-pointer">
-            {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />} 
+            {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
             {exporting ? "Đang xuất..." : "Xuất báo cáo"}
           </button>
         )}
@@ -734,14 +915,14 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                 <button key={preset.label} type="button"
                   onClick={() => {
                     const today = new Date()
-                    const fmt = (d: Date) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`
+                    const fmt = (d: Date) => `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
                     if (preset.type === "thisMonth") {
                       setRangeStart(fmt(new Date(today.getFullYear(), today.getMonth(), 1)))
-                      setRangeEnd(fmt(new Date(today.getFullYear(), today.getMonth()+1, 0)))
+                      setRangeEnd(fmt(new Date(today.getFullYear(), today.getMonth() + 1, 0)))
                     } else if (preset.type === "thisQuarter") {
                       const q = Math.floor(today.getMonth() / 3)
-                      setRangeStart(fmt(new Date(today.getFullYear(), q*3, 1)))
-                      setRangeEnd(fmt(new Date(today.getFullYear(), q*3+3, 0)))
+                      setRangeStart(fmt(new Date(today.getFullYear(), q * 3, 1)))
+                      setRangeEnd(fmt(new Date(today.getFullYear(), q * 3 + 3, 0)))
                     } else {
                       const end = new Date(today)
                       const start = new Date(today)
@@ -801,9 +982,26 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
         )}
 
         <div className="flex flex-col gap-1.5 ml-auto self-end w-full lg:w-auto">
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold border border-gray-150 shadow-2xs h-[34px] justify-center lg:justify-start">
-            <Calendar size={13} className="text-gray-400" />
-            {dateRangeText}
+          <div className="flex items-center gap-2 justify-center lg:justify-start">
+            <button
+              onClick={() => {
+                setFilterType("month")
+                setSelectedYear(currentYearStr)
+                setSelectedMonth(currentMonthStr)
+                setSelectedWeekId("w1")
+                setPersonalDept("all")
+                setSearchQuery("")
+              }}
+              className="px-3 py-2 bg-white text-gray-500 hover:text-[#C62828] hover:bg-red-50 hover:border-red-100 rounded-xl text-xs font-bold border border-gray-200 transition-all shadow-2xs h-[34px] flex items-center gap-1.5"
+              title="Đặt lại bộ lọc"
+            >
+              <RefreshCw size={13} />
+              <span className="hidden sm:inline">Bỏ lọc</span>
+            </button>
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold border border-gray-150 shadow-2xs h-[34px]">
+              <Calendar size={13} className="text-gray-400" />
+              {dateRangeText}
+            </div>
           </div>
         </div>
       </div>
@@ -841,7 +1039,9 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-3xl p-5 border border-gray-100 border-l-4 border-l-blue-500 shadow-sm transition-all hover:shadow-md">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-bold text-gray-800">Tổng ngày công</span>
+                  <span className="text-sm font-bold text-gray-800">
+                    Tổng {selectedPersonalEmp && isInternContract(selectedPersonalEmp.contractType) ? "buổi công" : "ngày công"}
+                  </span>
                   <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center"><Clock size={16} className="text-blue-500" /></div>
                 </div>
                 <div className="text-2xl font-black text-blue-600">{personalStats.total - personalStats.leave}</div>
@@ -850,11 +1050,13 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
               <div className="bg-white rounded-3xl p-5 border border-gray-100 border-l-4 border-l-amber-500 shadow-sm transition-all hover:shadow-md">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-bold text-gray-800">Đi trễ</span>
+                  <span className="text-sm font-bold text-gray-800">Đi trễ / Về sớm</span>
                   <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center"><AlertCircle size={16} className="text-amber-500" /></div>
                 </div>
                 <div className="text-2xl font-black text-amber-600">{personalStats.late}</div>
-                <div className="text-[10px] text-gray-400 font-medium mt-1">Số ngày đi làm muộn</div>
+                <div className="text-[10px] text-gray-400 font-medium mt-1">
+                  Số {selectedPersonalEmp && isInternContract(selectedPersonalEmp.contractType) ? "buổi" : "ngày"} vi phạm giờ giấc
+                </div>
               </div>
 
               <div className="bg-white rounded-3xl p-5 border border-gray-100 border-l-4 border-l-rose-500 shadow-sm transition-all hover:shadow-md">
@@ -868,7 +1070,9 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
               <div className="bg-white rounded-3xl p-5 border border-gray-100 border-l-4 border-l-emerald-500 shadow-sm transition-all hover:shadow-md">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-bold text-gray-800">Số ngày đúng giờ</span>
+                  <span className="text-sm font-bold text-gray-800">
+                    Số {selectedPersonalEmp && isInternContract(selectedPersonalEmp.contractType) ? "buổi" : "ngày"} đúng giờ
+                  </span>
                   <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center"><TrendingUp size={16} className="text-emerald-500" /></div>
                 </div>
                 <div className="text-2xl font-black text-emerald-600">{personalStats.onTime}</div>
@@ -919,7 +1123,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                         let rowBgClass = "hover:bg-gray-50/50 transition-colors font-semibold text-gray-700 border-b border-gray-100"
                         if (log.status === "on-time") {
                           rowBgClass = "bg-emerald-50/80 hover:bg-emerald-100/45 transition-colors font-semibold text-gray-700 border-b border-gray-100"
-                        } else if (log.status === "late") {
+                        } else if (log.status === "late" || log.status === "late_early") {
                           rowBgClass = "bg-amber-50/90 hover:bg-amber-100/55 transition-colors font-semibold text-gray-700 border-b border-gray-100"
                         } else if (log.status === "early") {
                           rowBgClass = "bg-blue-50/85 hover:bg-blue-100/50 transition-colors font-semibold text-gray-700 border-b border-gray-100"
@@ -933,14 +1137,61 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                           <tr key={log.id} className={rowBgClass}>
                             <td className="px-6 py-4 font-bold text-gray-900">{dayName}</td>
                             <td className="px-6 py-4">{dateVN}</td>
-                            <td className="px-6 py-4 font-mono">{log.checkIn || "—"}</td>
-                            <td className="px-6 py-4 font-mono">{log.checkOut || "—"}</td>
-                            <td className="px-6 py-4">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${state.class}`}>
-                                {state.label}
-                              </span>
+                            <td className="px-6 py-4 font-mono">
+                              {log.isIntern ? (
+                                <div className="space-y-1 text-[11px]">
+                                  <div><span className="text-gray-400 font-bold mr-1">S:</span><span>{formatCheckTime(log.checkInAm)}</span></div>
+                                  <div><span className="text-gray-400 font-bold mr-1">C:</span><span>{formatCheckTime(log.checkInPm)}</span></div>
+                                </div>
+                              ) : (
+                                log.checkIn || "—"
+                              )}
                             </td>
-                            <td className="px-6 py-4 text-gray-400 text-xs font-medium">{log.note || "—"}</td>
+                            <td className="px-6 py-4 font-mono">
+                              {log.isIntern ? (
+                                <div className="space-y-1 text-[11px]">
+                                  <div><span className="text-gray-400 font-bold mr-1">S:</span><span>{formatCheckTime(log.checkOutAm)}</span></div>
+                                  <div><span className="text-gray-400 font-bold mr-1">C:</span><span>{formatCheckTime(log.checkOutPm)}</span></div>
+                                </div>
+                              ) : (
+                                log.checkOut || "—"
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              {log.status === "pending" ? (
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${state.class}`}>
+                                  {state.label}
+                                </span>
+                              ) : log.isIntern ? (
+                                <div className="flex flex-col gap-1.5">
+                                  {([["S", log.statusAm || "absent"], ["C", log.statusPm || "absent"]] as const).map(([label, sessionStatus]) => {
+                                    const sessionState = formatStatus(sessionStatus)
+                                    return (
+                                      <span key={label} className={`inline-flex items-center gap-1.5 w-fit px-2.5 py-1 rounded-full text-[11px] font-bold ${sessionState.class}`}>
+                                        <span className="text-gray-500">{label}:</span>
+                                        {sessionState.label}
+                                      </span>
+                                    )
+                                  })}
+                                </div>
+                              ) : (
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${state.class}`}>
+                                  {state.label}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-gray-400 text-xs font-medium">
+                              {log.status === "pending" ? (
+                                <div>Chưa tới ngày</div>
+                              ) : log.isIntern ? (
+                                <div className="space-y-1">
+                                  <div><span className="font-bold text-gray-500 mr-1">S:</span>{log.noteAm || "—"}</div>
+                                  <div><span className="font-bold text-gray-500 mr-1">C:</span>{log.notePm || "—"}</div>
+                                </div>
+                              ) : (
+                                log.note || "—"
+                              )}
+                            </td>
                           </tr>
                         )
                       })
@@ -958,7 +1209,15 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         )
       ) : activeTab === "violation" ? (
-        <ViolationTab employees={employees} attendance={attendance} selectedBranch={selectedBranch} systemConfig={systemConfig} />
+        <ViolationTab
+          employees={employees}
+          attendance={attendance}
+          selectedBranch={selectedBranch}
+          selectedDepartment={personalDept}
+          systemConfig={systemConfig}
+          dateRange={dateRange}
+          onExportDataChange={setViolationExport}
+        />
       ) : (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -986,9 +1245,9 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                     return (
                       <div key={group.rank} className="flex items-center gap-4">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
-                          ${group.rank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200" 
-                            : group.rank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200" 
-                            : "bg-orange-100 text-orange-700 border border-orange-200"}`}>
+                          ${group.rank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200"
+                            : group.rank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200"
+                              : "bg-orange-100 text-orange-700 border border-orange-200"}`}>
                           {group.rank}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1005,8 +1264,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                                 </>
                               ) : (
                                 <div className="cursor-pointer" onClick={() => setActiveRankDetail({
-                                  title: `Top đi trễ - Hạng ${group.rank} (${group.count} ngày muộn)`,
-                                  countLabel: `${group.count} ngày muộn`,
+                                  title: `Top đi trễ - Hạng ${group.rank} (${group.count} ${statsUnit} muộn)`,
+                                  countLabel: `${group.count} ${statsUnit} muộn`,
                                   employees: group.employees
                                 })}>
                                   <span className="text-sm font-bold text-gray-800 block leading-tight truncate hover:text-[#C62828] transition-colors">
@@ -1021,7 +1280,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                               )}
                             </div>
                             <span className="text-xs font-bold text-[#C62828] bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg h-fit flex-shrink-0">
-                              {group.count} ngày muộn
+                              {group.count} {statsUnit} muộn
                             </span>
                           </div>
                           <div className={`flex h-1.5 mt-2 ${maxNotches === 5 ? "gap-1" : "gap-[2px]"}`}>
@@ -1065,9 +1324,9 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                     return (
                       <div key={group.rank} className="flex items-center gap-4">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
-                          ${group.rank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200" 
-                            : group.rank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200" 
-                            : "bg-orange-100 text-orange-700 border border-orange-200"}`}>
+                          ${group.rank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200"
+                            : group.rank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200"
+                              : "bg-orange-100 text-orange-700 border border-orange-200"}`}>
                           {group.rank}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1084,8 +1343,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                                 </>
                               ) : (
                                 <div className="cursor-pointer" onClick={() => setActiveRankDetail({
-                                  title: `Top nghỉ phép - Hạng ${group.rank} (${group.count} ngày nghỉ)`,
-                                  countLabel: `${group.count} ngày nghỉ`,
+                                  title: `Top nghỉ phép - Hạng ${group.rank} (${group.count} ${statsUnit} nghỉ)`,
+                                  countLabel: `${group.count} ${statsUnit} nghỉ`,
                                   employees: group.employees
                                 })}>
                                   <span className="text-sm font-bold text-gray-800 block leading-tight truncate hover:text-blue-600 transition-colors">
@@ -1100,7 +1359,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                               )}
                             </div>
                             <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-lg h-fit flex-shrink-0">
-                              {group.count} ngày nghỉ
+                              {group.count} {statsUnit} nghỉ
                             </span>
                           </div>
                           <div className={`flex h-1.5 mt-2 ${maxNotches === 5 ? "gap-1" : "gap-[2px]"}`}>
@@ -1144,9 +1403,9 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                     return (
                       <div key={group.rank} className="flex items-center gap-4">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0
-                          ${group.rank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200" 
-                            : group.rank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200" 
-                            : "bg-orange-100 text-orange-700 border border-orange-200"}`}>
+                          ${group.rank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200"
+                            : group.rank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200"
+                              : "bg-orange-100 text-orange-700 border border-orange-200"}`}>
                           {group.rank}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1163,8 +1422,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                                 </>
                               ) : (
                                 <div className="cursor-pointer" onClick={() => setActiveRankDetail({
-                                  title: `Top vắng mặt - Hạng ${group.rank} (${group.count} ngày vắng)`,
-                                  countLabel: `${group.count} ngày vắng`,
+                                  title: `Top vắng mặt - Hạng ${group.rank} (${group.count} ${statsUnit} vắng)`,
+                                  countLabel: `${group.count} ${statsUnit} vắng`,
                                   employees: group.employees
                                 })}>
                                   <span className="text-sm font-bold text-gray-800 block leading-tight truncate hover:text-rose-600 transition-colors">
@@ -1179,7 +1438,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                               )}
                             </div>
                             <span className="text-xs font-bold text-rose-600 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-lg h-fit flex-shrink-0">
-                              {group.count} ngày vắng
+                              {group.count} {statsUnit} vắng
                             </span>
                           </div>
                           <div className={`flex h-1.5 mt-2 ${maxNotches === 5 ? "gap-1" : "gap-[2px]"}`}>
@@ -1226,7 +1485,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                     <th className="px-6 py-3.5">Mã NV</th>
                     <th className="px-6 py-3.5">Họ tên</th>
                     <th className="px-6 py-3.5">Đơn vị</th>
-                    <th className="px-6 py-3.5">Số ngày đi trễ</th>
+                    <th className="px-6 py-3.5">Số {statsUnit} đi trễ/về sớm</th>
                     <th className="px-6 py-3.5">Nghỉ phép</th>
                     <th className="px-6 py-3.5">Vắng mặt</th>
                   </tr>
@@ -1274,7 +1533,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
         icon={Award}
         width="lg"
         footer={
-          <button 
+          <button
             onClick={() => setActiveRankDetail(null)}
             className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
           >
@@ -1291,11 +1550,10 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                   <p className="text-sm font-bold text-gray-800 truncate">{emp.name}</p>
                   <p className="text-[11px] text-gray-400 font-semibold">{emp.id} — {emp.department}</p>
                 </div>
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
-                  activeRankDetail.countLabel.includes("muộn") 
-                    ? "text-[#C62828] bg-rose-50 border-rose-100" 
-                    : "text-blue-600 bg-blue-50 border-blue-100"
-                }`}>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${activeRankDetail.countLabel.includes("muộn")
+                  ? "text-[#C62828] bg-rose-50 border-rose-100"
+                  : "text-blue-600 bg-blue-50 border-blue-100"
+                  }`}>
                   {activeRankDetail.countLabel}
                 </span>
               </div>
@@ -1311,7 +1569,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
         icon={showFullRank === "late" ? Award : showFullRank === "leave" ? Users : UserX}
         width="xl"
         footer={
-          <button 
+          <button
             onClick={() => setShowFullRank(null)}
             className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
           >
@@ -1330,7 +1588,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                   <th className="px-4 py-3">Đơn vị</th>
                   <th className="px-4 py-3">Loại hợp đồng</th>
                   <th className="px-4 py-3 text-right">
-                    {showFullRank === "late" ? "Số ngày đi trễ" : showFullRank === "leave" ? "Số ngày nghỉ" : "Số ngày vắng mặt"}
+                    {showFullRank === "late" ? `Số ${statsUnit} đi trễ` : showFullRank === "leave" ? `Số ${statsUnit} nghỉ` : `Số ${statsUnit} vắng mặt`}
                   </th>
                 </tr>
               </thead>
@@ -1346,7 +1604,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                       </tr>
                     )
                   }
-                  
+
                   let currentRank = 0
                   let previousCount = -1
 
@@ -1361,15 +1619,15 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                       : showFullRank === "leave"
                         ? (countVal > 0 ? "bg-purple-100 text-purple-900 border-purple-200" : "bg-gray-100 text-gray-700 border-gray-200")
                         : (countVal > 0 ? "bg-rose-100 text-rose-900 border-rose-200" : "bg-gray-100 text-gray-700 border-gray-200")
-                    
+
                     return (
                       <tr key={item.id} className="hover:bg-gray-50/50 transition-colors font-medium text-black border-b border-gray-150">
                         <td className="px-4 py-3 text-center">
                           <span className={`inline-flex w-6 h-6 rounded-full items-center justify-center text-xs font-black
-                            ${currentRank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200" 
-                              : currentRank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200" 
-                              : currentRank === 3 ? "bg-orange-100 text-orange-700 border border-orange-200"
-                              : "text-gray-500"}`}>
+                            ${currentRank === 1 ? "bg-amber-100 text-amber-700 border border-amber-200"
+                              : currentRank === 2 ? "bg-slate-100 text-slate-700 border border-slate-200"
+                                : currentRank === 3 ? "bg-orange-100 text-orange-700 border border-orange-200"
+                                  : "text-gray-500"}`}>
                             {currentRank}
                           </span>
                         </td>
@@ -1377,17 +1635,16 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                         <td className="px-4 py-3 text-black font-semibold">{item.name}</td>
                         <td className="px-4 py-3 text-xs font-medium text-black">{item.department}</td>
                         <td className="px-4 py-3 text-xs">
-                          <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${
-                            item.contractType === "Chính thức" 
-                              ? "bg-blue-50 text-blue-700 border border-blue-100" 
-                              : "bg-orange-50 text-orange-700 border border-orange-100"
-                          }`}>
-                            {item.contractType}
+                          <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${item.contractType === "staff" || item.contractType === "Chính thức"
+                            ? "bg-blue-50 text-blue-700 border border-blue-100"
+                            : "bg-orange-50 text-orange-700 border border-orange-100"
+                            }`}>
+                            {item.contractType === "staff" || item.contractType === "Chính thức" ? "Chính thức" : "Thực tập"}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold border ${pillClass}`}>
-                            {countVal} {showFullRank === "late" ? "ngày" : "ngày"}
+                            {countVal} {statsUnit}
                           </span>
                         </td>
                       </tr>
@@ -1403,20 +1660,151 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
   )
 }
 
-function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
-  employees: { id: string; name: string; department: string; status: string; contractType: string; branchId?: string }[]
-  attendance: { employeeId: string; date: string; status: string; checkIn?: string; checkOut?: string; note?: string }[]
+function ViolationTab({ employees, attendance, selectedBranch, selectedDepartment, systemConfig, dateRange, onExportDataChange }: {
+  employees: Employee[]
+  attendance: {
+    employeeId: string
+    date: string
+    status: string
+    checkIn?: string
+    checkOut?: string
+    note?: string
+    checkInAm?: string
+    checkOutAm?: string
+    checkInPm?: string
+    checkOutPm?: string
+    statusAm?: string
+    statusPm?: string
+    noteAm?: string
+    notePm?: string
+    employeeStatus?: "staff" | "intern"
+    contractType?: string
+  }[]
   selectedBranch: string
-  systemConfig: { morningStart: string; morningEnd: string; afternoonStart: string; afternoonEnd: string }
+  selectedDepartment: string
+  systemConfig: { morningStart: string; morningEnd: string; afternoonStart: string; afternoonEnd: string; employeeStart?: string; employeeEnd?: string }
+  dateRange: { start: string; end: string }
+  onExportDataChange?: (payload: ExportPayload) => void
 }) {
   const [filterType, setFilterType] = useState<"all" | "late" | "early_checkout" | "forgot_checkout" | "forgot_checkin" | "absent" | "approved_leave">("all")
   const [selectedEmpId, setSelectedEmpId] = useState<string>("all")
+  const [scopedAttendance, setScopedAttendance] = useState<typeof attendance>([])
 
-  const branchEmployees = employees.filter(e =>
-    selectedBranch === "all" || (e as any).branchId === selectedBranch
-  )
+  const branchEmployees = employees.filter(e => {
+    const inBranch = selectedBranch === "all" || (e as any).branchId === selectedBranch
+    const inDept = selectedDepartment === "all" || e.department === selectedDepartment
+    return inBranch && inDept
+  })
 
-  const classifyRecord = (a: typeof attendance[0]) => {
+  const employeeMap = useMemo(() => {
+    const m = new Map<string, Employee>()
+    employees.forEach(e => m.set(e.id, e))
+    return m
+  }, [employees])
+
+  useEffect(() => {
+    let mounted = true
+    api.attendance.list({
+      startDate: dateRange.start,
+      endDate: dateRange.end,
+      branchId: selectedBranch,
+      department: selectedDepartment,
+    })
+      .then((rows) => {
+        if (!mounted) return
+        setScopedAttendance((rows || []) as typeof attendance)
+      })
+      .catch(() => {
+        if (!mounted) return
+        setScopedAttendance([])
+      })
+    return () => { mounted = false }
+  }, [dateRange, selectedBranch, selectedDepartment])
+
+  const todayIso = useMemo(() => {
+    const n = new Date()
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`
+  }, [])
+
+  type ViolationRecord = {
+    employeeId: string
+    date: string
+    status: string
+    checkIn?: string
+    checkOut?: string
+    note?: string
+    session?: "am" | "pm"
+  }
+
+  const expandViolationRecords = (a: typeof attendance[number]): ViolationRecord[] => {
+    const emp = employeeMap.get(a.employeeId)
+    const contractAtDate = emp ? getContractTypeForDate(emp, a.date) : undefined
+    const isInternByDate = isInternContract(contractAtDate)
+
+    const isIntern = isInternByDate || a.employeeStatus === "intern" || a.contractType === "intern"
+    if (!isIntern) {
+      return [{
+        employeeId: a.employeeId,
+        date: a.date,
+        status: a.status,
+        checkIn: a.checkIn,
+        checkOut: a.checkOut,
+        note: a.note
+      }]
+    }
+    return [
+      {
+        employeeId: a.employeeId,
+        date: a.date,
+        status: a.statusAm || "absent",
+        checkIn: a.checkInAm,
+        checkOut: a.checkOutAm,
+        note: a.noteAm,
+        session: "am",
+      },
+      {
+        employeeId: a.employeeId,
+        date: a.date,
+        status: a.statusPm || "absent",
+        checkIn: a.checkInPm,
+        checkOut: a.checkOutPm,
+        note: a.notePm,
+        session: "pm",
+      },
+    ]
+  }
+
+  const normalizeConflictRecords = (records: ViolationRecord[]) => {
+    const grouped = new Map<string, ViolationRecord[]>()
+    records.forEach((r) => {
+      const key = `${r.date}_${r.session || "day"}`
+      const list = grouped.get(key) || []
+      list.push(r)
+      grouped.set(key, list)
+    })
+
+    const normalized: ViolationRecord[] = []
+    grouped.forEach((group) => {
+      const hasLeave = group.some(r => r.status === "leave")
+      const hasWorkedOrPunched = group.some(r =>
+        WORKED_STATUSES.has(r.status) || hasPunchValue(r.checkIn) || hasPunchValue(r.checkOut)
+      )
+
+      group.forEach((r) => {
+        if (r.status !== "absent") {
+          normalized.push(r)
+          return
+        }
+
+        if (hasLeave || hasWorkedOrPunched) return
+        normalized.push(r)
+      })
+    })
+
+    return normalized
+  }
+
+  const classifyRecord = (a: ViolationRecord) => {
     if (a.status === "leave") return "approved_leave"
     if (a.status === "absent") return "absent"
 
@@ -1433,7 +1821,7 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
     return null
   }
 
-  const getCheckInDisplay = (a: typeof attendance[0]) => {
+  const getCheckInDisplay = (a: ViolationRecord) => {
     const recType = classifyRecord(a)
     if (recType === "approved_leave" || recType === "absent") {
       return <span className="text-gray-400">—</span>
@@ -1443,7 +1831,10 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
       return <span className="text-red-400 font-bold">Chưa CI</span>
     }
     const [inH, inM] = val.split(":").map(Number)
-    const [startH, startM] = systemConfig.morningStart.split(":").map(Number)
+    const sessionStart = a.session
+      ? (a.session === "pm" ? systemConfig.afternoonStart : systemConfig.morningStart)
+      : (systemConfig.employeeStart || "09:00")
+    const [startH, startM] = sessionStart.split(":").map(Number)
     const diff = (inH * 60 + inM) - (startH * 60 + startM)
     if (diff > 0 && (a.status === "late" || a.status === "late_early")) {
       return (
@@ -1456,7 +1847,7 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
     return <span className="text-gray-700 font-mono font-semibold">{val}</span>
   }
 
-  const getCheckOutDisplay = (a: typeof attendance[0]) => {
+  const getCheckOutDisplay = (a: ViolationRecord) => {
     const recType = classifyRecord(a)
     if (recType === "approved_leave" || recType === "absent") {
       return <span className="text-gray-400">—</span>
@@ -1466,7 +1857,10 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
       return <span className="text-red-400 font-bold">Chưa CO</span>
     }
     const [outH, outM] = val.split(":").map(Number)
-    const [endH, endM] = systemConfig.afternoonEnd.split(":").map(Number)
+    const sessionEnd = a.session
+      ? (a.session === "am" ? systemConfig.morningEnd : systemConfig.afternoonEnd)
+      : (systemConfig.employeeEnd || "17:00")
+    const [endH, endM] = sessionEnd.split(":").map(Number)
     const diff = (endH * 60 + endM) - (outH * 60 + outM)
     if (diff > 0 && (a.status === "early" || a.status === "late_early")) {
       return (
@@ -1481,17 +1875,39 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
 
   const empViolations = useMemo(() => {
     return branchEmployees.map(emp => {
-      const empAtt = attendance.filter(a => a.employeeId === emp.id)
-      const lateList = empAtt.filter(a => a.status === "late" || a.status === "late_early")
-      const earlyList = empAtt.filter(a => a.status === "early" || a.status === "late_early")
-      const forgotOut = empAtt.filter(a => (a.checkIn && a.checkIn !== "--" && a.checkIn !== "-") && (!a.checkOut || a.checkOut === "--" || a.checkOut === "-"))
-      const forgotIn = empAtt.filter(a => (!a.checkIn || a.checkIn === "--" || a.checkIn === "-") && (a.checkOut && a.checkOut !== "--" && a.checkOut !== "-"))
-      const absentList = empAtt.filter(a => a.status === "absent")
-      const leaveList = empAtt.filter(a => a.status === "leave")
-      const violations = lateList.length + earlyList.length + forgotOut.length + forgotIn.length + absentList.length
-      return { ...emp, lateList, earlyList, forgotOut, forgotIn, absentList, leaveList, violations }
+      const empAtt = scopedAttendance
+        .filter(a => a.employeeId === emp.id && a.date <= todayIso)
+        .flatMap(expandViolationRecords)
+      const normalized = normalizeConflictRecords(empAtt)
+      const lateList = normalized.filter(a => a.status === "late" || a.status === "late_early")
+      const earlyList = normalized.filter(a => a.status === "early" || a.status === "late_early")
+      const forgotOut = normalized.filter(a => hasPunchValue(a.checkIn) && !hasPunchValue(a.checkOut) && a.date < todayIso)
+      const forgotIn = normalized.filter(a => !hasPunchValue(a.checkIn) && hasPunchValue(a.checkOut) && a.date < todayIso)
+      const absentList = normalized.filter(a => a.status === "absent")
+      const absentDayList = absentList.filter(a => !a.session)
+      const absentSessionList = absentList.filter(a => !!a.session)
+      const leaveList = normalized.filter(a => a.status === "leave")
+      const uniqueKeys = new Set<string>()
+      lateList.forEach(a => uniqueKeys.add(`${a.date}_${a.session || "day"}`))
+      earlyList.forEach(a => uniqueKeys.add(`${a.date}_${a.session || "day"}`))
+      forgotOut.forEach(a => uniqueKeys.add(`${a.date}_${a.session || "day"}`))
+      forgotIn.forEach(a => uniqueKeys.add(`${a.date}_${a.session || "day"}`))
+      absentList.forEach(a => uniqueKeys.add(`${a.date}_${a.session || "day"}`))
+      const violations = uniqueKeys.size
+      return {
+        ...emp,
+        lateList,
+        earlyList,
+        forgotOut,
+        forgotIn,
+        absentList,
+        absentDayList,
+        absentSessionList,
+        leaveList,
+        violations
+      }
     })
-  }, [branchEmployees, attendance])
+  }, [branchEmployees, scopedAttendance, todayIso, employeeMap])
 
   const totals = useMemo(() => {
     return {
@@ -1500,6 +1916,8 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
       forgotOut: empViolations.reduce((s, v) => s + v.forgotOut.length, 0),
       forgotIn: empViolations.reduce((s, v) => s + v.forgotIn.length, 0),
       absent: empViolations.reduce((s, v) => s + v.absentList.length, 0),
+      absentDay: empViolations.reduce((s, v) => s + v.absentDayList.length, 0),
+      absentSession: empViolations.reduce((s, v) => s + v.absentSessionList.length, 0),
       leave: empViolations.reduce((s, v) => s + v.leaveList.length, 0),
     }
   }, [empViolations])
@@ -1507,7 +1925,7 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
   const displayed = useMemo(() => {
     return empViolations
       .filter(v => {
-        if (filterType === "all") return true 
+        if (filterType === "all") return true
         if (filterType === "late") return v.lateList.length > 0
         if (filterType === "early_checkout") return v.earlyList.length > 0
         if (filterType === "forgot_checkout") return v.forgotOut.length > 0
@@ -1533,6 +1951,22 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
       })
   }, [empViolations, filterType, selectedEmpId, employees])
 
+  const buildAllLogs = (v: typeof displayed[number]) => {
+    return [
+      ...v.lateList.map(a => ({ ...a, _type: "late" as const })),
+      ...v.earlyList.map(a => ({ ...a, _type: "early_checkout" as const })),
+      ...v.forgotOut.map(a => ({ ...a, _type: "forgot_checkout" as const })),
+      ...v.forgotIn.map(a => ({ ...a, _type: "forgot_checkin" as const })),
+      ...v.absentList.map(a => ({ ...a, _type: "absent" as const })),
+      ...v.leaveList.map(a => ({ ...a, _type: "approved_leave" as const })),
+    ].sort((a, b) => a.date.localeCompare(b.date))
+  }
+
+  const filterLogsByType = <T extends { _type: string }>(logs: T[]) => {
+    if (filterType === "all") return logs
+    return logs.filter(log => log._type === filterType)
+  }
+
   const empOptions = useMemo(() => {
     return [
       { value: "all", label: "Tất cả nhân viên" },
@@ -1555,12 +1989,24 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
   ]
 
   const statCards = [
-    { key: "late", label: "Đi trễ", count: totals.late, icon: Clock, color: "amber", bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-200" },
-    { key: "early_checkout", label: "Check-out sớm", count: totals.early, icon: LogOut, color: "orange", bg: "bg-orange-50", text: "text-orange-600", border: "border-orange-200" },
-    { key: "forgot_checkout", label: "Quên check-out", count: totals.forgotOut, icon: Timer, color: "purple", bg: "bg-purple-50", text: "text-purple-600", border: "border-purple-200" },
-    { key: "forgot_checkin", label: "Quên check-in", count: totals.forgotIn, icon: LogIn, color: "blue", bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200" },
-    { key: "absent", label: "Nghỉ không phép", count: totals.absent, icon: UserX, color: "red", bg: "bg-red-50", text: "text-red-600", border: "border-red-200" },
-    { key: "approved_leave", label: "Nghỉ có phép", count: totals.leave, icon: CheckCircle2, color: "emerald", bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200" },
+    { key: "late", label: "Đi trễ", count: totals.late, unit: "lượt", hint: "Tổng lượt đi trễ", icon: Clock, color: "amber", bg: "bg-amber-50", text: "text-amber-600", border: "border-amber-200" },
+    { key: "early_checkout", label: "Check-out sớm", count: totals.early, unit: "lượt", hint: "Tổng lượt về sớm", icon: LogOut, color: "orange", bg: "bg-orange-50", text: "text-orange-600", border: "border-orange-200" },
+    { key: "forgot_checkout", label: "Quên check-out", count: totals.forgotOut, unit: "lượt", hint: "Có check-in, thiếu check-out", icon: Timer, color: "purple", bg: "bg-purple-50", text: "text-purple-600", border: "border-purple-200" },
+    { key: "forgot_checkin", label: "Quên check-in", count: totals.forgotIn, unit: "lượt", hint: "Có check-out, thiếu check-in", icon: LogIn, color: "blue", bg: "bg-blue-50", text: "text-blue-600", border: "border-blue-200" },
+    {
+      key: "absent",
+      label: "Nghỉ không phép",
+      count: totals.absent,
+      unit: "lượt",
+      hint: "Tổng lượt nghỉ không phép",
+      detail: `Ngày: ${totals.absentDay} | Buổi: ${totals.absentSession}`,
+      icon: UserX,
+      color: "red",
+      bg: "bg-red-50",
+      text: "text-red-600",
+      border: "border-red-200"
+    },
+    { key: "approved_leave", label: "Nghỉ có phép", count: totals.leave, unit: "lượt", hint: "Chỉ tính đến ngày hiện tại", icon: CheckCircle2, color: "emerald", bg: "bg-emerald-50", text: "text-emerald-600", border: "border-emerald-200" },
   ] as const
 
   const typeConfig = {
@@ -1571,6 +2017,62 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
     absent: { label: "Nghỉ không phép", icon: UserX, cls: "text-red-500" },
     approved_leave: { label: "Nghỉ có phép", icon: CheckCircle2, cls: "text-emerald-500" },
   } as const
+
+  const getViolationLabel = (log: { _type: string; session?: "am" | "pm" }) => {
+    if (log._type === "absent") {
+      return log.session ? "Nghỉ không phép (buổi)" : "Nghỉ không phép (ngày)"
+    }
+    return typeConfig[log._type as keyof typeof typeConfig].label
+  }
+
+  useEffect(() => {
+    const rows: (string | number)[][] = []
+    displayed.forEach(v => {
+      const allLogs = filterLogsByType(buildAllLogs(v))
+
+      allLogs.forEach((a, idx) => {
+        const cfg = typeConfig[a._type]
+        rows.push([
+          rows.length + 1,
+          v.id,
+          v.name,
+          v.department,
+          getDayOfWeekVN(a.date),
+          a.date.split("-").reverse().join("/"),
+          a.session ? (a.session === "am" ? "Sáng" : "Chiều") : "Cả ngày",
+          cfg.label,
+          getViolationLabel(a),
+          a.checkIn && a.checkIn !== "--" && a.checkIn !== "-" ? a.checkIn : "—",
+          a.checkOut && a.checkOut !== "--" && a.checkOut !== "-" ? a.checkOut : "—",
+          a.note || "—",
+        ])
+      })
+
+
+      if (allLogs.length === 0) {
+        rows.push([
+          rows.length + 1,
+          v.id,
+          v.name,
+          v.department,
+          "-",
+          "-",
+          "-",
+          "Không có vi phạm",
+          "—",
+          "—",
+          "—",
+        ])
+      }
+    })
+
+    onExportDataChange?.({
+      filename: `bao-cao-vi-pham-${dateRange.start}-den-${dateRange.end}.xlsx`,
+      sheetName: "Bao cao vi pham",
+      headers: ["STT", "Mã NV", "Họ tên", "Đơn vị", "Thứ", "Ngày", "Buổi", "Loại vi phạm", "Phân loại", "Check-in", "Check-out", "Lý do / Ghi chú"],
+      rows,
+    })
+  }, [displayed, onExportDataChange, dateRange, typeConfig, filterType])
 
   return (
     <div className="space-y-5 pt-2">
@@ -1602,14 +2104,22 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
           return (
             <button key={s.key}
               onClick={() => setFilterType(isActive ? "all" : s.key as typeof filterType)}
-              className={`relative ${cardBg} rounded-2xl p-4 border transition-all text-left hover:shadow-lg active:scale-[0.97] ${
-                isActive ? `border-transparent shadow-lg` : `border-gray-100 shadow-sm hover:border-gray-200 border-l-4 ${leftBorderColor[s.color]}`
-              }`}>
+              className={`relative ${cardBg} rounded-2xl p-4 border transition-all text-left hover:shadow-lg active:scale-[0.97] ${isActive ? `border-transparent shadow-lg` : `border-gray-100 shadow-sm hover:border-gray-200 border-l-4 ${leftBorderColor[s.color]}`
+                }`}>
               <div className={`w-9 h-9 rounded-xl ${iconBg} flex items-center justify-center mb-2.5`}>
                 <Icon size={17} className={iconColor} />
               </div>
               <p className={`text-3xl font-black ${numColor} leading-none`}>{s.count}</p>
               <p className={`text-[11px] ${labelColor} font-medium mt-1 leading-tight`}>{s.label}</p>
+              {"unit" in s && s.unit ? (
+                <p className={`text-[10px] ${labelColor} font-semibold mt-0.5 leading-tight uppercase tracking-wide`}>{s.unit}</p>
+              ) : null}
+              {"hint" in s && s.hint ? (
+                <p className={`text-[10px] ${labelColor} mt-0.5 leading-tight`}>{s.hint}</p>
+              ) : null}
+              {"detail" in s && s.detail ? (
+                <p className={`text-[10px] ${labelColor} font-bold mt-0.5 leading-tight`}>{s.detail}</p>
+              ) : null}
             </button>
           )
         })}
@@ -1660,17 +2170,10 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
         ) : (
           <div className="divide-y divide-gray-100">
             {displayed.map((v, rowIdx) => {
-              const allLogs = [
-                ...v.lateList.map(a => ({ ...a, _type: "late" as const })),
-                ...v.earlyList.map(a => ({ ...a, _type: "early_checkout" as const })),
-                ...v.forgotOut.map(a => ({ ...a, _type: "forgot_checkout" as const })),
-                ...v.forgotIn.map(a => ({ ...a, _type: "forgot_checkin" as const })),
-                ...v.absentList.map(a => ({ ...a, _type: "absent" as const })),
-                ...v.leaveList.map(a => ({ ...a, _type: "approved_leave" as const })),
-              ].sort((a, b) => a.date.localeCompare(b.date))
+              const allLogs = filterLogsByType(buildAllLogs(v))
 
-              const bgClass = rowIdx % 2 === 0 
-                ? "bg-[#E0F2FE]/12 hover:bg-[#E0F2FE]/30" 
+              const bgClass = rowIdx % 2 === 0
+                ? "bg-[#E0F2FE]/12 hover:bg-[#E0F2FE]/30"
                 : "bg-[#DCFCE7]/12 hover:bg-[#DCFCE7]/30"
 
 
@@ -1686,7 +2189,8 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
                       {v.earlyList.length > 0 && <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded border border-orange-200"><LogOut size={9} />{v.earlyList.length} CO sớm</span>}
                       {v.forgotOut.length > 0 && <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded border border-purple-200"><Timer size={9} />{v.forgotOut.length} quên CO</span>}
                       {v.forgotIn.length > 0 && <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded border border-blue-200"><LogIn size={9} />{v.forgotIn.length} quên CI</span>}
-                      {v.absentList.length > 0 && <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded border border-red-300"><UserX size={9} />{v.absentList.length} nghỉ KP</span>}
+                      {v.absentDayList.length > 0 && <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded border border-red-300"><UserX size={9} />{v.absentDayList.length} nghỉ KP ngày</span>}
+                      {v.absentSessionList.length > 0 && <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-bold rounded border border-rose-300"><UserX size={9} />{v.absentSessionList.length} nghỉ KP buổi</span>}
                       {v.leaveList.length > 0 && <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded border border-emerald-200"><CheckCircle2 size={9} />{v.leaveList.length} có phép</span>}
                     </div>
                   </div>
@@ -1698,22 +2202,71 @@ function ViolationTab({ employees, attendance, selectedBranch, systemConfig }: {
                         Không ghi nhận bất kỳ vi phạm hay nghỉ phép nào trong kỳ
                       </div>
                     ) : (
-                      allLogs.map((a, i) => {
-                        const cfg = typeConfig[a._type]
-                        const Icon = cfg.icon
-                        return (
-                          <div key={i} className="grid grid-cols-[140px_180px_140px_140px_1fr] items-center text-[12px] h-11 border-b border-gray-100 last:border-b-0">
-                            <span className="px-5 py-2.5 border-r border-dotted border-gray-300/80 text-gray-500 font-mono font-medium h-full flex items-center">{a.date.split("-").reverse().join("/")}</span>
-                            <span className={`px-5 py-2.5 border-r border-dotted border-gray-300/80 flex items-center gap-1 font-bold ${cfg.cls} text-[11px] h-full`}>
-                              <Icon size={11} className="flex-shrink-0" />
-                              {cfg.label}
-                            </span>
-                            <span className="px-5 py-2.5 border-r border-dotted border-gray-300/80 h-full flex items-center">{getCheckInDisplay(a)}</span>
-                            <span className="px-5 py-2.5 border-r border-dotted border-gray-300/80 h-full flex items-center">{getCheckOutDisplay(a)}</span>
-                            <span className="px-5 py-2.5 text-gray-600 font-medium truncate h-full flex items-center">{a.note || "—"}</span>
-                          </div>
-                        )
-                      })
+                      (() => {
+                        const groupedByDate = allLogs.reduce((acc, log) => {
+                          const existing = acc.find(g => g.date === log.date)
+                          if (existing) {
+                            existing.items.push(log)
+                          } else {
+                            acc.push({ date: log.date, items: [log] })
+                          }
+                          return acc
+                        }, [] as { date: string; items: typeof allLogs }[])
+
+                        return groupedByDate.map((group) => {
+                          const sessionMap = new Map<string, typeof allLogs>()
+                          group.items.forEach(item => {
+                            const sKey = item.session || "day"
+                            const list = sessionMap.get(sKey) || []
+                            list.push(item)
+                            sessionMap.set(sKey, list)
+                          })
+                          const sessions = Array.from(sessionMap.entries())
+
+                          return (
+                            <div key={group.date} className="grid grid-cols-[140px_1fr] items-stretch text-[12px] border-b border-gray-100 last:border-b-0">
+                              <div className="px-5 py-2.5 border-r border-dotted border-gray-300/80 text-gray-500 font-mono font-medium flex items-center">
+                                {group.date.split("-").reverse().join("/")}
+                              </div>
+                              <div className="divide-y divide-gray-100/50 flex flex-col justify-center">
+                                {sessions.map(([sKey, sessItems]) => {
+                                  const firstItem = sessItems[0]
+                                  return (
+                                    <div key={sKey} className="grid grid-cols-[180px_140px_140px_1fr] items-center py-2 last:border-0 border-b border-gray-100/30">
+                                      <div className="px-5 py-1.5 border-r border-dotted border-gray-300/80 space-y-1">
+                                        {sessItems.map((a, idx) => {
+                                          const cfg = typeConfig[a._type]
+                                          const Icon = cfg.icon
+                                          return (
+                                            <div key={idx} className={`flex items-center gap-1 font-bold ${cfg.cls} text-[11px]`}>
+                                              <Icon size={11} className="flex-shrink-0" />
+                                              {getViolationLabel(a)}
+                                              {a.session && (
+                                                <span className="ml-1 px-1.5 py-0.5 rounded bg-black/10 text-[9px] leading-none font-black">
+                                                  {a.session === "am" ? "Sáng" : "Chiều"}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )
+                                        })}
+                                      </div>
+                                      <div className="px-5 py-1.5 border-r border-dotted border-gray-300/80">
+                                        {getCheckInDisplay(firstItem)}
+                                      </div>
+                                      <div className="px-5 py-1.5 border-r border-dotted border-gray-300/80">
+                                        {getCheckOutDisplay(firstItem)}
+                                      </div>
+                                      <div className="px-5 py-1.5 text-gray-600 font-medium truncate">
+                                        {firstItem.note || "—"}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })
+                      })()
                     )}
                   </div>
                 </div>

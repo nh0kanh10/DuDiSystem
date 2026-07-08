@@ -5,7 +5,7 @@ import { getAll as getNotifications } from "../repositories/notification.reposit
 
 export function getDashboardStats() {
   const employees = getEmployees()
-  const today = new Date().toISOString().split("T")[0]
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
   const todayAtt = getAttendance({ date: today })
   const pendingReqs = getRequests({ status: "pending" })
   const unreadNotifs = getNotifications({ read: false })
@@ -16,7 +16,7 @@ export function getDashboardStats() {
     internEmployees: employees.filter(e => e.contractType === "intern").length,
     attendance: {
       onTime: todayAtt.filter(r => r.status === "on-time").length,
-      late: todayAtt.filter(r => r.status === "late").length,
+      late: todayAtt.filter(r => r.status === "late" || r.status === "late_early" || r.status === "early").length,
       absent: todayAtt.filter(r => r.status === "absent").length,
       leave: todayAtt.filter(r => r.status === "leave").length
     },

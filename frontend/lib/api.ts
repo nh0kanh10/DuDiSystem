@@ -4,6 +4,17 @@ import { contractDownloadName, quoteDownloadName } from "../app/utils/filename"
 
 const BASE = resolveApiBase()
 
+export async function detectPublicIP(): Promise<string> {
+  try {
+    const res = await fetch("https://api.ipify.org?format=json")
+    const json = (await res.json()) as { ip?: string }
+    return (json.ip || "").trim()
+  } catch {
+    return ""
+  }
+}
+
+
 function token() {
   return localStorage.getItem("dudi_token") ?? ""
 }
@@ -340,7 +351,7 @@ export const api = {
   allowedIPs: {
     list: (params?: { orgNodeId?: string }) => req<any[]>("GET", `/allowed-ips${qs(params)}`),
     create: (data: { ip: string; description: string; orgNodeId?: string }) => req<any>("POST", "/allowed-ips", data),
-    update: (id: string, data: { ip: string; description: string; orgNodeId?: string }) => req<any>("PUT", `/allowed-ips/${id}`, data),
+    update: (id: string, data: { ip: string; description: string; orgNodeId?: string | null }) => req<any>("PUT", `/allowed-ips/${id}`, data),
     toggle: (id: string) => req<any>("POST", `/allowed-ips/${id}/toggle`),
     delete: (id: string) => req<any>("DELETE", `/allowed-ips/${id}`),
   },

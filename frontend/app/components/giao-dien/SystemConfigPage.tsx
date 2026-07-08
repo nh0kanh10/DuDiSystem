@@ -3,110 +3,7 @@ import { Settings, Clock, ShieldAlert, Check, RefreshCw, Users, Layers, X, Edit,
 import { createPortal } from "react-dom"
 import { api } from "@/lib/api"
 
-function CustomTimePicker({ value, onChange }: { value: string; onChange: (val: string) => void }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  const [hourStr, minStr] = (value || "00:00").split(":")
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => {
-        const hourContainer = containerRef.current?.querySelector('.hours-list')
-        const selectedHour = hourContainer?.querySelector('.hour-selected')
-        if (hourContainer && selectedHour) {
-          hourContainer.scrollTop = (selectedHour as HTMLElement).offsetTop - 60
-        }
-
-        const minContainer = containerRef.current?.querySelector('.mins-list')
-        const selectedMin = minContainer?.querySelector('.min-selected')
-        if (minContainer && selectedMin) {
-          minContainer.scrollTop = (selectedMin as HTMLElement).offsetTop - 60
-        }
-      }, 50)
-    }
-  }, [isOpen])
-
-  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"))
-  const minutes = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"))
-
-  return (
-    <div className="relative" ref={containerRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 bg-gray-50 border border-gray-150 rounded-xl text-sm font-mono font-bold text-gray-800 hover:bg-gray-100 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#C62828]/10 focus:border-[#C62828]/45 transition-all text-center"
-      >
-        <span className="mx-auto">{value}</span>
-        <Clock size={15} className="text-gray-400 flex-shrink-0" />
-      </button>
-
-      {isOpen && (
-        <div className="absolute left-1/2 -translate-x-1/2 mt-1.5 w-48 bg-white border border-gray-150 rounded-2xl shadow-xl z-50 p-3 grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black text-gray-400 uppercase text-center mb-1.5 pb-1 border-b border-gray-100">Giờ</span>
-            <div className="hours-list h-40 overflow-y-auto space-y-0.5 pr-1 scrollbar-thin text-center scroll-smooth pb-8">
-              {hours.map(h => {
-                const isSelected = h === hourStr
-                return (
-                  <button
-                    key={h}
-                    type="button"
-                    onClick={() => {
-                      onChange(`${h}:${minStr}`)
-                    }}
-                    className={`hour-selected w-full py-1 text-xs font-mono font-bold rounded-lg transition-colors ${
-                      isSelected
-                        ? "bg-[#C62828] text-white hour-selected"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
-                  >
-                    {h}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black text-gray-400 uppercase text-center mb-1.5 pb-1 border-b border-gray-100">Phút</span>
-            <div className="mins-list h-40 overflow-y-auto space-y-0.5 pr-1 scrollbar-thin text-center scroll-smooth pb-8">
-              {minutes.map(m => {
-                const isSelected = m === minStr
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => {
-                      onChange(`${hourStr}:${m}`)
-                    }}
-                    className={`min-selected w-full py-1 text-xs font-mono font-bold rounded-lg transition-colors ${
-                      isSelected
-                        ? "bg-[#C62828] text-white min-selected"
-                        : "text-gray-700 hover:bg-gray-100"
-                    }`}
-                  >
-                    {m}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+import { CustomTimePicker } from "../ui/CustomTimePicker"
 
 export function SystemConfigPage() {
   const [loading, setLoading] = useState(false)
@@ -124,9 +21,10 @@ export function SystemConfigPage() {
     internshipMonths: 2,
     projectDeadlineWarningDays: 7,
     sessionTimeoutMinutes: 30,
+    employeeStart: "09:00",
+    employeeEnd: "17:00",
   })
 
-  // States cho Right Drawer
   const [activeDrawer, setActiveDrawer] = useState<"admin" | null>(null)
   const [adminUsers, setAdminUsers] = useState<any[]>([])
   const [isLoadingAdmins, setIsLoadingAdmins] = useState(false)
@@ -203,6 +101,8 @@ export function SystemConfigPage() {
             internshipMonths: Number(res.internshipMonths ?? 2),
             projectDeadlineWarningDays: Number(res.projectDeadlineWarningDays ?? 7),
             sessionTimeoutMinutes: Number(res.sessionTimeoutMinutes ?? 30),
+            employeeStart: res.employeeStart || "09:00",
+            employeeEnd: res.employeeEnd || "17:00",
           })
         }
       } catch (err) {
@@ -255,7 +155,7 @@ export function SystemConfigPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
+        <div className="lg:col-span-2 bg-white rounded-3xl border border-black/5 shadow-sm">
           <div className="bg-[#C62828] text-white px-6 py-4 flex items-center gap-2">
             <Settings size={18} />
             <h3 className="font-black text-sm text-white">Cấu hình hệ thống</h3>
@@ -263,9 +163,8 @@ export function SystemConfigPage() {
 
           <form onSubmit={handleSave} className="p-6 space-y-6 bg-gray-50/30">
             
-            {/* Khối 1: Thông tin chung & Chấm công */}
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2 rounded-t-2xl">
                 <Building size={15} className="text-[#C62828]" />
                 <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">Thông tin chung & Chấm công</h4>
               </div>
@@ -299,66 +198,62 @@ export function SystemConfigPage() {
 
                 <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-dashed border-gray-200">
                   <div className="space-y-4">
-                    <h5 className="text-[11px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                      <Clock size={13} /> Ca làm việc sáng
+                    <h5 className="text-[11px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-1.5 border-b border-gray-100 pb-2">
+                      <Clock size={13} /> CA THỰC TẬP SINH (TÍNH THEO BUỔI)
                     </h5>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Giờ bắt đầu</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Sáng: Bắt đầu</label>
                         <CustomTimePicker
                           value={config.morningStart}
                           onChange={val => setConfig({ ...config, morningStart: val })}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Giờ nghỉ trưa</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Sáng: Kết thúc</label>
                         <CustomTimePicker
                           value={config.morningEnd}
                           onChange={val => setConfig({ ...config, morningEnd: val })}
                         />
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Thời gian đi trễ cho phép (Phút)</label>
-                      <input
-                        type="number"
-                        value={config.lateGraceMinutes}
-                        onChange={e => setConfig({ ...config, lateGraceMinutes: Number(e.target.value) })}
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h5 className="text-[11px] font-black text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
-                      <Clock size={13} /> Ca làm việc chiều
-                    </h5>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 mt-2">
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Giờ bắt đầu lại</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Chiều: Bắt đầu</label>
                         <CustomTimePicker
                           value={config.afternoonStart}
                           onChange={val => setConfig({ ...config, afternoonStart: val })}
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Giờ kết thúc ca</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Chiều: Kết thúc</label>
                         <CustomTimePicker
                           value={config.afternoonEnd}
                           onChange={val => setConfig({ ...config, afternoonEnd: val })}
                         />
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Thời gian về sớm cho phép (Phút)</label>
-                      <input
-                        type="number"
-                        value={config.earlyGraceMinutes}
-                        onChange={e => setConfig({ ...config, earlyGraceMinutes: Number(e.target.value) })}
-                        className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:border-[#C62828]/45 transition-all"
-                        required
-                      />
+                  </div>
+
+                  <div className="space-y-4">
+                    <h5 className="text-[11px] font-black text-[#C62828] uppercase tracking-wider flex items-center gap-1.5 border-b border-[#C62828]/10 pb-2">
+                      <Clock size={13} /> CA CHÍNH THỨC (TÍNH THEO NGÀY)
+                    </h5>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Giờ bắt đầu làm việc</label>
+                        <CustomTimePicker
+                          value={config.employeeStart}
+                          onChange={val => setConfig({ ...config, employeeStart: val })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">Giờ kết thúc ca</label>
+                        <CustomTimePicker
+                          value={config.employeeEnd}
+                          onChange={val => setConfig({ ...config, employeeEnd: val })}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -366,8 +261,8 @@ export function SystemConfigPage() {
             </div>
 
             {/* Khối 2: Quản lý nhân sự */}
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2 rounded-t-2xl">
                 <Users size={15} className="text-[#C62828]" />
                 <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">Cấu hình quản lý nhân sự</h4>
               </div>
@@ -386,8 +281,8 @@ export function SystemConfigPage() {
             </div>
 
             {/* Khối 3: Bảo mật & Phiên làm việc */}
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2 rounded-t-2xl">
                 <ShieldAlert size={15} className="text-[#C62828]" />
                 <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">Bảo mật & Phiên làm việc</h4>
               </div>
@@ -408,8 +303,8 @@ export function SystemConfigPage() {
             </div>
 
             {/* Khối 4: Quản lý dự án */}
-            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
-              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm">
+              <div className="bg-gray-50 px-5 py-3.5 border-b border-gray-200 flex items-center gap-2 rounded-t-2xl">
                 <Layers size={15} className="text-[#C62828]" />
                 <h4 className="text-xs font-black text-gray-700 uppercase tracking-wider">Quản lý dự án</h4>
               </div>
@@ -575,6 +470,7 @@ export function SystemConfigPage() {
                                     placeholder="Nhập mật khẩu mới..."
                                     className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#C62828] focus:ring-2 focus:ring-[#C62828]/10 transition-all"
                                     autoFocus
+                                    autoComplete="new-password"
                                   />
                                 </div>
                                 {editError && (

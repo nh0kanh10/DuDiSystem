@@ -156,10 +156,13 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
     }
   }, [isOpen])
 
+  const widthClass = className?.split(" ").find(c => c.startsWith("w-")) || "w-full"
+  const inputClass = className?.split(" ").filter(c => !c.startsWith("w-")).join(" ") || ""
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <div ref={containerRef} className="relative w-full">
+        <div ref={containerRef} className={`relative ${widthClass}`}>
           <input
             type="text"
             disabled={disabled}
@@ -167,7 +170,7 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
             value={localDateInput}
             onChange={e => setLocalDateInput(e.target.value)}
             onBlur={handleDateInputBlur}
-            className={`${className} pr-10 cursor-text`}
+            className={`${inputClass} w-full pr-10 cursor-text`}
           />
           <CalendarIcon size={15} className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer hover:text-gray-600 transition-colors" />
         </div>
@@ -290,10 +293,13 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
     }
   }, [isOpen])
 
+  const widthClass = className?.split(" ").find(c => c.startsWith("w-")) || "w-full"
+  const inputClass = className?.split(" ").filter(c => !c.startsWith("w-")).join(" ") || ""
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <div ref={containerRef} className="relative w-full">
+        <div ref={containerRef} className={`relative ${widthClass}`}>
           <input
             type="text"
             disabled={disabled}
@@ -301,7 +307,7 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
             value={localValue}
             onChange={e => setLocalValue(e.target.value)}
             onBlur={handleBlur}
-            className={`${className} pr-10 cursor-text`}
+            className={`${inputClass} w-full pr-10 cursor-text`}
           />
           <CalendarIcon size={15} className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer hover:text-gray-600 transition-colors" />
         </div>

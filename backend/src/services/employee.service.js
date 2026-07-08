@@ -115,6 +115,13 @@ export async function createEmployee(data) {
     university: data.university || "",
     notes: data.notes || "",
     resignDate: data.resignDate || "",
+    contractHistory: [
+      {
+        contractType: data.contractType || "staff",
+        startDate: data.joinDate || todayVN(),
+        endDate: ""
+      }
+    ]
   }
 
   if (fields.orgNodeId) {
@@ -198,6 +205,30 @@ export function updateEmployee(id, patch) {
   if (safe.orgNodeId !== undefined) {
     safe = applyOrgSync(safe)
   }
+
+  const oldEmp = repo.getById(id)
+  if (oldEmp && patch.contractType !== undefined && patch.contractType !== oldEmp.contractType) {
+    const history = oldEmp.contractHistory && oldEmp.contractHistory.length > 0
+      ? oldEmp.contractHistory
+      : [{ contractType: oldEmp.contractType || "staff", startDate: oldEmp.joinDate || todayVN(), endDate: "" }]
+    
+    const today = todayVN()
+    const updatedHistory = history.map((item, index) => {
+      if (index === history.length - 1) {
+        return { ...item, endDate: today }
+      }
+      return item
+    })
+    
+    updatedHistory.push({
+      contractType: patch.contractType,
+      startDate: today,
+      endDate: ""
+    })
+    
+    safe.contractHistory = updatedHistory
+  }
+
   return repo.update(id, safe)
 }
 

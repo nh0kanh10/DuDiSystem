@@ -48,7 +48,6 @@ export function resolveDocumentDownloadName(doc = {}) {
   return `${doc.id || "tai-lieu"}.docx`
 }
 
-/** Tên kiểu Website-b-n-v-h-i (vowels bị tách) từ regex cũ */
 function looksLikeBrokenSlug(name = "") {
   return /-[bcdfghjklmnpqrstvwxyz]-[bcdfghjklmnpqrstvwxyz]-/i.test(name)
     || /-b-n-|-v-h-|-c-n-/i.test(name)

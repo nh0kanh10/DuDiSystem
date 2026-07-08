@@ -3,12 +3,13 @@ import { Fingerprint, CheckCircle, Clock, AlertCircle, Calendar, Loader2, Refres
 import { useEmployeeAttendance, todayISO } from "../../hooks/useEmployeeAttendance"
 import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL, ATT_STATUS_STYLE } from "../cham-cong/attendanceDisplay"
 import { EMPLOYEE_KIND, INTERN_SESSION, internSessionRange } from "../cham-cong/attendanceModel"
+import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
   "on-time": { label: "Đúng giờ", color: "text-green-700", bg: "bg-green-100" },
   late: { label: "Đi trễ", color: "text-orange-700", bg: "bg-orange-100" },
   early: { label: "Về sớm", color: "text-amber-700", bg: "bg-amber-100" },
-  late_early: { label: "Trễ & sớm", color: "text-orange-800", bg: "bg-orange-100" },
+  late_early: { label: "Vào trễ, ra sớm", color: "text-orange-800", bg: "bg-orange-100" },
   absent: { label: "Vắng mặt", color: "text-red-700", bg: "bg-red-100" },
   leave: { label: "Nghỉ phép", color: "text-purple-700", bg: "bg-purple-100" },
 }
@@ -108,6 +109,7 @@ function PortalAttendanceView() {
     loading, punching, error, ipStatus, verifyWifi, punch, punchLabel, statusText, reload,
   } = useEmployeeAttendance()
   const [hms, setHms] = useState({ h: "00", m: "00", s: "00" })
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const isSuperAdmin = React.useMemo(() => {
     try {
       const raw = localStorage.getItem("dudi_user")
@@ -143,11 +145,7 @@ function PortalAttendanceView() {
     { l: "Vắng / nghỉ", v: monthStats.absent + monthStats.leave, c: "#ff5555", g: "rgba(255,85,85,0.22)" },
   ]
 
-  const handlePunchWithConfirm = () => {
-    if (window.confirm(`Xác nhận thực hiện ${punchLabel.label}?`)) {
-      punch()
-    }
-  }
+  const handlePunchWithConfirm = () => setConfirmOpen(true)
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 20 }}>
@@ -269,6 +267,30 @@ function PortalAttendanceView() {
           })}
         </div>
       </div>
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Xác nhận chấm công"
+        icon={AlertCircle}
+        width="sm"
+        bodyClassName="px-6 py-5"
+        footer={
+          <>
+            <ModalCancelButton onClick={() => setConfirmOpen(false)} />
+            <ModalSubmitButton
+              onClick={() => {
+                setConfirmOpen(false)
+                punch()
+              }}
+              label="Xác nhận"
+            />
+          </>
+        }
+      >
+        <p className="text-sm text-gray-700">
+          Bạn có chắc muốn thực hiện <span className="font-bold text-[#C62828]">{punchLabel.label}</span> không?
+        </p>
+      </Modal>
     </div>
   )
 }
@@ -291,6 +313,7 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
     statusText,
     reload,
   } = useEmployeeAttendance()
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const isSuperAdmin = React.useMemo(() => {
     try {
@@ -302,11 +325,7 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
     }
   }, [])
 
-  const handlePunchWithConfirm = () => {
-    if (window.confirm(`Xác nhận thực hiện ${punchLabel.label}?`)) {
-      punch()
-    }
-  }
+  const handlePunchWithConfirm = () => setConfirmOpen(true)
 
   const working = !punchLabel.done && statusText === "Đang làm việc"
   const monthLabel = new Date().toLocaleDateString("vi-VN", { month: "long", year: "numeric" })
@@ -446,6 +465,30 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
           </table>
         </div>
       </div>
+      <Modal
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Xác nhận chấm công"
+        icon={AlertCircle}
+        width="sm"
+        bodyClassName="px-6 py-5"
+        footer={
+          <>
+            <ModalCancelButton onClick={() => setConfirmOpen(false)} />
+            <ModalSubmitButton
+              onClick={() => {
+                setConfirmOpen(false)
+                punch()
+              }}
+              label="Xác nhận"
+            />
+          </>
+        }
+      >
+        <p className="text-sm text-gray-700">
+          Bạn có chắc muốn thực hiện <span className="font-bold text-[#C62828]">{punchLabel.label}</span> không?
+        </p>
+      </Modal>
     </div>
   )
 }

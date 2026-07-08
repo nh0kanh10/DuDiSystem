@@ -1,6 +1,5 @@
 import { decodeUploadFilename } from "../utils/uploadFilename.util.js"
 
-/** Chạy ngay sau multer — sửa originalname tiếng Việt */
 export function fixUploadFilename(req, res, next) {
   if (req.file?.originalname) {
     req.file.originalname = decodeUploadFilename(req.file.originalname)
