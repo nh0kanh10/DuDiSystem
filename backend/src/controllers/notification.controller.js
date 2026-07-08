@@ -1,29 +1,47 @@
 import * as svc from "../services/notification.service.js"
-import { ok, created, notFound } from "../utils/response.js"
+import { ok, created, notFound, fail } from "../utils/response.js"
+import { isAdminUser } from "../utils/access.js"
 
 export function list(req, res) {
   const filter = {}
   if (req.query.read === "true") filter.read = true
   if (req.query.read === "false") filter.read = false
+  const recipientId = req.user?.employeeId || req.user?.id || null
+  if (recipientId) filter.recipientId = recipientId
   ok(res, svc.listNotifications(filter))
 }
 
 export function create(req, res) {
-  created(res, svc.createNotification(req.body))
+  const result = svc.createNotification(req.body)
+  if (Array.isArray(result)) {
+    return created(res, { items: result, count: result.length })
+  }
+  return created(res, result)
 }
 
 export function markRead(req, res) {
+  const target = svc.getNotificationById(req.params.id)
+  if (!target) return notFound(res, "Không tìm thấy thông báo")
+  const actorId = req.user?.employeeId || req.user?.id || null
+  if (!isAdminUser(req.user) && target.recipientId && target.recipientId !== actorId) {
+    return fail(res, "Không có quyền thao tác thông báo này", 403)
+  }
   const result = svc.markRead(req.params.id)
-  if (!result) return notFound(res, "Không tìm thấy thông báo")
   ok(res, result)
 }
 
 export function markAllRead(req, res) {
-  ok(res, { count: svc.markAllRead() })
+  const recipientId = req.user?.employeeId || req.user?.id || null
+  ok(res, { count: svc.markAllRead(recipientId) })
 }
 
 export function remove(req, res) {
+  const target = svc.getNotificationById(req.params.id)
+  if (!target) return notFound(res, "Không tìm thấy thông báo")
+  const actorId = req.user?.employeeId || req.user?.id || null
+  if (!isAdminUser(req.user) && target.recipientId && target.recipientId !== actorId) {
+    return fail(res, "Không có quyền thao tác thông báo này", 403)
+  }
   const deleted = svc.deleteNotification(req.params.id)
-  if (!deleted) return notFound(res, "Không tìm thấy thông báo")
   ok(res, { message: "Đã xóa thông báo" })
 }

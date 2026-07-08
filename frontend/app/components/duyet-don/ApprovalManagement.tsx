@@ -14,6 +14,20 @@ import { CustomSelect } from "../ui/CustomSelect"
 import { CustomCombobox } from "../ui/CustomCombobox"
 import { CustomDatePicker } from "../ui/CustomDatePicker"
 import { Employee } from "../../types"
+import {
+  type LeaveRequestRecord,
+  expandRequestToSlots,
+  formatVnDate,
+  formatRequestTimeSummary,
+  getScopeSessionLabel,
+  getWeekdayDateRange,
+  isRequestExpired,
+  parseVnDate,
+  requestCoversDate,
+  LEAVE_TYPE,
+  LEAVE_SESSION,
+} from "../nghi-phep/leaveRequestModel"
+import { EMPLOYEE_KIND, isInternEmployee } from "../cham-cong/attendanceModel"
 
 export type TOStatus = "approved" | "pending" | "rejected" | "cancelled"
 
@@ -35,19 +49,7 @@ export interface TimeOffSlot {
   processedAt: string
 }
 
-export type RequestRecord = {
-  id: string
-  employeeId: string
-  employeeName: string
-  department: string
-  category: "leave" | "timeoff"
-  startDate: string
-  endDate: string
-  reason: string
-  status: "pending" | "approved" | "rejected" | "cancelled"
-  submittedAt: string
-  session?: "sang" | "chieu" | "all"
-}
+export type RequestRecord = LeaveRequestRecord
 
 function initials(name: string): string {
   return name.split(" ").pop()?.charAt(0) ?? "?"
@@ -89,34 +91,19 @@ function StatusPill({ status }: { status: TOStatus }) {
   )
 }
 
-function SessionPill({ session, isMultiDay }: { session?: string; isMultiDay?: boolean }) {
-  if (isMultiDay) {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
-        Nhiều ngày
-      </span>
-    )
-  }
-  switch (session) {
-    case "sang":
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100">
-          Ca sáng
-        </span>
-      )
-    case "chieu":
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
-          Ca chiều
-        </span>
-      )
-    default:
-      return (
-        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-50 text-sky-600 border border-sky-100">
-          Cả ngày
-        </span>
-      )
-  }
+function ScopePill({ req }: { req: RequestRecord }) {
+  const label = getScopeSessionLabel(req)
+  const cls = {
+    full_day: "bg-sky-50 text-sky-600 border-sky-100",
+    date_range: "bg-indigo-50 text-indigo-600 border-indigo-100",
+    half_session: req.session === "sang" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-amber-50 text-amber-600 border-amber-100",
+    multi_session: "bg-violet-50 text-violet-600 border-violet-100",
+  }[req.scope] ?? "bg-gray-50 text-gray-600 border-gray-100"
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${cls}`}>
+      {label}
+    </span>
+  )
 }
 
 function SkeletonCard() {
@@ -147,7 +134,7 @@ function SkeletonCard() {
 
 function SessionBlock({
   slot, session, empId, empName, day,
-  onApprove, onReject, onClick, onQuickAdd, disabled,
+  onApprove, onReject, onClick, onQuickAdd, disabled, isActive,
 }: {
   slot: TimeOffSlot | undefined
   session: "sang" | "chieu"
@@ -159,6 +146,7 @@ function SessionBlock({
   onClick: (slot: TimeOffSlot) => void
   onQuickAdd: (info: { empId: string; empName: string; day: number; session: "sang" | "chieu" }) => void
   disabled?: boolean
+  isActive?: boolean
 }) {
   const isMorning = session === "sang"
   const sessionLabel = isMorning ? "Sáng" : "Chiều"
@@ -169,10 +157,14 @@ function SessionBlock({
       <div className="relative group/cell">
         <button
           onClick={() => onQuickAdd({ empId, empName, day, session })}
-          className="group w-full h-14 rounded-xl border-2 border-dashed border-gray-100 hover:border-[#C62828]/30 hover:bg-red-50/30 flex items-center justify-center"
+          className={`group w-full h-14 rounded-xl border-2 flex items-center justify-center transition-all ${
+            isActive
+              ? "border-[#C62828] bg-red-50 border-solid shadow-sm shadow-red-100"
+              : "border-dashed border-gray-100 hover:border-[#C62828]/40 hover:bg-red-50/40"
+          }`}
           title={`Thêm nghỉ ${sessionLabel}`}
         >
-          <Plus size={14} className="text-gray-200 group-hover:text-[#C62828]/50 transition-colors" />
+          <Plus size={14} className={`transition-colors ${isActive ? "text-[#C62828]" : "text-gray-300 group-hover:text-[#C62828]"}`} />
         </button>
       </div>
     )
@@ -434,32 +426,17 @@ function computeWeeksInMonth(year: number, month: number) {
   return result
 }
 
-function parseVnDate(dateStr: string): Date {
-  const [day, month, year] = dateStr.split("/").map(Number)
-  return new Date(year, month - 1, day)
+function getDateRange(startStr: string, endStr: string): Date[] {
+  return getWeekdayDateRange(startStr, endStr)
+}
+
+function slotRequestId(slotId: string): string {
+  const i = slotId.indexOf("::")
+  return i >= 0 ? slotId.slice(0, i) : slotId
 }
 
 function isSameDate(d1: Date, d2: Date): boolean {
   return d1.getDate() === d2.getDate() && d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear()
-}
-
-function isWeekend(d: Date): boolean {
-  const day = d.getDay()
-  return day === 0 || day === 6
-}
-
-function getDateRange(startStr: string, endStr: string): Date[] {
-  const start = parseVnDate(startStr)
-  const end = parseVnDate(endStr)
-  const dates: Date[] = []
-  const current = new Date(start)
-  while (current <= end) {
-    if (!isWeekend(current)) {
-      dates.push(new Date(current))
-    }
-    current.setDate(current.getDate() + 1)
-  }
-  return dates
 }
 
 function getRequestForSlot(
@@ -472,27 +449,13 @@ function getRequestForSlot(
   if (!emp) return null
   return requests.find(req => {
     if (req.employeeId !== emp.id) return false
-    const dates = getDateRange(req.startDate, req.endDate)
-    return dates.some(d => isSameDate(d, dayDate))
+    return expandRequestToSlots(req).some(s => isSameDate(s.date, dayDate))
   }) || null
-}
-
-function isRequestExpired(req: RequestRecord): boolean {
-  if (req.status !== "pending") return false
-  try {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const start = parseVnDate(req.startDate)
-    start.setHours(0, 0, 0, 0)
-    return start < today
-  } catch {
-    return false
-  }
 }
 
 function isSlotExpired(slot: TimeOffSlot, requests: RequestRecord[]): boolean {
   if (slot.status !== "pending") return false
-  const reqId = slot.id.includes("-") ? slot.id.split("-")[0] : slot.id
+  const reqId = slotRequestId(slot.id)
   const req = requests.find(r => r.id === reqId)
   return req ? isRequestExpired(req) : false
 }
@@ -524,6 +487,52 @@ export default function ApprovalManagement({
   const [leaveSearchFilter, setLeaveSearchFilter] = useState("")
   const [selectedSlot, setSelectedSlot] = useState<TimeOffSlot | null>(null)
   const [selectedRequest, setSelectedRequest] = useState<RequestRecord | null>(null)
+  const [requestEditMode, setRequestEditMode] = useState(false)
+  const [requestEditForm, setRequestEditForm] = useState({
+    startDate: "",
+    endDate: "",
+    session: "sang" as "sang" | "chieu",
+    reason: "",
+  })
+  const [savingRequestEdit, setSavingRequestEdit] = useState(false)
+
+  const openRequestDetail = (req: RequestRecord) => {
+    setRequestEditMode(false)
+    setRequestEditForm({
+      startDate: req.startDate || "",
+      endDate: req.endDate || req.startDate || "",
+      session: (req.session as "sang" | "chieu") || "sang",
+      reason: req.reason || "",
+    })
+    setSelectedRequest(req)
+  }
+
+  const saveRequestEdit = async () => {
+    if (!selectedRequest) return
+    setSavingRequestEdit(true)
+    try {
+      const payload: Record<string, unknown> = { reason: requestEditForm.reason.trim() }
+      if (selectedRequest.scope === "full_day" || selectedRequest.scope === "half_session") {
+        payload.startDate = requestEditForm.startDate
+      }
+      if (selectedRequest.scope === "date_range") {
+        payload.startDate = requestEditForm.startDate
+        payload.endDate = requestEditForm.endDate
+      }
+      if (selectedRequest.scope === "half_session") {
+        payload.session = requestEditForm.session
+      }
+      const updated = await api.requests.update(selectedRequest.id, payload) as RequestRecord
+      setRequests(prev => prev.map(r => r.id === updated.id ? updated : r))
+      setSelectedRequest(updated)
+      setRequestEditMode(false)
+      showToast("Đã cập nhật đơn — nhân viên sẽ nhận thông báo")
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Lỗi cập nhật đơn", "error")
+    } finally {
+      setSavingRequestEdit(false)
+    }
+  }
   const [adminNote, setAdminNote] = useState("")
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [toastType, setToastType] = useState<"success" | "error">("success")
@@ -537,8 +546,9 @@ export default function ApprovalManagement({
   const [quickAddReason, setQuickAddReason] = useState("")
   const [quickAddStartDate, setQuickAddStartDate] = useState("")
   const [quickAddEndDate, setQuickAddEndDate] = useState("")
-  const [quickAddSessionMode, setQuickAddSessionMode] = useState<"sang" | "chieu" | "all">("all")
-  const [confirmAction, setConfirmAction] = useState<{ label: string; count: number; variant: "approve" | "reject"; onConfirm: () => void } | null>(null)
+  const [quickAddScope, setQuickAddScope] = useState<"half_session" | "full_day" | "date_range">("half_session")
+  const [quickAddSession, setQuickAddSession] = useState<"sang" | "chieu">("sang")
+  const [confirmAction, setConfirmAction] = useState<{ label: string; count: number; variant: "approve" | "reject"; summary?: string; onConfirm: () => void } | null>(null)
   const [loadingInit, setLoadingInit] = useState(true)
   const [processingIds, setProcessingIds] = useState<string[]>([])
   const [initError, setInitError] = useState(false)
@@ -562,13 +572,6 @@ export default function ApprovalManagement({
       setWeekFilter(weeks[0].value)
     }
   }, [selectedYear, selectedMonth, weekFilter])
-
-  useEffect(() => {
-    if (tab !== "leave" && weekFilter === "all") {
-      const now = new Date()
-      setWeekFilter(`W${getISOWeek(now)}`)
-    }
-  }, [tab, weekFilter])
 
   const findBranchForNode = (nodeId: string, nodes: any[]): string => {
     const node = nodes.find(n => n.id === nodeId)
@@ -601,25 +604,26 @@ export default function ApprovalManagement({
     const list: TimeOffSlot[] = []
     requests.forEach(req => {
       try {
-        const dates = getDateRange(req.startDate, req.endDate)
-        const isMultiDay = req.startDate !== req.endDate
-        let sessionMode: "sang" | "chieu" | "all" = "all"
-        if (req.session) {
-          sessionMode = req.session
-        }
-        dates.forEach(date => {
+        const expanded = expandRequestToSlots(req)
+        const isMultiDay = req.scope === "date_range"
+        expanded.forEach(({ date, session }) => {
           const weekVal = `W${getISOWeek(date)}`
-          if (weekVal !== weekFilter) return
+          if (weekFilter !== "all" && weekVal !== weekFilter) return
           const day = date.getDay() === 0 ? 7 : date.getDay()
           const emp = employees.find(e => e.id === req.employeeId)
           if (!emp) return
           if (selectedBranch !== "all" && !isEmployeeInBranch(req.employeeId, selectedBranch)) return
-          const baseSlot = {
+          const sessionMode: "sang" | "chieu" | "all" =
+            req.scope === "full_day" || req.scope === "date_range" ? "all" :
+            req.scope === "half_session" ? (req.session ?? "sang") : session
+          list.push({
+            id: `${req.id}::${session}::${formatVnDate(date).replace(/\//g, "")}`,
+            session,
             empId: req.employeeId,
-            empName: req.employeeName,
-            empCode: emp.id || "2026xxxx",
-            department: req.department,
-            day: day,
+            empName: req.employeeName ?? emp.name,
+            empCode: emp.id,
+            department: req.department ?? emp.department ?? "",
+            day,
             sessionMode,
             isMultiDay,
             reason: req.reason,
@@ -628,13 +632,7 @@ export default function ApprovalManagement({
             registeredAt: req.submittedAt,
             adminNote: "",
             processedAt: "",
-          }
-          if (sessionMode === "sang" || sessionMode === "all") {
-            list.push({ id: `${req.id}-sang-${day}`, session: "sang", ...baseSlot } as TimeOffSlot)
-          }
-          if (sessionMode === "chieu" || sessionMode === "all") {
-            list.push({ id: `${req.id}-chieu-${day}`, session: "chieu", ...baseSlot } as TimeOffSlot)
-          }
+          })
         })
       } catch { }
     })
@@ -666,37 +664,30 @@ export default function ApprovalManagement({
         if (leaveDeptFilter !== "all" && r.department !== leaveDeptFilter) {
           return false
         }
-        if (leaveSearchFilter.trim() !== "" && !r.employeeName.toLowerCase().includes(leaveSearchFilter.toLowerCase())) {
+        if (leaveSearchFilter.trim() !== "" && !(r.employeeName ?? "").toLowerCase().includes(leaveSearchFilter.toLowerCase())) {
           return false
         }
         if (leaveDateFilter !== "") {
           try {
             const filterDate = parseVnDate(leaveDateFilter)
             filterDate.setHours(0, 0, 0, 0)
-            const start = parseVnDate(r.startDate)
-            start.setHours(0, 0, 0, 0)
-            const end = parseVnDate(r.endDate)
-            end.setHours(0, 0, 0, 0)
-            if (filterDate < start || filterDate > end) return false
+            if (!requestCoversDate(r, filterDate)) return false
           } catch {
             return false
           }
         }
         if (weekFilter !== "all") {
           try {
-            const dates = getDateRange(r.startDate, r.endDate)
-            const isInWeek = dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+            const isInWeek = expandRequestToSlots(r).some(({ date }) => `W${getISOWeek(date)}` === weekFilter)
             if (!isInWeek) return false
           } catch {
             return false
           }
         }
       } else if (tab === "timeoff") {
-        // Lịch tuần -> Lọc theo tuần được chọn
         if (weekFilter !== "all") {
           try {
-            const dates = getDateRange(r.startDate, r.endDate)
-            const isInWeek = dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+            const isInWeek = expandRequestToSlots(r).some(({ date }) => `W${getISOWeek(date)}` === weekFilter)
             if (!isInWeek) return false
           } catch {
             return false
@@ -705,28 +696,21 @@ export default function ApprovalManagement({
         if (deptFilter !== "all" && r.department !== deptFilter) {
           return false
         }
-        if (searchEmp.trim() !== "" && !r.employeeName.toLowerCase().includes(searchEmp.toLowerCase())) {
+        if (searchEmp.trim() !== "" && !(r.employeeName ?? "").toLowerCase().includes(searchEmp.toLowerCase())) {
           return false
         }
       } else if (tab === "stats") {
-        // Tab thống kê: Lọc theo tuần (hoặc hôm nay nếu showToday được bật)
         if (showToday) {
           try {
             const todayDate = new Date()
             todayDate.setHours(0, 0, 0, 0)
-            const start = parseVnDate(r.startDate)
-            start.setHours(0, 0, 0, 0)
-            const end = parseVnDate(r.endDate)
-            end.setHours(0, 0, 0, 0)
-            const isToday = todayDate >= start && todayDate <= end
-            if (!isToday) return false
+            if (!requestCoversDate(r, todayDate)) return false
           } catch {
             return false
           }
         } else if (weekFilter !== "all") {
           try {
-            const dates = getDateRange(r.startDate, r.endDate)
-            const isInWeek = dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+            const isInWeek = expandRequestToSlots(r).some(({ date }) => `W${getISOWeek(date)}` === weekFilter)
             if (!isInWeek) return false
           } catch {
             return false
@@ -765,25 +749,15 @@ export default function ApprovalManagement({
     todayDate.setHours(0, 0, 0, 0)
     return requests.filter(req => {
       if (selectedBranch !== "all" && !isEmployeeInBranch(req.employeeId, selectedBranch)) return false
-      try {
-        const start = parseVnDate(req.startDate)
-        start.setHours(0, 0, 0, 0)
-        const end = parseVnDate(req.endDate)
-        end.setHours(0, 0, 0, 0)
-        return todayDate >= start && todayDate <= end
-      } catch {
-        return false
-      }
+      return requestCoversDate(req, todayDate)
     })
   }, [requests, selectedBranch, orgNodes, employees])
 
   const requestsInWeek = useMemo(() => {
     return requests.filter(req => {
       if (selectedBranch !== "all" && !isEmployeeInBranch(req.employeeId, selectedBranch)) return false
-      try {
-        const dates = getDateRange(req.startDate, req.endDate)
-        return dates.some(d => `W${getISOWeek(d)}` === weekFilter)
-      } catch { return false }
+      if (weekFilter === "all") return true
+      return expandRequestToSlots(req).some(({ date }) => `W${getISOWeek(date)}` === weekFilter)
     })
   }, [requests, weekFilter, selectedBranch, orgNodes, employees])
 
@@ -847,6 +821,25 @@ export default function ApprovalManagement({
     }
   }
 
+  const approveAllExpiredReqs = async () => {
+    const pendingExpired = filteredReqs.filter(r => r.status === "pending" && isRequestExpired(r))
+    if (pendingExpired.length === 0) return
+    addProcessing("bulk-req-expired")
+    try {
+      const res = await api.requests.approveBulk(pendingExpired.map(r => r.id)) as { count?: number; failed?: { id: string; error: string }[] }
+      const okIds = new Set(pendingExpired.map(r => r.id).filter(id => !(res.failed || []).some(f => f.id === id)))
+      setRequests(p => p.map(r => okIds.has(r.id) ? { ...r, status: "approved" as const } : r))
+      const failCount = res.failed?.length ?? 0
+      showToast(failCount > 0
+        ? `Đã duyệt ${res.count ?? 0} đơn quá hạn, ${failCount} đơn lỗi`
+        : `Đã duyệt ${res.count ?? pendingExpired.length} đơn quá hạn!`)
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : "Lỗi duyệt đơn quá hạn", "error")
+    } finally {
+      removeProcessing("bulk-req-expired")
+    }
+  }
+
   const rejectAllReqs = async () => {
     const pending = filteredReqs.filter(r => r.status === "pending")
     if (pending.length === 0) return
@@ -863,7 +856,7 @@ export default function ApprovalManagement({
   }
 
   const handleQuickApprove = async (id: string) => {
-    const reqId = id.includes("-") ? id.split("-")[0] : id
+    const reqId = slotRequestId(id)
     addProcessing(reqId)
     try {
       await api.requests.approve(reqId)
@@ -876,7 +869,7 @@ export default function ApprovalManagement({
     }
   }
   const handleQuickReject = async (id: string) => {
-    const reqId = id.includes("-") ? id.split("-")[0] : id
+    const reqId = slotRequestId(id)
     addProcessing(reqId)
     try {
       await api.requests.reject(reqId)
@@ -893,9 +886,10 @@ export default function ApprovalManagement({
     const pendingActiveInWeek = requests.filter(req => {
       if (req.status !== "pending") return false
       if (isRequestExpired(req)) return false
+      if (selectedBranch !== "all" && !isEmployeeInBranch(req.employeeId, selectedBranch)) return false
+      if (weekFilter === "all") return true
       try {
-        const dates = getDateRange(req.startDate, req.endDate)
-        return dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+        return expandRequestToSlots(req).some(({ date }) => `W${getISOWeek(date)}` === weekFilter)
       } catch { return false }
     })
     if (pendingActiveInWeek.length === 0) { showToast("Không có đơn nào còn hạn chờ duyệt trong tuần này!", "error"); return }
@@ -914,9 +908,10 @@ export default function ApprovalManagement({
   const handleRejectAllPending = async () => {
     const pendingInWeek = requests.filter(req => {
       if (req.status !== "pending") return false
+      if (selectedBranch !== "all" && !isEmployeeInBranch(req.employeeId, selectedBranch)) return false
+      if (weekFilter === "all") return true
       try {
-        const dates = getDateRange(req.startDate, req.endDate)
-        return dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+        return expandRequestToSlots(req).some(({ date }) => `W${getISOWeek(date)}` === weekFilter)
       } catch { return false }
     })
     if (pendingInWeek.length === 0) { showToast("Không có đơn nào chờ duyệt trong tuần này!", "error"); return }
@@ -933,44 +928,73 @@ export default function ApprovalManagement({
   }
 
   const handleCreateQuickSlot = async () => {
+    if (!quickAddSlot) return
     if (!quickAddReason.trim()) { showToast("Vui lòng nhập lý do nghỉ!", "error"); return }
-    if (!quickAddStartDate || !quickAddEndDate) { showToast("Vui lòng chọn đầy đủ khoảng thời gian!", "error"); return }
-    if (quickAddStartDate > quickAddEndDate) { showToast("Ngày kết thúc không thể trước ngày bắt đầu!", "error"); return }
 
     const toVnDate = (s: string) => {
       const p = s.split("-")
       return `${p[2]}/${p[1]}/${p[0]}`
     }
-    const startVn = toVnDate(quickAddStartDate)
-    const endVn = toVnDate(quickAddEndDate)
 
+    if (quickAddScope === "date_range") {
+      if (!quickAddStartDate || !quickAddEndDate) { showToast("Vui lòng chọn đầy đủ khoảng thời gian!", "error"); return }
+      if (quickAddStartDate > quickAddEndDate) { showToast("Ngày kết thúc không thể trước ngày bắt đầu!", "error"); return }
+    } else if (!quickAddStartDate) {
+      showToast("Vui lòng chọn ngày nghỉ!", "error"); return
+    }
+
+    const emp = employees.find(e => e.id === quickAddSlot.empId)
+    const intern = emp ? isInternEmployee(emp) : false
+    const category = "leave"
+    const leaveType = intern ? "personal" : "annual"
+    const startVn = toVnDate(quickAddStartDate)
+
+    let payload: Record<string, unknown>
+    if (quickAddScope === "half_session") {
+      payload = {
+        employeeId: quickAddSlot.empId,
+        category,
+        leaveType,
+        scope: "half_session",
+        startDate: startVn,
+        session: quickAddSession,
+        reason: quickAddReason,
+      }
+    } else if (quickAddScope === "full_day") {
+      payload = {
+        employeeId: quickAddSlot.empId,
+        category,
+        leaveType,
+        scope: "full_day",
+        startDate: startVn,
+        reason: quickAddReason,
+      }
+    } else {
+      payload = {
+        employeeId: quickAddSlot.empId,
+        category,
+        leaveType,
+        scope: "date_range",
+        startDate: startVn,
+        endDate: toVnDate(quickAddEndDate),
+        reason: quickAddReason,
+      }
+    }
+
+    const empName = quickAddSlot.empName
     addProcessing("quick-create")
     try {
-      const created = await api.requests.create({
-        employeeId: quickAddSlot!.empId,
-        category: "timeoff",
-        startDate: startVn,
-        endDate: endVn,
-        reason: quickAddReason,
-        session: quickAddSessionMode,
-      }) as any
-
+      const created = await api.requests.create(payload) as RequestRecord
       await api.requests.approve(created.id)
-      
       setRequests(p => [...p, { ...created, status: "approved" }])
       setQuickAddSlot(null)
       setQuickAddReason("")
-      showToast(`Đã đăng ký & duyệt nghỉ thành công cho ${quickAddSlot!.empName}!`)
+      showToast(`Đã đăng ký & duyệt nghỉ thành công cho ${empName}!`)
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Lỗi tạo ca nghỉ", "error")
     } finally {
       removeProcessing("quick-create")
     }
-  }
-
-  const handleOpenQuickAdd = (s: { empId: string; empName: string; day: number; session: "sang" | "chieu" }) => {
-    setQuickAddSlot(s)
-    setQuickAddSessionMode(s.session)
   }
 
   const filteredReqs = useMemo(() => {
@@ -987,26 +1011,21 @@ export default function ApprovalManagement({
       if (leaveDeptFilter !== "all" && r.department !== leaveDeptFilter) {
         return false
       }
-      if (leaveSearchFilter.trim() !== "" && !r.employeeName.toLowerCase().includes(leaveSearchFilter.toLowerCase())) {
+      if (leaveSearchFilter.trim() !== "" && !(r.employeeName ?? "").toLowerCase().includes(leaveSearchFilter.toLowerCase())) {
         return false
       }
       if (leaveDateFilter !== "") {
         try {
           const filterDate = parseVnDate(leaveDateFilter)
           filterDate.setHours(0, 0, 0, 0)
-          const start = parseVnDate(r.startDate)
-          start.setHours(0, 0, 0, 0)
-          const end = parseVnDate(r.endDate)
-          end.setHours(0, 0, 0, 0)
-          if (filterDate < start || filterDate > end) return false
+          if (!requestCoversDate(r, filterDate)) return false
         } catch {
           return false
         }
       }
       if (weekFilter !== "all" && tab === "leave") {
         try {
-          const dates = getDateRange(r.startDate, r.endDate)
-          const isInWeek = dates.some(d => `W${getISOWeek(d)}` === weekFilter)
+          const isInWeek = expandRequestToSlots(r).some(({ date }) => `W${getISOWeek(date)}` === weekFilter)
           if (!isInWeek) return false
         } catch {
           return false
@@ -1022,16 +1041,75 @@ export default function ApprovalManagement({
     [selectedYear, selectedMonth]
   )
 
+  const gridWeekFilter = useMemo(() => {
+    if (weekFilter !== "all") return weekFilter
+    return `W${getISOWeek(new Date())}`
+  }, [weekFilter])
+
   const DAYS = useMemo(() => {
     const DAY_LABELS = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6"]
-    const week = weeksInMonth.find(w => w.value === weekFilter)
+    const week = weeksInMonth.find(w => w.value === gridWeekFilter)
     if (!week) return DAY_LABELS.map((label, i) => ({ label, date: "—", day: i + 1, dateObj: new Date(0) }))
     return DAY_LABELS.map((label, i) => {
       const d = new Date(week.startDate)
       d.setDate(d.getDate() + i)
       return { label, date: `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`, day: i + 1, dateObj: new Date(d) }
     })
-  }, [weeksInMonth, weekFilter])
+  }, [weeksInMonth, gridWeekFilter])
+
+  const isoFromDayInfo = (day: number) => {
+    const dayInfo = DAYS.find(d => d.day === day)
+    if (!dayInfo || dayInfo.dateObj.getTime() === 0) return ""
+    const d = dayInfo.dateObj
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+  }
+
+  const handleOpenQuickAdd = (s: { empId: string; empName: string; day: number; session: "sang" | "chieu" }) => {
+    const iso = isoFromDayInfo(s.day)
+    setQuickAddSlot(s)
+    setQuickAddSession(s.session)
+    setQuickAddScope("half_session")
+    setQuickAddStartDate(iso)
+    setQuickAddEndDate(iso)
+    setQuickAddReason("")
+  }
+
+  const quickAddEmployee = quickAddSlot ? employees.find(e => e.id === quickAddSlot.empId) : undefined
+  const quickAddIsIntern = quickAddEmployee ? isInternEmployee(quickAddEmployee) : false
+  const quickAddKind = quickAddIsIntern ? EMPLOYEE_KIND.intern : EMPLOYEE_KIND.staff
+
+  const buildQuickAddSummary = () => {
+    if (!quickAddSlot) return ""
+    const dayInfo = DAYS.find(d => d.day === quickAddSlot.day)
+    const dayLabel = dayInfo ? `${dayInfo.label} (${dayInfo.date})` : ""
+    if (quickAddScope === "half_session") {
+      return `${quickAddSlot.empName} · ${dayLabel} · Buổi ${quickAddSession === "sang" ? "sáng" : "chiều"}`
+    }
+    if (quickAddScope === "full_day") {
+      const d = quickAddStartDate ? quickAddStartDate.split("-").reverse().join("/") : dayLabel
+      return `${quickAddSlot.empName} · Cả ngày · ${d}`
+    }
+    const from = quickAddStartDate ? quickAddStartDate.split("-").reverse().join("/") : "?"
+    const to = quickAddEndDate ? quickAddEndDate.split("-").reverse().join("/") : "?"
+    return `${quickAddSlot.empName} · ${from} → ${to} (các ngày làm việc)`
+  }
+
+  const requestQuickAddConfirm = () => {
+    if (!quickAddReason.trim()) { showToast("Vui lòng nhập lý do nghỉ!", "error"); return }
+    if (quickAddScope === "date_range") {
+      if (!quickAddStartDate || !quickAddEndDate) { showToast("Vui lòng chọn đầy đủ khoảng thời gian!", "error"); return }
+      if (quickAddStartDate > quickAddEndDate) { showToast("Ngày kết thúc không thể trước ngày bắt đầu!", "error"); return }
+    } else if (!quickAddStartDate) {
+      showToast("Vui lòng chọn ngày nghỉ!", "error"); return
+    }
+    setConfirmAction({
+      label: "Xác nhận đăng ký & duyệt nghỉ hộ?",
+      count: 1,
+      variant: "approve",
+      summary: buildQuickAddSummary(),
+      onConfirm: handleCreateQuickSlot,
+    })
+  }
 
   const departments = useMemo(() => {
     const deptNodes = orgNodes.filter(n => n.type === "department" && (selectedBranch === "all" || findBranchForNode(n.id, orgNodes) === selectedBranch))
@@ -1069,12 +1147,12 @@ export default function ApprovalManagement({
   const slotsLookup = useMemo(() => {
     const map = new Map<string, TimeOffSlot>()
     slots.forEach(s => {
-      if (s.week === weekFilter) {
+      if (s.week === gridWeekFilter) {
         map.set(`${s.empId}-${s.day}-${s.session}`, s)
       }
     })
     return map
-  }, [slots, weekFilter])
+  }, [slots, gridWeekFilter])
 
   const empMultiDayMap = useMemo(() => {
     const map = new Map<string, {
@@ -1089,17 +1167,17 @@ export default function ApprovalManagement({
     if (!DAYS[0] || DAYS[0].dateObj.getTime() === 0) return map
 
     employees.forEach(emp => {
-      const empMultiReqs = requests.filter(r => r.employeeId === emp.id && r.startDate !== r.endDate)
+      const empMultiReqs = requests.filter(r => r.employeeId === emp.id && r.scope === "date_range")
       const list: any[] = []
 
       empMultiReqs.forEach(req => {
-        const repSlot = slots.find(s => s.empId === emp.id && s.id.startsWith(req.id + "-"))
+        const repSlot = slots.find(s => s.empId === emp.id && slotRequestId(s.id) === req.id)
         if (!repSlot) return
 
         let colStart = -1
         let colEnd = -1
         try {
-          const dates = getDateRange(req.startDate, req.endDate)
+          const dates = getDateRange(req.startDate, req.endDate ?? req.startDate)
           DAYS.forEach((d, idx) => {
             if (dates.some(rd => isSameDate(rd, d.dateObj))) {
               if (colStart === -1) colStart = idx + 1
@@ -1112,7 +1190,7 @@ export default function ApprovalManagement({
 
         const colSpan = colEnd - colStart + 1
         const reqStart = parseVnDate(req.startDate)
-        const reqEnd = parseVnDate(req.endDate)
+        const reqEnd = parseVnDate(req.endDate ?? req.startDate)
         const isLeftCont = reqStart.getTime() < DAYS[0].dateObj.getTime()
         const isRightCont = reqEnd.getTime() > DAYS[4].dateObj.getTime()
 
@@ -1162,42 +1240,19 @@ export default function ApprovalManagement({
   const statByDept = useMemo(() => {
     const map: Record<string, { dept: string; approved: number; pending: number; rejected: number }> = {}
     activeStatsRequests.forEach(r => {
-      if (!map[r.department]) {
-        map[r.department] = { dept: r.department, approved: 0, pending: 0, rejected: 0 }
+      const dept = r.department ?? "Khác"
+      if (!map[dept]) {
+        map[dept] = { dept, approved: 0, pending: 0, rejected: 0 }
       }
-      if (r.status === "approved") map[r.department].approved += 1
-      else if (r.status === "pending") map[r.department].pending += 1
-      else if (r.status === "rejected") map[r.department].rejected += 1
+      if (r.status === "approved") map[dept].approved += 1
+      else if (r.status === "pending") map[dept].pending += 1
+      else if (r.status === "rejected") map[dept].rejected += 1
     })
     return Object.values(map)
   }, [activeStatsRequests])
 
   return (
     <div className="space-y-4 pb-24">
-      {quickAddSlot && createPortal(
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-xl">
-            <h3 className="font-black text-lg">Đăng ký nghỉ hộ {quickAddSlot.empName}</h3>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500">Khoảng thời gian</label>
-              <div className="flex gap-2">
-                <input type="date" value={quickAddStartDate} onChange={e => setQuickAddStartDate(e.target.value)} className="flex-1 border rounded-lg p-2 text-sm" />
-                <input type="date" value={quickAddEndDate} onChange={e => setQuickAddEndDate(e.target.value)} className="flex-1 border rounded-lg p-2 text-sm" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500">Lý do</label>
-              <textarea value={quickAddReason} onChange={e => setQuickAddReason(e.target.value)} className="w-full border rounded-lg p-2 text-sm" rows={2} />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setQuickAddSlot(null)} className="flex-1 px-4 py-2 rounded-xl bg-gray-100 font-bold text-sm">Hủy</button>
-              <button onClick={handleCreateQuickSlot} disabled={processingIds.includes("quick-create")} className="flex-1 px-4 py-2 rounded-xl bg-[#C62828] text-white font-bold text-sm">Duyệt</button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
       {toastMessage && createPortal(
         <div className={`fixed bottom-6 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] border backdrop-blur-sm animate-in slide-in-from-right duration-300
           ${toastType === "success"
@@ -1294,21 +1349,33 @@ export default function ApprovalManagement({
             onChange={val => {
               setWeekFilter(val)
               setShowToday(false)
-              if (val !== "all" && tab === "leave") {
+              if (val === "all" || tab === "leave") {
                 setLeaveDateFilter("")
               }
             }}
             heightClass="h-[28px]"
             className="w-[240px]"
-            options={
-              tab === "leave"
-                ? [
-                    { value: "all", label: "Tất cả các tuần" },
-                    ...weeksInMonth.map(w => ({ value: w.value, label: w.label }))
-                  ]
-                : weeksInMonth.map(w => ({ value: w.value, label: w.label }))
-            }
+            options={[
+              { value: "all", label: "Tất cả đơn" },
+              ...weeksInMonth.map(w => ({ value: w.value, label: w.label })),
+            ]}
           />
+          <span className="w-px h-4 bg-gray-200 mx-0.5" />
+          <button
+            type="button"
+            onClick={() => {
+              setWeekFilter("all")
+              setShowToday(false)
+              setLeaveDateFilter("")
+            }}
+            className={`text-xs font-bold transition-colors whitespace-nowrap active:scale-95 ${
+              weekFilter === "all" && !showToday && leaveDateFilter === ""
+                ? "text-[#C62828] font-extrabold"
+                : "text-gray-500 hover:text-[#C62828]"
+            }`}
+          >
+            Tất cả
+          </button>
           <span className="w-px h-4 bg-gray-200 mx-0.5" />
           <button
             onClick={() => {
@@ -1356,6 +1423,11 @@ export default function ApprovalManagement({
 
       {tab === "timeoff" && (
         <div className="space-y-4">
+          {weekFilter === "all" && (
+            <div className="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5">
+              Đang xem <span className="font-black">toàn bộ đơn</span> trong hệ thống · Lưới tuần hiển thị tuần hiện tại
+            </div>
+          )}
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/[0.06] flex items-center gap-3 flex-wrap">
 
             <CustomSelect
@@ -1465,8 +1537,9 @@ export default function ApprovalManagement({
                           const count = requests.filter(req => {
                             if (req.employeeId !== emp.empId) return false
                             if (req.status !== st) return false
+                            if (weekFilter === "all") return true
                             try {
-                              const dates = getDateRange(req.startDate, req.endDate)
+                              const dates = getDateRange(req.startDate, req.endDate ?? req.startDate)
                               return dates.some(d => `W${getISOWeek(d)}` === weekFilter)
                             } catch { return false }
                           }).length
@@ -1505,7 +1578,7 @@ export default function ApprovalManagement({
                                 onClick={s => { setSelectedSlot(s); setAdminNote(s.adminNote) }}
                                 onApprove={handleQuickApprove}
                                 onReject={handleQuickReject}
-                                disabled={processingIds.includes(spanEntry.slot.id.split("-")[0])}
+                                disabled={processingIds.includes(slotRequestId(spanEntry.slot.id))}
                               />
                             ) : isSingleFullDay ? (
                               <FullDayBlock
@@ -1513,7 +1586,7 @@ export default function ApprovalManagement({
                                 onClick={s => { setSelectedSlot(s); setAdminNote(s.adminNote) }}
                                 onApprove={handleQuickApprove}
                                 onReject={handleQuickReject}
-                                disabled={processingIds.includes(sang!.id.split("-")[0])}
+                                disabled={processingIds.includes(slotRequestId(sang!.id))}
                               />
                             ) : (
                               <>
@@ -1523,6 +1596,7 @@ export default function ApprovalManagement({
                                   onApprove={handleQuickApprove} onReject={handleQuickReject}
                                   onClick={s => { setSelectedSlot(s); setAdminNote(s.adminNote) }}
                                   onQuickAdd={handleOpenQuickAdd}
+                                  isActive={quickAddSlot?.empId === emp.empId && quickAddSlot?.day === d.day && quickAddSlot?.session === "sang"}
                                   disabled={!!sang && processingIds.includes(sang.id)}
                                 />
                                 <SessionBlock
@@ -1530,7 +1604,8 @@ export default function ApprovalManagement({
                                   empId={emp.empId} empName={emp.empName} day={d.day}
                                   onApprove={handleQuickApprove} onReject={handleQuickReject}
                                   onClick={s => { setSelectedSlot(s); setAdminNote(s.adminNote) }}
-                                  onQuickAdd={setQuickAddSlot}
+                                  onQuickAdd={handleOpenQuickAdd}
+                                  isActive={quickAddSlot?.empId === emp.empId && quickAddSlot?.day === d.day && quickAddSlot?.session === "chieu"}
                                   disabled={!!chieu && processingIds.includes(chieu.id)}
                                 />
                               </>
@@ -1640,6 +1715,21 @@ export default function ApprovalManagement({
                   Từ chối tất cả ({filteredReqs.filter(r => r.status === "pending").length})
                 </button>
                 <button
+                  onClick={() => setConfirmAction({
+                    label: "Duyệt tất cả đơn quá hạn trong danh sách lọc?",
+                    count: filteredReqs.filter(r => r.status === "pending" && isRequestExpired(r)).length,
+                    variant: "approve",
+                    summary: "Các đơn quá hạn vẫn được ghi nhận nghỉ phép và nhân viên nhận thông báo.",
+                    onConfirm: approveAllExpiredReqs,
+                  })}
+                  disabled={processingIds.includes("bulk-req-expired") || processingIds.includes("bulk-req") || filteredReqs.filter(r => r.status === "pending" && isRequestExpired(r)).length === 0}
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black transition-all shadow-sm active:scale-95">
+                  {processingIds.includes("bulk-req-expired")
+                    ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    : <Clock size={11} />}
+                  Duyệt quá hạn ({filteredReqs.filter(r => r.status === "pending" && isRequestExpired(r)).length})
+                </button>
+                <button
                   onClick={() => setConfirmAction({ label: "Duyệt các đơn xin nghỉ còn hạn?", count: filteredReqs.filter(r => r.status === "pending" && !isRequestExpired(r)).length, variant: "approve", onConfirm: approveAllReqs })}
                   disabled={processingIds.includes("bulk-req") || processingIds.includes("bulk-req-reject") || filteredReqs.filter(r => r.status === "pending" && !isRequestExpired(r)).length === 0}
                   className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:from-[#B71C1C] hover:to-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black transition-all shadow-sm active:scale-95">
@@ -1670,18 +1760,18 @@ export default function ApprovalManagement({
                   <tr key={req.id} className="hover:bg-gray-50/30 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        <AvatarCircle name={req.employeeName} photo={employees.find(e => e.id === req.employeeId)?.photos?.[0]} size="sm" />
-                        <span className="font-bold text-gray-900 text-sm">{req.employeeName}</span>
+                        <AvatarCircle name={req.employeeName ?? req.employeeId} photo={employees.find(e => e.id === req.employeeId)?.photos?.[0]} size="sm" />
+                        <span className="font-bold text-gray-900 text-sm">{req.employeeName ?? "—"}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-900 font-bold">
                       {req.department}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs font-semibold text-gray-700">
-                      <SessionPill session={req.session} isMultiDay={req.startDate !== req.endDate} />
+                      <ScopePill req={req} />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-gray-900">
-                      {req.startDate === req.endDate ? req.startDate : `${req.startDate} → ${req.endDate}`}
+                    <td className="px-6 py-4 text-xs font-mono font-bold text-gray-900 max-w-[200px]">
+                      {formatRequestTimeSummary(req)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs font-mono font-bold text-gray-900">
                       {req.submittedAt}
@@ -1702,13 +1792,13 @@ export default function ApprovalManagement({
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="inline-flex gap-1.5 justify-end items-center">
                         <button
-                          onClick={() => setSelectedRequest(req)}
+                          onClick={() => openRequestDetail(req)}
                           className="p-2 hover:bg-gray-100 text-gray-600 hover:text-gray-900 rounded-xl text-xs font-bold transition-all border border-gray-200 hover:border-gray-300 active:scale-95"
                           title="Chi tiết"
                         >
                           <Eye size={17} className="stroke-[2.5px]" />
                         </button>
-                        {req.status === "pending" && !isRequestExpired(req) && (
+                        {req.status === "pending" && (
                           <>
                             <button
                               onClick={() => rejectReq(req.id)}
@@ -1721,8 +1811,10 @@ export default function ApprovalManagement({
                             <button
                               onClick={() => approveReq(req.id)}
                               disabled={processingIds.includes(req.id)}
-                              className="p-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all active:scale-95 shadow-sm"
-                              title="Duyệt"
+                              className={`p-2 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl transition-all active:scale-95 shadow-sm ${
+                                isRequestExpired(req) ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-500 hover:bg-emerald-600"
+                              }`}
+                              title={isRequestExpired(req) ? "Duyệt đơn quá hạn" : "Duyệt"}
                             >
                               {processingIds.includes(req.id) ? (
                                 <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -1753,7 +1845,11 @@ export default function ApprovalManagement({
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <span className="text-xs font-bold text-gray-500">Đang xem: </span>
-              <span className="text-xs font-black text-gray-800">{weeksInMonth.find(w => w.value === weekFilter)?.label ?? weekFilter}</span>
+              <span className="text-xs font-black text-gray-800">
+                {weekFilter === "all"
+                  ? "Toàn bộ đơn trong hệ thống"
+                  : (weeksInMonth.find(w => w.value === weekFilter)?.label ?? weekFilter)}
+              </span>
             </div>
             {/* Week selector is managed globally at the top of the page */}
           </div>
@@ -1784,8 +1880,11 @@ export default function ApprovalManagement({
             ) : (
               <div className="grid grid-cols-5 gap-3">
                 {DAYS.map(d => {
-                  const sang  = slots.filter(s => s.day === d.day && s.session === "sang"  && s.status !== "rejected").length
-                  const chieu = slots.filter(s => s.day === d.day && s.session === "chieu" && s.status !== "rejected").length
+                  const daySlots = showToday
+                    ? _todaySlots
+                    : slots.filter(s => s.week === (weekFilter === "all" ? gridWeekFilter : weekFilter))
+                  const sang  = daySlots.filter(s => s.day === d.day && s.session === "sang"  && s.status !== "rejected").length
+                  const chieu = daySlots.filter(s => s.day === d.day && s.session === "chieu" && s.status !== "rejected").length
                   const cellCls = (n: number) =>
                     n === 0 ? "bg-gray-50 text-gray-300"
                     : n <= 2 ? "bg-amber-50 text-amber-600"
@@ -1813,7 +1912,9 @@ export default function ApprovalManagement({
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/[0.06]">
               <h3 className="font-black text-gray-800 text-sm mb-1">Nghỉ nhiều nhất</h3>
-              <p className="text-xs text-gray-400 mb-4">{showToday ? `Hôm nay · ${_todayStr}` : `Cả tuần ${weekFilter}`}</p>
+              <p className="text-xs text-gray-400 mb-4">
+                {showToday ? `Hôm nay · ${_todayStr}` : weekFilter === "all" ? "Toàn bộ đơn trong hệ thống" : `Cả tuần ${weekFilter}`}
+              </p>
               {statByEmp.length === 0 ? (
                 <p className="text-center text-gray-300 py-6 text-xs">Chưa có dữ liệu</p>
               ) : statByEmp.slice(0, 6).map((row, i) => (
@@ -1827,7 +1928,9 @@ export default function ApprovalManagement({
 
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/[0.06]">
               <h3 className="font-black text-gray-800 text-sm mb-1">Theo phòng ban</h3>
-              <p className="text-xs text-gray-400 mb-4">{showToday ? `Hôm nay · ${_todayStr}` : `Tổng hợp ${weekFilter}`}</p>
+              <p className="text-xs text-gray-400 mb-4">
+                {showToday ? `Hôm nay · ${_todayStr}` : weekFilter === "all" ? "Toàn bộ đơn trong hệ thống" : `Tổng hợp ${weekFilter}`}
+              </p>
               {statByDept.length === 0 ? (
                 <p className="text-center text-gray-300 py-6 text-xs">Chưa có dữ liệu</p>
               ) : statByDept.sort((a, b) => (b.approved + b.pending) - (a.approved + a.pending)).map((row, i) => (
@@ -1849,7 +1952,7 @@ export default function ApprovalManagement({
         <div className="sticky bottom-0 -mx-0 mt-2 z-30 px-5 py-3 bg-white/95 backdrop-blur-xl border border-gray-200 rounded-2xl shadow-[0_-2px_20px_rgba(0,0,0,0.07)] flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-gray-500">
-              {showToday ? "Hôm nay:" : `Tuần ${weekFilter}:`}
+              {showToday ? "Hôm nay:" : weekFilter === "all" ? "Toàn bộ đơn:" : `Tuần ${weekFilter}:`}
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
               <AlertCircle size={11} /> {allPendingRequestsInWeek.length} chờ duyệt
@@ -1898,6 +2001,9 @@ export default function ApprovalManagement({
               </div>
               <div>
                 <p className="font-black text-gray-800 text-base">{confirmAction.label}</p>
+                {confirmAction.summary ? (
+                  <p className="text-sm text-gray-700 mt-1 font-semibold">{confirmAction.summary}</p>
+                ) : null}
                 <p className="text-sm text-gray-500 mt-0.5">
                   {confirmAction.count} đơn sẽ được xử lý. Không thể hoàn tác.
                 </p>
@@ -2080,11 +2186,9 @@ export default function ApprovalManagement({
                         <div key={r.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-100">
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-bold text-gray-700">
-                              {r.startDate === r.endDate
-                                ? (r.session === "sang" ? "Nghỉ ca sáng" : r.session === "chieu" ? "Nghỉ ca chiều" : "Nghỉ cả ngày")
-                                : "Nghỉ nhiều ngày"}
+                              {getScopeSessionLabel(r)} · {LEAVE_TYPE[r.leaveType]?.label ?? r.leaveType}
                             </p>
-                            <p className="text-[11px] text-gray-400 font-mono">{r.startDate === r.endDate ? r.startDate : `${r.startDate} → ${r.endDate}`}</p>
+                            <p className="text-[11px] text-gray-400 font-mono">{formatRequestTimeSummary(r)}</p>
                           </div>
                           <StatusPill status={r.status as TOStatus} />
                         </div>
@@ -2109,8 +2213,8 @@ export default function ApprovalManagement({
       })()}
 
       {quickAddSlot && createPortal(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setQuickAddSlot(null)}>
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setQuickAddSlot(null)}>
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
               <h3 className="font-black text-gray-800 text-base">Đăng ký nghỉ hộ</h3>
               <button onClick={() => setQuickAddSlot(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 transition-colors"><X size={16} /></button>
@@ -2120,36 +2224,96 @@ export default function ApprovalManagement({
                 <div className="w-10 h-10 rounded-2xl bg-[#C62828]/10 flex items-center justify-center flex-shrink-0">
                   <User size={18} className="text-[#C62828]" />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500 font-medium">Nhân viên</p>
-                  <p className="font-black text-gray-800 text-sm">{quickAddSlot.empName}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${quickAddKind.badgeClass}`}>{quickAddKind.badge}</span>
+                    <p className="text-xs text-gray-500 font-medium">{quickAddKind.label}</p>
+                  </div>
+                  <p className="font-black text-gray-800 text-sm truncate">{quickAddSlot.empName}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Từ ngày</label>
-                  <input type="date" value={quickAddStartDate} onChange={e => setQuickAddStartDate(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] transition-colors" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Đến ngày</label>
-                  <input type="date" value={quickAddEndDate} onChange={e => setQuickAddEndDate(e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] transition-colors" />
-                </div>
-              </div>
+
+              {(() => {
+                const dayInfo = DAYS.find(d => d.day === quickAddSlot.day)
+                if (!dayInfo) return null
+                return (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100 text-xs text-gray-600">
+                    <Calendar size={13} className="text-[#C62828] flex-shrink-0" />
+                    <span>Ô đã chọn: <strong className="text-gray-800">{dayInfo.label} · {dayInfo.date}</strong></span>
+                  </div>
+                )
+              })()}
+
               <div>
-                <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Buổi nghỉ</label>
+                <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Hình thức nghỉ</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {([["sang", "☀️", "Sáng"], ["chieu", "🌤", "Chiều"], ["all", "🌙", "Cả ngày"]] as const).map(([val, icon, label]) => (
-                    <button key={val} type="button"
-                      onClick={() => setQuickAddSessionMode(val)}
-                      className={`py-2.5 rounded-xl text-sm font-bold border transition-all flex flex-col items-center gap-0.5 ${quickAddSessionMode === val ? "bg-[#C62828] text-white border-[#C62828] shadow-sm" : "bg-gray-50 text-gray-600 border-gray-200 hover:border-[#C62828]/40"}`}>
-                      <span className="text-base leading-none">{icon}</span>
-                      <span className="text-[11px]">{label}</span>
+                  {([
+                    ["half_session", Sun, "Một buổi"],
+                    ["full_day", CalendarDays, "Cả ngày"],
+                    ["date_range", CalendarRange, "Nhiều ngày"],
+                  ] as const).map(([scope, Icon, label]) => (
+                    <button key={scope} type="button"
+                      onClick={() => {
+                        setQuickAddScope(scope)
+                        if (scope !== "date_range" && quickAddStartDate) setQuickAddEndDate(quickAddStartDate)
+                      }}
+                      className={`py-2.5 rounded-xl text-[11px] font-bold border transition-all flex flex-col items-center gap-1 ${
+                        quickAddScope === scope ? "bg-[#C62828] text-white border-[#C62828] shadow-sm" : "bg-gray-50 text-gray-600 border-gray-200 hover:border-[#C62828]/40"
+                      }`}>
+                      <Icon size={16} strokeWidth={2.5} />
+                      {label}
                     </button>
                   ))}
                 </div>
+                <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+                  {quickAddIsIntern
+                    ? "Thực tập (TT): thường đăng ký theo buổi sáng/chiều."
+                    : "Chính thức (CT): có thể nghỉ cả ngày hoặc nhiều ngày liên tiếp."}
+                </p>
               </div>
+
+              {quickAddScope === "date_range" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Từ ngày</label>
+                    <input type="date" value={quickAddStartDate} onChange={e => setQuickAddStartDate(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] transition-colors" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Đến ngày</label>
+                    <input type="date" value={quickAddEndDate} onChange={e => setQuickAddEndDate(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] transition-colors" />
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Ngày nghỉ</label>
+                  <input type="date" value={quickAddStartDate} onChange={e => {
+                    setQuickAddStartDate(e.target.value)
+                    setQuickAddEndDate(e.target.value)
+                  }}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] transition-colors" />
+                </div>
+              )}
+
+              {quickAddScope === "half_session" && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Buổi nghỉ</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([["sang", Sun, "Sáng"], ["chieu", Sunset, "Chiều"]] as const).map(([val, Icon, label]) => (
+                      <button key={val} type="button"
+                        onClick={() => setQuickAddSession(val)}
+                        className={`py-2.5 rounded-xl text-sm font-bold border transition-all flex items-center justify-center gap-2 ${
+                          quickAddSession === val ? "bg-[#C62828] text-white border-[#C62828] shadow-sm" : "bg-gray-50 text-gray-600 border-gray-200 hover:border-[#C62828]/40"
+                        }`}>
+                        <Icon size={16} strokeWidth={2.5} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Lý do nghỉ</label>
                 <input type="text" value={quickAddReason} onChange={e => setQuickAddReason(e.target.value)}
@@ -2158,7 +2322,7 @@ export default function ApprovalManagement({
               </div>
             </div>
             <div className="px-6 pb-6 flex gap-2">
-              <button onClick={handleCreateQuickSlot} disabled={processingIds.includes("quick-create")}
+              <button onClick={requestQuickAddConfirm} disabled={processingIds.includes("quick-create")}
                 className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:from-[#B71C1C] hover:to-[#D84315] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-sm">
                 {processingIds.includes("quick-create") && (
                   <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -2176,7 +2340,7 @@ export default function ApprovalManagement({
       )}
 
       {selectedRequest && createPortal(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setSelectedRequest(null)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => { setSelectedRequest(null); setRequestEditMode(false) }}>
           <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
               <div className="flex items-center gap-2.5">
@@ -2184,21 +2348,83 @@ export default function ApprovalManagement({
                   <FileText size={16} className="text-[#C62828]" />
                 </div>
                 <div>
-                  <h3 className="font-black text-gray-800 text-base">Chi tiết đơn xin nghỉ</h3>
+                  <h3 className="font-black text-gray-800 text-base">
+                    {requestEditMode ? "Sửa đơn" : "Chi tiết đơn xin nghỉ"}
+                    {!requestEditMode && isRequestExpired(selectedRequest) && (
+                      <span className="ml-2 text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                        Quá hạn
+                      </span>
+                    )}
+                  </h3>
                   <p className="text-xs text-gray-400">Mã đơn: <span className="font-mono font-bold text-gray-600">{selectedRequest.id}</span></p>
                 </div>
               </div>
-              <button onClick={() => setSelectedRequest(null)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+              <button onClick={() => { setSelectedRequest(null); setRequestEditMode(false) }} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
                 <X size={16} />
               </button>
             </div>
 
             <div className="p-6 space-y-4">
+              {isRequestExpired(selectedRequest) && !requestEditMode && (
+                <div className="flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <AlertCircle size={15} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-black text-amber-700">Đơn đã quá hạn nhưng vẫn có thể xử lý</p>
+                    <p className="text-[11px] text-amber-600 leading-relaxed mt-0.5">
+                      Admin có thể duyệt hoặc nhấn “Sửa đơn” để đổi ngày/lý do trước khi duyệt.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {requestEditMode ? (
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-500">
+                    {selectedRequest.employeeName} · {getScopeSessionLabel(selectedRequest)}
+                  </p>
+                  {(selectedRequest.scope === "full_day" || selectedRequest.scope === "half_session" || selectedRequest.scope === "date_range") && (
+                    <div className={selectedRequest.scope === "date_range" ? "grid grid-cols-2 gap-3" : ""}>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1 block">Ngày{selectedRequest.scope === "date_range" ? " bắt đầu" : ""}</label>
+                        <CustomDatePicker value={requestEditForm.startDate} onChange={v => setRequestEditForm(f => ({ ...f, startDate: v }))} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm" />
+                      </div>
+                      {selectedRequest.scope === "date_range" && (
+                        <div>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1 block">Ngày kết thúc</label>
+                          <CustomDatePicker value={requestEditForm.endDate} onChange={v => setRequestEditForm(f => ({ ...f, endDate: v }))} className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {selectedRequest.scope === "half_session" && (
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1 block">Buổi</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(["sang", "chieu"] as const).map(s => (
+                          <button key={s} type="button" onClick={() => setRequestEditForm(f => ({ ...f, session: s }))}
+                            className={`py-2.5 rounded-xl text-sm font-bold border ${requestEditForm.session === s ? "bg-[#C62828] text-white border-[#C62828]" : "bg-gray-50 border-gray-200 text-gray-600"}`}>
+                            {LEAVE_SESSION[s].label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedRequest.scope === "multi_session" && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                      Đơn nhiều buổi: chỉ sửa lý do tại đây. Đổi buổi cần từ chối để nhân viên nộp lại.
+                    </p>
+                  )}
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider mb-1 block">Lý do</label>
+                    <textarea value={requestEditForm.reason} onChange={e => setRequestEditForm(f => ({ ...f, reason: e.target.value }))} rows={3}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-[#C62828]/40" />
+                  </div>
+                </div>
+              ) : (
               <div className="bg-gray-50 rounded-2xl p-5 space-y-3.5 border border-gray-100">
                 <div className="flex items-start gap-3">
-                  <AvatarCircle name={selectedRequest.employeeName} photo={employees.find(e => e.id === selectedRequest.employeeId)?.photos?.[0]} size="md" />
+                  <AvatarCircle name={selectedRequest.employeeName ?? selectedRequest.employeeId} photo={employees.find(e => e.id === selectedRequest.employeeId)?.photos?.[0]} size="md" />
                   <div>
-                    <p className="font-black text-gray-800 text-sm">{selectedRequest.employeeName}</p>
+                    <p className="font-black text-gray-800 text-sm">{selectedRequest.employeeName ?? "—"}</p>
                     <p className="text-xs text-gray-400">{selectedRequest.department}</p>
                   </div>
                 </div>
@@ -2207,12 +2433,9 @@ export default function ApprovalManagement({
 
                 {[
                   ["Phân loại", selectedRequest.category === "timeoff" ? "Time off" : "Nghỉ phép"],
-                  ["Ca nghỉ", selectedRequest.startDate !== selectedRequest.endDate 
-                    ? "Nhiều ngày" 
-                    : (selectedRequest.session === "sang" ? "Ca sáng" : selectedRequest.session === "chieu" ? "Ca chiều" : "Cả ngày")],
-                  ["Thời gian", selectedRequest.startDate === selectedRequest.endDate 
-                    ? selectedRequest.startDate 
-                    : `${selectedRequest.startDate} → ${selectedRequest.endDate}`],
+                  ["Loại hình", LEAVE_TYPE[selectedRequest.leaveType]?.label ?? selectedRequest.leaveType],
+                  ["Hình thức", getScopeSessionLabel(selectedRequest)],
+                  ["Thời gian", formatRequestTimeSummary(selectedRequest)],
                   ["Thời gian gửi", selectedRequest.submittedAt],
                   ["Lý do", selectedRequest.reason || "Không có lý do"],
                 ].map(([k, v]) => (
@@ -2227,14 +2450,33 @@ export default function ApprovalManagement({
                   <StatusPill status={selectedRequest.status as TOStatus} />
                 </div>
               </div>
+              )}
             </div>
 
-            <div className="px-6 pb-6 flex gap-2">
-              {selectedRequest.status === "pending" && !isRequestExpired(selectedRequest) && (
+            <div className="px-6 pb-6 flex flex-wrap gap-2">
+              {selectedRequest.status === "pending" && requestEditMode && (
                 <>
+                  <button onClick={saveRequestEdit} disabled={savingRequestEdit}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-[#C62828] hover:bg-[#B71C1C] disabled:opacity-50 text-white rounded-2xl text-sm font-black transition-all">
+                    {savingRequestEdit ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <Check size={16} />}
+                    Lưu thay đổi
+                  </button>
+                  <button onClick={() => setRequestEditMode(false)} className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl text-sm font-bold">
+                    Hủy sửa
+                  </button>
+                </>
+              )}
+              {selectedRequest.status === "pending" && !requestEditMode && (
+                <>
+                  <button onClick={() => setRequestEditMode(true)}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-200 hover:border-[#C62828]/30 text-gray-700 rounded-2xl text-sm font-bold transition-all">
+                    <PenLine size={15} /> Sửa đơn
+                  </button>
                   <button onClick={() => { approveReq(selectedRequest.id); setSelectedRequest(null) }}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-sm">
-                    <Check size={16} className="stroke-[3px]" /> Phê duyệt
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-sm ${
+                      isRequestExpired(selectedRequest) ? "bg-amber-500 hover:bg-amber-600" : "bg-emerald-500 hover:bg-emerald-600"
+                    }`}>
+                    <Check size={16} className="stroke-[3px]" /> {isRequestExpired(selectedRequest) ? "Duyệt (quá hạn)" : "Phê duyệt"}
                   </button>
                   <button onClick={() => { rejectReq(selectedRequest.id); setSelectedRequest(null) }}
                     className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-500 hover:bg-red-600 text-white rounded-2xl text-sm font-black transition-all active:scale-95 shadow-sm">
@@ -2242,8 +2484,8 @@ export default function ApprovalManagement({
                   </button>
                 </>
               )}
-              <button onClick={() => setSelectedRequest(null)}
-                className={`py-3 bg-gray-150 hover:bg-gray-200 text-gray-700 rounded-2xl text-sm font-bold transition-all ${selectedRequest.status === "pending" && !isRequestExpired(selectedRequest) ? "px-5" : "flex-1"}`}>
+              <button onClick={() => { setSelectedRequest(null); setRequestEditMode(false) }}
+                className={`py-3 bg-gray-150 hover:bg-gray-200 text-gray-700 rounded-2xl text-sm font-bold transition-all ${selectedRequest.status === "pending" && !requestEditMode ? "px-5" : "flex-1"}`}>
                 Đóng
               </button>
             </div>

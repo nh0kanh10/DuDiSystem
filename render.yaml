@@ -17,3 +17,13 @@ services:
         generateValue: true
       - key: CORS_ORIGIN
         sync: false
+      - key: FILE_STORAGE_PROVIDER
+        value: cloudinary
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        value: dudi

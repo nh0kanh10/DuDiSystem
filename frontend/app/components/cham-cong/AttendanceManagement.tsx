@@ -1,17 +1,38 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react"
+import { createPortal } from "react-dom"
 import {
   Search, Download, Edit2, UserCheck, Clock, UserX, CalendarDays,
   BarChart3, X, Check, ChevronLeft, ChevronRight, Plus, Loader2,
   FileText, TrendingUp, AlertTriangle, RefreshCw, Calendar, Save
 } from "lucide-react"
 import { api } from "@/lib/api"
-import { AttendanceRecord } from "../../types"
+import { AttendanceRecord, Employee } from "../../types"
 import { CustomDatePicker } from "../ui/CustomDatePicker"
+import { formatAttendanceTimes, formatAttendanceNote, formatDurationHms, formatCheckTime, ATT_STATUS_STYLE, internPunchClass, recordMatchesStatusFilter, internSessionStatusForRow } from "./attendanceDisplay"
+import {
+  EMPLOYEE_KIND,
+  createAddAttendanceForm,
+  enrichAttendanceRecord,
+  employeeKindMeta,
+  emptyTimeFormValue,
+  getPunchTime,
+  internLegendText,
+  isInternEmployee,
+  isInternRecord,
+  monthRowsForEmployee,
+  sessionLabel,
+  toApiTime,
+  INTERN_SESSION,
+  type MonthTimeRow,
+} from "./attendanceModel"
 import { CustomSelect } from "../ui/CustomSelect"
+import { CustomTimePicker } from "../ui/CustomTimePicker"
 
 const STATUS_MAP = {
   "on-time": { label: "Đúng giờ",  bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500"  },
   "late":    { label: "Đi trễ",    bg: "bg-orange-100", text: "text-orange-700", dot: "bg-orange-500" },
+  "early":   { label: "Về sớm",    bg: "bg-amber-100",  text: "text-amber-700",  dot: "bg-amber-500"  },
+  "late_early": { label: "Vào trễ, ra sớm", bg: "bg-orange-100", text: "text-orange-800", dot: "bg-orange-600" },
   "absent":  { label: "Vắng mặt",  bg: "bg-red-100",    text: "text-red-700",    dot: "bg-red-500"    },
   "leave":   { label: "Nghỉ phép", bg: "bg-violet-100", text: "text-violet-700", dot: "bg-violet-500" },
 } as const
@@ -19,20 +40,60 @@ const STATUS_MAP = {
 type AttStatus = keyof typeof STATUS_MAP
 
 const HEAT_COLOR: Record<AttStatus, string> = {
-  "on-time": "#bbf7d0", "late": "#fed7aa", "absent": "#fecaca", "leave": "#ddd6fe"
+  "on-time": "#bbf7d0",
+  late: "#fed7aa",
+  early: "#fde68a",
+  late_early: "#fdba74",
+  absent: "#fecaca",
+  leave: "#ddd6fe",
 }
 const HEAT_TEXT: Record<AttStatus, string> = {
-  "on-time": "#15803d", "late": "#c2410c", "absent": "#b91c1c", "leave": "#6d28d9"
+  "on-time": "#15803d",
+  late: "#c2410c",
+  early: "#b45309",
+  late_early: "#9a3412",
+  absent: "#b91c1c",
+  leave: "#6d28d9",
+}
+
+function heatForStatus(status: string) {
+  const key = (status in STATUS_MAP ? status : "absent") as AttStatus
+  return { bg: HEAT_COLOR[key], text: HEAT_TEXT[key] }
+}
+
+function shortClock(t?: string): string | null {
+  if (!t || t === "--") return null
+  const m = t.match(/^(\d{1,2}):(\d{2})/)
+  return m ? `${m[1].padStart(2, "0")}:${m[2]}` : null
+}
+
+function monthRowTime(rec: AttendanceRecord, row: MonthTimeRow): string | null {
+  return shortClock(getPunchTime(rec, row))
+}
+
+const MONTH_SUB_ROW_H = 52
+
+function inBranch(emp: { branchId?: string }, branch: string) {
+  return branch === "all" || emp.branchId === branch
+}
+
+function branchQuery(branch: string): { branchId?: string } {
+  return branch !== "all" ? { branchId: branch } : {}
 }
 
 function calcHours(ci: string, co: string): string {
   if (!ci || !co || ci === "--" || co === "--") return "--"
-  const [h1, m1] = ci.split(":").map(Number)
-  const [h2, m2] = co.split(":").map(Number)
-  const total = (h2 * 60 + m2) - (h1 * 60 + m1)
-  if (total <= 0) return "--"
-  const h = Math.floor(total / 60), m = total % 60
-  return m > 0 ? `${h}g${m}p` : `${h}g`
+  const parse = (t: string) => {
+    const p = t.split(":").map(Number)
+    return p[0] * 3600 + (p[1] ?? 0) * 60 + (p[2] ?? 0)
+  }
+  const diff = parse(co) - parse(ci)
+  if (diff <= 0) return "--"
+  const h = Math.floor(diff / 3600)
+  const m = Math.floor((diff % 3600) / 60)
+  const s = diff % 60
+  const raw = `${h > 0 ? `${h}g` : ""}${m}p${s > 0 ? `${s}s` : ""}`
+  return formatDurationHms(raw)
 }
 
 function fmtDate(iso: string) {
@@ -54,12 +115,16 @@ function vnToIso(vn: string) {
 }
 
 function exportCSV(rows: AttendanceRecord[], label: string) {
-  const header = ["Mã NV", "Họ tên", "Phòng ban", "Ngày", "Check-in", "Check-out", "Tổng giờ", "Trạng thái", "Ghi chú"]
-  const lines = rows.map(r => [
-    r.employeeId, r.employeeName, r.department, fmtDate(r.date),
-    r.checkIn, r.checkOut, calcHours(r.checkIn, r.checkOut),
-    STATUS_MAP[r.status as AttStatus]?.label ?? r.status, r.note
-  ].join(","))
+  const header = ["Mã NV", "Họ tên", "Phòng ban", "Loại", "Ngày", "Giờ công", "Tổng giờ", "Trạng thái", "Ghi chú"]
+  const lines = rows.map(r => {
+    const t = formatAttendanceTimes(r)
+    const type = employeeKindMeta(r.employeeStatus).label
+    return [
+      r.employeeId, r.employeeName, r.department, type, fmtDate(r.date),
+      t.combined, r.workingHours ?? calcHours(r.checkIn, r.checkOut),
+      STATUS_MAP[r.status as AttStatus]?.label ?? r.status, r.note
+    ].join(",")
+  })
   const csv = [header.join(","), ...lines].join("\n")
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" })
   const url = URL.createObjectURL(blob)
@@ -69,11 +134,27 @@ function exportCSV(rows: AttendanceRecord[], label: string) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const s = STATUS_MAP[status as AttStatus] ?? { label: status, bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" }
+  const s = ATT_STATUS_STYLE[status] ?? { label: status, bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" }
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${s.bg} ${s.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
     </span>
+  )
+}
+
+function InternSessionBadges({ record }: { record: AttendanceRecord }) {
+  return (
+    <div className="flex flex-col gap-1">
+      {([["S", record.statusAm], ["C", record.statusPm]] as const).map(([label, status]) => {
+        const s = ATT_STATUS_STYLE[status ?? "absent"] ?? ATT_STATUS_STYLE.absent
+        return (
+          <span key={label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${s.bg} ${s.text}`}>
+            <span className="text-gray-500 font-black">{label}:</span>
+            {s.label}
+          </span>
+        )
+      })}
+    </div>
   )
 }
 
@@ -102,69 +183,75 @@ function EditModal({ record, onClose, onSave }: {
   onClose: () => void
   onSave: (id: string, data: Partial<AttendanceRecord>) => Promise<void>
 }) {
-  const [form, setForm] = useState({
-    checkIn: record.checkIn === "--" ? "" : record.checkIn,
-    checkOut: record.checkOut === "--" ? "" : record.checkOut,
-    status: record.status,
-    note: record.note ?? ""
+  const isIntern = isInternRecord(record)
+  const [form, setForm] = useState(isIntern ? {
+    checkInAm: emptyTimeFormValue(record.checkInAm),
+    checkOutAm: emptyTimeFormValue(record.checkOutAm),
+    checkInPm: emptyTimeFormValue(record.checkInPm),
+    checkOutPm: emptyTimeFormValue(record.checkOutPm),
+  } : {
+    checkIn: emptyTimeFormValue(record.checkIn),
+    checkOut: emptyTimeFormValue(record.checkOut),
   })
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
     setSaving(true)
-    await onSave(record.id, {
-      checkIn: form.checkIn || "--",
-      checkOut: form.checkOut || "--",
-      status: form.status as AttStatus,
-      note: form.note
-    })
+    if (isIntern) {
+      const f = form as { checkInAm: string; checkOutAm: string; checkInPm: string; checkOutPm: string }
+      await onSave(record.id, {
+        checkInAm: toApiTime(f.checkInAm),
+        checkOutAm: toApiTime(f.checkOutAm),
+        checkInPm: toApiTime(f.checkInPm),
+        checkOutPm: toApiTime(f.checkOutPm),
+      })
+    } else {
+      const f = form as { checkIn: string; checkOut: string }
+      await onSave(record.id, {
+        checkIn: toApiTime(f.checkIn),
+        checkOut: toApiTime(f.checkOut),
+      })
+    }
     setSaving(false)
     onClose()
   }
 
-  return (
+  const timeInput = (label: string, key: string, value: string) => (
+    <div>
+      <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">{label}</label>
+      <CustomTimePicker value={value} onChange={val => setForm(p => ({ ...p, [key]: val }))} />
+    </div>
+  )
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
         <div className="bg-[#C62828] px-6 py-4 flex items-center justify-between">
           <div>
             <p className="text-white font-black text-base">{record.employeeName}</p>
-            <p className="text-white/70 text-xs mt-0.5">{record.employeeId} · {fmtDate(record.date)}</p>
+            <p className="text-white/70 text-xs mt-0.5">
+              {record.employeeId} · {fmtDate(record.date)} · {employeeKindMeta(record.employeeStatus).label}
+            </p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 text-white transition-colors">
             <X size={15} />
           </button>
         </div>
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Giờ Check-in</label>
-              <input type="time" value={form.checkIn} onChange={e => setForm(p => ({ ...p, checkIn: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-gray-800 focus:outline-none focus:border-[#C62828]/50 focus:ring-2 focus:ring-[#C62828]/10 transition-all" />
+          {isIntern ? (
+            <div className="grid grid-cols-2 gap-4">
+              {timeInput("Vào sáng", "checkInAm", (form as any).checkInAm)}
+              {timeInput("Ra sáng", "checkOutAm", (form as any).checkOutAm)}
+              {timeInput("Vào chiều", "checkInPm", (form as any).checkInPm)}
+              {timeInput("Ra chiều", "checkOutPm", (form as any).checkOutPm)}
             </div>
-            <div>
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Giờ Check-out</label>
-              <input type="time" value={form.checkOut} onChange={e => setForm(p => ({ ...p, checkOut: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold text-gray-800 focus:outline-none focus:border-[#C62828]/50 focus:ring-2 focus:ring-[#C62828]/10 transition-all" />
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              {timeInput("Giờ Check-in", "checkIn", (form as any).checkIn)}
+              {timeInput("Giờ Check-out", "checkOut", (form as any).checkOut)}
             </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Trạng thái</label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(STATUS_MAP).map(([k, v]) => (
-                <button key={k} onClick={() => setForm(p => ({ ...p, status: k as AttStatus }))}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-xs font-bold transition-all ${form.status === k ? `border-current ${v.bg} ${v.text}` : "border-gray-100 text-gray-500 hover:border-gray-200 bg-gray-50"}`}>
-                  <span className={`w-2 h-2 rounded-full ${v.dot}`} />{v.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Ghi chú</label>
-            <textarea rows={2} value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))}
-              placeholder="Lý do đi trễ, vắng mặt..."
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 resize-none focus:outline-none focus:border-[#C62828]/50 focus:ring-2 focus:ring-[#C62828]/10 transition-all" />
-          </div>
+          )}
         </div>
         <div className="px-6 pb-6 flex gap-2">
           <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-colors">Hủy</button>
@@ -174,35 +261,59 @@ function EditModal({ record, onClose, onSave }: {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
 function AddModal({ date, employees, onClose, onSave }: {
   date: string
-  employees: any[]
+  employees: Employee[]
   onClose: () => void
   onSave: (data: any) => Promise<void>
 }) {
-  const [form, setForm] = useState({ employeeId: "", checkIn: "08:00", checkOut: "17:00", status: "on-time" as AttStatus, note: "" })
+  const [form, setForm] = useState(createAddAttendanceForm)
   const [saving, setSaving] = useState(false)
+
+  const selectedEmp = useMemo(
+    () => employees.find(e => e.id === form.employeeId),
+    [employees, form.employeeId],
+  )
+  const isIntern = isInternEmployee(selectedEmp ?? { contractType: "" })
 
   const handleSave = async () => {
     if (!form.employeeId) return
     setSaving(true)
-    await onSave({ ...form, date })
+    if (isIntern) {
+      await onSave({
+        employeeId: form.employeeId,
+        date,
+        checkInAm: form.checkInAm,
+        checkOutAm: form.checkOutAm,
+        checkInPm: form.checkInPm,
+        checkOutPm: form.checkOutPm,
+      })
+    } else {
+      await onSave({
+        employeeId: form.employeeId,
+        date,
+        checkIn: form.checkIn,
+        checkOut: form.checkOut,
+      })
+    }
     setSaving(false)
     onClose()
   }
 
-  const empOptions = useMemo(() => {
-    return [
-      { value: "", label: "-- Chọn nhân viên --" },
-      ...employees.map((e: any) => ({ value: e.id, label: `${e.name} (${e.id})` }))
-    ]
-  }, [employees])
+  const empOptions = useMemo(() => [
+    { value: "", label: "-- Chọn nhân viên --" },
+    ...employees.map(e => ({
+      value: e.id,
+      label: `${e.name} (${e.id})${isInternEmployee(e) ? ` · ${EMPLOYEE_KIND.intern.badge}` : ""}`,
+    })),
+  ], [employees])
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in zoom-in-95 duration-200">
@@ -225,34 +336,42 @@ function AddModal({ date, employees, onClose, onSave }: {
               searchable
             />
           </div>
+          {isIntern ? (
+            <div className="space-y-3">
+              <p className="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
+                Thực tập — nhập giờ theo buổi sáng / chiều
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Vào sáng</label>
+                  <CustomTimePicker value={form.checkInAm} onChange={val => setForm(p => ({ ...p, checkInAm: val }))} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Ra sáng</label>
+                  <CustomTimePicker value={form.checkOutAm} onChange={val => setForm(p => ({ ...p, checkOutAm: val }))} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Vào chiều</label>
+                  <CustomTimePicker value={form.checkInPm} onChange={val => setForm(p => ({ ...p, checkInPm: val }))} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Ra chiều</label>
+                  <CustomTimePicker value={form.checkOutPm} onChange={val => setForm(p => ({ ...p, checkOutPm: val }))} />
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Check-in</label>
-              <input type="time" value={form.checkIn} onChange={e => setForm(p => ({ ...p, checkIn: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10" />
+              <CustomTimePicker value={form.checkIn} onChange={val => setForm(p => ({ ...p, checkIn: val }))} />
             </div>
             <div>
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Check-out</label>
-              <input type="time" value={form.checkOut} onChange={e => setForm(p => ({ ...p, checkOut: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10" />
+              <CustomTimePicker value={form.checkOut} onChange={val => setForm(p => ({ ...p, checkOut: val }))} />
             </div>
           </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Trạng thái</label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(STATUS_MAP).map(([k, v]) => (
-                <button key={k} onClick={() => setForm(p => ({ ...p, status: k as AttStatus }))}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-xs font-bold transition-all ${form.status === k ? `border-current ${v.bg} ${v.text}` : "border-gray-100 text-gray-400 hover:border-gray-200"}`}>
-                  <span className={`w-2 h-2 rounded-full ${v.dot}`} />{v.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1.5">Ghi chú</label>
-            <input value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))} placeholder="Ghi chú..."
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#C62828]/50 focus:ring-2 focus:ring-[#C62828]/10" />
-          </div>
+          )}
         </div>
         <div className="px-6 pb-6 flex gap-2">
           <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50">Hủy</button>
@@ -262,22 +381,24 @@ function AddModal({ date, employees, onClose, onSave }: {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
-// ─── TAB 1: Chấm công theo ngày ───────────────────────────────────────────────
-function DailyTab() {
-  const todayISO = new Date().toISOString().split("T")[0]
-  const [dateMode, setDateMode] = useState<"single" | "month" | "range">("single")
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [startDate, setStartDate] = useState(todayISO)
-  const [endDate, setEndDate] = useState(todayISO)
+function getLocalTodayISO() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
+
+function DailyTab({ selectedBranch }: { selectedBranch: string }) {
+  const todayISO = getLocalTodayISO()
+  const [selectedDate, setSelectedDate] = useState(todayISO)
   const [filterEmployee, setFilterEmployee] = useState("all")
   const [search, setSearch] = useState("")
   const [filterDept, setFilterDept] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
+  const [filterType, setFilterType] = useState<"all" | "intern" | "staff">("all")
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [stats, setStats] = useState({ onTime: 0, late: 0, absent: 0, leave: 0, total: 0 })
   const [loading, setLoading] = useState(true)
@@ -291,12 +412,11 @@ function DailyTab() {
   const loadData = useCallback(async (start: string, end: string, empId: string) => {
     setLoading(true)
     try {
-      const queryParams: any = {
+      const queryParams = {
         startDate: start,
-        endDate: end
-      }
-      if (empId !== "all") {
-        queryParams.employeeId = empId
+        endDate: end,
+        ...branchQuery(selectedBranch),
+        ...(empId !== "all" ? { employeeId: empId } : {}),
       }
       const [data, statsData] = await Promise.all([
         api.attendance.list(queryParams),
@@ -309,32 +429,41 @@ function DailyTab() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedBranch])
 
-  useEffect(() => { loadData(startDate, endDate, filterEmployee) }, [startDate, endDate, filterEmployee, loadData])
+  useEffect(() => { loadData(selectedDate, selectedDate, filterEmployee) }, [selectedDate, filterEmployee, loadData])
+
+  useEffect(() => {
+    if (filterEmployee !== "all" && !employees.some((e: Employee) => e.id === filterEmployee && inBranch(e, selectedBranch))) {
+      setFilterEmployee("all")
+    }
+  }, [selectedBranch, employees, filterEmployee])
+
+  const branchEmployees = useMemo(
+    () => (employees as Employee[]).filter(e => inBranch(e, selectedBranch)),
+    [employees, selectedBranch],
+  )
 
   const shiftDate = (days: number) => {
-    const s = new Date(startDate)
+    const s = new Date(selectedDate)
     s.setDate(s.getDate() + days)
-    const newStart = s.toISOString().split("T")[0]
-    
-    const e = new Date(endDate)
-    e.setDate(e.getDate() + days)
-    const newEnd = e.toISOString().split("T")[0]
-    
-    setStartDate(newStart)
-    setEndDate(newEnd)
+    setSelectedDate(`${s.getFullYear()}-${String(s.getMonth() + 1).padStart(2, "0")}-${String(s.getDate()).padStart(2, "0")}`)
   }
 
   const handleSaveEdit = async (id: string, data: Partial<AttendanceRecord>) => {
     try {
-      await api.attendance.update(id, data)
-      setRecords(prev => prev.map(r => r.id === id ? { ...r, ...data } : r))
-      const statsData = await api.attendance.stats({ startDate, endDate, employeeId: filterEmployee !== "all" ? filterEmployee : undefined })
+      const updated = await api.attendance.update(id, data) as AttendanceRecord
+      setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r))
+      const statsData = await api.attendance.stats({
+        startDate: selectedDate,
+        endDate: selectedDate,
+        employeeId: filterEmployee !== "all" ? filterEmployee : undefined,
+        ...branchQuery(selectedBranch),
+      })
       setStats(statsData)
       setToast({ msg: "Cập nhật thành công", type: "success" })
-    } catch {
-      setToast({ msg: "Lỗi cập nhật", type: "error" })
+    } catch (e: unknown) {
+      setToast({ msg: e instanceof Error ? e.message : "Lỗi cập nhật", type: "error" })
     }
   }
 
@@ -342,28 +471,47 @@ function DailyTab() {
     try {
       await api.attendance.create(data)
       setToast({ msg: "Thêm bản ghi thành công", type: "success" })
-      await loadData(startDate, endDate, filterEmployee)
+      await loadData(selectedDate, selectedDate, filterEmployee)
     } catch (e: any) {
       setToast({ msg: e.message || "Lỗi thêm bản ghi", type: "error" })
     }
   }
 
-  const filtered = useMemo(() => records.filter(r => {
+  const employeeById = useMemo(
+    () => new Map(branchEmployees.map(e => [e.id, e])),
+    [branchEmployees],
+  )
+
+  const enrichedRecords = useMemo(
+    () => records.map(r => {
+      const emp = employeeById.get(r.employeeId)
+      return emp ? enrichAttendanceRecord(r, emp) : r
+    }),
+    [records, employeeById],
+  )
+
+  const filtered = useMemo(() => enrichedRecords.filter(r => {
     const q = search.toLowerCase()
     return (!q || r.employeeName.toLowerCase().includes(q) || r.employeeId.toLowerCase().includes(q))
       && (filterDept === "all" || r.department === filterDept)
-      && (filterStatus === "all" || r.status === filterStatus)
-  }), [records, search, filterDept, filterStatus])
+      && recordMatchesStatusFilter(r, filterStatus)
+      && (filterType === "all"
+        || (filterType === "intern" ? isInternRecord(r) : !isInternRecord(r)))
+  }), [enrichedRecords, search, filterDept, filterStatus, filterType])
 
-  const departments = useMemo(() => Array.from(new Set(records.map(r => r.department).filter(Boolean))), [records])
-  const isToday = endDate === todayISO
+  const departments = useMemo(
+    () => Array.from(new Set(branchEmployees.map(e => e.department).filter(Boolean))),
+    [branchEmployees],
+  )
+  const isToday = selectedDate === todayISO
 
-  const empFilterOptions = useMemo(() => {
-    return [
-      { value: "all", label: "Tất cả nhân viên" },
-      ...employees.map((e: any) => ({ value: e.id, label: `${e.name} (${e.id})` }))
-    ]
-  }, [employees])
+  const empFilterOptions = useMemo(() => [
+    { value: "all", label: "Tất cả nhân viên" },
+    ...branchEmployees.map(e => ({
+      value: e.id,
+      label: `${e.name} (${e.id})${isInternEmployee(e) ? ` · ${EMPLOYEE_KIND.intern.badge}` : ""}`,
+    })),
+  ], [branchEmployees])
 
   const deptFilterOptions = useMemo(() => {
     return [
@@ -372,122 +520,52 @@ function DailyTab() {
     ]
   }, [departments])
 
-  const statusFilterOptions = useMemo(() => {
-    return [
-      { value: "all", label: "Tất cả trạng thái" },
-      ...Object.entries(STATUS_MAP).map(([k, v]) => ({ value: k, label: v.label }))
-    ]
-  }, [])
+  const statusFilterOptions = useMemo(() => [
+    { value: "all", label: "Tất cả trạng thái" },
+    ...Object.entries(STATUS_MAP).map(([k, v]) => ({ value: k, label: v.label })),
+  ], [])
+
+  const typeFilterOptions = useMemo(() => [
+    { value: "all", label: "Tất cả loại" },
+    { value: "staff", label: EMPLOYEE_KIND.staff.filterLabel },
+    { value: "intern", label: EMPLOYEE_KIND.intern.filterLabel },
+  ], [])
 
   return (
     <div className="space-y-5">
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       {editRecord && <EditModal record={editRecord} onClose={() => setEditRecord(null)} onSave={handleSaveEdit} />}
-      {showAdd && <AddModal date={endDate} employees={employees} onClose={() => setShowAdd(false)} onSave={handleAdd} />}
+      {showAdd && <AddModal date={selectedDate} employees={branchEmployees} onClose={() => setShowAdd(false)} onSave={handleAdd} />}
 
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex bg-gray-100 p-0.5 rounded-xl border border-gray-200/50 shrink-0">
-            <button onClick={() => { setDateMode("single"); setEndDate(startDate) }}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${dateMode === "single" ? "bg-white text-[#C62828] shadow-xs" : "text-gray-500 hover:text-gray-700"}`}>
-              Một ngày
-            </button>
-            <button onClick={() => {
-              setDateMode("month")
-              const newStart = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`
-              const newEnd = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${new Date(selectedYear, selectedMonth, 0).getDate()}`
-              setStartDate(newStart)
-              setEndDate(newEnd)
-            }}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${dateMode === "month" ? "bg-white text-[#C62828] shadow-xs" : "text-gray-500 hover:text-gray-700"}`}>
-              Theo tháng
-            </button>
-            <button onClick={() => setDateMode("range")}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition-all ${dateMode === "range" ? "bg-white text-[#C62828] shadow-xs" : "text-gray-500 hover:text-gray-700"}`}>
-              Khoảng ngày
-            </button>
-          </div>
-
-          {dateMode === "single" ? (
-            <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
-              <button onClick={() => shiftDate(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors">
-                <ChevronLeft size={15} />
-              </button>
-              <CustomDatePicker
-                value={isoToVn(startDate)}
-                onChange={val => {
-                  const d = vnToIso(val)
-                  setStartDate(d)
-                  setEndDate(d)
-                }}
-                className="w-32 text-xs font-bold text-gray-800 bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 cursor-pointer hover:bg-gray-50"
-              />
-              <button onClick={() => shiftDate(1)} disabled={startDate === todayISO}
-                className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 transition-colors disabled:opacity-30">
-                <ChevronRight size={15} />
-              </button>
-            </div>
-          ) : dateMode === "month" ? (
-            <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
-              <select value={selectedMonth} onChange={e => {
-                const m = Number(e.target.value)
-                setSelectedMonth(m)
-                const newStart = `${selectedYear}-${String(m).padStart(2, "0")}-01`
-                const newEnd = `${selectedYear}-${String(m).padStart(2, "0")}-${new Date(selectedYear, m, 0).getDate()}`
-                setStartDate(newStart)
-                setEndDate(newEnd)
-              }}
-                className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 bg-white cursor-pointer focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50">
-                {Array.from({ length: 12 }, (_, i) => (
-                  <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>
-                ))}
-              </select>
-              <select value={selectedYear} onChange={e => {
-                const y = Number(e.target.value)
-                setSelectedYear(y)
-                const newStart = `${y}-${String(selectedMonth).padStart(2, "0")}-01`
-                const newEnd = `${y}-${String(selectedMonth).padStart(2, "0")}-${new Date(y, selectedMonth, 0).getDate()}`
-                setStartDate(newStart)
-                setEndDate(newEnd)
-              }}
-                className="px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 bg-white cursor-pointer focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50">
-                {Array.from({ length: 5 }, (_, i) => {
-                  const y = new Date().getFullYear() - 2 + i
-                  return <option key={y} value={y}>Năm {y}</option>
-                })}
-              </select>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 animate-in fade-in duration-200">
-              <CustomDatePicker
-                value={isoToVn(startDate)}
-                onChange={val => setStartDate(vnToIso(val))}
-                className="w-32 text-xs font-bold text-gray-800 bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 cursor-pointer hover:bg-gray-50"
-              />
-              <span className="text-gray-400 text-xs font-semibold">đến</span>
-              <CustomDatePicker
-                value={isoToVn(endDate)}
-                onChange={val => setEndDate(vnToIso(val))}
-                className="w-32 text-xs font-bold text-gray-800 bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 cursor-pointer hover:bg-gray-50"
-              />
-            </div>
-          )}
-
-          {dateMode === "single" && (!isToday || startDate !== todayISO) && (
-            <button onClick={() => { setStartDate(todayISO); setEndDate(todayISO) }} className="px-3 py-1.5 text-xs font-bold text-[#C62828] border border-[#C62828]/30 rounded-xl hover:bg-red-50 transition-colors animate-in fade-in duration-200">
+      <div className="flex flex-wrap items-center justify-between gap-3 w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => shiftDate(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500">
+            <ChevronLeft size={15} />
+          </button>
+          <CustomDatePicker
+            value={isoToVn(selectedDate)}
+            onChange={val => setSelectedDate(vnToIso(val))}
+            className="w-36 text-xs font-bold text-gray-800 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 cursor-pointer"
+          />
+          <button onClick={() => shiftDate(1)} disabled={selectedDate >= todayISO}
+            className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 disabled:opacity-30">
+            <ChevronRight size={15} />
+          </button>
+          {!isToday && (
+            <button onClick={() => setSelectedDate(todayISO)} className="px-3 py-1.5 text-xs font-bold text-[#C62828] border border-[#C62828]/30 rounded-xl hover:bg-red-50">
               Hôm nay
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => loadData(startDate, endDate, filterEmployee)} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-2 flex-wrap ml-auto">
+          <button onClick={() => loadData(selectedDate, selectedDate, filterEmployee)} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50">
             <RefreshCw size={13} /> Làm mới
           </button>
-          <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 bg-[#C62828] text-white rounded-xl text-xs font-bold hover:bg-[#B71C1C] transition-colors">
-            <Plus size={13} /> Thêm bản ghi
+          <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-2 bg-[#C62828] text-white rounded-xl text-xs font-bold hover:bg-[#B71C1C]">
+            <Plus size={13} /> Thêm
           </button>
-          <button onClick={() => exportCSV(filtered, `${startDate}_den_${endDate}`)} className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-colors">
-            <Download size={13} /> Xuất CSV
+          <button onClick={() => exportCSV(filtered, selectedDate)} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50">
+            <Download size={13} /> CSV
           </button>
         </div>
       </div>
@@ -513,48 +591,32 @@ function DailyTab() {
         ))}
       </div>
 
-      <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-50 flex flex-wrap gap-3 items-center">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+      <div className="bg-white rounded-3xl border border-black/5 shadow-sm">
+        <div className="p-3 border-b border-gray-100 grid grid-cols-1 xl:grid-cols-[minmax(180px,1fr)_minmax(120px,0.7fr)_minmax(130px,0.8fr)_minmax(130px,0.8fr)_minmax(130px,0.8fr)_auto] gap-2 items-center w-full">
+          <div className="relative min-w-0">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Tìm tên hoặc mã NV..."
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50/50 focus:outline-none focus:border-[#C62828]/40 text-gray-700 font-bold" />
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl bg-gray-50/50 focus:outline-none focus:border-[#C62828]/40 text-gray-700 font-bold" />
           </div>
-          <CustomSelect
-            value={filterEmployee}
-            onChange={setFilterEmployee}
-            options={empFilterOptions}
-            placeholder="Tất cả nhân viên"
-            className="min-w-[150px]"
-            searchable
-          />
-          <CustomSelect
-            value={filterDept}
-            onChange={setFilterDept}
-            options={deptFilterOptions}
-            placeholder="Tất cả phòng ban"
-            className="min-w-[150px]"
-          />
-          <CustomSelect
-            value={filterStatus}
-            onChange={setFilterStatus}
-            options={statusFilterOptions}
-            placeholder="Tất cả trạng thái"
-            className="min-w-[150px]"
-          />
-          {(search || filterEmployee !== "all" || filterDept !== "all" || filterStatus !== "all") && (
-            <button onClick={() => { setSearch(""); setFilterEmployee("all"); setFilterDept("all"); setFilterStatus("all") }}
-              className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 font-bold">
-              <X size={12} /> Xóa lọc
-            </button>
-          )}
-          <span className="ml-auto text-xs text-gray-400 font-medium">{filtered.length} / {records.length} bản ghi</span>
+          <CustomSelect value={filterType} onChange={v => setFilterType(v as "all" | "intern" | "staff")} options={typeFilterOptions} placeholder="Loại NV" className="w-full" />
+          <CustomSelect value={filterEmployee} onChange={setFilterEmployee} options={empFilterOptions} placeholder="Nhân viên" className="w-full" searchable />
+          <CustomSelect value={filterDept} onChange={setFilterDept} options={deptFilterOptions} placeholder="Phòng ban" className="w-full" />
+          <CustomSelect value={filterStatus} onChange={setFilterStatus} options={statusFilterOptions} placeholder="Trạng thái" className="w-full" />
+          <div className="flex items-center justify-end gap-2 shrink-0">
+            {(search || filterEmployee !== "all" || filterDept !== "all" || filterStatus !== "all" || filterType !== "all") && (
+              <button onClick={() => { setSearch(""); setFilterEmployee("all"); setFilterDept("all"); setFilterStatus("all"); setFilterType("all") }}
+                className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 font-bold whitespace-nowrap">
+                <X size={12} /> Xóa lọc
+              </button>
+            )}
+            <span className="text-xs text-gray-400 font-medium whitespace-nowrap">{filtered.length}/{records.length}</span>
+          </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto rounded-b-3xl">
           <table className="w-full text-sm text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/80 text-gray-400 font-semibold text-xs border-b border-gray-100">
-                {["Mã NV", "Họ và tên", "Phòng ban", "Check-in", "Check-out", "Tổng giờ", "Trạng thái", "Ghi chú", ""].map(h => (
+                {["Mã NV", "Họ và tên", "Phòng ban", "Loại", "Check-in", "Check-out", "Tổng giờ", "Trạng thái", "Ghi chú", ""].map(h => (
                   <th key={h} className="py-3 px-4 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -565,7 +627,7 @@ function DailyTab() {
                 : filtered.length === 0
                   ? (
                     <tr>
-                      <td colSpan={9} className="py-16 text-center">
+                      <td colSpan={10} className="py-16 text-center">
                         <div className="flex flex-col items-center gap-2 text-gray-400">
                           <FileText size={32} className="opacity-30" />
                           <p className="text-sm font-medium">Không có bản ghi chấm công</p>
@@ -574,18 +636,59 @@ function DailyTab() {
                       </td>
                     </tr>
                   )
-                  : filtered.map(r => (
+                  : filtered.map(r => {
+                    const kind = employeeKindMeta(r.employeeStatus)
+                    return (
                     <tr key={r.id} className="hover:bg-gray-50/40 transition-colors group">
                       <td className="py-3 px-4 font-mono text-xs text-gray-500">{r.employeeId}</td>
                       <td className="py-3 px-4 font-bold text-gray-800 whitespace-nowrap">{r.employeeName}</td>
                       <td className="py-3 px-4 text-gray-500 text-xs">{r.department}</td>
-                      <td className="py-3 px-4 font-mono font-bold text-gray-800">
-                        <span className={r.status === "late" ? "text-orange-600" : ""}>{r.checkIn}</span>
+                      <td className="py-3 px-4 text-xs">
+                        <span className={`px-2 py-0.5 rounded-full font-bold ${kind.badgeClass}`}>
+                          {kind.badge}
+                        </span>
                       </td>
-                      <td className="py-3 px-4 font-mono text-gray-400">{r.checkOut}</td>
-                      <td className="py-3 px-4 font-mono font-bold text-gray-700">{calcHours(r.checkIn, r.checkOut)}</td>
-                      <td className="py-3 px-4"><StatusBadge status={r.status} /></td>
-                      <td className="py-3 px-4 text-xs text-gray-400 max-w-[120px] truncate" title={r.note}>{r.note || "--"}</td>
+                      <td className="py-3 px-4 font-mono text-xs text-gray-700">
+                        {isInternRecord(r) ? (
+                          <div className="space-y-0.5 text-[10px]">
+                            <div>
+                              <span className="text-gray-400">{INTERN_SESSION.am.short}:</span>{" "}
+                              <span className={internPunchClass(r.statusAm, r.checkInAm)}>{formatCheckTime(r.checkInAm)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">{INTERN_SESSION.pm.short}:</span>{" "}
+                              <span className={internPunchClass(r.statusPm, r.checkInPm)}>{formatCheckTime(r.checkInPm)}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className={r.status === "late" ? "text-orange-600 font-bold" : "font-bold"}>{formatCheckTime(r.checkIn)}</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-xs text-gray-500">
+                        {isInternRecord(r) ? (
+                          <div className="space-y-0.5 text-[10px]">
+                            <div>
+                              <span className="text-gray-400">{INTERN_SESSION.am.short}:</span>{" "}
+                              <span className={internPunchClass(r.statusAm, r.checkOutAm)}>{formatCheckTime(r.checkOutAm)}</span>
+                            </div>
+                            <div>
+                              <span className="text-gray-400">{INTERN_SESSION.pm.short}:</span>{" "}
+                              <span className={internPunchClass(r.statusPm, r.checkOutPm)}>{formatCheckTime(r.checkOutPm)}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          formatCheckTime(r.checkOut)
+                        )}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-xs font-bold text-gray-700">
+                        {isInternRecord(r)
+                          ? formatDurationHms(r.workingHours ?? "--")
+                          : formatDurationHms(r.workingHours ?? calcHours(r.checkIn, r.checkOut))}
+                      </td>
+                      <td className="py-3 px-4">
+                        {isInternRecord(r) ? <InternSessionBadges record={r} /> : <StatusBadge status={r.status} />}
+                      </td>
+                      <td className="py-3 px-4 text-xs text-gray-500 max-w-[220px] truncate" title={r.note}>{formatAttendanceNote(r.note)}</td>
                       <td className="py-3 px-4">
                         <button onClick={() => setEditRecord(r)}
                           className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-[#C62828] transition-all">
@@ -593,7 +696,7 @@ function DailyTab() {
                         </button>
                       </td>
                     </tr>
-                  ))
+                  )})
               }
             </tbody>
           </table>
@@ -603,15 +706,14 @@ function DailyTab() {
   )
 }
 
-// ─── TAB 2: Lịch sử tháng (Heatmap) ─────────────────────────────────────────
-function MonthlyTab() {
+function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [records, setRecords] = useState<AttendanceRecord[]>([])
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [filterDept, setFilterDept] = useState("all")
-  const [hoverCell, setHoverCell] = useState<{ empId: string; date: string } | null>(null)
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null)
 
@@ -622,12 +724,20 @@ function MonthlyTab() {
     const load = async () => {
       setLoading(true)
       try {
-        const data = await api.attendance.list()
+        const [empData, attData] = await Promise.all([
+          api.employees.list(),
+          api.attendance.list(branchQuery(selectedBranch)),
+        ])
+        setAllEmployees(empData as Employee[])
         const monthStr = String(month).padStart(2, "0")
-        const filtered = (data as AttendanceRecord[]).filter(r => {
+        const branchEmpIds = new Set(
+          (empData as Employee[]).filter(e => inBranch(e, selectedBranch)).map(e => e.id),
+        )
+        const filtered = (attData as AttendanceRecord[]).filter(r => {
           if (!r.date) return false
           const [y, m] = r.date.split("-")
-          return y === String(year) && m === monthStr
+          if (y !== String(year) || m !== monthStr) return false
+          return selectedBranch === "all" || branchEmpIds.has(r.employeeId)
         })
         setRecords(filtered)
       } catch {
@@ -637,17 +747,20 @@ function MonthlyTab() {
       }
     }
     load()
-  }, [year, month])
+  }, [year, month, selectedBranch])
 
-  const employees = useMemo(() => {
-    const map = new Map<string, { id: string; name: string; dept: string }>()
-    records.forEach(r => {
-      if (!map.has(r.employeeId)) map.set(r.employeeId, { id: r.employeeId, name: r.employeeName, dept: r.department })
-    })
-    return Array.from(map.values()).filter(e => filterDept === "all" || e.dept === filterDept)
-  }, [records, filterDept])
+  const employees = useMemo(() =>
+    allEmployees
+      .filter(e => inBranch(e, selectedBranch))
+      .filter(e => filterDept === "all" || e.department === filterDept)
+      .sort((a, b) => a.name.localeCompare(b.name, "vi")),
+  [allEmployees, filterDept, selectedBranch])
 
-  const departments = useMemo(() => Array.from(new Set(records.map(r => r.department).filter(Boolean))), [records])
+  const departments = useMemo(() =>
+    Array.from(new Set(
+      allEmployees.filter(e => inBranch(e, selectedBranch)).map(e => e.department).filter(Boolean),
+    )).sort((a, b) => a.localeCompare(b, "vi")),
+  [allEmployees, selectedBranch])
 
   const lookup = useMemo(() => {
     const m = new Map<string, AttendanceRecord>()
@@ -672,58 +785,51 @@ function MonthlyTab() {
     }
   }
 
-  const deptFilterOptions = useMemo(() => {
-    return [
-      { value: "all", label: "Tất cả phòng ban" },
-      ...departments.map(d => ({ value: d, label: d }))
-    ]
-  }, [departments])
+  const deptFilterOptions = useMemo(() => [
+    { value: "all", label: "Tất cả phòng ban" },
+    ...departments.map(d => ({ value: d, label: d })),
+  ], [departments])
 
   return (
     <div className="space-y-5">
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       {editRecord && <EditModal record={editRecord} onClose={() => setEditRecord(null)} onSave={handleSaveEdit} />}
 
-      <div className="flex items-center justify-between flex-wrap gap-3">
+      <div className="flex items-center justify-between flex-wrap gap-3 w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
         <div className="flex items-center gap-2">
           <button onClick={() => shiftMonth(-1)} className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500">
             <ChevronLeft size={15} />
           </button>
-          <span className="font-black text-gray-800 text-base min-w-[130px] text-center">Tháng {month}/{year}</span>
+          <span className="font-black text-[#C62828] text-base min-w-[140px] text-center">Tháng {month}/{year}</span>
           <button onClick={() => shiftMonth(1)} disabled={year === now.getFullYear() && month >= now.getMonth() + 1}
             className="w-8 h-8 flex items-center justify-center rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-500 disabled:opacity-30">
             <ChevronRight size={15} />
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          <CustomSelect
-            value={filterDept}
-            onChange={setFilterDept}
-            options={deptFilterOptions}
-            placeholder="Tất cả phòng ban"
-            className="min-w-[150px]"
-          />
+        <div className="flex items-center gap-2 flex-1 justify-end min-w-[200px]">
+          <CustomSelect value={filterDept} onChange={setFilterDept} options={deptFilterOptions} placeholder="Phòng ban" className="w-full max-w-[200px]" />
           <button onClick={() => exportCSV(records, `${year}-${month}`)}
-            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50">
-            <Download size={13} /> Xuất CSV
+            className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 whitespace-nowrap">
+            <Download size={13} /> CSV
           </button>
         </div>
       </div>
 
-      <div className="flex items-center gap-4 flex-wrap">
+      <div className="flex items-center gap-2 flex-wrap w-full">
         {Object.entries(STATUS_MAP).map(([k, v]) => (
-          <div key={k} className="flex items-center gap-1.5 text-xs text-gray-600">
-            <div className="w-4 h-4 rounded" style={{ background: HEAT_COLOR[k as AttStatus] }} />
-            <span>{v.label}</span>
-          </div>
+          <span key={k} className="inline-flex items-center gap-1.5 text-[11px] text-gray-600 bg-white border border-gray-100 rounded-full px-2.5 py-1">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: HEAT_COLOR[k as AttStatus] }} />
+            {v.label}
+          </span>
         ))}
-        <div className="flex items-center gap-1.5 text-xs text-gray-600">
-          <div className="w-4 h-4 rounded bg-gray-50 border border-gray-200" />
-          <span>Không có dữ liệu</span>
-        </div>
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2.5 py-1 font-semibold">Vào</span>
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-full px-2.5 py-1 font-semibold">Ra</span>
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-purple-700 bg-purple-50 border border-purple-100 rounded-full px-2.5 py-1 font-semibold">
+          {EMPLOYEE_KIND.intern.badge}: {internLegendText()}
+        </span>
       </div>
 
-      <div className="bg-white rounded-3xl border border-black/5 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-48 gap-2 text-gray-400">
             <Loader2 size={20} className="animate-spin" />
@@ -732,91 +838,184 @@ function MonthlyTab() {
         ) : employees.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 gap-2 text-gray-400">
             <CalendarDays size={32} className="opacity-30" />
-            <p className="text-sm">Không có dữ liệu chấm công tháng này</p>
+            <p className="text-sm">Không có nhân viên phù hợp bộ lọc</p>
           </div>
         ) : (
-          <div className="overflow-auto" style={{ maxHeight: "60vh" }}>
-            <table className="text-xs border-collapse" style={{ minWidth: `${120 + daysInMonth * 44}px` }}>
-              <thead className="sticky top-0 z-10 bg-white shadow-sm">
-                <tr>
-                  <th className="sticky left-0 z-20 bg-gray-50 border-b border-r border-gray-100 py-3 px-4 text-left text-gray-500 font-bold min-w-[140px]">
+          <div className="overflow-auto w-full" style={{ maxHeight: "70vh" }}>
+            <table className="w-full min-w-max border-collapse text-xs">
+              <thead className="sticky top-0 z-40">
+                <tr className="bg-[#C62828] text-white">
+                  <th className="sticky left-0 z-30 bg-[#C62828] border-b border-r border-white/15 py-3 px-4 text-left font-bold min-w-[160px] shadow-[4px_0_8px_-2px_rgba(0,0,0,0.12)]">
                     Nhân viên
                   </th>
                   {dayNumbers.map(d => {
                     const dateObj = new Date(year, month - 1, d)
-                    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6
-                    const isTodayCell = dateObj.toISOString().split("T")[0] === new Date().toISOString().split("T")[0]
+                    const dow = dateObj.getDay()
+                    const isWeekend = dow === 0 || dow === 6
+                    const isToday = dateObj.toDateString() === new Date().toDateString()
                     return (
-                      <th key={d} style={{ width: 44 }}
-                        className={`border-b border-gray-100 py-2 text-center font-bold ${isWeekend ? "bg-gray-50/80 text-gray-300" : isTodayCell ? "bg-red-50 text-[#C62828]" : "text-gray-500"}`}>
-                        <div>{d}</div>
-                        <div className="text-[9px] font-medium opacity-60">
-                          {["CN", "T2", "T3", "T4", "T5", "T6", "T7"][dateObj.getDay()]}
+                      <th key={d}
+                        className={`border-b border-white/15 py-2 px-0.5 text-center font-semibold min-w-[70px] ${isToday ? "bg-white/15" : ""}`}>
+                        <div className={`text-sm leading-none ${isToday ? "font-black" : ""}`}>{d}</div>
+                        <div className={`text-[10px] mt-0.5 font-medium ${isWeekend ? "text-white/50" : "text-white/80"}`}>
+                          {["CN", "T2", "T3", "T4", "T5", "T6", "T7"][dow]}
                         </div>
                       </th>
                     )
                   })}
-                  <th className="border-b border-gray-100 py-3 px-3 text-gray-500 font-bold text-center min-w-[80px]">Tổng</th>
+                  <th className="sticky right-0 z-20 bg-[#C62828] border-b border-l border-white/15 py-3 px-3 font-bold text-center min-w-[80px] shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.12)]">
+                    Tổng
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {employees.map(emp => {
+                {employees.map((emp, empIdx) => {
                   const empRecords = dayNumbers.map(d => {
                     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
                     return lookup.get(`${emp.id}_${dateStr}`)
                   })
-                  const present = empRecords.filter(r => r && (r.status === "on-time" || r.status === "late")).length
-                  const late    = empRecords.filter(r => r && r.status === "late").length
+                  const present = empRecords.filter(r => r && ["on-time", "late", "early", "late_early"].includes(r.status)).length
+                  const late    = empRecords.filter(r => r && ["late", "late_early"].includes(r.status)).length
                   const absent  = empRecords.filter(r => r && r.status === "absent").length
+                  const rowBg = empIdx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"
+                  const stickyBg = empIdx % 2 === 0 ? "bg-white" : "bg-[#fafafa]"
 
                   return (
-                    <tr key={emp.id} className="hover:bg-gray-50/30 transition-colors border-b border-gray-50 last:border-0">
-                      <td className="sticky left-0 z-10 bg-white border-r border-gray-100 py-2 px-4">
-                        <div className="font-bold text-gray-800 whitespace-nowrap">{emp.name}</div>
-                        <div className="text-[10px] text-gray-400 font-mono mt-0.5">{emp.id}</div>
+                    <tr key={emp.id} className={`group ${rowBg}`}>
+                      <td className={`sticky left-0 z-10 border-b border-r border-gray-100 px-4 py-3 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)] group-hover:bg-red-50/40 align-middle ${stickyBg}`}
+                        style={{ minWidth: 160 }}>
+                        <div className="flex items-start gap-2 py-1">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-gray-800 whitespace-nowrap text-sm leading-tight">{emp.name}</div>
+                            <div className="text-[11px] text-gray-400 font-mono">{emp.id}</div>
+                            {emp.department && <div className="text-[10px] text-gray-400 mt-1 truncate max-w-[120px]">{emp.department}</div>}
+                          </div>
+                          <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black ${emp.contractType === "intern" ? "bg-purple-100 text-purple-700" : "bg-blue-50 text-blue-700"}`}>
+                            {emp.contractType === "intern" ? "TT" : "CT"}
+                          </span>
+                        </div>
                       </td>
+
                       {dayNumbers.map(d => {
                         const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
-                        const rec = lookup.get(`${emp.id}_${dateStr}`)
+                        const raw = lookup.get(`${emp.id}_${dateStr}`)
                         const dateObj = new Date(year, month - 1, d)
                         const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6
-                        const isHov = hoverCell?.empId === emp.id && hoverCell?.date === dateStr
+                        const isToday = dateObj.toDateString() === new Date().toDateString()
+                        const todayISO = getLocalTodayISO()
+
+                        let rec = raw ? enrichAttendanceRecord(raw, emp) : undefined
+                        if (!rec && dateStr < todayISO && !isWeekend) {
+                          rec = {
+                            id: `TEMP_${emp.id}_${dateStr}`,
+                            employeeId: emp.id,
+                            employeeName: emp.name,
+                            department: emp.department || "",
+                            employeeStatus: isInternEmployee(emp) ? "intern" : "staff",
+                            date: dateStr,
+                            status: "absent",
+                            statusAm: "absent",
+                            statusPm: "absent",
+                            checkIn: "--",
+                            checkOut: "--",
+                            checkInAm: "--",
+                            checkOutAm: "--",
+                            checkInPm: "--",
+                            checkOutPm: "--",
+                            note: ""
+                          }
+                        }
+
+                        const baseTd = `border-b border-r border-gray-100 p-1 min-w-[70px] ${isWeekend ? "bg-gray-100/50" : ""} ${isToday ? "ring-1 ring-inset ring-[#C62828]/20" : ""}`
+
+                        if (!rec) {
+                          return (
+                            <td key={d} className={baseTd}>
+                              <div className="w-full h-full flex items-center justify-center min-h-[44px]">
+                                <span className="text-gray-200 text-sm select-none">·</span>
+                              </div>
+                            </td>
+                          )
+                        }
+
+                        const isCellIntern = rec.employeeStatus === "intern"
+                        const cellRows: MonthTimeRow[] = isCellIntern ? [
+                          { id: "am-in", session: "am", kind: "in", label: "S·Vào", labelClass: "" },
+                          { id: "am-out", session: "am", kind: "out", label: "S·Ra", labelClass: "" },
+                          { id: "pm-in", session: "pm", kind: "in", label: "C·Vào", labelClass: "" },
+                          { id: "pm-out", session: "pm", kind: "out", label: "C·Ra", labelClass: "" },
+                        ] : [
+                          { id: "in", kind: "in", label: "Vào", labelClass: "" },
+                          { id: "out", kind: "out", label: "Ra", labelClass: "" },
+                        ]
 
                         return (
-                          <td key={d} style={{ width: 44, padding: "3px 2px" }}
-                            className={`border-r border-gray-50 text-center ${isWeekend ? "bg-gray-50/60" : ""}`}>
-                            {rec ? (
-                              <div
-                                title={`${rec.checkIn} → ${rec.checkOut}${rec.note ? " · " + rec.note : ""}`}
-                                onClick={() => setEditRecord(rec)}
-                                onMouseEnter={() => setHoverCell({ empId: emp.id, date: dateStr })}
-                                onMouseLeave={() => setHoverCell(null)}
-                                className="mx-auto rounded-lg cursor-pointer transition-all select-none"
-                                style={{
-                                  width: 36, height: 36,
-                                  background: HEAT_COLOR[rec.status as AttStatus] + (isHov ? "" : "cc"),
-                                  color: HEAT_TEXT[rec.status as AttStatus],
-                                  display: "flex", flexDirection: "column",
-                                  alignItems: "center", justifyContent: "center",
-                                  fontSize: 8, fontWeight: 700, lineHeight: 1.2,
-                                  border: isHov ? `1.5px solid ${HEAT_TEXT[rec.status as AttStatus]}` : "1.5px solid transparent",
-                                  transform: isHov ? "scale(1.1)" : "scale(1)",
-                                  boxShadow: isHov ? "0 2px 8px rgba(0,0,0,0.12)" : "none"
-                                }}>
-                                <span>{rec.checkIn === "--" ? "—" : rec.checkIn}</span>
-                              </div>
-                            ) : isWeekend ? (
-                              <div style={{ width: 36, height: 36 }} className="mx-auto" />
-                            ) : (
-                              <div style={{ width: 36, height: 36 }} className="mx-auto rounded-lg border border-dashed border-gray-200" />
-                            )}
+                          <td key={d} className={baseTd}>
+                            <div className="flex flex-col gap-[2px] w-full">
+                              {cellRows.map(row => {
+                                const isFuture = dateStr > todayISO
+                                const sessionStatus = (row.session ? (row.session === "am" ? rec.statusAm : rec.statusPm) : rec.status) || (isFuture ? "" : "absent")
+                                const heat = heatForStatus(sessionStatus)
+                                const timeRaw = row.session 
+                                  ? (row.session === "am" ? (row.kind === "in" ? rec.checkInAm : rec.checkOutAm) : (row.kind === "in" ? rec.checkInPm : rec.checkOutPm))
+                                  : (row.kind === "in" ? rec.checkIn : rec.checkOut)
+                                const time = shortClock(timeRaw)
+                                const hasTime = time && time !== "--"
+                                const kindLabel = row.label
+                                const sessionNote = row.session === "am" ? rec.noteAm : row.session === "pm" ? rec.notePm : rec.note
+                                const label = STATUS_MAP[sessionStatus as AttStatus]?.label ?? sessionStatus
+                                const tip = [
+                                  kindLabel,
+                                  hasTime ? time : label,
+                                  sessionNote && formatAttendanceNote(sessionNote),
+                                  !sessionNote && rec.note && formatAttendanceNote(rec.note),
+                                ].filter(Boolean).join(" · ")
+
+                                const inStyle = { borderColor: "#10b981", bg: "#ecfdf5", text: "#047857" }
+                                const outStyle = { borderColor: "#64748b", bg: "#f8fafc", text: "#475569" }
+                                const style = row.kind === "in" ? inStyle : outStyle
+
+                                const sessionEmptyLabel = (status?: string) => {
+                                  if (status === "leave") return <span className="text-[9px] font-black text-violet-600">Phép</span>
+                                  if (status === "absent") return <span className="text-[9px] font-black text-red-400">Vắng</span>
+                                  if (status === "late") return <span className="text-[9px] font-black text-orange-500">Trễ</span>
+                                  if (status === "early") return <span className="text-[9px] font-black text-amber-500">Sớm</span>
+                                  if (status === "late_early") return <span className="text-[9px] font-black text-orange-600">T&amp;S</span>
+                                  return null
+                                }
+
+                                return (
+                                  <button
+                                    key={row.id}
+                                    type="button"
+                                    title={tip}
+                                    onClick={() => setEditRecord(rec)}
+                                    className="w-full h-[20px] flex items-center justify-between transition-all cursor-pointer select-none border-l-[3px] rounded-[3px] px-1 text-[10px] hover:scale-[1.02] hover:shadow-sm"
+                                    style={{
+                                      borderLeftColor: hasTime ? style.borderColor : heat.text,
+                                      background: hasTime ? style.bg : heat.bg + "35",
+                                    }}>
+                                    <span className="text-gray-400 font-medium scale-90 origin-left">{row.label}</span>
+                                    {hasTime ? (
+                                      <span className="font-bold tabular-nums" style={{ color: style.text }}>{time}</span>
+                                    ) : (
+                                      sessionEmptyLabel(sessionStatus) ?? <span className="text-gray-300">—</span>
+                                    )}
+                                  </button>
+                                )
+                              })}
+                            </div>
                           </td>
                         )
                       })}
-                      <td className="py-2 px-3 text-center">
-                        <div className="text-xs font-bold text-green-700">{present}✓</div>
-                        {late > 0 && <div className="text-[10px] text-orange-500">{late}⚠</div>}
-                        {absent > 0 && <div className="text-[10px] text-red-500">{absent}✗</div>}
+
+                      <td className={`sticky right-0 z-10 border-b border-l border-gray-100 py-3 px-3 text-center shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)] group-hover:bg-red-50/40 align-middle ${stickyBg}`}>
+                        <div className="text-sm font-bold text-emerald-700 tabular-nums">{present}</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">{emp.contractType === "intern" ? "buổi/ngày" : "ngày công"}</div>
+                        <div className="flex flex-col items-center gap-0.5 mt-2">
+                          {late > 0 && <span className="text-[10px] font-semibold text-orange-600">{late} trễ</span>}
+                          {absent > 0 && <span className="text-[10px] font-semibold text-red-500">{absent} vắng</span>}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -830,17 +1029,16 @@ function MonthlyTab() {
   )
 }
 
-// ─── TAB 3: Thống kê (thuần bảng + progress bar, không biểu đồ) ──────────────
-function StatsTab() {
+function StatsTab({ selectedBranch }: { selectedBranch: string }) {
   const [records, setRecords] = useState<AttendanceRecord[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.attendance.list().then(d => {
+    api.attendance.list(branchQuery(selectedBranch)).then(d => {
       setRecords(d as AttendanceRecord[])
       setLoading(false)
     }).catch(() => setLoading(false))
-  }, [])
+  }, [selectedBranch])
 
   const totals = useMemo(() => ({
     onTime: records.filter(r => r.status === "on-time").length,
@@ -1046,8 +1244,7 @@ function StatsTab() {
   )
 }
 
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-export function AttendanceManagement() {
+export function AttendanceManagement({ selectedBranch = "all" }: { selectedBranch?: string }) {
   const [tab, setTab] = useState<"daily" | "monthly" | "stats">("daily")
 
   const TABS = [
@@ -1072,18 +1269,18 @@ export function AttendanceManagement() {
         </div>
       </div>
 
-      <div className="flex bg-white rounded-2xl border border-gray-100 shadow-sm p-1 gap-1 w-fit">
+      <div className="flex w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-1 gap-1">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${tab === id ? "bg-[#C62828] text-white shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${tab === id ? "bg-[#C62828] text-white shadow-sm" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}>
             <Icon size={15} />{label}
           </button>
         ))}
       </div>
 
-      {tab === "daily"   && <DailyTab />}
-      {tab === "monthly" && <MonthlyTab />}
-      {tab === "stats"   && <StatsTab />}
+      {tab === "daily"   && <DailyTab selectedBranch={selectedBranch} />}
+      {tab === "monthly" && <MonthlyTab selectedBranch={selectedBranch} />}
+      {tab === "stats"   && <StatsTab selectedBranch={selectedBranch} />}
     </div>
   )
 }

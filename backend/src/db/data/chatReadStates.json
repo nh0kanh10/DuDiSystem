@@ -1,0 +1,23 @@
+[
+  {
+    "id": "READ001",
+    "conversationId": "CONV001",
+    "employeeId": "NV001",
+    "lastReadMessageId": "MSG002",
+    "lastReadAt": "2026-07-03T09:36:00+07:00"
+  },
+  {
+    "id": "READ002",
+    "conversationId": "CONV002",
+    "employeeId": "NV001",
+    "lastReadMessageId": null,
+    "lastReadAt": null
+  },
+  {
+    "id": "READ003",
+    "conversationId": "CONV003",
+    "employeeId": "NV001",
+    "lastReadMessageId": null,
+    "lastReadAt": null
+  }
+]

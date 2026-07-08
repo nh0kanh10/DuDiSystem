@@ -1,12 +1,16 @@
 import * as svc from "../services/assignment.service.js"
-import { ok, created, notFound } from "../utils/response.js"
+import { ok, created, notFound, fail } from "../utils/response.js"
 
 export function list(req, res) {
   ok(res, svc.listAssignments(req.query))
 }
 
 export function create(req, res) {
-  created(res, svc.createAssignment(req.body))
+  try {
+    created(res, svc.createAssignment(req.body))
+  } catch (err) {
+    fail(res, err.message || "Không thể tạo phân công")
+  }
 }
 
 export function cancel(req, res) {

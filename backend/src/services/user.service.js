@@ -4,6 +4,7 @@ import * as raRepo from "../repositories/roleAssignment.repository.js"
 import * as orgRepo from "../repositories/orgNode.repository.js"
 import * as roleRepo from "../repositories/role.repository.js"
 import bcrypt from "bcryptjs"
+import { resolveClientPermissions, bumpPermissionsVersion } from "../utils/access.js"
 
 export function resolveBranchId(userId) {
   if (!userId) return "all"
@@ -49,14 +50,17 @@ function resolveScopeFromEmployee(employeeId) {
 }
 
 export async function createUser(data) {
-  const { email, roleId, employeeId, status, scopeId } = data
+  const loginId = data.loginId ?? data.email
+  const { roleId, employeeId, status, scopeId } = data
   if (roleId === "role-super-admin") {
     throw new Error("Không thể gán vai trò ẩn hệ thống")
   }
-  if (!email) throw new Error("Email là bắt buộc")
+  if (!loginId) throw new Error("Mã đăng nhập là bắt buộc")
 
-  const existing = repo.getByEmail(email)
-  if (existing) throw new Error("Email đã tồn tại")
+  if (repo.getByEmail(loginId)) throw new Error("Mã đăng nhập đã tồn tại")
+  if (employeeId && repo.getByEmployeeId(employeeId)) {
+    throw new Error("Nhân viên này đã có tài khoản")
+  }
 
   let rawPassword = "123456"
   if (employeeId) {
@@ -72,7 +76,7 @@ export async function createUser(data) {
 
   const user = repo.create({
     id: `U-${Date.now()}`,
-    email,
+    email: loginId,
     password: hashedPassword,
     roleId: roleId || "role-user",
     employeeId: employeeId || null,
@@ -114,6 +118,10 @@ export function updateUser(id, patch) {
 
   const updated = repo.update(id, safePatch)
   if (!updated) throw new Error("Không tìm thấy tài khoản")
+
+  if ("permissions" in safePatch || "roleId" in safePatch || patch.scopeId !== undefined) {
+    bumpPermissionsVersion(id)
+  }
 
   if (safePatch.roleId || patch.scopeId !== undefined) {
     const roleId = safePatch.roleId || updated.roleId
@@ -178,11 +186,9 @@ export function deleteUser(id) {
   return true
 }
 
-export function getUserDetails(id) {
-  const user = repo.getById(id)
+export function enrichUserProfile(user) {
   if (!user) return null
-  const employees = empRepo.getAll()
-  const emp = user.employeeId ? employees.find(e => e.id === user.employeeId) : null
+  const emp = user.employeeId ? empRepo.getById(user.employeeId) : null
   const assignments = raRepo.getByUserId(user.id)
   const primary = assignments.find(a => a.isPrimary) ?? assignments[0] ?? null
   const branchId = primary
@@ -190,7 +196,22 @@ export function getUserDetails(id) {
     : "all"
   const branchName = getBranchName(branchId)
   const { password: _, ...safeUser } = user
-  return { ...safeUser, name: emp ? emp.name : "—", branchId, branchName, assignments }
+  return {
+    ...safeUser,
+    name: emp?.name ?? "—",
+    department: emp?.department ?? "—",
+    position: emp?.position ?? "—",
+    employeeStatus: emp?.status ?? "active",
+    branchId,
+    branchName,
+    assignments,
+    effectivePermissions: resolveClientPermissions(user),
+  }
+}
+
+export function getUserDetails(id) {
+  const user = repo.getById(id)
+  return enrichUserProfile(user)
 }
 
 export async function updateAdminAccount(id, data) {
@@ -208,6 +229,35 @@ export async function updateAdminAccount(id, data) {
   const hashedPassword = await bcrypt.hash(newPassword, salt)
 
   repo.update(id, {
+    password: hashedPassword
+  })
+
+  return true
+}
+
+export async function changePassword(userId, oldPassword, newPassword) {
+  const user = repo.getById(userId)
+  if (!user) throw new Error("Không tìm thấy tài khoản")
+
+  if (!oldPassword || !newPassword) {
+    throw new Error("Mật khẩu cũ và mật khẩu mới là bắt buộc")
+  }
+
+  const valid = await bcrypt.compare(oldPassword, user.password)
+  if (!valid) throw new Error("Mật khẩu cũ không chính xác")
+
+  if (newPassword.length < 6) {
+    throw new Error("Mật khẩu mới phải có ít nhất 6 ký tự")
+  }
+
+  if (oldPassword === newPassword) {
+    throw new Error("Mật khẩu mới không được trùng với mật khẩu cũ")
+  }
+
+  const salt = await bcrypt.genSalt(10)
+  const hashedPassword = await bcrypt.hash(newPassword, salt)
+
+  repo.update(userId, {
     password: hashedPassword
   })
 

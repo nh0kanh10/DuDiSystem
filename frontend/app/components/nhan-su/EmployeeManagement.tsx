@@ -1,16 +1,19 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
-import {
-  Plus, Search, Edit2, Trash2, X, Download, MoreHorizontal, Eye, Users,
+import { Plus, Search, Edit2, Trash2, X, Download, MoreHorizontal, Eye, Users,
   Building2, Paperclip, Briefcase, ExternalLink, FileText, Image as ImageIcon,
-  File, Link2, AlertCircle, UserPlus, UserMinus, ArrowRightLeft,
+  File, Link2, AlertCircle, CheckCircle2, UserPlus, UserMinus, ArrowRightLeft,
   TrendingUp, RefreshCw, ChevronLeft, ChevronRight, Maximize2,
   User, Camera, ClipboardList, Upload, Calendar
 } from "lucide-react"
+import * as XLSX from "xlsx"
 import { Employee, EmpExtForm, WorkHistoryEntry, WorkHistoryType, Attachment, OrgNode } from "../../types"
 import { api } from "@/lib/api"
-import { Badge } from "../ui/Badge"
-import { initials } from "../../utils"
+import { useToast } from "@/app/hooks/useToast"
+import { Badge } from "../ui/badge"
+import { initials, removeVietnameseTones } from "../../utils"
+import { deriveOrgFields, isOrgPlacementChanged, buildOrgSnapshot } from "../../utils/orgUtils"
+import { previewEmployeeId } from "../../utils/employeeId"
 import UserProfile from "../nhan-vien/UserProfile"
 import { CustomDatePicker as DateInput } from "../ui/CustomDatePicker"
 import { VNAddressSelect } from "../ui/VNAddressSelect"
@@ -19,7 +22,13 @@ import ConfirmModal from "../ui/ConfirmModal"
 
 type EditTab = "personal" | "work" | "files" | "history"
 
-const CONTRACT_TYPES = ["Chính thức", "Thực tập", "Part-time", "CTV", "Cộng tác viên"]
+const CONTRACT_TYPES = [
+  { value: "staff", label: "Chính thức" },
+  { value: "intern", label: "Thực tập" },
+  { value: "probation", label: "Thử việc" },
+  { value: "parttime", label: "Part-time" },
+  { value: "ctv", label: "Cộng tác viên" },
+]
 
 const WH_CONFIG: Record<WorkHistoryType, { label: string; color: string; bg: string; Icon: React.ElementType }> = {
   join:      { label: "Bắt đầu làm việc", color: "#22c55e", bg: "#f0fdf4", Icon: UserPlus },
@@ -51,11 +60,95 @@ function todayVN(): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
 }
 
+const DEFAULT_INTERNSHIP_MONTHS = 2 
+
 function addMonthsToVNDate(dateStr: string, months: number): string {
   const d = parseVNDate(dateStr)
   if (!d) return ""
   d.setMonth(d.getMonth() + months)
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
+}
+
+function safeStringify(value: unknown) {
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+function formatDiffValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—"
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value)
+  if (Array.isArray(value)) return value.length === 0 ? "[]" : `${value.length} mục`
+  return safeStringify(value)
+}
+
+function buildProfileDiffRows(currentProfile: Record<string, any>, pendingData: Record<string, any>) {
+  const keys = Array.from(new Set([
+    ...Object.keys(currentProfile || {}),
+    ...Object.keys(pendingData || {}),
+  ]))
+
+  return keys
+    .map((key) => {
+      const before = currentProfile?.[key]
+      const after = pendingData?.[key]
+      const changed = safeStringify(before) !== safeStringify(after)
+      return { key, before, after, changed }
+    })
+    .filter(row => row.changed)
+}
+
+function PreviewField({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div>
+      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
+      <div className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-700 min-h-[40px]">
+        {formatDiffValue(value)}
+      </div>
+    </div>
+  )
+}
+
+function EmployeeFormLikePreview({ data }: { data: Record<string, any> }) {
+  return (
+    <div className="space-y-5">
+      <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <p className="text-[10px] font-bold text-[#C62828] uppercase tracking-[0.15em] mb-3">Định danh cá nhân</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <PreviewField label="Họ và tên" value={data.name} />
+          <PreviewField label="Ngày sinh" value={data.dob} />
+          <PreviewField label="Giới tính" value={data.gender} />
+          <PreviewField label="Số điện thoại" value={data.phone} />
+          <div className="md:col-span-2"><PreviewField label="Email" value={data.email} /></div>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <p className="text-[10px] font-bold text-[#C62828] uppercase tracking-[0.15em] mb-3">CCCD / Ngân hàng</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <PreviewField label="Số CCCD" value={data.cccd} />
+          <PreviewField label="Ngày cấp" value={data.cccdDate} />
+          <div className="md:col-span-2"><PreviewField label="Nơi cấp" value={data.cccdPlace} /></div>
+          <PreviewField label="Số tài khoản" value={data.bankAccount} />
+          <PreviewField label="Ngân hàng" value={data.bank} />
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-100 rounded-xl p-4">
+        <p className="text-[10px] font-bold text-[#C62828] uppercase tracking-[0.15em] mb-3">Công việc</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <PreviewField label="Chi nhánh" value={data.branchId} />
+          <PreviewField label="Phòng ban" value={data.department} />
+          <PreviewField label="Vị trí" value={data.position} />
+          <PreviewField label="Loại hợp đồng" value={data.contractType} />
+          <PreviewField label="Trạng thái" value={data.status} />
+          <PreviewField label="Ngày bắt đầu" value={data.joinDate} />
+        </div>
+      </div>
+    </div>
+  )
 }
 
 
@@ -138,48 +231,57 @@ function FilesTab({
   photos,
   onChangePhotos,
   attachments,
-  onChangeAttachments
+  onChangeAttachments,
+  readonly = false
 }: {
   photos: string[]
   onChangePhotos: (p: string[]) => void
   attachments: Attachment[]
   onChangeAttachments: (a: Attachment[]) => void
+  readonly?: boolean
 }) {
   const [url, setUrl] = useState("")
   const [name, setName] = useState("")
   const [showAddLink, setShowAddLink] = useState(false)
   const [err, setErr] = useState("")
   const [lightbox, setLightbox] = useState<number | null>(null)
+  const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { showToast } = useToast()
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (!files) return
-    
-    const newPhotos = [...photos]
-    const newAttachments = [...attachments]
+    if (!files || files.length === 0) return
+    e.target.value = ""
 
-    Array.from(files).forEach(file => {
-      const isImg = file.type.startsWith("image/")
-      if (isImg) {
-        const mockImgUrl = `https://picsum.photos/seed/${encodeURIComponent(file.name)}/800/800`
-        newPhotos.push(mockImgUrl)
-      } else {
-        const mockDocUrl = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
-          ? "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
-          : `https://example.com/docs/${encodeURIComponent(file.name)}`
-        newAttachments.push({
-          id: Date.now() + Math.random(),
-          name: file.name,
-          url: mockDocUrl,
-          type: "file",
-          uploadedAt: todayVN()
-        })
+    setUploading(true)
+    try {
+      const newPhotos = [...photos]
+      const newAttachments = [...attachments]
+
+      for (const file of Array.from(files)) {
+        const result = await api.storage.upload(file)
+        const isImg = file.type.startsWith("image/")
+        if (isImg) {
+          newPhotos.push(result.url)
+        } else {
+          newAttachments.push({
+            id: Date.now() + Math.random(),
+            name: result.name,
+            url: result.url,
+            type: "file",
+            uploadedAt: todayVN()
+          })
+        }
       }
-    })
-    
-    onChangePhotos(newPhotos)
-    onChangeAttachments(newAttachments)
+
+      onChangePhotos(newPhotos)
+      onChangeAttachments(newAttachments)
+    } catch (err: any) {
+      showToast(err.message || "Upload file thất bại", "error")
+    } finally {
+      setUploading(false)
+    }
   }
 
   const addLink = () => {
@@ -207,20 +309,30 @@ function FilesTab({
   return (
     <div className="space-y-6">
       <div className="bg-gray-50 border border-gray-150 rounded-2xl p-5 flex flex-col md:flex-row gap-3 items-center">
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" />
-        <button onClick={() => fileInputRef.current?.click()}
-          className="w-full md:w-auto flex-1 flex items-center justify-center gap-2 px-5 py-3 border-2 border-dashed border-[#C62828] text-[#C62828] bg-white hover:bg-red-50/50 rounded-xl text-sm font-black transition-all cursor-pointer">
-          <Upload size={15} />
-          <span>Chọn ảnh/tài liệu từ máy tính</span>
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} multiple className="hidden" disabled={readonly} />
+        <button
+          onClick={() => {
+            if (readonly || uploading) return
+            fileInputRef.current?.click()
+          }}
+          disabled={readonly || uploading}
+          className="w-full md:w-auto flex-1 flex items-center justify-center gap-2 px-5 py-3 border-2 border-dashed border-[#C62828] text-[#C62828] bg-white hover:bg-red-50/50 rounded-xl text-sm font-black transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+          {uploading ? <span className="w-4 h-4 border-2 border-[#C62828] border-t-transparent rounded-full animate-spin" /> : <Upload size={15} />}
+          <span>{uploading ? "Đang tải lên..." : "Chọn ảnh/tài liệu từ máy tính"}</span>
         </button>
-        <button onClick={() => setShowAddLink(!showAddLink)}
+        <button
+          onClick={() => {
+            if (readonly) return
+            setShowAddLink(!showAddLink)
+          }}
+          disabled={readonly}
           className="w-full md:w-auto flex-1 flex items-center justify-center gap-2 px-5 py-3 border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 rounded-xl text-sm font-black transition-all cursor-pointer">
           <Link2 size={15} />
           <span>Thêm link liên kết (URL)</span>
         </button>
       </div>
 
-      {showAddLink && (
+      {showAddLink && !readonly && (
         <div className="bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-200 animate-in fade-in duration-150">
           <input value={name} onChange={e => setName(e.target.value)} placeholder="Tên liên kết (ví dụ: Portfolio)..."
             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/45 bg-white" />
@@ -250,10 +362,12 @@ function FilesTab({
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
                   <Maximize2 size={16} className="text-white" />
                 </div>
+                {!readonly && (
                 <button onClick={e => { e.stopPropagation(); onChangePhotos(photos.filter((_, j) => j !== i)) }}
                   className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-all shadow opacity-0 group-hover:opacity-100">
                   <X size={12} />
                 </button>
+                )}
                 {i === 0 && (
                   <span className="absolute bottom-1.5 left-1.5 bg-[#C62828] text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">Đại diện</span>
                 )}
@@ -283,10 +397,12 @@ function FilesTab({
                   </a>
                   <p className="text-[10px] text-gray-400 mt-0.5">{a.url} · {a.uploadedAt}</p>
                 </div>
+                {!readonly && (
                 <button onClick={() => onChangeAttachments(attachments.filter(x => x.id !== a.id))}
                   className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
                   <X size={14} />
                 </button>
+                )}
               </div>
             ))}
           </div>
@@ -298,10 +414,11 @@ function FilesTab({
   )
 }
 
-function WorkHistoryTab({ history, onChange, orgNodes }: {
+function WorkHistoryTab({ history, onChange, orgNodes, readonly = false }: {
   history: WorkHistoryEntry[]
   onChange: (h: WorkHistoryEntry[]) => void
   orgNodes: { id: string; name: string; type?: string }[]
+  readonly?: boolean
 }) {
   const [show, setShow] = useState(false)
   const [entry, setEntry] = useState<Partial<WorkHistoryEntry>>({ type: "join", date: todayVN() })
@@ -320,14 +437,16 @@ function WorkHistoryTab({ history, onChange, orgNodes }: {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        <button onClick={() => setShow(p => !p)}
-          className="flex items-center gap-1.5 px-3 py-2 border border-[#C62828] text-[#C62828] rounded-xl text-xs font-bold hover:bg-red-50 transition-colors">
-          + Thêm sự kiện
-        </button>
-      </div>
+      {!readonly && (
+        <div className="flex justify-end">
+          <button onClick={() => setShow(p => !p)}
+            className="flex items-center gap-1.5 px-3 py-2 border border-[#C62828] text-[#C62828] rounded-xl text-xs font-bold hover:bg-red-50 transition-colors">
+            + Thêm sự kiện
+          </button>
+        </div>
+      )}
 
-      {show && (
+      {show && !readonly && (
         <div className="bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-200">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -416,10 +535,12 @@ function WorkHistoryTab({ history, onChange, orgNodes }: {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span className="text-xs font-mono text-gray-400">{ev.date}</span>
-                        <button onClick={() => onChange(history.filter(h => h.id !== ev.id))}
-                          className="w-6 h-6 rounded-full hover:bg-red-50 flex items-center justify-center text-gray-200 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
-                          <X size={12} />
-                        </button>
+                        {!readonly && (
+                          <button onClick={() => onChange(history.filter(h => h.id !== ev.id))}
+                            className="w-6 h-6 rounded-full hover:bg-red-50 flex items-center justify-center text-gray-200 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100">
+                            <X size={12} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -446,10 +567,11 @@ function WorkHistoryTab({ history, onChange, orgNodes }: {
   )
 }
 
-function PersonalTab({ form, sf, inp, sel, lbl }: {
+function PersonalTab({ form, sf, inp, sel, lbl, readonly = false }: {
   form: EmpExtForm
   sf: (k: keyof EmpExtForm, v: any) => void
   inp: string; sel: string; lbl: string
+  readonly?: boolean
 }) {
   const sectionLabel = "text-[10px] font-bold text-[#C62828] uppercase tracking-[0.15em] mb-3"
 
@@ -458,10 +580,21 @@ function PersonalTab({ form, sf, inp, sel, lbl }: {
       <div>
         <p className={sectionLabel}>Định danh cá nhân</p>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={lbl}>Họ và tên *</label><input value={form.name} onChange={e => sf("name", e.target.value)} placeholder="Nguyễn Văn A" className={inp} /></div>
-          <div><label className={lbl}>Ngày sinh</label><DateInput value={form.dob} onChange={val => sf("dob", val)} className={inp} /></div>
+          <div><label className={lbl}>Họ và tên *</label><input autoComplete="new-password" disabled={readonly} value={form.name} onChange={e => !readonly && sf("name", e.target.value)} placeholder="Nguyễn Văn A" className={inp} /></div>
+          <div><label className={lbl}>Ngày sinh</label><DateInput disabled={readonly} value={form.dob} onChange={val => {
+            if (!readonly) {
+              if (val) {
+                const parts = val.split("/").map(Number)
+                const d = new Date(parts[2], parts[1] - 1, parts[0])
+                const today = new Date(); today.setHours(0,0,0,0)
+                if (d > today) return 
+              }
+              sf("dob", val)
+            }
+          }} className={inp} /></div>
           <div><label className={lbl}>Giới tính</label>
             <CustomSelect
+              disabled={readonly}
               value={form.gender}
               onChange={val => sf("gender", val)}
               options={[
@@ -473,25 +606,35 @@ function PersonalTab({ form, sf, inp, sel, lbl }: {
               heightClass="h-[42px]"
             />
           </div>
-          <div><label className={lbl}>Số điện thoại</label><input value={form.phone} onChange={e => sf("phone", e.target.value)} placeholder="09xx xxx xxx" className={inp} /></div>
-          <div className="col-span-2"><label className={lbl}>Email</label><input value={form.email} onChange={e => sf("email", e.target.value)} placeholder="email@dudi.vn" className={inp} /></div>
+          <div><label className={lbl}>Số điện thoại</label><input autoComplete="new-password" disabled={readonly} value={form.phone} onChange={e => !readonly && sf("phone", e.target.value)} placeholder="09xx xxx xxx" className={inp} /></div>
+          <div className="col-span-2"><label className={lbl}>Email</label><input autoComplete="new-password" disabled={readonly} value={form.email} onChange={e => !readonly && sf("email", e.target.value)} placeholder="email@dudi.vn" className={inp} /></div>
         </div>
       </div>
 
       <div>
         <p className={sectionLabel}>CCCD / CMND</p>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={lbl}>Số CCCD</label><input value={form.cccd} onChange={e => sf("cccd", e.target.value)} placeholder="012345678901" className={inp} /></div>
-          <div><label className={lbl}>Ngày cấp</label><DateInput value={form.cccdDate} onChange={val => sf("cccdDate", val)} className={inp} /></div>
-          <div className="col-span-2"><label className={lbl}>Nơi cấp</label><input value={form.cccdPlace} onChange={e => sf("cccdPlace", e.target.value)} placeholder="Cục CSQLHC về TTXH..." className={inp} /></div>
+          <div><label className={lbl}>Số CCCD</label><input disabled={readonly} value={form.cccd} onChange={e => !readonly && sf("cccd", e.target.value)} placeholder="012345678901" className={inp} /></div>
+          <div><label className={lbl}>Ngày cấp</label><DateInput disabled={readonly} value={form.cccdDate} onChange={val => {
+            if (!readonly) {
+              if (val) {
+                const parts = val.split("/").map(Number)
+                const d = new Date(parts[2], parts[1] - 1, parts[0])
+                const today = new Date(); today.setHours(0,0,0,0)
+                if (d > today) return
+              }
+              sf("cccdDate", val)
+            }
+          }} className={inp} /></div>
+          <div className="col-span-2"><label className={lbl}>Nơi cấp</label><input disabled={readonly} value={form.cccdPlace} onChange={e => !readonly && sf("cccdPlace", e.target.value)} placeholder="Cục CSQLHC về TTXH..." className={inp} /></div>
         </div>
       </div>
 
       <div>
         <p className={sectionLabel}>Tài khoản ngân hàng</p>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={lbl}>Số tài khoản</label><input value={form.bankAccount} onChange={e => sf("bankAccount", e.target.value)} placeholder="0123456789" className={inp} /></div>
-          <div><label className={lbl}>Ngân hàng</label><input value={form.bank} onChange={e => sf("bank", e.target.value)} placeholder="Vietcombank..." className={inp} /></div>
+          <div><label className={lbl}>Số tài khoản</label><input disabled={readonly} value={form.bankAccount} onChange={e => !readonly && sf("bankAccount", e.target.value)} placeholder="0123456789" className={inp} /></div>
+          <div><label className={lbl}>Ngân hàng</label><input disabled={readonly} value={form.bank} onChange={e => !readonly && sf("bank", e.target.value)} placeholder="Vietcombank..." className={inp} /></div>
         </div>
       </div>
 
@@ -502,16 +645,19 @@ function PersonalTab({ form, sf, inp, sel, lbl }: {
             province={form.curProvince}
             district={form.curDistrict}
             ward={form.curWard}
+            disabled={readonly}
             onChange={addr => {
-              sf("curProvince", addr.province)
-              sf("curDistrict", addr.district)
-              sf("curWard", addr.ward)
+              if (!readonly) {
+                sf("curProvince", addr.province)
+                sf("curDistrict", addr.district)
+                sf("curWard", addr.ward)
+              }
             }}
             lblClass={lbl}
             selClass={sel}
             inpClass={inp}
           />
-          <div className="col-span-3"><label className={lbl}>Số nhà, tên đường</label><input value={form.curStreet} onChange={e => sf("curStreet", e.target.value)} placeholder="45 Đường Nguyễn Thị Thập..." className={inp} /></div>
+          <div className="col-span-3"><label className={lbl}>Số nhà, tên đường</label><input disabled={readonly} value={form.curStreet} onChange={e => !readonly && sf("curStreet", e.target.value)} placeholder="45 Đường Nguyễn Thị Thập..." className={inp} /></div>
         </div>
       </div>
 
@@ -522,39 +668,39 @@ function PersonalTab({ form, sf, inp, sel, lbl }: {
             province={form.homeProvince}
             district={form.homeDistrict}
             ward={form.homeWard}
+            disabled={readonly}
             onChange={addr => {
-              sf("homeProvince", addr.province)
-              sf("homeDistrict", addr.district)
-              sf("homeWard", addr.ward)
+              if (!readonly) {
+                sf("homeProvince", addr.province)
+                sf("homeDistrict", addr.district)
+                sf("homeWard", addr.ward)
+              }
             }}
             lblClass={lbl}
             selClass={sel}
             inpClass={inp}
           />
-          <div className="col-span-3"><label className={lbl}>Địa chỉ cụ thể</label><input value={form.homeStreet} onChange={e => sf("homeStreet", e.target.value)} placeholder="Ấp, xóm, số nhà..." className={inp} /></div>
+          <div className="col-span-3"><label className={lbl}>Địa chỉ cụ thể</label><input disabled={readonly} value={form.homeStreet} onChange={e => !readonly && sf("homeStreet", e.target.value)} placeholder="Ấp, xóm, số nhà..." className={inp} /></div>
         </div>
       </div>
 
       <div>
-        <p className={sectionLabel}>Học vấn & Ghi chú</p>
+        <p className={sectionLabel}>Học vấn</p>
         <div className="grid grid-cols-1 gap-3">
-          <div><label className={lbl}>Trường đại học / cao đẳng</label><input value={form.university} onChange={e => sf("university", e.target.value)} placeholder="Tên trường..." className={inp} /></div>
-          <div><label className={lbl}>Ghi chú</label>
-            <textarea value={form.notes} onChange={e => sf("notes", e.target.value)} rows={2} placeholder="Ghi chú thêm..."
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/50 resize-none text-gray-700 bg-white" />
-          </div>
+          <div><label className={lbl}>Trường đại học / cao đẳng</label><input disabled={readonly} value={form.university} onChange={e => !readonly && sf("university", e.target.value)} placeholder="Tên trường..." className={inp} /></div>
         </div>
       </div>
     </div>
   )
 }
 
-function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
+function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false }: {
   form: EmpExtForm
   sf: (k: keyof EmpExtForm, v: any) => void
   inp: string; sel: string; lbl: string
-  orgNodes: { id: string; name: string; type?: string; parentId?: string }[]
+  orgNodes: OrgNode[]
   branches: { id: string; name: string }[]
+  readonly?: boolean
 }) {
   const sectionLabel = "text-[10px] font-bold text-[#C62828] uppercase tracking-[0.15em] mb-3"
   const [catalogPositions, setCatalogPositions] = useState<{id:string,name:string,code:string}[]>([])
@@ -610,6 +756,15 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
     return orgNodes.filter(n => n.type === "team" && n.parentId === activeHierarchy.positionId)
   }, [orgNodes, activeHierarchy.positionId])
 
+  const applyOrgSelection = (nodeId: string) => {
+    if (readonly) return
+    const derived = deriveOrgFields(nodeId, orgNodes)
+    sf("orgNodeId", nodeId)
+    sf("branchId", derived.branchId)
+    sf("department", derived.department)
+    sf("position", derived.position)
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -617,10 +772,13 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
         <div className="grid grid-cols-2 gap-3">
           <div><label className={lbl}>Chi nhánh *</label>
             <CustomSelect
+              disabled={readonly}
               value={activeHierarchy.branchId}
               onChange={bId => {
-                sf("branchId", bId)
-                sf("orgNodeId", bId)
+                if (!readonly) {
+                  sf("branchId", bId)
+                  applyOrgSelection(bId)
+                }
               }}
               options={branches.map(b => ({ value: b.id, label: b.name }))}
               className="w-full"
@@ -632,12 +790,12 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
             <CustomSelect
               value={activeHierarchy.departmentId}
               onChange={dId => {
-                const node = orgNodes.find(n => n.id === dId)
-                sf("department", node ? node.name : "")
-                sf("orgNodeId", dId || activeHierarchy.branchId)
+                if (!readonly) {
+                  applyOrgSelection(dId || activeHierarchy.branchId)
+                }
               }}
               options={deptList.map(d => ({ value: d.id, label: d.name }))}
-              disabled={!activeHierarchy.branchId}
+              disabled={readonly || !activeHierarchy.branchId}
               className="w-full"
               heightClass="h-[42px]"
             />
@@ -647,10 +805,10 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
             <CustomSelect
               value={activeHierarchy.subDepartmentId}
               onChange={sdId => {
-                sf("orgNodeId", sdId || activeHierarchy.departmentId || activeHierarchy.branchId)
+                if (!readonly) applyOrgSelection(sdId || activeHierarchy.departmentId || activeHierarchy.branchId)
               }}
               options={subDeptList.map(sd => ({ value: sd.id, label: sd.name }))}
-              disabled={!activeHierarchy.departmentId}
+              disabled={readonly || !activeHierarchy.departmentId}
               className="w-full"
               heightClass="h-[42px]"
             />
@@ -660,12 +818,12 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
             <CustomSelect
               value={activeHierarchy.positionId}
               onChange={pId => {
-                const node = orgNodes.find(n => n.id === pId)
-                sf("position", node ? node.name : "")
-                sf("orgNodeId", pId || activeHierarchy.subDepartmentId || activeHierarchy.departmentId || activeHierarchy.branchId)
+                if (!readonly) {
+                  applyOrgSelection(pId || activeHierarchy.subDepartmentId || activeHierarchy.departmentId || activeHierarchy.branchId)
+                }
               }}
               options={posList.map(p => ({ value: p.id, label: p.name }))}
-              disabled={!activeHierarchy.subDepartmentId && !activeHierarchy.departmentId}
+              disabled={readonly || (!activeHierarchy.subDepartmentId && !activeHierarchy.departmentId)}
               className="w-full"
               heightClass="h-[42px]"
             />
@@ -675,10 +833,10 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
             <CustomSelect
               value={activeHierarchy.teamId}
               onChange={tId => {
-                sf("orgNodeId", tId || activeHierarchy.positionId || activeHierarchy.subDepartmentId || activeHierarchy.departmentId || activeHierarchy.branchId)
+                if (!readonly) applyOrgSelection(tId || activeHierarchy.positionId || activeHierarchy.subDepartmentId || activeHierarchy.departmentId || activeHierarchy.branchId)
               }}
               options={teamList.map(t => ({ value: t.id, label: t.name }))}
-              disabled={!activeHierarchy.positionId}
+              disabled={readonly || !activeHierarchy.positionId}
               className="w-full"
               heightClass="h-[42px]"
             />
@@ -692,7 +850,8 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
           <div><label className={lbl}>Chức danh (danh mục)</label>
             <CustomSelect
               value={form.positionId ?? ""}
-              onChange={val => sf("positionId", val)}
+              onChange={val => !readonly && sf("positionId", val)}
+              disabled={readonly}
               options={[{ value: "", label: "— Chọn chức danh —" }, ...catalogPositions.map(p => ({ value: p.id, label: `${p.name} (${p.code})` }))]}
               className="w-full"
               heightClass="h-[42px]"
@@ -707,8 +866,9 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
           <div><label className={lbl}>Loại hợp đồng</label>
             <CustomSelect
               value={form.contractType}
-              onChange={val => sf("contractType", val)}
-              options={CONTRACT_TYPES.map(t => ({ value: t, label: t }))}
+              onChange={val => !readonly && sf("contractType", val)}
+              disabled={readonly}
+              options={CONTRACT_TYPES.map(t => ({ value: t.value, label: t.label }))}
               className="w-full"
               heightClass="h-[42px]"
             />
@@ -716,22 +876,23 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
           <div><label className={lbl}>Trạng thái</label>
             <CustomSelect
               value={form.status}
-              onChange={val => sf("status", val)}
+              onChange={val => !readonly && sf("status", val)}
+              disabled={readonly}
               options={[
                 { value: "active", label: "Đang làm" },
-                { value: "intern", label: "Thực tập" },
+                { value: "suspended", label: "Tạm nghỉ" },
                 { value: "inactive", label: "Nghỉ việc" }
               ]}
               className="w-full"
               heightClass="h-[42px]"
             />
           </div>
-          <div><label className={lbl}>Ngày bắt đầu làm việc</label><DateInput value={form.joinDate} onChange={val => sf("joinDate", val)} className={inp} /></div>
-          {form.status === "intern" && (
-            <div><label className={lbl}>Ngày kết thúc thực tập</label><DateInput value={form.internEndDate} onChange={val => sf("internEndDate", val)} className={inp} /></div>
+          <div><label className={lbl}>Ngày bắt đầu làm việc</label><DateInput disabled={readonly} value={form.joinDate} onChange={val => !readonly && sf("joinDate", val)} className={inp} /></div>
+          {form.contractType === "intern" && (
+            <div><label className={lbl}>Ngày kết thúc thực tập</label><DateInput disabled={readonly} value={form.internEndDate} onChange={val => !readonly && sf("internEndDate", val)} className={inp} /></div>
           )}
           {form.status === "inactive" && (
-            <div><label className={lbl}>Ngày nghỉ việc</label><DateInput value={form.resignDate} onChange={val => sf("resignDate", val)} className={inp} /></div>
+            <div><label className={lbl}>Ngày nghỉ việc</label><DateInput disabled={readonly} value={form.resignDate} onChange={val => !readonly && sf("resignDate", val)} className={inp} /></div>
           )}
         </div>
       </div>
@@ -742,16 +903,17 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches }: {
 export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }: {
   editEmp: Employee | null
   employees: Employee[]
-  orgNodes: { id: string; name: string; type?: string; parentId?: string }[]
+  orgNodes: OrgNode[]
   onClose: () => void
   onSave: (form: EmpExtForm) => void
 }) {
   const [tab, setTab] = useState<EditTab>("personal")
   const branches = orgNodes.filter(n => n.type === "branch")
+  const { showToast } = useToast()
 
   const blank = (): EmpExtForm => ({
     name: "", email: "", phone: "", department: "", position: "", positionId: "",
-    joinDate: todayVN(), status: "active", contractType: "Chính thức",
+    joinDate: todayVN(), status: "active", contractType: "staff",
     branchId: "", orgNodeId: "",
     cccd: "", cccdDate: "", cccdPlace: "", bankAccount: "", bank: "",
     dob: "", gender: "Nam",
@@ -763,23 +925,26 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
 
   const [form, setForm] = useState<EmpExtForm>(() => editEmp ? { ...blank(), ...editEmp } : blank())
   const sf = useCallback((k: keyof EmpExtForm, v: any) => setForm(p => ({ ...p, [k]: v })), [])
-  const [internshipMonths, setInternshipMonths] = useState(2)
+
+  const [internshipMonths, setInternshipMonths] = useState<number | null>(null)
 
   useEffect(() => {
     api.systemConfig.get()
       .then(res => {
-        if (res && res.internshipMonths !== undefined) {
-          setInternshipMonths(Number(res.internshipMonths))
-        }
+        const m = Number(res?.internshipMonths)
+        setInternshipMonths(Number.isFinite(m) && m > 0 ? m : DEFAULT_INTERNSHIP_MONTHS)
       })
-      .catch(err => console.error("Lỗi lấy cấu hình thực tập:", err))
+      .catch(() => setInternshipMonths(DEFAULT_INTERNSHIP_MONTHS))
   }, [])
 
+ 
   useEffect(() => {
-    if (form.status === "intern" && !form.internEndDate && form.joinDate) {
-      sf("internEndDate", addMonthsToVNDate(form.joinDate, internshipMonths))
-    }
-  }, [form.status, form.joinDate, internshipMonths, form.internEndDate, sf])
+    if (internshipMonths == null) return
+    if (form.contractType !== "intern" || !form.joinDate) return
+    const nextEnd = addMonthsToVNDate(form.joinDate, internshipMonths)
+    if (!nextEnd) return
+    setForm((p) => (p.internEndDate === nextEnd ? p : { ...p, internEndDate: nextEnd }))
+  }, [internshipMonths, form.contractType, form.joinDate])
 
   const inp = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/50 focus:ring-1 focus:ring-[#C62828]/10 transition-all text-gray-700 bg-white"
   const sel = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/50 text-gray-700 bg-white"
@@ -792,21 +957,92 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
     { key: "history",     label: "Lịch sử",       Icon: ClipboardList, badge: form.workHistory.length || undefined },
   ]
 
-  const newId = useMemo(() => {
-    const d = new Date()
-    const yy = d.getFullYear()
-    const mm = String(d.getMonth() + 1).padStart(2, "0")
-    const dd = String(d.getDate()).padStart(2, "0")
-    const min = String(d.getMinutes()).padStart(2, "0")
-    const baseId = `${yy}${mm}${dd}${min}`
-    let candidate = baseId
-    let count = 1
-    while (employees.some(e => e.id === candidate)) {
-      candidate = `${baseId}-${count}`
-      count++
+  const newId = useMemo(
+    () => previewEmployeeId(employees.map(e => e.id)),
+    [employees]
+  )
+
+  const handleOnSaveClick = () => {
+    const name = (form.name || "").trim()
+    if (!name) {
+      showToast("Họ tên không được để trống", "error")
+      setTab("personal")
+      return
     }
-    return candidate
-  }, [employees])
+
+    const email = (form.email || "").trim()
+    if (!email) {
+      showToast("Email không được để trống", "error")
+      setTab("personal")
+      return
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      showToast("Email không đúng định dạng", "error")
+      setTab("personal")
+      return
+    }
+    const duplicateEmail = employees.find(e => e.email.trim().toLowerCase() === email.toLowerCase() && (!editEmp || e.id !== editEmp.id))
+    if (duplicateEmail) {
+      showToast(`Email "${email}" đã tồn tại trên hệ thống (Nhân viên: ${duplicateEmail.name})`, "error")
+      setTab("personal")
+      return
+    }
+
+    const phone = (form.phone || "").trim()
+    if (phone) {
+      const phoneRegex = /^[0-9]+$/
+      if (!phoneRegex.test(phone)) {
+        showToast("Số điện thoại chỉ được chứa ký số", "error")
+        setTab("personal")
+        return
+      }
+      if (phone.length < 10 || phone.length > 11) {
+        showToast("Số điện thoại phải từ 10 đến 11 ký số", "error")
+        setTab("personal")
+        return
+      }
+      const duplicatePhone = employees.find(e => e.phone.trim() === phone && (!editEmp || e.id !== editEmp.id))
+      if (duplicatePhone) {
+        showToast(`Số điện thoại "${phone}" đã tồn tại trên hệ thống (Nhân viên: ${duplicatePhone.name})`, "error")
+        setTab("personal")
+        return
+      }
+    }
+
+    const cccd = (form.cccd || "").trim()
+    if (cccd) {
+      const cccdRegex = /^[0-9]+$/
+      if (!cccdRegex.test(cccd)) {
+        showToast("Số CCCD chỉ được chứa ký số", "error")
+        setTab("personal")
+        return
+      }
+      if (cccd.length !== 9 && cccd.length !== 12) {
+        showToast("Số CCCD phải có độ dài là 9 hoặc 12 ký số", "error")
+        setTab("personal")
+        return
+      }
+      const duplicateCccd = employees.find(e => e.cccd && e.cccd.trim() === cccd && (!editEmp || e.id !== editEmp.id))
+      if (duplicateCccd) {
+        showToast(`Số CCCD "${cccd}" đã tồn tại trên hệ thống (Nhân viên: ${duplicateCccd.name})`, "error")
+        setTab("personal")
+        return
+      }
+    }
+
+    const bankAccount = (form.bankAccount || "").trim()
+    if (bankAccount) {
+      const bankAccRegex = /^[0-9]+$/
+      if (!bankAccRegex.test(bankAccount)) {
+        showToast("Số tài khoản ngân hàng chỉ được chứa ký số", "error")
+        setTab("personal")
+        return
+      }
+    }
+
+    onSave(form)
+  }
 
   return createPortal(
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3">
@@ -815,7 +1051,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
         <div className="bg-gradient-to-r from-[#C62828] to-[#E64A19] px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
           <div>
             <h3 className="text-white font-bold text-lg">{editEmp ? `Sửa hồ sơ — ${editEmp.name}` : "Thêm nhân viên mới"}</h3>
-            <p className="text-white/60 text-xs mt-0.5">ID: {editEmp ? editEmp.id : newId}</p>
+            <p className="text-white/60 text-xs mt-0.5">Mã NV (dự kiến): {editEmp ? editEmp.id : newId}</p>
           </div>
           <button onClick={onClose} className="text-white/70 hover:text-white transition-colors"><X size={20} /></button>
         </div>
@@ -853,7 +1089,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
               className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors">
               Hủy
             </button>
-            <button onClick={() => onSave(form)}
+            <button onClick={handleOnSaveClick}
               className="px-6 py-2.5 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-sm shadow-[#C62828]/20">
               {editEmp ? "Lưu thay đổi" : "Thêm nhân viên"}
             </button>
@@ -865,12 +1101,14 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
   )
 }
 
-export function EmployeeManagement({ employees, setEmployees, orgNodes = [], selectedBranch = "all", onBranchChange }: {
+export function EmployeeManagement({ employees, setEmployees, orgNodes = [], selectedBranch = "all", onBranchChange, autoOpenUpdateReqId, onClearAutoOpenReq }: {
   employees: Employee[]
   setEmployees: React.Dispatch<React.SetStateAction<Employee[]>>
-  orgNodes?: { id: string; name: string; type?: string; parentId?: string }[]
+  orgNodes?: OrgNode[]
   selectedBranch?: string
   onBranchChange?: (b: string) => void
+  autoOpenUpdateReqId?: string | null
+  onClearAutoOpenReq?: () => void
 }) {
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -887,6 +1125,89 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [deleteEmpId, setDeleteEmpId] = useState<string | null>(null)
+  const [profileUpdates, setProfileUpdates] = useState<any[]>([])
+  const [previewReq, setPreviewReq] = useState<any | null>(null)
+  const { showToast } = useToast()
+  const [previewMode, setPreviewMode] = useState<"diff" | "form">("diff")
+  const [previewFormTab, setPreviewFormTab] = useState<EditTab>("personal")
+  const [inputModal, setInputModal] = useState<{
+    open: boolean
+    title: string
+    placeholder: string
+    defaultValue?: string
+    onConfirm: (val: string) => void
+  } | null>(null)
+
+  useEffect(() => {
+    console.log("EmployeeManagement mounted, fetching profileUpdates...");
+    api.profileUpdates.list().then(d => {
+      console.log("EmployeeManagement list fetched on mount:", d);
+      setProfileUpdates(d);
+    }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    console.log("autoOpenUpdateReqId changed:", autoOpenUpdateReqId);
+    if (autoOpenUpdateReqId) {
+      console.log("Fetching profileUpdates due to autoOpenUpdateReqId...");
+      api.profileUpdates.list().then(d => {
+        console.log("Fetched profileUpdates due to autoOpenUpdateReqId:", d);
+        setProfileUpdates(d);
+      }).catch(() => {})
+    }
+  }, [autoOpenUpdateReqId])
+
+  useEffect(() => {
+    console.log("Checking autoOpenUpdateReqId condition:", { autoOpenUpdateReqId, updatesCount: profileUpdates.length });
+    if (autoOpenUpdateReqId && profileUpdates.length > 0) {
+      const req = profileUpdates.find(r => r.id === autoOpenUpdateReqId)
+      console.log("Search request result:", req);
+      if (req) {
+        console.log("Setting previewReq to:", req);
+        setPreviewReq(req)
+      } else {
+        console.warn("Could not find request with ID:", autoOpenUpdateReqId, "in updates:", profileUpdates);
+      }
+      console.log("Clearing auto-open request ID...");
+      onClearAutoOpenReq?.()
+    }
+  }, [autoOpenUpdateReqId, profileUpdates])
+
+  const handleRequestUpdate = async (empId: string, note?: string) => {
+    try {
+      const res = await api.profileUpdates.request(empId, note)
+      setProfileUpdates(prev => [...prev, res])
+      showToast("Đã gửi yêu cầu cập nhật hồ sơ thành công!", "success")
+    } catch (e: any) {
+      showToast(e.message, "error")
+    }
+  }
+
+  const handleApproveUpdate = async (id: string) => {
+    try {
+      await api.profileUpdates.approve(id)
+      setProfileUpdates(prev => prev.map(p => p.id === id ? { ...p, status: "approved" } : p))
+      if (previewReq) {
+        setEmployees(prev => prev.map(e => e.id === previewReq.employeeId ? { ...e, ...previewReq.pendingData } : e))
+      }
+      setPreviewReq(null)
+      showToast("Đã phê duyệt cập nhật hồ sơ thành công!", "success")
+    } catch (e: any) {
+      showToast(e.message, "error")
+    }
+  }
+
+  const handleRejectUpdate = async (id: string, reason: string) => {
+    try {
+      await api.profileUpdates.reject(id, reason)
+      setProfileUpdates(prev => prev.map(p => p.id === id ? { ...p, status: "rework_requested", reworkReason: reason } : p))
+      setPreviewReq(null)
+      showToast("Đã yêu cầu nhân viên sửa đổi bổ sung hồ sơ!", "success")
+    } catch (e: any) {
+      showToast(e.message, "error")
+    }
+  }
+
 
   const branches = useMemo(() => orgNodes.filter(n => n.type === "branch"), [orgNodes])
 
@@ -900,9 +1221,15 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
 
   const filtered = useMemo(() => employees.filter(e => {
     if (["0000000000", "1111111111", "2222222222"].includes(e.id)) return false
-    const q = search.toLowerCase()
-    const matchQ = !q || e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
-    const matchS = filterStatus === "all" || e.status === filterStatus
+    const q = removeVietnameseTones(search.toLowerCase())
+    const nameStr = removeVietnameseTones(e.name.toLowerCase())
+    const idStr = e.id.toLowerCase()
+    const emailStr = e.email.toLowerCase()
+    const phoneStr = e.phone.toLowerCase()
+    const matchQ = !q || nameStr.includes(q) || idStr.includes(q) || emailStr.includes(q) || phoneStr.includes(q)
+    const matchS = filterStatus === "all"
+      || e.status === filterStatus
+      || (filterStatus === "intern" && e.contractType === "intern")
     const matchD = filterDept === "all" || e.department === filterDept
     const matchB = selectedBranch === "all" || (e as any).branchId === selectedBranch
     return matchQ && matchS && matchD && matchB
@@ -913,31 +1240,18 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       if (editEmp) {
         const updated = await api.employees.update(editEmp.id, finalForm) as Employee
         setEmployees(prev => prev.map(e => e.id === editEmp.id ? { ...e, ...updated } : e))
+        showToast("Đã cập nhật thông tin nhân viên thành công!", "success")
       } else {
         const created = await api.employees.create(finalForm) as Employee
         setEmployees(prev => [...prev, created])
+        showToast("Đã thêm mới nhân viên thành công!", "success")
       }
-    } catch {
-      if (editEmp) {
-        setEmployees(prev => prev.map(e => e.id === editEmp.id ? { ...e, ...finalForm } : e))
-      } else {
-        const d = new Date()
-        const yy = d.getFullYear()
-        const mm = String(d.getMonth() + 1).padStart(2, "0")
-        const dd = String(d.getDate()).padStart(2, "0")
-        const min = String(d.getMinutes()).padStart(2, "0")
-        const baseId = `${yy}${mm}${dd}${min}`
-        let candidate = baseId
-        let count = 1
-        while (employees.some(e => e.id === candidate)) {
-          candidate = `${baseId}-${count}`
-          count++
-        }
-        setEmployees(prev => [...prev, { id: candidate, ...finalForm } as Employee])
-      }
+      setShowModal(false)
+      setEditEmp(null)
+    } catch (err) {
+      console.error("Lỗi lưu nhân viên:", err)
+      showToast(err instanceof Error ? err.message : "Không thể lưu nhân viên", "error")
     }
-    setShowModal(false)
-    setEditEmp(null)
   }
 
   const handleConfirmHistory = async (writeHistory: boolean) => {
@@ -945,14 +1259,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     let finalForm = { ...historyConfirm.pendingForm }
 
     if (writeHistory) {
-      const path = []
-      let curr = orgNodes.find(n => n.id === finalForm.orgNodeId)
-      while (curr) {
-        path.push(curr.name)
-        const pId = curr.parentId
-        curr = pId ? orgNodes.find(n => n.id === pId) : undefined
-      }
-      const snapshot = path.reverse().join(" · ")
+      const snapshot = buildOrgSnapshot(finalForm.orgNodeId, orgNodes)
 
       const newHistoryEntry = {
         id: finalForm.workHistory.length + 1,
@@ -975,27 +1282,26 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     let finalForm = { ...form }
     
     if (editEmp) {
-      const isDeptChanged = form.department !== editEmp.department
-      const isPosChanged = form.position !== editEmp.position
+      const orgChanged = isOrgPlacementChanged(editEmp, form)
       const isStatusChanged = form.status !== editEmp.status
 
       let detectedType: "transfer" | "promotion" | "resign" | "rehire" | null = null
       let defaultNote = ""
 
       if (isStatusChanged) {
-        if (editEmp.status === "inactive" && (form.status === "active" || form.status === "intern")) {
+        if (editEmp.status === "inactive" && (form.status === "active" || form.status === "suspended")) {
           detectedType = "rehire"
           defaultNote = "Tái tuyển dụng"
-        } else if ((editEmp.status === "active" || editEmp.status === "intern") && form.status === "inactive") {
+        } else if ((editEmp.status === "active" || editEmp.status === "suspended") && form.status === "inactive") {
           detectedType = "resign"
           defaultNote = "Nghỉ việc"
-        } else if (editEmp.status === "intern" && form.status === "active") {
+        } else if ((editEmp.status === "active" && form.status === "suspended") || (editEmp.status === "suspended" && form.status === "active")) {
           detectedType = "promotion"
-          defaultNote = "Chuyển chính thức"
+          defaultNote = "Thay đổi trạng thái"
         }
       }
 
-      if (!detectedType && (isDeptChanged || isPosChanged)) {
+      if (!detectedType && orgChanged) {
         detectedType = "transfer"
         defaultNote = "Thuyên chuyển công tác"
       }
@@ -1010,14 +1316,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
         return
       }
     } else {
-      const path = []
-      let curr = orgNodes.find(n => n.id === form.orgNodeId)
-      while (curr) {
-        path.push(curr.name)
-        const pId = curr.parentId
-        curr = pId ? orgNodes.find(n => n.id === pId) : undefined
-      }
-      const snapshot = path.reverse().join(" · ")
+      const snapshot = buildOrgSnapshot(form.orgNodeId, orgNodes)
 
       const joinEntry = {
         id: 1,
@@ -1041,9 +1340,15 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
 
   const confirmDelete = async () => {
     if (!deleteEmpId) return
-    try { await api.employees.delete(deleteEmpId) } catch {}
-    setEmployees(prev => prev.filter(e => e.id !== deleteEmpId))
-    setDeleteEmpId(null)
+    try {
+      await api.employees.delete(deleteEmpId)
+      setEmployees(prev => prev.filter(e => e.id !== deleteEmpId))
+      showToast("Đã xóa nhân viên thành công!", "success")
+    } catch (e: any) {
+      showToast(e.message || "Xóa nhân viên thất bại", "error")
+    } finally {
+      setDeleteEmpId(null)
+    }
   }
 
   const openEdit = (emp: Employee) => { setEditEmp(emp); setShowModal(true) }
@@ -1051,7 +1356,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
 
   const stats = useMemo(() => ({
     active: employees.filter(e => e.status === "active").length,
-    intern: employees.filter(e => e.status === "intern").length,
+    intern: employees.filter(e => e.contractType === "intern").length,
     inactive: employees.filter(e => e.status === "inactive").length,
   }), [employees])
 
@@ -1072,7 +1377,43 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
+          <button onClick={() => {
+            const header = ["Mã NV", "Họ tên", "Email", "SĐT", "Chi nhánh", "Phòng ban", "Vị trí", "Hợp đồng", "Ngày vào", "Trạng thái"]
+            const dataRow = filtered.map(emp => {
+              const branchName = branches.find(b => b.id === (emp as any).branchId)?.name || ""
+              const contractLabel = CONTRACT_TYPES.find(c => c.value === emp.contractType)?.label || emp.contractType
+              const statusLabel = emp.status === "active" ? "Đang làm" : emp.status === "inactive" ? "Nghỉ việc" : emp.status === "suspended" ? "Tạm nghỉ" : emp.status
+              return [
+                emp.id,
+                emp.name,
+                emp.email,
+                emp.phone,
+                branchName,
+                emp.department,
+                emp.position,
+                contractLabel,
+                emp.joinDate,
+                statusLabel
+              ]
+            })
+            
+            const wsData = [header, ...dataRow]
+            const ws = XLSX.utils.aoa_to_sheet(wsData)
+            
+            
+            const colsWidth = header.map((_, colIndex) => {
+              const maxLen = wsData.reduce((max, row) => {
+                const cellValue = row[colIndex] ? String(row[colIndex]) : ""
+                return Math.max(max, cellValue.length)
+              }, 0)
+              return { wch: Math.max(maxLen + 2, 10) } 
+            })
+            ws['!cols'] = colsWidth
+
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, "Nhân viên")
+            XLSX.writeFile(wb, `danh-sach-nhan-vien-${new Date().toISOString().slice(0, 10)}.xlsx`)
+          }} className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
             <Download size={14} /> Xuất Excel
           </button>
           <button onClick={openAdd}
@@ -1083,26 +1424,6 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-black/[0.06] space-y-3">
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => onBranchChange?.("all")}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold border transition-all ${selectedBranch === "all" ? "bg-[#C62828] text-white border-[#C62828] shadow-sm" : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"}`}>
-            <Building2 size={14} />
-            Tất cả
-            <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${selectedBranch === "all" ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"}`}>
-              {employees.length}
-            </span>
-          </button>
-          {branches.map(b => (
-            <button key={b.id} onClick={() => onBranchChange?.(b.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold border transition-all ${selectedBranch === b.id ? "bg-[#C62828] text-white border-[#C62828] shadow-sm" : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"}`}>
-              <Building2 size={14} />
-              {b.name}
-              <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${selectedBranch === b.id ? "bg-white/25 text-white" : "bg-gray-100 text-gray-500"}`}>
-                {branchCount[b.id] || 0}
-              </span>
-            </button>
-          ))}
-        </div>
 
         <div className="flex gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
@@ -1182,7 +1503,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                       <p className="text-xs font-semibold text-gray-700 whitespace-nowrap">{emp.department}</p>
                       <p className="text-[11px] text-gray-400">{emp.position}</p>
                     </td>
-                    <td className="px-4 py-4 text-gray-400 text-xs whitespace-nowrap">{emp.contractType}</td>
+                    <td className="px-4 py-4 text-gray-400 text-xs whitespace-nowrap">{CONTRACT_TYPES.find(c => c.value === emp.contractType)?.label || emp.contractType}</td>
                     <td className="px-4 py-4 text-gray-400 text-xs font-mono whitespace-nowrap">{emp.joinDate}</td>
                     <td className="px-4 py-4"><Badge status={emp.status} /></td>
                     <td className="px-4 py-4 sticky right-0 bg-white z-10">
@@ -1339,6 +1660,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
             {(() => {
               const emp = filtered.find(e => e.id === openMenu)
               if (!emp) return null
+              const updateReq = (profileUpdates || []).find(p => p.employeeId === emp.id && ["sent", "pending_approval", "rework_requested"].includes(p.status))
               return (
                 <>
                   <button onClick={() => { setViewEmp(emp); setOpenMenu(null); setMenuPos(null) }}
@@ -1350,6 +1672,38 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                     <Edit2 size={15} className="text-gray-400" /> Sửa hồ sơ
                   </button>
                   <div className="h-px bg-gray-100 my-1" />
+                  
+                  {!updateReq && (
+                    <button onClick={() => { 
+                      setInputModal({
+                        open: true,
+                        title: "Yêu cầu nhân viên cập nhật hồ sơ",
+                        placeholder: "Nhập lời nhắn hoặc ghi chú cho nhân viên (tùy chọn)...",
+                        onConfirm: (val) => {
+                          handleRequestUpdate(emp.id, val.trim() || undefined)
+                        }
+                      })
+                      setOpenMenu(null); 
+                      setMenuPos(null) 
+                    }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 text-sm text-blue-600 transition-colors text-left">
+                      <ClipboardList size={15} className="text-blue-400" /> Yêu cầu cập nhật
+                    </button>
+                  )}
+                  {(updateReq?.status === "sent" || updateReq?.status === "rework_requested") && (
+                    <button disabled
+                      className="w-full flex items-center gap-3 px-4 py-2.5 bg-gray-50 text-sm text-gray-400 transition-colors text-left cursor-not-allowed">
+                      <ClipboardList size={15} /> Đã gửi yêu cầu
+                    </button>
+                  )}
+                  {updateReq?.status === "pending_approval" && (
+                    <button onClick={() => { setPreviewReq(updateReq); setPreviewMode("diff"); setPreviewFormTab("personal"); setOpenMenu(null); setMenuPos(null) }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-orange-50 text-sm text-orange-600 font-bold transition-colors text-left">
+                      <ClipboardList size={15} className="text-orange-400" /> Chờ duyệt hồ sơ
+                    </button>
+                  )}
+                  <div className="h-px bg-gray-100 my-1" />
+
                   <button onClick={() => { handleDelete(emp.id); setOpenMenu(null); setMenuPos(null) }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 text-sm text-red-600 font-medium transition-colors text-left">
                     <Trash2 size={15} className="text-red-400" /> Xóa
@@ -1372,6 +1726,221 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
         cancelText="Hủy"
         type="danger"
       />
+
+      {previewReq && createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+          {(() => {
+            const currentProfile = employees.find(e => e.id === previewReq.employeeId) || {}
+            const pendingData = previewReq.pendingData || {}
+            const diffRows = buildProfileDiffRows(currentProfile as any, pendingData as any)
+            return (
+              <div className="bg-white rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-orange-50/50">
+                  <div>
+                    <h3 className="font-bold text-gray-800 text-lg flex items-center gap-2">
+                      <ClipboardList className="text-orange-500" size={20} />
+                      Duyệt hồ sơ cập nhật
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Nhân viên: <span className="font-semibold">{previewReq.employeeId}</span> · Có <span className="font-semibold text-orange-600">{diffRows.length}</span> thay đổi
+                    </p>
+                  </div>
+                  <button onClick={() => { setPreviewReq(null); setPreviewMode("diff"); setPreviewFormTab("personal") }} className="text-gray-400 hover:text-gray-600 transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="inline-flex p-1 rounded-xl bg-white border border-gray-200">
+                      <button
+                        onClick={() => setPreviewMode("diff")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${previewMode === "diff" ? "bg-[#C62828] text-white" : "text-gray-500 hover:bg-gray-100"}`}
+                      >
+                        So sánh thay đổi
+                      </button>
+                      <button
+                        onClick={() => setPreviewMode("form")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${previewMode === "form" ? "bg-[#C62828] text-white" : "text-gray-500 hover:bg-gray-100"}`}
+                      >
+                        Dạng màn chỉnh sửa
+                      </button>
+                    </div>
+                  </div>
+
+                  {previewMode === "diff" ? (
+                    diffRows.length === 0 ? (
+                      <div className="bg-white border border-gray-100 rounded-xl p-6 text-sm text-gray-500">
+                        Không phát hiện thay đổi nào giữa hồ sơ hiện tại và dữ liệu cập nhật.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {diffRows.map((row) => (
+                          <div key={row.key} className="bg-white border border-gray-100 rounded-xl p-4">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">{row.key}</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1">Hiện tại</p>
+                                <p className="text-sm text-gray-700 break-words">{formatDiffValue(row.before)}</p>
+                              </div>
+                              <div className="rounded-lg border border-orange-200 bg-orange-50/60 px-3 py-2">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-orange-500 mb-1">Cập nhật</p>
+                                <p className="text-sm text-gray-800 font-semibold break-words">{formatDiffValue(row.after)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    (() => {
+                      const currentProfile = employees.find(e => e.id === previewReq.employeeId) || {}
+                      const pendingData = previewReq.pendingData || {}
+                      const merged = { ...(currentProfile as any), ...(pendingData as any) } as EmpExtForm
+
+                      const inp = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/50 focus:ring-1 focus:ring-[#C62828]/10 transition-all text-gray-700 bg-white"
+                      const sel = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/50 text-gray-700 bg-white"
+                      const lbl = "block text-xs font-semibold text-gray-500 mb-1.5"
+
+                      return (
+                        <div className="space-y-5">
+                          <div className="flex gap-3 flex-wrap">
+                            {[
+                              { key: "personal" as const, label: "Cá nhân", Icon: User },
+                              { key: "work" as const, label: "Công việc", Icon: Briefcase },
+                              { key: "files" as const, label: "Tài liệu", Icon: Paperclip },
+                              { key: "history" as const, label: "Lịch sử", Icon: ClipboardList },
+                            ].map(t => (
+                              <button
+                                key={t.key}
+                                onClick={() => setPreviewFormTab(t.key)}
+                                className={`px-3 py-2 rounded-xl text-xs font-bold transition-colors ${
+                                  previewFormTab === t.key ? "bg-[#C62828] text-white" : "bg-white border border-gray-200 text-gray-500 hover:bg-gray-50"
+                                }`}
+                              >
+                                <t.Icon size={14} className="inline-block mr-2 -mt-[1px]" />
+                                {t.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {previewFormTab === "personal" && (
+                            <PersonalTab form={merged} sf={() => { }} inp={inp} sel={sel} lbl={lbl} readonly />
+                          )}
+                          {previewFormTab === "work" && (
+                            <WorkTab form={merged} sf={() => { }} inp={inp} sel={sel} lbl={lbl} orgNodes={orgNodes} branches={branches} readonly />
+                          )}
+
+                          {previewFormTab === "files" && (
+                            <FilesTab
+                              photos={((merged as any).photos as string[]) ?? []}
+                              onChangePhotos={() => {}}
+                              attachments={((merged as any).attachments as Attachment[]) ?? []}
+                              onChangeAttachments={() => {}}
+                              readonly
+                            />
+                          )}
+                          {previewFormTab === "history" && (
+                            <WorkHistoryTab
+                              history={((merged as any).workHistory as WorkHistoryEntry[]) ?? []}
+                              onChange={() => {}}
+                              orgNodes={orgNodes}
+                              readonly
+                            />
+                          )}
+                        </div>
+                      )
+                    })()
+                  )}
+
+                  {previewMode === "diff" && (
+                    <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <details className="bg-white border border-gray-100 rounded-xl p-3">
+                        <summary className="cursor-pointer text-xs font-bold text-gray-600 uppercase tracking-wide">Xem JSON hiện tại</summary>
+                        <pre className="mt-3 text-[11px] text-gray-600 whitespace-pre-wrap font-mono max-h-56 overflow-y-auto">
+                          {JSON.stringify(currentProfile, null, 2)}
+                        </pre>
+                      </details>
+                      <details className="bg-white border border-orange-100 rounded-xl p-3">
+                        <summary className="cursor-pointer text-xs font-bold text-orange-600 uppercase tracking-wide">Xem JSON cập nhật</summary>
+                        <pre className="mt-3 text-[11px] text-gray-700 whitespace-pre-wrap font-mono max-h-56 overflow-y-auto">
+                          {JSON.stringify(pendingData, null, 2)}
+                        </pre>
+                      </details>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-gray-100 bg-white flex justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setInputModal({
+                        open: true,
+                        title: "Yêu cầu chỉnh sửa lại hồ sơ",
+                        placeholder: "Nhập lý do cần sửa lại (bắt buộc)...",
+                        onConfirm: (val) => {
+                          handleRejectUpdate(previewReq.id, val.trim() || "Cần sửa lại")
+                        }
+                      })
+                    }}
+                    className="px-6 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl text-sm transition-colors"
+                  >
+                    Yêu cầu sửa lại
+                  </button>
+                  <button
+                    onClick={() => handleApproveUpdate(previewReq.id)}
+                    className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl text-sm hover:opacity-90 transition-opacity shadow-sm"
+                  >
+                    Duyệt & Lưu hồ sơ
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
+        </div>,
+        document.body
+      )}
+      {inputModal && createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 flex flex-col gap-4">
+            <div>
+              <h4 className="text-gray-900 font-extrabold text-base">{inputModal.title}</h4>
+            </div>
+            <div>
+              <textarea
+                id="modal-input-textarea"
+                placeholder={inputModal.placeholder}
+                defaultValue={inputModal.defaultValue}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/10 transition-all text-gray-700 bg-white resize-none"
+                autoFocus
+                autoComplete="off"
+              />
+            </div>
+            <div className="flex justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setInputModal(null)}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition-colors"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const val = (document.getElementById("modal-input-textarea") as HTMLTextAreaElement)?.value || "";
+                  inputModal.onConfirm(val);
+                  setInputModal(null);
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:opacity-90 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

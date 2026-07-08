@@ -1,3 +1,6 @@
+# Legacy CRM prototype (not part of DuDiSystem — ignore)
+DuDi_CRM/
+
 # Markdown files
 *.md
 
@@ -127,3 +130,15 @@ backup-local/
 temp_repo/
 src2/
 src copy/
+
+.vercel
+.env*.local
+
+# Lead quote/contract files (generated at runtime)
+backend/storage/
+
+# Temp templates and scratches
+scratch/
+_template_unzip/
+*.docx
+

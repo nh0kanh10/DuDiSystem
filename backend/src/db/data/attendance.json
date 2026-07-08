@@ -1033,5 +1033,809 @@
     "date": "2026-07-01",
     "status": "on-time",
     "note": ""
+  },
+  {
+    "id": "ATT108",
+    "employeeId": "NV002",
+    "checkIn": "09:15",
+    "checkOut": "--",
+    "date": "2026-07-01",
+    "status": "late",
+    "note": ""
+  },
+  {
+    "id": "ATT109",
+    "employeeId": "NV003",
+    "checkIn": "08:45",
+    "checkOut": "--",
+    "date": "2026-07-01",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT110",
+    "employeeId": "NV004",
+    "checkIn": "08:30",
+    "checkOut": "17:15",
+    "date": "2026-07-01",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT111",
+    "employeeId": "NV005",
+    "checkIn": "09:10",
+    "checkOut": "16:30",
+    "date": "2026-07-01",
+    "status": "late_early",
+    "note": ""
+  },
+  {
+    "id": "ATT112",
+    "employeeId": "NV006",
+    "checkInAm": "08:50",
+    "checkOutAm": "12:00",
+    "checkInPm": "13:30",
+    "checkOutPm": "--",
+    "statusAm": "on-time",
+    "statusPm": "absent",
+    "noteAm": "",
+    "notePm": "Vắng chiều",
+    "date": "2026-07-01",
+    "status": "absent",
+    "note": ""
+  },
+  {
+    "id": "ATT113",
+    "employeeId": "NV007",
+    "checkInAm": "09:20",
+    "checkOutAm": "12:00",
+    "checkInPm": "--",
+    "checkOutPm": "--",
+    "statusAm": "late",
+    "statusPm": "absent",
+    "noteAm": "",
+    "notePm": "Vắng chiều",
+    "date": "2026-07-01",
+    "status": "absent",
+    "note": ""
+  },
+  {
+    "id": "ATT114",
+    "employeeId": "NV009",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-01",
+    "status": "leave",
+    "note": "Nghỉ phép năm"
+  },
+  {
+    "id": "ATT115",
+    "employeeId": "NV011",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-01",
+    "status": "absent",
+    "note": "Vắng"
+  },
+  {
+    "id": "ATT116",
+    "employeeId": "NV001",
+    "checkIn": "08:02",
+    "checkOut": "17:35",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT117",
+    "employeeId": "NV002",
+    "checkIn": "08:10",
+    "checkOut": "17:30",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT118",
+    "employeeId": "NV003",
+    "checkIn": "07:58",
+    "checkOut": "17:05",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT119",
+    "employeeId": "NV004",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT120",
+    "employeeId": "NV005",
+    "checkIn": "08:05",
+    "checkOut": "17:30",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT121",
+    "employeeId": "NV006",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT122",
+    "employeeId": "NV007",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT123",
+    "employeeId": "NV008",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-02",
+    "status": "absent",
+    "note": ""
+  },
+  {
+    "id": "ATT124",
+    "employeeId": "NV009",
+    "checkIn": "08:00",
+    "checkOut": "17:30",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT125",
+    "employeeId": "NV011",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-02",
+    "status": "absent",
+    "note": "Vắng"
+  },
+  {
+    "id": "ATT126",
+    "employeeId": "NV012",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT127",
+    "employeeId": "NV013",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT128",
+    "employeeId": "NV014",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT129",
+    "employeeId": "NV015",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT130",
+    "employeeId": "NV016",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT131",
+    "employeeId": "NV017",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-02",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT132",
+    "employeeId": "NV001",
+    "checkIn": "08:02",
+    "checkOut": "17:35",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT133",
+    "employeeId": "NV002",
+    "checkIn": "08:10",
+    "checkOut": "17:30",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT134",
+    "employeeId": "NV003",
+    "checkIn": "07:58",
+    "checkOut": "17:05",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT135",
+    "employeeId": "NV004",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT136",
+    "employeeId": "NV005",
+    "checkIn": "08:05",
+    "checkOut": "17:30",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT137",
+    "employeeId": "NV006",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT138",
+    "employeeId": "NV007",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT139",
+    "employeeId": "NV008",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-03",
+    "status": "absent",
+    "note": ""
+  },
+  {
+    "id": "ATT140",
+    "employeeId": "NV009",
+    "checkIn": "08:00",
+    "checkOut": "17:30",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT141",
+    "employeeId": "NV011",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-03",
+    "status": "absent",
+    "note": "Vắng"
+  },
+  {
+    "id": "ATT142",
+    "employeeId": "NV012",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT143",
+    "employeeId": "NV013",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT144",
+    "employeeId": "NV014",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT145",
+    "employeeId": "NV015",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT146",
+    "employeeId": "NV016",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT147",
+    "employeeId": "NV017",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-03",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT148",
+    "employeeId": "NV001",
+    "checkIn": "08:02",
+    "checkOut": "17:35",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT149",
+    "employeeId": "NV002",
+    "checkIn": "08:10",
+    "checkOut": "17:30",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT150",
+    "employeeId": "NV003",
+    "checkIn": "07:58",
+    "checkOut": "17:05",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT151",
+    "employeeId": "NV004",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT152",
+    "employeeId": "NV005",
+    "checkIn": "08:05",
+    "checkOut": "17:30",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT153",
+    "employeeId": "NV006",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT154",
+    "employeeId": "NV007",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT155",
+    "employeeId": "NV008",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-06",
+    "status": "absent",
+    "note": ""
+  },
+  {
+    "id": "ATT156",
+    "employeeId": "NV009",
+    "checkIn": "08:00",
+    "checkOut": "17:30",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT157",
+    "employeeId": "NV011",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-06",
+    "status": "absent",
+    "note": "Vắng"
+  },
+  {
+    "id": "ATT158",
+    "employeeId": "NV012",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT159",
+    "employeeId": "NV013",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT160",
+    "employeeId": "NV014",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT161",
+    "employeeId": "NV015",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT162",
+    "employeeId": "NV016",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT163",
+    "employeeId": "NV017",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-06",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT164",
+    "employeeId": "NV001",
+    "checkIn": "08:02",
+    "checkOut": "17:35",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT165",
+    "employeeId": "NV002",
+    "checkIn": "08:10",
+    "checkOut": "17:30",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT166",
+    "employeeId": "NV003",
+    "checkIn": "07:58",
+    "checkOut": "17:05",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT167",
+    "employeeId": "NV004",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT168",
+    "employeeId": "NV005",
+    "checkIn": "08:05",
+    "checkOut": "17:30",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT169",
+    "employeeId": "NV006",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT170",
+    "employeeId": "NV007",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT171",
+    "employeeId": "NV008",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-07",
+    "status": "absent",
+    "note": ""
+  },
+  {
+    "id": "ATT172",
+    "employeeId": "NV009",
+    "checkIn": "08:00",
+    "checkOut": "17:30",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT173",
+    "employeeId": "NV011",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-07",
+    "status": "absent",
+    "note": "Vắng"
+  },
+  {
+    "id": "ATT174",
+    "employeeId": "NV012",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT175",
+    "employeeId": "NV013",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT176",
+    "employeeId": "NV014",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT177",
+    "employeeId": "NV015",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT178",
+    "employeeId": "NV016",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT179",
+    "employeeId": "NV017",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-07",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT180",
+    "employeeId": "NV001",
+    "checkIn": "08:02",
+    "checkOut": "17:35",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT181",
+    "employeeId": "NV002",
+    "checkIn": "08:10",
+    "checkOut": "17:30",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT182",
+    "employeeId": "NV003",
+    "checkIn": "07:58",
+    "checkOut": "17:05",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT183",
+    "employeeId": "NV004",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT184",
+    "employeeId": "NV005",
+    "checkIn": "08:05",
+    "checkOut": "17:30",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT185",
+    "employeeId": "NV006",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT186",
+    "employeeId": "NV007",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT187",
+    "employeeId": "NV008",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-08",
+    "status": "absent",
+    "note": ""
+  },
+  {
+    "id": "ATT188",
+    "employeeId": "NV009",
+    "checkIn": "08:00",
+    "checkOut": "17:30",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT189",
+    "employeeId": "NV011",
+    "checkIn": "--",
+    "checkOut": "--",
+    "date": "2026-07-08",
+    "status": "absent",
+    "note": "Vắng"
+  },
+  {
+    "id": "ATT190",
+    "employeeId": "NV012",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT191",
+    "employeeId": "NV013",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT192",
+    "employeeId": "NV014",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT193",
+    "employeeId": "NV015",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT194",
+    "employeeId": "NV016",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
+  },
+  {
+    "id": "ATT195",
+    "employeeId": "NV017",
+    "checkIn": "08:00",
+    "checkOut": "17:00",
+    "date": "2026-07-08",
+    "status": "on-time",
+    "note": ""
   }
 ]

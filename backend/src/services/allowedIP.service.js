@@ -13,10 +13,8 @@ export function createAllowedIP(data) {
     return { error: "Vui lòng nhập địa chỉ IP", status: 400 }
   }
 
-  // Chuẩn hóa IP
   const ipTrimmed = data.ip.trim()
 
-  // Kiểm tra trùng
   const existing = repo.findByIP(ipTrimmed)
   if (existing) {
     return { error: "Địa chỉ IP này đã tồn tại trong danh sách cấu hình", status: 400 }

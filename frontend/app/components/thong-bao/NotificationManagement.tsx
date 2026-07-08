@@ -3,7 +3,7 @@ import { createPortal } from "react-dom"
 import {
   Bell, Plus, Search, Edit2, Trash2, RefreshCw,
   Settings, Info, AlertTriangle, Calendar, Zap,
-  CheckCircle2, Clock, XCircle,
+  CheckCircle2, Clock, XCircle, Eye,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { Announcement, AnnouncementType, AnnouncementPriority, AnnouncementStatus } from "../../types"
@@ -11,7 +11,6 @@ import { CustomSelect } from "../ui/CustomSelect"
 import { CustomDateTimePicker } from "../ui/CustomDatePicker"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 
-// ─── Config maps ─────────────────────────────────────────────────────────────
 
 const TYPE_CFG: Record<AnnouncementType, { label: string; icon: React.ElementType; cls: string }> = {
   info:    { label: "Thông tin", icon: Info,          cls: "bg-blue-50 text-blue-600" },
@@ -37,7 +36,6 @@ const EMPTY_FORM = {
   priority: "medium" as AnnouncementPriority, startTime: "", endTime: "",
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCard({ icon: Icon, value, label, highlight }: {
   icon: React.ElementType; value: number; label: string; highlight?: boolean
@@ -75,12 +73,12 @@ function StatusBadge({ status }: { status: AnnouncementStatus }) {
   )
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function NotificationManagement() {
   const [items, setItems]     = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats]     = useState({ total: 0, active: 0, scheduled: 0, expired: 0 })
+  const [employees, setEmployees] = useState<any[]>([])
 
   const [search, setSearch]             = useState("")
   const [filterType, setFilterType]     = useState("all")
@@ -97,9 +95,39 @@ export function NotificationManagement() {
   const [defaultContent, setDefaultContent] = useState("Chào mừng đến với hệ thống DuDi!")
   const [savingDefault, setSavingDefault]   = useState(false)
 
-  const [deleteConfirm, setDeleteConfirm] = useState<Announcement | null>(null)
+  useEffect(() => {
+    if (showDefault) {
+      api.systemConfig.get().then((cfg: any) => {
+        if (cfg) {
+          setDefaultEnabled(cfg.defaultAnnouncementEnabled ?? true)
+          setDefaultContent(cfg.defaultAnnouncementContent ?? "Chào mừng đến với hệ thống DuDi!")
+        }
+      }).catch(() => {})
+    }
+  }, [showDefault])
 
-  useEffect(() => { loadAll() }, [])
+  const [deleteConfirm, setDeleteConfirm] = useState<Announcement | null>(null)
+  const [previewItem, setPreviewItem] = useState<Announcement | null>(null)
+  const [showInboxForm, setShowInboxForm] = useState(false)
+  const [sendingInbox, setSendingInbox] = useState(false)
+  const [inboxForm, setInboxForm] = useState({
+    title: "",
+    type: "system",
+    message: "",
+    targetMode: "all",
+    recipientId: "",
+  })
+
+  useEffect(() => {
+    loadAll()
+    const timer = setInterval(() => { loadAll() }, 30000)
+    return () => clearInterval(timer)
+  }, [])
+  useEffect(() => {
+    api.employees.list({ status: "active" } as any)
+      .then((rows: any) => setEmployees(Array.isArray(rows) ? rows : []))
+      .catch(() => setEmployees([]))
+  }, [])
 
   async function loadAll() {
     setLoading(true)
@@ -178,9 +206,29 @@ export function NotificationManagement() {
     }
   }
 
+  async function sendInboxNotification() {
+    if (!inboxForm.message.trim()) return
+    if (inboxForm.targetMode === "one" && !inboxForm.recipientId) return
+    setSendingInbox(true)
+    try {
+      const payload: any = {
+        type: inboxForm.type,
+        title: inboxForm.title.trim(),
+        message: inboxForm.message.trim(),
+        time: new Date().toLocaleString("vi-VN"),
+      }
+      if (inboxForm.targetMode === "all") payload.toAll = true
+      if (inboxForm.targetMode === "one") payload.recipientId = inboxForm.recipientId
+      await api.notifications.create(payload)
+      setShowInboxForm(false)
+      setInboxForm({ title: "", type: "system", message: "", targetMode: "all", recipientId: "" })
+    } finally {
+      setSendingInbox(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
         <div className="flex items-center">
           <div className="flex gap-1.5 items-center mr-4 shrink-0">
@@ -202,6 +250,10 @@ export function NotificationManagement() {
             className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
             <Settings size={14} />Cài đặt mặc định
           </button>
+          <button onClick={() => setShowInboxForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
+            <Bell size={14} />Gửi inbox staff
+          </button>
           <button onClick={openCreate}
             className="flex items-center gap-2 px-4 py-2 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm cursor-pointer">
             <Plus size={14} />Tạo thông báo
@@ -209,7 +261,6 @@ export function NotificationManagement() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={CheckCircle2} value={stats.active}    label="Đang hiển thị" highlight />
         <StatCard icon={Clock}        value={stats.scheduled} label="Đã lên lịch" />
@@ -217,7 +268,6 @@ export function NotificationManagement() {
         <StatCard icon={XCircle}      value={stats.expired}   label="Đã hết hạn" />
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-2xl border border-black/[0.05] p-4 flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[180px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -243,7 +293,6 @@ export function NotificationManagement() {
         <span className="text-xs text-gray-400 font-bold ml-auto">{filtered.length} thông báo</span>
       </div>
 
-      {/* List */}
       {loading ? (
         <div className="bg-white rounded-2xl border border-black/[0.05] p-16 text-center">
           <div className="w-8 h-8 rounded-full border-2 border-[#C62828]/30 border-t-[#C62828] animate-spin mx-auto" />
@@ -263,7 +312,6 @@ export function NotificationManagement() {
             return (
               <div key={a.id}
                 className={`bg-white rounded-2xl border border-black/[0.05] border-l-4 ${borderColor} px-5 py-4 hover:shadow-md transition-all group`}>
-                {/* Row 1: icon + title + actions */}
                 <div className="flex items-center gap-3">
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${tcfg.cls}`}>
                     <Icon size={16} />
@@ -273,6 +321,12 @@ export function NotificationManagement() {
                     <TypeBadge type={a.type} />
                     <StatusBadge status={a.status} />
                     <div className="flex items-center gap-1 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => setPreviewItem(a)}
+                        className="p-1.5 rounded-lg hover:bg-indigo-50 text-gray-400 hover:text-indigo-600 transition-colors"
+                        title="Xem chi tiết"
+                      >
+                        <Eye size={13} />
+                      </button>
                       <button onClick={() => openEdit(a)}
                         className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
                         <Edit2 size={13} />
@@ -284,9 +338,7 @@ export function NotificationManagement() {
                     </div>
                   </div>
                 </div>
-                {/* Row 2: content */}
                 <p className="text-xs text-gray-500 mt-2 leading-relaxed line-clamp-2 pl-12">{a.content}</p>
-                {/* Row 3: meta */}
                 <div className="flex items-center gap-4 mt-1.5 pl-12 text-[11px] text-gray-400">
                   {a.startTime && (
                     <span className="flex items-center gap-1">
@@ -305,7 +357,6 @@ export function NotificationManagement() {
         </div>
       )}
 
-      {/* ── Create / Edit Modal ───────────────────────────────────── */}
       <Modal open={showForm} onClose={() => setShowForm(false)}
         title={editItem ? "Chỉnh sửa thông báo" : "Tạo thông báo mới"}
         icon={Bell} width="lg"
@@ -390,7 +441,131 @@ export function NotificationManagement() {
         </div>
       </Modal>
 
-      {/* ── Default Settings Modal ────────────────────────────────── */}
+      <Modal
+        open={!!previewItem}
+        onClose={() => setPreviewItem(null)}
+        title="Chi tiết thông báo"
+        icon={Bell}
+        width="lg"
+        footer={<ModalCancelButton onClick={() => setPreviewItem(null)} label="Đóng" />}
+      >
+        {previewItem && (
+          <div className="p-6 space-y-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <TypeBadge type={previewItem.type} />
+              <StatusBadge status={previewItem.status} />
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${PRIORITY_CFG[previewItem.priority].cls}`}>
+                {PRIORITY_CFG[previewItem.priority].full}
+              </span>
+              <span className="text-xs text-gray-400 ml-auto">Tạo: {previewItem.createdAt}</span>
+            </div>
+            <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4">
+              <p className="text-base font-black text-gray-800">{previewItem.title}</p>
+              <p className="text-sm text-gray-600 leading-relaxed mt-2 whitespace-pre-wrap">
+                {previewItem.content || "—"}
+              </p>
+            </div>
+            {(previewItem.startTime || previewItem.endTime) && (
+              <div className="text-xs text-gray-500">
+                <span className="font-bold text-gray-600">Khung thời gian:</span>{" "}
+                {previewItem.startTime || "—"}{previewItem.endTime ? ` → ${previewItem.endTime}` : ""}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={showInboxForm}
+        onClose={() => setShowInboxForm(false)}
+        title="Gửi thông báo inbox cho staff"
+        icon={Bell}
+        width="xl"
+        bodyClassName="overflow-visible"
+        footer={
+          <>
+            <ModalCancelButton onClick={() => setShowInboxForm(false)} />
+            <ModalSubmitButton onClick={sendInboxNotification} loading={sendingInbox} label="Gửi thông báo" />
+          </>
+        }
+      >
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-gray-600 block mb-1.5">Tiêu đề</label>
+              <input
+                value={inboxForm.title}
+                onChange={e => setInboxForm(f => ({ ...f, title: e.target.value }))}
+                placeholder="Ví dụ: Cập nhật hệ thống"
+                className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20 focus:border-[#C62828]/50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-gray-600 block mb-1.5">Loại thông báo</label>
+              <CustomSelect
+                value={inboxForm.type}
+                onChange={v => setInboxForm(f => ({ ...f, type: v }))}
+                options={[
+                  { value: "system", label: "Hệ thống" },
+                  { value: "hr", label: "Nhân sự" },
+                  { value: "leave", label: "Nghỉ phép" },
+                ]}
+                heightClass="h-[42px]"
+              />
+              <p className="text-[11px] text-gray-400 mt-1">Dùng để gắn nhãn và lọc trong inbox staff (không ảnh hưởng quyền nhận).</p>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-600 block mb-1.5">Nội dung <span className="text-red-500">*</span></label>
+            <textarea
+              rows={4}
+              value={inboxForm.message}
+              onChange={e => setInboxForm(f => ({ ...f, message: e.target.value }))}
+              placeholder="Nhập nội dung thông báo gửi tới staff..."
+              className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#C62828]/20 focus:border-[#C62828]/50 transition-all"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold text-gray-600 block mb-1.5">Đối tượng nhận</label>
+              <CustomSelect
+                value={inboxForm.targetMode}
+                onChange={v => setInboxForm(f => ({ ...f, targetMode: v, recipientId: "" }))}
+                options={[
+                  { value: "all", label: "Toàn bộ nhân viên active" },
+                  { value: "one", label: "Một nhân viên cụ thể" },
+                ]}
+                heightClass="h-[42px]"
+                menuClassName="max-h-[360px]"
+                portal
+              />
+            </div>
+            {inboxForm.targetMode === "one" && (
+              <div>
+                <label className="text-xs font-bold text-gray-600 block mb-1.5">Nhân viên nhận</label>
+                <CustomSelect
+                  value={inboxForm.recipientId}
+                  onChange={v => setInboxForm(f => ({ ...f, recipientId: v }))}
+                  options={employees.map(e => ({ value: e.id, label: `${e.name} (${e.id})` }))}
+                  heightClass="h-[42px]"
+                  searchable
+                  menuClassName="max-h-[420px]"
+                  portal
+                />
+              </div>
+            )}
+          </div>
+          {!inboxForm.message.trim() && (
+            <p className="text-xs text-amber-600">Nội dung thông báo đang để trống.</p>
+          )}
+          {inboxForm.targetMode === "one" && !inboxForm.recipientId && (
+            <p className="text-xs text-amber-600">Bạn chưa chọn nhân viên nhận thông báo.</p>
+          )}
+        </div>
+      </Modal>
+
       <Modal open={showDefault} onClose={() => setShowDefault(false)}
         title="Thông báo mặc định" icon={Settings} width="md"
         footer={
@@ -431,7 +606,6 @@ export function NotificationManagement() {
         </div>
       </Modal>
 
-      {/* ── Delete confirm ────────────────────────────────────────── */}
       {deleteConfirm && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDeleteConfirm(null)}>
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />

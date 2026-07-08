@@ -1,5 +1,8 @@
 import * as repo from "../repositories/crm.repository.js"
 import * as empRepo from "../repositories/employee.repository.js"
+import * as customerRepo from "../repositories/customer.repository.js"
+import * as leadSvc from "./lead.service.js"
+import * as customerSvc from "./customer.service.js"
 import { v4 as uuidv4 } from "uuid"
 
 export const CRM_STATUSES = [
@@ -201,12 +204,29 @@ export function getAdminDashboard() {
     if (["Trả lời"].includes(r.status)) empMap[r.assignedTo].converted++
   })
 
+  const employeeStats = Object.values(empMap).sort((a, b) => b.total - a.total)
+  const employeeProgress = employeeStats.map(emp => ({
+    employeeId: emp.employeeId,
+    employeeName: emp.employeeName,
+    // Frontend expects: totalAssigned / completedCount / processingCount
+    totalAssigned: emp.total,
+    completedCount: emp.converted,
+    processingCount: Math.max(emp.total - emp.converted, 0),
+  }))
+
   return {
     totalData: all.length,
+    // Old keys (kept for backward compatibility)
     assigned,
     unassigned: all.length - assigned,
     statusBreakdown,
-    employeeStats: Object.values(empMap).sort((a, b) => b.total - a.total)
+    employeeStats,
+
+    // Client contract (CrmAdminPage)
+    assignedData: assigned,
+    unassignedData: all.length - assigned,
+    statusCounts: statusBreakdown,
+    employeeProgress,
   }
 }
 
@@ -215,7 +235,24 @@ export function getEmployeeDashboard(employeeId) {
   const statusBreakdown = {}
   CRM_STATUSES.forEach(s => { statusBreakdown[s] = 0 })
   myRecords.forEach(r => { if (statusBreakdown[r.status] !== undefined) statusBreakdown[r.status]++ })
-  return { total: myRecords.length, statusBreakdown }
+  const totalAssigned = myRecords.length
+  const untreatedCount = statusBreakdown["Chưa xử lý"] ?? 0
+  const completedCount = statusBreakdown["Trả lời"] ?? 0
+  // "Đã gửi" here means: processed but not replied yet.
+  const processingCount = Math.max(totalAssigned - untreatedCount - completedCount, 0)
+
+  return {
+    // Old keys (kept for backward compatibility)
+    total: totalAssigned,
+    statusBreakdown,
+
+    // Client contract (CrmStaffPage)
+    totalAssigned,
+    untreatedCount,
+    processingCount,
+    completedCount,
+    statusCounts: statusBreakdown,
+  }
 }
 
 export function listMyRecords(employeeId, { status, search, page = 0, size = 20 } = {}) {
@@ -234,4 +271,117 @@ export function listMyRecords(employeeId, { status, search, page = 0, size = 20 
     number: page,
     size
   }
+}
+
+function assertCanConvertCrm(record, user) {
+  const isAdmin = ["role-admin", "role-super-admin"].includes(user?.roleId)
+  if (isAdmin) return
+  if (record.assignedTo && record.assignedTo === user?.employeeId) return
+  const err = new Error("Bạn chỉ được chuyển data do mình quản lý")
+  err.status = 403
+  throw err
+}
+
+/** CRM data → Lead; cùng CRM có thể có nhiều lead (forceNew) */
+export function listLeadsForCrmRecord(crmId) {
+  const record = repo.getById(crmId)
+  if (!record) throw new Error("Không tìm thấy dữ liệu")
+
+  const map = new Map()
+  const add = (lead) => {
+    if (!lead?.id) return
+    map.set(lead.id, { id: lead.id, code: lead.code, name: lead.name, status: lead.status })
+  }
+
+  for (const lead of leadSvc.listLeadsBySourceCrmId(crmId)) add(lead)
+
+  const phone = String(record.phone ?? "").trim()
+  if (phone) {
+    const customer = customerRepo.findByPhone(phone)
+    if (customer?.id) {
+      for (const lead of leadSvc.listLeadsByCustomerId(customer.id)) add(lead)
+    }
+  }
+
+  if (record.convertedLeadId) add(leadSvc.getLead(record.convertedLeadId))
+
+  const ids = Array.isArray(record.convertedLeadIds) ? record.convertedLeadIds : []
+  for (const id of ids) add(leadSvc.getLead(id))
+
+  const leads = Array.from(map.values()).sort((a, b) => String(b.code).localeCompare(String(a.code)))
+  return { leads }
+}
+
+/** CRM data → Lead (customer có thể trùng; 1 CRM có thể có nhiều lead) */
+export function convertToLead(crmId, user = {}, options = {}) {
+  const record = repo.getById(crmId)
+  if (!record) throw new Error("Không tìm thấy dữ liệu")
+  assertCanConvertCrm(record, user)
+
+  const leadName = String(options.leadName || "").trim()
+  if (!leadName) throw new Error("Tên lead (cơ hội) là bắt buộc")
+
+  const forceNew = options.forceNew === true
+
+  if (!forceNew) {
+    if (record.convertedLeadId) {
+      const existing = leadSvc.getLead(record.convertedLeadId)
+      if (existing) {
+        return { lead: existing, record, alreadyExists: true }
+      }
+    }
+
+    const bySource = leadSvc.findLeadBySourceCrmId(crmId)
+    if (bySource) {
+      const updated = repo.update(crmId, {
+        convertedLeadId: bySource.id,
+        convertedLeadCode: bySource.code,
+        updatedAt: now(),
+      })
+      return { lead: bySource, record: updated, alreadyExists: true }
+    }
+  }
+
+  const customer = customerSvc.findOrCreateFromCrm(record)
+  customerSvc.linkCrmRecord(customer.id, crmId)
+
+  const noteParts = [
+    record.note,
+    record.address,
+    record.area,
+    record.website,
+    record.businessType,
+  ].filter(Boolean)
+
+  const lead = leadSvc.createLead({
+    name: leadName,
+    customerId: customer.id,
+    customerType: "company",
+    companyName: record.businessName,
+    contactName: "",
+    contactPhone: record.phone || "",
+    industry: record.businessType || "",
+    address: record.address || "",
+    roughNotes: noteParts.join(" · "),
+    assignedToId: record.assignedTo || user.employeeId || "",
+    sourceCrmId: crmId,
+    status: "contacted",
+    formStatus: "not_sent",
+    formType: "landing_page",
+  })
+
+  const leadIds = Array.isArray(record.convertedLeadIds) ? [...record.convertedLeadIds] : []
+  if (record.convertedLeadId && !leadIds.includes(record.convertedLeadId)) {
+    leadIds.unshift(record.convertedLeadId)
+  }
+  if (!leadIds.includes(lead.id)) leadIds.push(lead.id)
+
+  const updated = repo.update(crmId, {
+    convertedLeadId: lead.id,
+    convertedLeadCode: lead.code,
+    convertedLeadIds: leadIds,
+    updatedAt: now(),
+  })
+
+  return { lead, record: updated, customer, alreadyExists: false }
 }

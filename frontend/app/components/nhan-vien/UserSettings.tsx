@@ -1,6 +1,7 @@
 import React, { useState } from "react"
 import { Camera, Lock, Shield, LogOut, Trash2, Check, Eye, EyeOff } from "lucide-react"
-import { ME } from "./types"
+import { getStoredUser } from "./types"
+import { api } from "@/lib/api"
 
 interface Props { onLogout: () => void }
 
@@ -17,6 +18,7 @@ const SESSIONS = [
 ]
 
 export default function UserSettings({ onLogout }: Props) {
+    const me = getStoredUser()
     const [tab, setTab] = useState<"info" | "password" | "session">("info")
     const [oldPass, setOldPass] = useState("")
     const [newPass, setNewPass] = useState("")
@@ -24,23 +26,36 @@ export default function UserSettings({ onLogout }: Props) {
     const [showOld, setShowOld] = useState(false)
     const [showNew, setShowNew] = useState(false)
     const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null)
-    const [name, setName] = useState(ME.name)
-    const [phone, setPhone] = useState(ME.phone)
+    const [name, setName] = useState(me.name)
+    const [phone, setPhone] = useState(me.phone)
 
     const inp = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 focus:ring-1 focus:ring-[#C62828]/10"
 
-    const handleChangePass = () => {
+    const handleChangePass = async () => {
         if (!oldPass || !newPass || !confirmPass) {
             setMsg({ type: "err", text: "Vui lòng điền đầy đủ thông tin." }); return
         }
         if (newPass.length < 6) {
             setMsg({ type: "err", text: "Mật khẩu mới phải ít nhất 6 ký tự." }); return
         }
+        if (newPass === oldPass) {
+            setMsg({ type: "err", text: "Mật khẩu mới không được trùng với mật khẩu cũ." }); return
+        }
         if (newPass !== confirmPass) {
             setMsg({ type: "err", text: "Mật khẩu xác nhận không khớp." }); return
         }
-        setMsg({ type: "ok", text: "✅ Đổi mật khẩu thành công!" })
-        setOldPass(""); setNewPass(""); setConfirmPass("")
+        try {
+            await api.auth.changePassword(oldPass, newPass)
+            setMsg({ type: "ok", text: "Đổi mật khẩu thành công!" })
+            setOldPass(""); setNewPass(""); setConfirmPass("")
+            setTimeout(() => setMsg(null), 3000)
+        } catch (err: any) {
+            setMsg({ type: "err", text: err.message || "Đổi mật khẩu thất bại. Vui lòng kiểm tra lại mật khẩu cũ." })
+        }
+    }
+
+    const handleSaveInfo = () => {
+        setMsg({ type: "ok", text: "Cập nhật thông tin thành công!" })
         setTimeout(() => setMsg(null), 3000)
     }
 
@@ -54,7 +69,6 @@ export default function UserSettings({ onLogout }: Props) {
                 </button>
             </div>
 
-            {/* Tab switcher */}
             <div className="flex gap-1 bg-gray-100 rounded-xl p-1 max-w-sm">
                 {([["info", "Thông tin"], ["password", "Mật khẩu"], ["session", "Phiên đăng nhập"]] as const).map(([k, l]) => (
                     <button key={k} onClick={() => setTab(k)}
@@ -64,18 +78,21 @@ export default function UserSettings({ onLogout }: Props) {
                     </button>
                 ))}
             </div>
+            {msg && (
+                <div className={`p-3.5 rounded-xl text-sm font-bold flex items-center gap-2 border ${msg.type === "ok" ? "bg-green-50 border-green-200 text-green-800" : "bg-red-50 border-red-200 text-red-800"}`}>
+                    {msg.text}
+                </div>
+            )}
 
-            {/* ── TAB: Thông tin ── */}
             {tab === "info" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {/* Avatar */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5 flex flex-col items-center gap-4">
                         <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-3xl font-black shadow-md shadow-red-900/20">
-                            {ME.name.split(" ").pop()?.charAt(0)}
+                            {me.name.split(" ").pop()?.charAt(0)}
                         </div>
                         <div className="text-center">
-                            <p className="font-bold text-gray-800">{ME.name}</p>
-                            <p className="text-xs text-gray-400 mt-0.5">{ME.id} · {ME.position}</p>
+                            <p className="font-bold text-gray-800">{me.name}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">{me.id} · {me.position}</p>
                         </div>
                         <div className="flex gap-2 w-full">
                             <button className="flex-1 flex items-center justify-center gap-1.5 py-2 border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
@@ -88,7 +105,6 @@ export default function UserSettings({ onLogout }: Props) {
                         <p className="text-[10px] text-gray-400 text-center">JPG, PNG tối đa 2MB. Tỷ lệ 1:1 tốt nhất.</p>
                     </div>
 
-                    {/* Info form */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5 space-y-4">
                         <h3 className="font-bold text-gray-700">Cập nhật thông tin</h3>
                         <div>
@@ -97,13 +113,13 @@ export default function UserSettings({ onLogout }: Props) {
                         </div>
                         <div>
                             <label className="text-xs font-bold text-gray-500 mb-1.5 block">Email công ty</label>
-                            <input value={ME.email} disabled className={`${inp} bg-gray-50 opacity-60`} />
+                            <input value={me.email} disabled className={`${inp} bg-gray-50 opacity-60`} />
                         </div>
                         <div>
                             <label className="text-xs font-bold text-gray-500 mb-1.5 block">Số điện thoại</label>
                             <input value={phone} onChange={e => setPhone(e.target.value)} className={inp} />
                         </div>
-                        <button onClick={() => alert("Đã cập nhật thông tin!")}
+                        <button onClick={handleSaveInfo}
                             className="w-full bg-[#C62828] text-white py-2.5 rounded-xl font-bold hover:bg-[#B71C1C] text-sm transition-colors flex items-center justify-center gap-2">
                             <Check size={15} /> Lưu thay đổi
                         </button>
@@ -111,20 +127,14 @@ export default function UserSettings({ onLogout }: Props) {
                 </div>
             )}
 
-            {/* ── TAB: Mật khẩu ── */}
             {tab === "password" && (
                 <div className="bg-white max-w-md rounded-2xl p-6 shadow-sm border border-black/5 space-y-4">
                     <h3 className="font-bold text-gray-700">Đổi mật khẩu</h3>
-                    {msg && (
-                        <div className={`p-3 rounded-xl text-sm font-medium ${msg.type === "ok" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
-                            {msg.text}
-                        </div>
-                    )}
                     <div>
                         <label className="text-xs font-bold text-gray-500 mb-1.5 block">Mật khẩu hiện tại</label>
                         <div className="relative">
-                            <input type={showOld ? "text" : "password"} value={oldPass} onChange={e => setOldPass(e.target.value)} placeholder="••••••••" className={`${inp} pr-10`} />
-                            <button onClick={() => setShowOld(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            <input type={showOld ? "text" : "password"} value={oldPass} onChange={e => setOldPass(e.target.value)} placeholder="••••••••" className={`${inp} pr-10`} autoComplete="current-password" />
+                            <button type="button" onClick={() => setShowOld(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                                 {showOld ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
@@ -132,24 +142,23 @@ export default function UserSettings({ onLogout }: Props) {
                     <div>
                         <label className="text-xs font-bold text-gray-500 mb-1.5 block">Mật khẩu mới</label>
                         <div className="relative">
-                            <input type={showNew ? "text" : "password"} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Ít nhất 6 ký tự" className={`${inp} pr-10`} />
-                            <button onClick={() => setShowNew(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            <input type={showNew ? "text" : "password"} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Ít nhất 6 ký tự" className={`${inp} pr-10`} autoComplete="new-password" />
+                            <button type="button" onClick={() => setShowNew(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                                 {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
                         </div>
                     </div>
                     <div>
                         <label className="text-xs font-bold text-gray-500 mb-1.5 block">Xác nhận mật khẩu mới</label>
-                        <input type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} placeholder="••••••••" className={inp} />
+                        <input type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} placeholder="••••••••" className={inp} autoComplete="new-password" />
                     </div>
-                    <button onClick={handleChangePass}
+                    <button type="button" onClick={handleChangePass}
                         className="w-full bg-[#C62828] text-white py-3 rounded-xl font-bold hover:bg-[#B71C1C] text-sm transition-colors shadow-md shadow-red-900/20 flex items-center justify-center gap-2">
                         <Lock size={15} /> Đổi mật khẩu
                     </button>
                 </div>
             )}
 
-            {/* ── TAB: Phiên đăng nhập ── */}
             {tab === "session" && (
                 <div className="space-y-4">
                     <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">

@@ -1,17 +1,43 @@
 import * as svc from "../services/employee.service.js"
-import { ok, created, notFound } from "../utils/response.js"
+import { ok, created, notFound, fail } from "../utils/response.js"
+import { canManageEmployees, enforceBranchQuery, assertEmployeeInScope } from "../utils/access.js"
+
+const DIRECTORY_FIELDS = ["id", "name", "email", "phone", "department", "position", "status", "photos", "orgNodeId", "branchId"]
+
+function toDirectory(emp) {
+  return Object.fromEntries(DIRECTORY_FIELDS.filter(k => emp[k] !== undefined).map(k => [k, emp[k]]))
+}
 
 export function list(req, res) {
-  ok(res, svc.listEmployees(req.query))
+  const query = canManageEmployees(req.user)
+    ? enforceBranchQuery(req.user, { ...req.query })
+    : { ...req.query }
+  const rows = svc.listEmployees(query)
+  if (canManageEmployees(req.user)) {
+    ok(res, rows)
+    return
+  }
+  ok(res, rows
+    .filter(e => e.status === "active" || e.status === "suspended")
+    .map(toDirectory))
 }
 
 export function getOne(req, res) {
   const emp = svc.getEmployee(req.params.id)
   if (!emp) return notFound(res, "Không tìm thấy nhân viên")
+  if (!canManageEmployees(req.user)) {
+    if (req.params.id !== req.user.employeeId) {
+      return fail(res, "Không có quyền xem hồ sơ này", 403)
+    }
+  } else {
+    const denied = assertEmployeeInScope(req.user, req.params.id)
+    if (denied) return fail(res, denied.error, denied.status)
+  }
   ok(res, emp)
 }
 
 export async function create(req, res, next) {
+  if (!canManageEmployees(req.user)) return fail(res, "Không có quyền tạo nhân viên", 403)
   try {
     const emp = await svc.createEmployee(req.body)
     created(res, emp)
@@ -21,12 +47,18 @@ export async function create(req, res, next) {
 }
 
 export function update(req, res) {
+  if (!canManageEmployees(req.user)) return fail(res, "Không có quyền cập nhật nhân viên", 403)
+  const denied = assertEmployeeInScope(req.user, req.params.id)
+  if (denied) return fail(res, denied.error, denied.status)
   const emp = svc.updateEmployee(req.params.id, req.body)
   if (!emp) return notFound(res, "Không tìm thấy nhân viên")
   ok(res, emp)
 }
 
 export function remove(req, res) {
+  if (!canManageEmployees(req.user)) return fail(res, "Không có quyền xóa nhân viên", 403)
+  const denied = assertEmployeeInScope(req.user, req.params.id)
+  if (denied) return fail(res, denied.error, denied.status)
   const deleted = svc.deleteEmployee(req.params.id)
   if (!deleted) return notFound(res, "Không tìm thấy nhân viên")
   ok(res, { message: "Đã xóa nhân viên" })

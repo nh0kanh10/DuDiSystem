@@ -12,8 +12,6 @@ export function getSystemConfig() {
       afternoonEnd: "17:00",
       employeeStart: "09:00",
       employeeEnd: "17:00",
-      lateGraceMinutes: 15,
-      earlyGraceMinutes: 15,
       requireIP: false,
       noonBoundary: "14:00",
       sessionTimeoutMinutes: 30

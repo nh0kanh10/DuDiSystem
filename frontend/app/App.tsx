@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useMemo, ReactNode } from "react"
-import { useNavigate, useLocation } from "react-router-dom"
+import React, { useState, useEffect, useMemo, ReactNode, useRef } from "react"
+import { useNavigate, useLocation, Routes, Route } from "react-router-dom"
 import {
   LayoutDashboard, Users, Clock, BarChart3, Bell,
   Wrench, LogOut, ChevronDown, ChevronRight,
-  Shield, Wifi, CheckSquare, FileText, Calendar, User, Fingerprint, Settings, MessageCircle, Layers, Menu, Search, Check, Building2
+  Shield, Wifi, CheckSquare, FileText, Calendar, User, Fingerprint, Settings, MessageCircle, Layers, Menu, Check, Building2, X
 } from "lucide-react"
 
 import UserPortalApp from "./components/nhan-vien/UserApp"
+import UserDashboard from "./components/nhan-vien/UserDashboard"
+import { StaffPortalFab } from "./components/nhan-vien/StaffPortalFab"
+import { canOpenStaffPortal, isStaffTypeRole, hasPageAccess } from "./utils/staffModules"
 import ApprovalManagement from "@/app/components/duyet-don/ApprovalManagement"
 import OrgStructure from "./components/co-cau/OrgStructure"
 import UserProfile from "./components/nhan-vien/UserProfile"
@@ -16,6 +19,7 @@ import StatisticsPage from "./components/thong-ke/StatisticsPage"
 
 // Imported Vietnamese subfolders / modular components
 import { LoginPage } from "./components/xac-thuc/LoginPage"
+import { BrandLogo } from "./components/ui/BrandLogo"
 import { AdminDashboard } from "./components/tong-quan/AdminDashboard"
 import { EmployeeManagement, EmployeeModal } from "./components/nhan-su/EmployeeManagement"
 import { AttendanceManagement } from "./components/cham-cong/AttendanceManagement"
@@ -24,9 +28,12 @@ import { TaskManagement } from "./components/cong-viec/TaskManagement"
 import { PlaceholderPage } from "./components/giao-dien/PlaceholderPage"
 import { SystemConfigPage } from "./components/giao-dien/SystemConfigPage"
 import { ProjectManagement } from "./components/du-an/ProjectManagement"
+import { CrmAdminPage } from "./components/crm/CrmAdminPage"
+import { CrmStaffPage } from "./components/crm/CrmStaffPage"
+import { LeadManagement } from "./components/lead/LeadManagement"
+import { PublicRequirementForm } from "./components/lead/PublicRequirementForm"
 
 // Imported user portal components
-import { UserHome } from "./components/nhan-vien/UserHome"
 import UserAttendance from "./components/nhan-vien/UserAttendance"
 import UserTimeOff from "./components/nhan-vien/UserTimeOff"
 import { UserDirectory } from "./components/nhan-vien/UserDirectory"
@@ -38,6 +45,10 @@ import { Role, Page, Employee, OrgNode, Assignment, RoleDefinition } from "./typ
 import { INIT_EMPLOYEES, INIT_ORG_NODES, NOTIFICATIONS, INIT_ASSIGNMENTS } from "./constants"
 import { findBranchForNode, initials } from "./utils"
 import { api } from "@/lib/api"
+import { connectChatSocket, releaseChatSocket, resetChatSocket, chatHeartbeat, getChatSocketStatus } from "@/lib/chatSocket"
+import { useNotificationBadge } from "./hooks/useNotifications"
+import { touchSession, resetSessionTouchClock } from "@/lib/session"
+import { ToastProvider } from "./hooks/useToast"
 
 function getISOWeek(d: Date): number {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
@@ -71,6 +82,14 @@ function getDateRange(startStr: string, endStr: string): Date[] {
 }
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
+  )
+}
+
+function AppContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return !!localStorage.getItem("dudi_token")
   })
@@ -100,6 +119,7 @@ export default function App() {
   })
   const [sessionTimeout, setSessionTimeout] = useState<number>(30)
   const [sessionAlertMsg, setSessionAlertMsg] = useState<string | null>(null)
+  const [loginLoading, setLoginLoading] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -109,14 +129,16 @@ export default function App() {
       return "dashboard"
     }
     const validPages: Page[] = [
-      "dashboard", "nhan-su", "cham-cong", "thong-ke",
-      "duyet-don", "thong-bao", "cong-viec", "du-an",
-      "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
-      "user-profile", "user-attendance", "user-timeoff", "user-directory",
-      "user-chat", "user-workflow", "user-settings"
-    ]
-    if (validPages.includes(rawPath as Page)) {
-      return rawPath as Page
+        "dashboard", "nhan-su", "cham-cong", "thong-ke",
+        "duyet-don", "thong-bao", "cong-viec", "du-an", "lead",
+        "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
+        "crm", "staff-portal",
+        "user-profile", "user-attendance", "user-timeoff", "user-directory",
+        "user-chat", "user-workflow", "user-settings", "user-crm"
+      ]
+    const firstSegment = rawPath.split("/")[0]
+    if (validPages.includes(firstSegment as Page)) {
+      return firstSegment as Page
     }
     return "dashboard"
   })()
@@ -125,6 +147,14 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [rolesList, setRolesList] = useState<RoleDefinition[]>([])
   const [isPageLoading, setIsPageLoading] = useState(false)
+  const [effectivePermissions, setEffectivePermissions] = useState<string[]>(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("dudi_user") || "{}")
+      return Array.isArray(u.effectivePermissions) ? u.effectivePermissions : []
+    } catch {
+      return []
+    }
+  })
 
   useEffect(() => {
     setIsPageLoading(true)
@@ -133,57 +163,11 @@ export default function App() {
   }, [activePage])
 
   const activeRolePermissions = useMemo(() => {
-    const saved = localStorage.getItem("dudi_user")
-    if (saved) {
-      try {
-        const u = JSON.parse(saved)
-        if (u.permissions && Array.isArray(u.permissions) && u.permissions.length > 0) {
-          if (u.permissions.includes("all")) {
-            return [
-              "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-              "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
-            ]
-          }
-          return u.permissions
-        }
-      } catch {}
-    }
-
-    if (role === "role-super-admin") {
-      return [
-        "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
-      ]
-    }
-
+    if (effectivePermissions.length > 0) return effectivePermissions
     const currentRole = rolesList.find(r => r.id === role)
-    if (currentRole) {
-      if (currentRole.modules.includes("all")) {
-        return [
-          "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-          "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
-        ]
-      }
-      return currentRole.modules
-    }
-    if (role === "role-admin") {
-      return [
-        "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "tai-khoan", "phan-quyen", "ip", "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
-      ]
-    }
-    if (role === "role-manager") {
-      return [
-        "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don", 
-        "thong-ke", "thong-bao", "du-an", "cong-viec", "tien-ich"
-      ]
-    }
-    // Default to role-user:
-    return [
-      "dashboard", "user-profile", "user-attendance", "user-timeoff", 
-      "user-directory", "user-chat", "user-workflow", "cong-viec", "thong-bao", "user-settings"
-    ]
-  }, [role, rolesList, isLoggedIn])
+    if (currentRole?.modules?.length) return [...currentRole.modules]
+    return []
+  }, [effectivePermissions, rolesList, role])
 
   const roleName = useMemo(() => {
     const currentRole = rolesList.find(r => r.id === role)
@@ -196,174 +180,225 @@ export default function App() {
 
   const isStaffRole = useMemo(() => {
     if (role === "role-user" || role === "user") return true
-    if (role === "role-admin" || role === "role-manager" || role === "role-super-admin" || role === "admin" || role === "manager") return false
-    const currentRole = rolesList.find(r => r.id === role)
-    if (currentRole) {
-      return (currentRole as any).roleType === "staff" || currentRole.scopeType === "self"
-    }
-    return false
+    return isStaffTypeRole(rolesList.find(r => r.id === role))
   }, [role, rolesList])
 
   useEffect(() => {
-    if (isLoggedIn && activeRolePermissions.length > 0 && activePage !== "dashboard") {
-      if (!activeRolePermissions.includes(activePage)) {
-        setActivePage("dashboard")
-      }
+    if (isLoggedIn && activeRolePermissions.length > 0 && !hasPageAccess(activeRolePermissions, activePage)) {
+      setActivePage(isStaffRole ? "staff-portal" : "dashboard")
     }
-  }, [activePage, activeRolePermissions, isLoggedIn])
+  }, [activePage, activeRolePermissions, isLoggedIn, isStaffRole])
 
   useEffect(() => {
     if (!isLoggedIn) {
       if (location.pathname !== "/login") {
         navigate("/login")
       }
-    } else {
-      if (location.pathname === "/login" || location.pathname === "/") {
-        navigate("/dashboard")
+    } else if (location.pathname === "/login" || location.pathname === "/") {
+      const target = hasPageAccess(activeRolePermissions, "dashboard") ? "/dashboard" : "/staff-portal"
+      navigate(target)
+    }
+    }, [isLoggedIn, location.pathname, navigate, activeRolePermissions])
+
+    useEffect(() => {
+      const handleUnauthorized = () => {
+        handleLogout()
+        setSessionAlertMsg("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+      }
+      window.addEventListener("dudi_unauthorized", handleUnauthorized)
+      return () => {
+        window.removeEventListener("dudi_unauthorized", handleUnauthorized)
+      }
+    }, [])
+
+    const lastActivityRef = useRef<number>(Date.now())
+
+    useEffect(() => {
+      if (!isLoggedIn) return
+
+      const SESSION_MS = sessionTimeout * 60 * 1000
+      let idleTimeoutId: ReturnType<typeof setTimeout> | undefined
+
+      const scheduleIdleCheck = () => {
+        if (idleTimeoutId) clearTimeout(idleTimeoutId)
+        const remaining = SESSION_MS - (Date.now() - lastActivityRef.current)
+        idleTimeoutId = setTimeout(() => {
+          const idleDuration = Date.now() - lastActivityRef.current
+          if (idleDuration >= SESSION_MS) {
+            handleLogout()
+            setSessionAlertMsg(
+              `Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`
+            )
+          } else {
+            scheduleIdleCheck()
+          }
+        }, Math.max(remaining, 1000))
+      }
+
+      const onActivity = () => {
+        lastActivityRef.current = Date.now()
+        touchSession()
+        scheduleIdleCheck()
+      }
+
+      const events = ["mousedown", "keydown", "scroll", "touchstart", "click"] as const
+
+      lastActivityRef.current = Date.now()
+      touchSession()
+      scheduleIdleCheck()
+
+      events.forEach(event => {
+        window.addEventListener(event, onActivity, { capture: true, passive: true })
+      })
+
+      return () => {
+        if (idleTimeoutId) clearTimeout(idleTimeoutId)
+        events.forEach(event => {
+          window.removeEventListener(event, onActivity, { capture: true })
+        })
+      }
+    }, [isLoggedIn, sessionTimeout])
+
+    const [employees, setEmployees] = useState<Employee[]>(INIT_EMPLOYEES)
+    const [orgNodes, setOrgNodes] = useState<OrgNode[]>(INIT_ORG_NODES)
+    const [assignments, setAssignments] = useState<Assignment[]>(INIT_ASSIGNMENTS)
+    const [requests, setRequests] = useState<any[]>([])
+
+    const pendingRequestsCount = useMemo(() => {
+      const currentWeekVal = `W${getISOWeek(new Date())}`
+      return requests.filter(r => {
+        if (r.status !== "pending") return false
+        try {
+          const dates = getDateRange(r.startDate, r.endDate)
+          return dates.some(d => `W${getISOWeek(d)}` === currentWeekVal)
+        } catch {
+          return false
+        }
+      }).length
+    }, [requests])
+    const [loginError, setLoginError] = useState<string | null>(null)
+    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+    const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
+    const {
+      unread: unreadNotifs,
+      latest: notifPreview,
+      reload: reloadNotificationsCount,
+      setLatest: setNotifPreview,
+      setUnread: setUnreadNotifCount,
+    } = useNotificationBadge(isLoggedIn)
+    const [profileUpdates, setProfileUpdates] = useState<any[]>([])
+    const [autoOpenUpdateReqId, setAutoOpenUpdateReqId] = useState<string | null>(null)
+
+    const reloadProfileUpdates = () => {
+      if (isLoggedIn) {
+        api.profileUpdates.list().then(d => {
+          if (d && Array.isArray(d)) setProfileUpdates(d as any[])
+        }).catch(err => console.error("Lỗi tải profile updates:", err))
       }
     }
-  }, [isLoggedIn, location.pathname, navigate])
 
-  // ─── LẮNG NGHE SỰ KIỆN HẾT HẠN TOKEN TOÀN CỤC (401) ───
-  useEffect(() => {
-    const handleUnauthorized = () => {
-      handleLogout()
-      setSessionAlertMsg("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
-    }
-    window.addEventListener("dudi_unauthorized", handleUnauthorized)
-    return () => {
-      window.removeEventListener("dudi_unauthorized", handleUnauthorized)
-    }
-  }, [])
-
-  // ─── TỰ ĐỘNG ĐĂNG XUẤT KHI KHÔNG HOẠT ĐỘNG ───
-  useEffect(() => {
-    if (!isLoggedIn) return
-
-    let timeoutId: any
-
-    const resetTimer = () => {
-      if (timeoutId) clearTimeout(timeoutId)
-      timeoutId = setTimeout(() => {
-        handleLogout()
-        setSessionAlertMsg(`Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`)
-      }, sessionTimeout * 60 * 1000)
-    }
-
-    const events = ["mousedown", "mousemove", "keypress", "scroll", "touchstart", "click"]
-    
-    resetTimer()
-
-    events.forEach(event => {
-      window.addEventListener(event, resetTimer)
+    const [selectedBranch, setSelectedBranch] = useState(() => {
+      const saved = localStorage.getItem("dudi_user")
+      if (saved) {
+        try {
+          const u = JSON.parse(saved)
+          return u.branchId || "all"
+        } catch {
+          return "all"
+        }
+      }
+      return "all"
     })
 
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId)
-      events.forEach(event => {
-        window.removeEventListener(event, resetTimer)
-      })
-    }
-  }, [isLoggedIn, sessionTimeout])
+    const branches = orgNodes.filter(n => n.type === "branch")
 
-  const [employees, setEmployees] = useState<Employee[]>(INIT_EMPLOYEES)
-  const [orgNodes, setOrgNodes] = useState<OrgNode[]>(INIT_ORG_NODES)
-  const [assignments, setAssignments] = useState<Assignment[]>(INIT_ASSIGNMENTS)
-  const [requests, setRequests] = useState<any[]>([])
-
-  const pendingRequestsCount = useMemo(() => {
-    const currentWeekVal = `W${getISOWeek(new Date())}`
-    return requests.filter(r => {
-      if (r.status !== "pending") return false
-      try {
-        const dates = getDateRange(r.startDate, r.endDate)
-        return dates.some(d => `W${getISOWeek(d)}` === currentWeekVal)
-      } catch {
-        return false
-      }
-    }).length
-  }, [requests])
-  const [loginError, setLoginError] = useState<string | null>(null)
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-  const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
-  
-  const [selectedBranch, setSelectedBranch] = useState(() => {
-    const saved = localStorage.getItem("dudi_user")
-    if (saved) {
-      try {
-        const u = JSON.parse(saved)
-        return u.branchId || "all"
-      } catch {
-        return "all"
-      }
-    }
-    return "all"
-  })
-  
-  const branches = orgNodes.filter(n => n.type === "branch")
-
-  const fetchRequests = () => {
-    if (isLoggedIn) {
-      api.requests.list().then(d => {
-        if (d && Array.isArray(d)) setRequests(d as any[])
-      }).catch(err => console.error("Lỗi tải requests:", err))
-    }
-  }
-
-  const reloadPermissionsAndRoles = () => {
-    api.roles.list().then(d => {
-      if (d && Array.isArray(d)) setRolesList(d as RoleDefinition[])
-    }).catch(err => console.error("Lỗi tải roles:", err))
-
-    api.auth.me().then(user => {
-      if (user) {
-        localStorage.setItem("dudi_user", JSON.stringify(user))
-        setRole(user.roleId || "role-admin")
-        setLoggedEmail(user.employeeId || user.email || "")
-      }
-    }).catch(err => console.error("Lỗi tải thông tin tài khoản:", err))
-  }
-
-  useEffect(() => {
-    if (isLoggedIn) {
-      reloadPermissionsAndRoles()
-
-      api.systemConfig.get().then(res => {
-        if (res && res.sessionTimeoutMinutes) {
-          setSessionTimeout(Number(res.sessionTimeoutMinutes))
-        }
-      }).catch(err => console.error("Lỗi tải cấu hình session:", err))
-
-      Promise.all([
-        api.employees.list().then(d => {
-          if (d && Array.isArray(d)) setEmployees(d as Employee[])
-        }),
-        api.orgNodes.list().then(d => {
-          if (d && Array.isArray(d)) setOrgNodes(d as OrgNode[])
-        }),
-        api.assignments.list().then(d => {
-          if (d && Array.isArray(d)) setAssignments(d as Assignment[])
-        }),
+    const fetchRequests = () => {
+      if (isLoggedIn) {
         api.requests.list().then(d => {
           if (d && Array.isArray(d)) setRequests(d as any[])
-        })
-      ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
-    }
-  }, [isLoggedIn])
-
-  useEffect(() => {
-    const handleUpdate = () => {
-      if (isLoggedIn) {
-        reloadPermissionsAndRoles()
+        }).catch(err => console.error("Lỗi tải requests:", err))
       }
     }
-    window.addEventListener("dudi_permissions_updated", handleUpdate)
-    return () => window.removeEventListener("dudi_permissions_updated", handleUpdate)
-  }, [isLoggedIn])
 
-  useEffect(() => {
+    const reloadPermissionsAndRoles = () => {
+      api.roles.list().then(d => {
+        if (d && Array.isArray(d)) setRolesList(d as RoleDefinition[])
+      }).catch(err => console.error("Lỗi tải roles:", err))
+
+      api.auth.me().then(user => {
+        if (user) {
+          localStorage.setItem("dudi_user", JSON.stringify(user))
+          setRole(user.roleId || "role-admin")
+          setLoggedEmail(user.employeeId || user.email || "")
+          if (Array.isArray((user as any).effectivePermissions)) {
+            setEffectivePermissions((user as any).effectivePermissions)
+          }
+        }
+      }).catch(err => console.error("Lỗi tải thông tin tài khoản:", err))
+    }
+
+    useEffect(() => {
+      if (isLoggedIn) {
+        reloadPermissionsAndRoles()
+
+        api.systemConfig.get().then(res => {
+          if (res && res.sessionTimeoutMinutes) {
+            setSessionTimeout(Number(res.sessionTimeoutMinutes))
+          }
+        }).catch(err => console.error("Lỗi tải cấu hình session:", err))
+
+        Promise.all([
+          api.employees.list().then(d => {
+            if (d && Array.isArray(d)) setEmployees(d as Employee[])
+          }),
+          api.orgNodes.list().then(d => {
+            if (d && Array.isArray(d)) setOrgNodes(d as OrgNode[])
+          }),
+          api.assignments.list().then(d => {
+            if (d && Array.isArray(d)) setAssignments(d as Assignment[])
+          }),
+          api.requests.list().then(d => {
+            if (d && Array.isArray(d)) setRequests(d as any[])
+          }),
+          api.profileUpdates.list().then(d => {
+            if (d && Array.isArray(d)) setProfileUpdates(d as any[])
+          }).catch(() => {})
+        ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
+      }
+    }, [isLoggedIn])
+
+    useEffect(() => {
+      if (!isLoggedIn) {
+        resetChatSocket()
+        return
+      }
+      connectChatSocket()
+      const heartbeat = setInterval(() => {
+        if (getChatSocketStatus() === "connected") {
+          chatHeartbeat()
+        } else {
+          api.staffChat.heartbeat().catch(() => {})
+        }
+      }, 25_000)
+      return () => {
+        clearInterval(heartbeat)
+        releaseChatSocket()
+      }
+    }, [isLoggedIn])
+
+    useEffect(() => {
+      const handleUpdate = () => {
+        if (isLoggedIn) {
+          reloadPermissionsAndRoles()
+        }
+      }
+      window.addEventListener("dudi_permissions_updated", handleUpdate)
+      return () => window.removeEventListener("dudi_permissions_updated", handleUpdate)
+    }, [isLoggedIn])
+
+    useEffect(() => {
     if (isLoggedIn && role === "role-manager" && orgNodes.length > 0) {
-      const emp = employees.find(e => 
+      const emp = employees.find(e =>
         (e.email || "").toLowerCase() === (loggedEmail || "").toLowerCase() ||
         (e.id || "").toLowerCase() === (loggedEmail || "").toLowerCase()
       )
@@ -376,6 +411,7 @@ export default function App() {
 
   const handleLogin = async (email: string, pass: string) => {
     setLoginError(null)
+    setLoginLoading(true)
     try {
       const res = await api.auth.login(email, pass)
       if (res && res.token) {
@@ -386,29 +422,40 @@ export default function App() {
         setRole(r)
         setLoggedEmail(user.employeeId || user.email || email)
         setSelectedBranch(user.branchId || "all")
+        if (Array.isArray(user.effectivePermissions)) {
+          setEffectivePermissions(user.effectivePermissions)
+        }
         setIsLoggedIn(true)
+        resetSessionTouchClock()
+        touchSession()
+        const perms = Array.isArray(user.effectivePermissions) ? user.effectivePermissions : []
+        navigate(hasPageAccess(perms, "dashboard") ? "/dashboard" : "/staff-portal")
       }
     } catch (e) {
       console.error("Backend login failed:", e)
       const isConnectionError = e instanceof Error && (
-        e.message.includes("Failed to fetch") || 
-        e.message.includes("fetch failed") || 
+        e.message.includes("Failed to fetch") ||
+        e.message.includes("fetch failed") ||
         e.message.includes("NetworkError")
       )
-      const errorMsg = isConnectionError 
-        ? "Không thể kết nối tới backend. Hãy chắc chắn backend đang chạy tại http://localhost:3001"
+      const errorMsg = isConnectionError
+        ? "Không thể kết nối tới server. Server Render có thể đang khởi động — vui lòng thử lại sau ít giây."
         : (e instanceof Error ? e.message : "Đăng nhập thất bại")
       setLoginError(errorMsg)
-      return
+    } finally {
+      setLoginLoading(false)
     }
   }
 
   const handleLogout = () => {
+    resetChatSocket()
     localStorage.removeItem("dudi_token")
     localStorage.removeItem("dudi_user")
+    resetSessionTouchClock()
     setIsLoggedIn(false)
     setRole("role-admin")
     setLoggedEmail("")
+    setEffectivePermissions([])
     setSelectedBranch("all")
     // Chuyển hướng sẽ do useEffect tự động xử lý khi isLoggedIn chuyển sang false
   }
@@ -418,7 +465,7 @@ export default function App() {
       {sessionAlertMsg && (
         <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
       )}
-      <LoginPage onLogin={handleLogin} loginError={loginError} />
+      <LoginPage onLogin={handleLogin} loginError={loginError} isLoading={loginLoading} />
     </>
   )
 
@@ -434,20 +481,25 @@ export default function App() {
     )
   }
 
-  const matchedEmp = employees.find(e => 
-    (e.id || "").toLowerCase() === (loggedEmail || "").toLowerCase() || 
+  const matchedEmp = employees.find(e =>
+    (e.id || "").toLowerCase() === (loggedEmail || "").toLowerCase() ||
     (e.email || "").toLowerCase() === (loggedEmail || "").toLowerCase()
   )
+  let profileUser: { name?: string; email?: string; employeeId?: string; position?: string; department?: string } = {}
+  try {
+    profileUser = JSON.parse(localStorage.getItem("dudi_user") || "{}")
+  } catch { /* ignore */ }
+  const isAdminRole = role === "role-admin" || role === "role-super-admin"
   const currentEmp: Employee = matchedEmp || {
-    id: loggedEmail || "—",
-    name: role === "admin" ? "Quản trị viên" : "Nhân viên",
-    email: loggedEmail || "—",
+    id: loggedEmail || profileUser.employeeId || "—",
+    name: profileUser.name || (isAdminRole ? "Quản trị viên" : "Nhân viên"),
+    email: loggedEmail || profileUser.email || "—",
     phone: "—",
-    department: "Ban điều hành",
-    position: role === "admin" ? "System Admin" : "Nhân sự",
+    department: profileUser.department || "Ban điều hành",
+    position: profileUser.position || (isAdminRole ? "System Admin" : "Nhân sự"),
     joinDate: "—",
-    status: "active" as "active" | "inactive" | "intern",
-    contractType: "Chính thức",
+    status: "active" as "active" | "inactive" | "suspended",
+    contractType: "staff",
     orgNodeId: "branch-hcm"
   }
   const currentUserInfo = {
@@ -459,38 +511,67 @@ export default function App() {
   }
 
   const renderPage = () => {
-    if (activePage !== "dashboard" && activeRolePermissions.length > 0 && !activeRolePermissions.includes(activePage)) {
-      return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
+    if (!hasPageAccess(activeRolePermissions, activePage)) {
+      return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
     }
     switch (activePage) {
-      case "dashboard": return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
-      case "nhan-su": return <EmployeeManagement employees={employees} setEmployees={setEmployees} orgNodes={orgNodes} selectedBranch={selectedBranch} onBranchChange={setSelectedBranch} />
+      case "dashboard": return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
+      case "nhan-su": return (
+        <EmployeeManagement
+          employees={employees}
+          setEmployees={setEmployees}
+          orgNodes={orgNodes}
+          selectedBranch={selectedBranch}
+          onBranchChange={setSelectedBranch}
+          autoOpenUpdateReqId={autoOpenUpdateReqId}
+          onClearAutoOpenReq={() => setAutoOpenUpdateReqId(null)}
+        />
+      )
       case "co-cau": return (
-        <OrgStructure 
-          employees={employees} 
-          setEmployees={setEmployees} 
+        <OrgStructure
+          employees={employees}
+          setEmployees={setEmployees}
           assignments={assignments}
           setAssignments={setAssignments}
-          orgNodes={orgNodes} 
-          setOrgNodes={setOrgNodes} 
-          selectedNodeId={selectedNodeId} 
-          setSelectedNodeId={setSelectedNodeId} 
-          selectedBranch={selectedBranch} 
-          currentUserEmail={loggedEmail} 
+          orgNodes={orgNodes}
+          setOrgNodes={setOrgNodes}
+          selectedNodeId={selectedNodeId}
+          setSelectedNodeId={setSelectedNodeId}
+          selectedBranch={selectedBranch}
+          currentUserEmail={loggedEmail}
           currentUserRole={role}
           onAddEmployee={() => setGlobalAddEmpOpen(true)}
         />
       )
-      case "cham-cong": return <AttendanceManagement />
-      case "thong-ke": return <StatisticsPage selectedBranch={selectedBranch} currentUserEmail={loggedEmail} currentUserRole={role} />
+      case "cham-cong": return <AttendanceManagement selectedBranch={selectedBranch} />
+      case "thong-ke": return <StatisticsPage selectedBranch={selectedBranch} currentUserEmail={loggedEmail} currentUserRole={role} modules={activeRolePermissions} />
       case "thong-bao": return <NotificationManagement />
       case "duyet-don": return <ApprovalManagement selectedBranch={selectedBranch} onRequestsUpdated={fetchRequests} />
       case "tai-khoan": return <AccountManagement selectedBranch={selectedBranch} currentUserEmail={loggedEmail} currentUserRole={role} mode="accounts" />
       case "phan-quyen": return <AccountManagement selectedBranch={selectedBranch} currentUserEmail={loggedEmail} currentUserRole={role} mode="roles" />
       case "ip": return <IPManagement selectedBranch={selectedBranch} />
-      case "du-an": return <ProjectManagement currentUserId={currentEmp.id} currentUserRole={role} selectedBranch={selectedBranch} />
+      case "du-an": {
+        const projectId = location.pathname.match(/^\/du-an\/([^/]+)/)?.[1]
+        return (
+          <ProjectManagement
+            currentUserId={currentEmp.id}
+            currentUserRole={role}
+            selectedBranch={selectedBranch}
+            projectId={projectId}
+            onNavigateToProject={(id) => navigate(id ? `/du-an/${id}` : "/du-an")}
+          />
+        )
+      }
       case "cong-viec": return <TaskManagement selectedBranch={selectedBranch} />
       case "tien-ich": return <SystemConfigPage />
+      case "crm": return (
+        <CrmAdminPage onOpenLead={(id) => navigate(`/lead/${id}`)} />
+      )
+      case "staff-portal": return (
+        <div className="w-full h-[calc(100vh-2.5rem)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
+          <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} embed={true} />
+        </div>
+      )
       case "user-profile": return (
         <div className="space-y-6">
           <h2 className="text-xl font-bold text-gray-800">Thông tin cá nhân</h2>
@@ -498,291 +579,124 @@ export default function App() {
         </div>
       )
       case "user-attendance": return <UserAttendance />
-      case "user-timeoff": return <UserTimeOff />
+      case "user-timeoff": return <UserTimeOff employee={currentEmp} />
       case "user-directory": return <UserDirectory />
       case "user-chat": return <UserChat />
       case "user-workflow": return <UserWorkflow />
       case "user-settings": return <UserSettings onLogout={handleLogout} />
-      default: return isStaffRole ? <UserHome onNavigate={setActivePage} /> : <AdminDashboard onNavigate={setActivePage} />
-    }
+      case "user-crm": return (
+        <CrmStaffPage onOpenLead={(id) => navigate(`/lead/${id}`)} />
+      )
+        case "lead": {
+          const leadId = location.pathname.match(/^\/lead\/([^/]+)/)?.[1]
+          return (
+            <LeadManagement
+              currentUserId={currentEmp.id}
+              employees={employees}
+              leadId={leadId}
+              selectedBranch={selectedBranch}
+              onNavigateToLead={(id) => navigate(id ? `/lead/${id}` : "/lead")}
+              onNavigateToProject={(id) => navigate(id ? `/du-an/${id}` : "/du-an")}
+            />
+          )
+        }
+        default: return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
+      }
   }
 
 
-
-  const unreadNotifs = NOTIFICATIONS.filter(n => !n.read).length
+  const showStaffFab = canOpenStaffPortal(activeRolePermissions)
 
   return (
-    <>
-    {sessionAlertMsg && (
-      <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
-    )}
-    <div className="flex h-screen bg-[#F5F1EF] overflow-hidden" onClick={() => { }}>
-      <UserAwareSidebar active={activePage} onNavigate={setActivePage}
-        collapsed={sidebarCollapsed} role={role} roleName={roleName} modules={activeRolePermissions} onLogout={handleLogout}
-        pendingRequestsCount={pendingRequestsCount} />
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <Header
-          onToggle={() => setSidebarCollapsed(p => !p)}
-          unread={unreadNotifs}
-          currentUser={currentUserInfo}
-          onLogout={handleLogout}
-          onNavigate={setActivePage}
-          selectedBranch={selectedBranch}
-          onBranchChange={setSelectedBranch}
-          branches={branches}
-        />
-        <main className="flex-1 overflow-y-auto p-5 relative"
-          style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
-          {isPageLoading && (
-            <div className="absolute top-0 left-0 right-0 h-0.5 z-[100] overflow-hidden pointer-events-none">
-              <div className="h-full bg-gradient-to-r from-[#C62828] to-[#E64A19] animate-[loadingBar_0.4s_ease-out_forwards]" />
-            </div>
+    <Routes>
+      {/* Route dành cho khách hàng điền form */}
+      <Route path="/form/:leadId" element={<PublicRequirementForm />} />
+      {/* Route dành cho admin */}
+      <Route path="*" element={
+        <>
+          {sessionAlertMsg && (
+            <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
           )}
-          <div key={activePage} className="page-enter-active">
-            {renderPage()}
-          </div>
-          {globalAddEmpOpen && (
-            <EmployeeModal
-              editEmp={null}
+          <div className="flex h-screen bg-[#F5F1EF] overflow-hidden" onClick={() => { }}>
+            <UserAwareSidebar active={activePage} onNavigate={setActivePage}
+              collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(p => !p)}
+              role={role} roleName={roleName} modules={activeRolePermissions} onLogout={handleLogout}
+              pendingRequestsCount={pendingRequestsCount}
+              currentUser={currentUserInfo}
+              unread={unreadNotifs}
+              notifPreview={notifPreview}
+              onMarkAllRead={async () => {
+                await api.notifications.markAllRead()
+                setUnreadNotifCount(0)
+                setNotifPreview([])
+              }}
+              onReloadNotifCount={reloadNotificationsCount}
+              selectedBranch={selectedBranch}
+              onBranchChange={setSelectedBranch}
+              branches={branches}
+              profileUpdates={profileUpdates}
+              onReloadProfileUpdates={reloadProfileUpdates}
               employees={employees}
               orgNodes={orgNodes}
-              onClose={() => setGlobalAddEmpOpen(false)}
-              onSave={async (form) => {
-                const snapshotDate = new Date().toISOString().split("T")[0].split("-").reverse().join("/")
-                const path = []
-                let curr = orgNodes.find(n => n.id === form.orgNodeId)
-                while (curr) {
-                  path.push(curr.name)
-                  const pId = curr.parentId
-                  curr = pId ? orgNodes.find(n => n.id === pId) : undefined
-                }
-                const snapshot = path.reverse().join(" · ")
-
-                const joinEntry = {
-                  id: 1,
-                  type: "join" as const,
-                  date: form.joinDate || snapshotDate,
-                  toDate: "",
-                  title: form.position || "Nhân viên",
-                  orgNodeId: form.orgNodeId,
-                  snapshot: snapshot,
-                  note: "Tiếp nhận nhân sự mới"
-                }
-                const finalForm = { ...form, workHistory: [joinEntry] }
-
-                try {
-                  const created = await api.employees.create(finalForm) as Employee
-                  setEmployees(prev => [...prev, created])
-                } catch {
-                  const newId = `NV${String(employees.length + 1).padStart(3, "0")}`
-                  setEmployees(prev => [...prev, { id: newId, ...finalForm } as Employee])
-                }
-                setGlobalAddEmpOpen(false)
-              }}
+              onSelectUpdateReq={setAutoOpenUpdateReqId}
             />
-          )}
-        </main>
-      </div>
-    </div>
-    </>
-  )
-}
-
-function Header({ onToggle, unread, currentUser, onLogout, onNavigate, selectedBranch, onBranchChange, branches }: {
-  onToggle: () => void; unread: number
-  currentUser: { name: string; id: string; role: Role; position: string; department: string }
-  onLogout: () => void
-  onNavigate: (p: Page) => void
-  selectedBranch: string
-  onBranchChange: (b: string) => void
-  branches: { id: string; name: string }[]
-}) {
-  const [showDrop, setShowDrop] = useState(false)
-  const [showBranchDrop, setShowBranchDrop] = useState(false)
-  const [showNotifDrop, setShowNotifDrop] = useState(false)
-  const [notifs, setNotifs] = useState<any[]>([])
-  const [loadingNotifs, setLoadingNotifs] = useState(false)
-  const shortName = currentUser.name.split(" ").slice(-2).join(" ")
-
-  async function openNotifs() {
-    setShowNotifDrop(v => !v)
-    if (!notifs.length) {
-      setLoadingNotifs(true)
-      try {
-        const data = await api.notifications.list() as any[]
-        setNotifs(data)
-      } finally {
-        setLoadingNotifs(false)
-      }
-    }
-  }
-
-  async function markAllRead() {
-    await api.notifications.markAllRead()
-    setNotifs(ns => ns.map(n => ({ ...n, read: true })))
-  }
-  return (
-    <header className="bg-white border-b border-black/5 px-5 py-3 flex items-center gap-4 flex-shrink-0 relative">
-      <button onClick={onToggle} className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500">
-        <Menu size={20} />
-      </button>
-      <div className="flex-1 max-w-sm">
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input type="text" placeholder="Tìm kiếm nhân viên, ID..."
-            className="w-full pl-9 pr-4 py-2 bg-gray-50 rounded-xl text-sm border border-gray-100 focus:outline-none focus:border-[#C62828]/40 focus:ring-2 focus:ring-[#C62828]/10 transition-all" />
-        </div>
-      </div>
-      <div className="ml-auto flex items-center gap-3">
-        {(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") && (
-          <div className="relative">
-            <button
-              onClick={() => setShowBranchDrop(!showBranchDrop)}
-              className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 rounded-xl px-3.5 py-2 border border-gray-100 shadow-sm transition-all active:scale-[0.98] text-xs font-bold text-gray-700 flex-shrink-0 cursor-pointer"
-            >
-              <Building2 size={13.5} className="text-gray-400" />
-              <span>
-                {selectedBranch === "all"
-                  ? "Tất cả chi nhánh"
-                  : (branches.find(b => b.id === selectedBranch)?.name || "Tất cả chi nhánh")}
-              </span>
-              <ChevronDown size={12} className={`text-gray-400 transition-transform duration-200 ${showBranchDrop ? "rotate-180" : ""}`} />
-            </button>
-
-            {showBranchDrop && (
-              <>
-                <div className="fixed inset-0 z-[90]" onClick={() => setShowBranchDrop(false)} />
-                <div className="absolute right-0 top-full mt-2 w-56 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl py-1.5 z-[100] flex flex-col animate-in fade-in slide-in-from-top-2 duration-150">
-                  <button
-                    onClick={() => {
-                      onBranchChange("all")
-                      setShowBranchDrop(false)
-                    }}
-                    className={`px-4 py-2 text-left text-xs font-bold hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedBranch === "all" ? "text-[#C62828] bg-red-50/40" : "text-gray-600"}`}
-                  >
-                    <span>Tất cả chi nhánh</span>
-                    {selectedBranch === "all" && <Check size={12} className="flex-shrink-0 text-[#C62828]" />}
-                  </button>
-                  {branches.map(b => (
-                    <button
-                      key={b.id}
-                      onClick={() => {
-                        onBranchChange(b.id)
-                        setShowBranchDrop(false)
-                      }}
-                      className={`px-4 py-2 text-left text-xs font-bold hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedBranch === b.id ? "text-[#C62828] bg-red-50/40" : "text-gray-600"}`}
-                    >
-                      <span className="truncate">{b.name}</span>
-                      {selectedBranch === b.id && <Check size={12} className="flex-shrink-0 text-[#C62828]" />}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-        {/* Notification dropdown */}
-        <div className="relative">
-          <button onClick={openNotifs} className="relative p-2.5 hover:bg-gray-100 rounded-xl transition-colors text-gray-500">
-            <Bell size={19} />
-            {unread > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#C62828] rounded-full animate-pulse" />}
-          </button>
-          {showNotifDrop && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowNotifDrop(false)} />
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl shadow-xl border border-black/8 z-50 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-black text-gray-800">Thông báo</p>
-                  <button onClick={markAllRead} className="text-[11px] font-bold text-[#C62828] hover:underline">Đọc tất cả</button>
-                </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {loadingNotifs ? (
-                    <div className="p-8 text-center">
-                      <div className="w-6 h-6 rounded-full border-2 border-[#C62828]/30 border-t-[#C62828] animate-spin mx-auto" />
-                    </div>
-                  ) : notifs.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-gray-400">Không có thông báo nào</div>
-                  ) : notifs.map((n: any) => (
-                    <button key={n.id} onClick={async () => { await api.notifications.markRead(n.id); setNotifs(ns => ns.map(x => x.id === n.id ? { ...x, read: true } : x)) }}
-                      className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0 ${!n.read ? "bg-red-50/30" : ""}`}>
-                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${!n.read ? "bg-[#C62828]" : "bg-gray-200"}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-xs leading-relaxed ${!n.read ? "font-bold text-gray-800" : "text-gray-500"}`}>{n.message}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">{n.time}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                {currentUser.role === "role-admin" && (
-                  <div className="border-t border-gray-100 p-2">
-                    <button onClick={() => { setShowNotifDrop(false); onNavigate("thong-bao") }}
-                      className="w-full text-center text-xs font-bold text-[#C62828] py-2 hover:bg-red-50 rounded-xl transition-colors">
-                      Quản lý thông báo hệ thống →
-                    </button>
+            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+              <main className="flex-1 overflow-y-auto p-5 relative"
+                style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
+                {isPageLoading && (
+                  <div className="absolute top-0 left-0 right-0 h-0.5 z-[100] overflow-hidden pointer-events-none">
+                    <div className="h-full bg-gradient-to-r from-[#C62828] to-[#E64A19] animate-[loadingBar_0.4s_ease-out_forwards]" />
                   </div>
                 )}
-              </div>
-            </>
-          )}
-        </div>
-        {/* User dropdown */}
-        <div className="relative">
-          <button onClick={() => setShowDrop(p => !p)}
-            className="flex items-center gap-2.5 pl-3 border-l border-gray-100 cursor-pointer group">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-bold">
-              {initials(currentUser.name)}
-            </div>
-            <div className="text-left">
-              <div className="text-xs font-semibold text-gray-700 leading-none">{shortName}</div>
-              <div className="text-[10px] text-gray-400 mt-0.5 font-mono">{currentUser.id}</div>
-            </div>
-            <ChevronDown size={13} className={`text-gray-400 transition-transform ${showDrop ? "rotate-180" : ""}`} />
-          </button>
-          {showDrop && (
-            <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-xl border border-black/8 z-50 overflow-hidden">
-              {/* User info */}
-              <div className="p-4 bg-gradient-to-br from-[#C62828]/5 to-[#E64A19]/5 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-lg font-bold">
-                    {initials(currentUser.name)}
-                  </div>
-                  <div>
-                    <div className="font-bold text-gray-800 text-sm">{currentUser.name}</div>
-                    <div className="text-xs text-gray-500">{currentUser.position} · {currentUser.department}</div>
-                    <div className="text-[10px] font-mono text-[#C62828] mt-0.5">{currentUser.id}</div>
-                  </div>
+                <div key={activePage} className="page-enter-active">
+                  {renderPage()}
                 </div>
-                <div className={`mt-3 text-center text-xs font-bold py-1 rounded-lg
-                  ${(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") ? "bg-amber-100 text-amber-700" : "bg-blue-50 text-blue-600"}`}>
-                  {(currentUser.role === "role-admin" || currentUser.role === "role-super-admin") ? "👑 Quản trị viên" : "🧑‍💻 Nhân viên"}
-                </div>
-              </div>
-              {/* Menu items */}
-              <div className="py-1">
-                <button onClick={() => { onNavigate((currentUser.role === "role-admin" || currentUser.role === "role-super-admin") ? "tai-khoan" : "user-settings"); setShowDrop(false) }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-                >
-                  <Settings size={15} className="text-gray-400" />
-                  Cài đặt tài khoản
-                </button>
-                <button onClick={() => { onNavigate("user-profile"); setShowDrop(false) }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
-                  <User size={15} className="text-gray-400" />
-                  Thông tin cá nhân
-                </button>
-              </div>
-              <div className="border-t border-gray-100 py-1">
-                <button onClick={() => { onLogout(); setShowDrop(false) }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
-                  <LogOut size={15} />
-                  Đăng xuất
-                </button>
-              </div>
+                {globalAddEmpOpen && (
+                  <EmployeeModal
+                    editEmp={null}
+                    employees={employees}
+                    orgNodes={orgNodes}
+                    onClose={() => setGlobalAddEmpOpen(false)}
+                    onSave={async (form) => {
+                      const snapshotDate = new Date().toISOString().split("T")[0].split("-").reverse().join("/")
+                      const path = []
+                      let curr = orgNodes.find(n => n.id === form.orgNodeId)
+                      while (curr) {
+                        path.push(curr.name)
+                        const pId = curr.parentId
+                        curr = pId ? orgNodes.find(n => n.id === pId) : undefined
+                      }
+                      const snapshot = path.reverse().join(" · ")
+
+                      const joinEntry = {
+                        id: 1,
+                        type: "join" as const,
+                        date: form.joinDate || snapshotDate,
+                        toDate: "",
+                        title: form.position || "Nhân viên",
+                        orgNodeId: form.orgNodeId,
+                        snapshot: snapshot,
+                        note: "Tiếp nhận nhân sự mới"
+                      }
+                      const finalForm = { ...form, workHistory: [joinEntry] }
+
+                      try {
+                        const created = await api.employees.create(finalForm) as Employee
+                        setEmployees(prev => [...prev, created])
+                      } catch {
+                        const newId = `NV${String(employees.length + 1).padStart(3, "0")}`
+                        setEmployees(prev => [...prev, { id: newId, ...finalForm } as Employee])
+                      }
+                      setGlobalAddEmpOpen(false)
+                    }}
+                  />
+                )}
+              </main>
             </div>
-          )}
-        </div>
-      </div>
-    </header>
+          </div>
+        </>
+      } />
+    </Routes>
   )
 }
 
@@ -802,37 +716,108 @@ function NavItem({ page, icon: Icon, label, badge, active, onNavigate, collapsed
   )
 }
 
-function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate, collapsed, expanded, onToggle }: {
+function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate, collapsed, expanded, onToggle, onFlyoutOpen }: {
   gKey: string; icon: React.ElementType; label: string; pages: Page[]; children: ReactNode
   active: Page; onNavigate: (p: Page) => void; collapsed: boolean
   expanded: string[]; onToggle: (k: string) => void
+  onFlyoutOpen?: () => void
 }) {
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [flyoutPos, setFlyoutPos] = useState({ top: 0, left: 0 })
   const open = expanded.includes(gKey)
   const hasActiveChild = pages.includes(active)
+
+  useEffect(() => {
+    if (!collapsed || !open || !btnRef.current) return
+    const update = () => {
+      const rect = btnRef.current!.getBoundingClientRect()
+      setFlyoutPos({ top: rect.top, left: rect.right + 8 })
+    }
+    update()
+    window.addEventListener("scroll", update, true)
+    window.addEventListener("resize", update)
+    return () => {
+      window.removeEventListener("scroll", update, true)
+      window.removeEventListener("resize", update)
+    }
+  }, [collapsed, open])
+
+  const handleClick = () => {
+    if (collapsed) {
+      onFlyoutOpen?.()
+    }
+    onToggle(gKey)
+  }
+
   return (
-    <div>
-      <button onClick={() => onToggle(gKey)}
+    <div className="relative">
+      <button
+        ref={btnRef}
+        onClick={handleClick}
+        title={label}
         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 cursor-pointer
-          ${hasActiveChild ? "text-white font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white/90"}`}>
+          ${collapsed ? "justify-center" : ""}
+          ${hasActiveChild ? "text-white font-semibold" : "text-white/60 hover:bg-white/8 hover:text-white/90"}`}
+      >
         <Icon size={18} className={`flex-shrink-0 ${hasActiveChild ? "text-[#FF8A65]" : "text-white/60"}`} />
-        {!collapsed && <>
-          <span className="flex-1 text-left font-medium">{label}</span>
-          <ChevronDown size={14} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-        </>}
+        {!collapsed && (
+          <>
+            <span className="flex-1 text-left font-medium">{label}</span>
+            <ChevronDown size={14} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+          </>
+        )}
       </button>
       {!collapsed && open && (
         <div className="ml-4 mt-1 border-l border-white/10 pl-3 space-y-0.5">{children}</div>
+      )}
+      {collapsed && open && (
+        <>
+          <div className="fixed inset-0 z-[90]" onClick={() => onToggle(gKey)} />
+          <div
+            className="fixed w-56 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl py-1.5 z-[100] flex flex-col"
+            style={{ top: flyoutPos.top, left: flyoutPos.left }}
+          >
+            <div className="px-4 py-2 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">
+              {label}
+            </div>
+            {React.Children.map(children, child => {
+              if (!React.isValidElement(child)) return child
+              return React.cloneElement(child, {
+                flyout: true,
+                onSelect: () => onToggle(gKey),
+              } as Partial<React.ComponentProps<typeof SubItem>>)
+            })}
+          </div>
+        </>
       )}
     </div>
   )
 }
 
-function SubItem({ page, label, badge, active, onNavigate }: {
+function SubItem({ page, label, badge, active, onNavigate, flyout, onSelect }: {
   page: Page; label: string; badge?: number
   active: Page; onNavigate: (p: Page) => void
+  flyout?: boolean
+  onSelect?: () => void
 }) {
+  const handleClick = () => {
+    onNavigate(page)
+    onSelect?.()
+  }
+
+  if (flyout) {
+    return (
+      <button onClick={handleClick}
+        className={`w-full flex items-center justify-between px-4 py-2 text-left text-xs font-bold hover:bg-gray-50 transition-colors
+          ${active === page ? "text-[#C62828] bg-red-50/40" : "text-gray-600"}`}>
+        <span className="truncate">{label}</span>
+        {badge ? <span className="bg-[#FF6D00] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold ml-2 flex-shrink-0">{badge}</span> : null}
+      </button>
+    )
+  }
+
   return (
-    <button onClick={() => onNavigate(page)}
+    <button onClick={handleClick}
       className={`w-full flex items-center justify-between text-xs py-2 px-2 rounded-lg transition-all cursor-pointer
         ${active === page ? "text-[#FF8A65] font-semibold" : "text-white/45 hover:text-white/80"}`}>
       <span>{label}</span>
@@ -841,32 +826,297 @@ function SubItem({ page, label, badge, active, onNavigate }: {
   )
 }
 
-function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modules, onLogout, pendingRequestsCount = 0 }:
-  { active: Page; onNavigate: (p: Page) => void; collapsed: boolean; role: Role; roleName: string; modules: string[]; onLogout: () => void; pendingRequestsCount?: number }) {
+function UserAwareSidebar({
+  active, onNavigate, collapsed, onToggle, role, roleName, modules, onLogout, pendingRequestsCount = 0,
+  currentUser, unread = 0, notifPreview = [], onMarkAllRead, onReloadNotifCount,
+  selectedBranch = "all", onBranchChange, branches = [],
+  profileUpdates = [], onReloadProfileUpdates, employees = [], orgNodes = [], onSelectUpdateReq,
+}: {
+  active: Page
+  onNavigate: (p: Page) => void
+  collapsed: boolean
+  onToggle: () => void
+  role: Role
+  roleName: string
+  modules: string[]
+  onLogout: () => void
+  pendingRequestsCount?: number
+  currentUser?: { name: string; id: string; role: Role; position: string; department: string }
+  unread?: number
+  notifPreview?: any[]
+  onMarkAllRead?: () => void | Promise<void>
+  onReloadNotifCount?: () => void
+  selectedBranch?: string
+  onBranchChange?: (b: string) => void
+  branches?: { id: string; name: string }[]
+  profileUpdates?: any[]
+  onReloadProfileUpdates?: () => void
+  employees?: Employee[]
+  orgNodes?: OrgNode[]
+  onSelectUpdateReq?: (id: string | null) => void
+}) {
+  const [expanded, setExpanded] = useState<string[]>([])
+  const [showBranchDrop, setShowBranchDrop] = useState(false)
+  const [showNotifDrop, setShowNotifDrop] = useState(false)
+  const [showUserDrop, setShowUserDrop] = useState(false)
+  const userBtnRef = useRef<HTMLButtonElement>(null)
+  const [userFlyoutPos, setUserFlyoutPos] = useState({ left: 0, bottom: 0 })
+  const [notifs, setNotifs] = useState<any[]>([])
+  const [loadingNotifs, setLoadingNotifs] = useState(false)
+  const toggle = (k: string) => setExpanded(p => {
+    if (collapsed) return p.includes(k) ? [] : [k]
+    return p.includes(k) ? p.filter(x => x !== k) : [...p, k]
+  })
 
-  const [expanded, setExpanded] = useState<string[]>(["nhan-su"])
-  const toggle = (k: string) => setExpanded(p => p.includes(k) ? p.filter(x => x !== k) : [...p, k])
+  const closeOverlays = () => {
+    setShowBranchDrop(false)
+    setShowNotifDrop(false)
+    setShowUserDrop(false)
+    setExpanded([])
+  }
 
-  const hasAccess = (moduleKey: string) => modules.includes(moduleKey)
+  const hasAccess = (moduleKey: string) => hasPageAccess(modules, moduleKey)
+  const isAdmin = currentUser?.role === "role-admin" || currentUser?.role === "role-super-admin"
+  const shortName = currentUser?.name.split(" ").slice(-2).join(" ") ?? ""
+
+  const pendingUpdates = profileUpdates.filter(req => {
+    if (req.status !== "pending_approval") return false
+    if (!isAdmin) return false
+    const matchedEmp = employees.find(e => e.id === currentUser?.id)
+    if (matchedEmp) {
+      const adminBranchId = findBranchForNode(matchedEmp.orgNodeId ?? "", orgNodes)
+      if (!adminBranchId) return true
+      const reqEmp = employees.find(e => e.id === req.employeeId)
+      if (!reqEmp) return true
+      const reqBranchId = findBranchForNode(reqEmp.orgNodeId ?? "", orgNodes)
+      return adminBranchId === reqBranchId
+    }
+    return true
+  })
+
+  const notifBadge = unread + pendingUpdates.length
+  const branchLabel = selectedBranch === "all"
+    ? "Tất cả chi nhánh"
+    : (branches.find(b => b.id === selectedBranch)?.name || "Chi nhánh")
+
+  const dropPos = collapsed
+    ? "absolute left-full top-0 ml-2"
+    : "absolute left-0 right-0 top-full mt-1.5"
+
+  async function openNotifs() {
+    const opening = !showNotifDrop
+    setShowNotifDrop(opening)
+    setShowBranchDrop(false)
+    setShowUserDrop(false)
+    setExpanded([])
+    onReloadProfileUpdates?.()
+    if (opening) {
+      if (notifPreview.length > 0) {
+        setNotifs(notifPreview)
+        return
+      }
+      setLoadingNotifs(true)
+      try {
+        const data = await api.notifications.list({ read: "false" }) as any[]
+        setNotifs(data)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoadingNotifs(false)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (showNotifDrop && notifPreview.length > 0) {
+      setNotifs(notifPreview)
+    }
+  }, [notifPreview, showNotifDrop])
+
+  async function markAllRead() {
+    await onMarkAllRead?.()
+    setNotifs([])
+    onReloadNotifCount?.()
+  }
+
+  useEffect(() => {
+    if (!collapsed || !showUserDrop || !userBtnRef.current) return
+    const update = () => {
+      const rect = userBtnRef.current!.getBoundingClientRect()
+      setUserFlyoutPos({ left: rect.right + 8, bottom: window.innerHeight - rect.bottom })
+    }
+    update()
+    window.addEventListener("scroll", update, true)
+    window.addEventListener("resize", update)
+    return () => {
+      window.removeEventListener("scroll", update, true)
+      window.removeEventListener("resize", update)
+    }
+  }, [collapsed, showUserDrop])
+
+  const userMenuItems = currentUser ? (
+    <>
+      <button
+        onClick={() => { onLogout(); setShowUserDrop(false) }}
+        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-red-400/90 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+      >
+        <LogOut size={15} className="flex-shrink-0" />
+        Đăng xuất
+      </button>
+    </>
+  ) : null
 
   return (
-    <aside className={`${collapsed ? "w-16" : "w-60"} bg-[#160606] flex flex-col transition-all duration-300 flex-shrink-0 overflow-hidden relative z-40`}>
-      {/* Logo */}
-      <div className="p-4 flex items-center gap-3 border-b border-white/5">
-        <div className="w-9 h-9 bg-[#C62828] rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
-          <span className="text-white text-xs font-black leading-none">D<br /><span className="text-[8px] font-semibold tracking-wide">S</span></span>
-        </div>
-        {!collapsed && (
-          <div>
-            <div className="text-white font-black text-sm tracking-wide leading-none">DUDI</div>
-            <div className="text-white/40 text-xs font-medium">software</div>
+    <aside className={`${collapsed ? "w-16" : "w-60"} bg-[#160606] flex flex-col transition-all duration-300 flex-shrink-0 overflow-visible relative z-40`}>
+      <div className={`p-3 border-b border-white/5 flex ${collapsed ? "flex-col items-center gap-2" : "items-center gap-2"}`}>
+        <button
+          onClick={onToggle}
+          title={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
+          className="p-1.5 rounded-lg hover:bg-white/10 text-white/45 hover:text-white/80 transition-colors flex-shrink-0"
+        >
+          <Menu size={18} />
+        </button>
+        <BrandLogo
+          size={collapsed ? 28 : 34}
+          withText={!collapsed}
+          collapsed={collapsed}
+          textLight
+          className={collapsed ? "" : "flex-1 min-w-0"}
+        />
+      </div>
+
+      {/* Chi nhánh + Thông báo */}
+      <div className={`px-2 pt-2 pb-1 space-y-1 border-b border-white/5 ${collapsed ? "flex flex-col items-center" : ""}`}>
+        {isAdmin && onBranchChange && (
+          <div className="relative w-full">
+            <button
+              onClick={() => { setShowBranchDrop(p => !p); setShowNotifDrop(false); setShowUserDrop(false); setExpanded([]) }}
+              title={branchLabel}
+              className={`w-full flex items-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/75 cursor-pointer
+                ${collapsed ? "justify-center p-2.5" : "px-3 py-2.5 text-xs font-bold"}`}
+            >
+              <Building2 size={16} className="text-white/45 flex-shrink-0" />
+              {!collapsed && (
+                <>
+                  <span className="flex-1 text-left truncate">{branchLabel}</span>
+                  <ChevronDown size={12} className={`text-white/40 flex-shrink-0 transition-transform ${showBranchDrop ? "rotate-180" : ""}`} />
+                </>
+              )}
+            </button>
+            {showBranchDrop && (
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowBranchDrop(false)} />
+                <div className={`${dropPos} w-56 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl py-1.5 z-[100] flex flex-col`}>
+                  <button
+                    onClick={() => { onBranchChange("all"); setShowBranchDrop(false) }}
+                    className={`px-4 py-2 text-left text-xs font-bold hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedBranch === "all" ? "text-[#C62828] bg-red-50/40" : "text-gray-600"}`}
+                  >
+                    <span>Tất cả chi nhánh</span>
+                    {selectedBranch === "all" && <Check size={12} className="text-[#C62828]" />}
+                  </button>
+                  {branches.map(b => (
+                    <button
+                      key={b.id}
+                      onClick={() => { onBranchChange(b.id); setShowBranchDrop(false) }}
+                      className={`px-4 py-2 text-left text-xs font-bold hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedBranch === b.id ? "text-[#C62828] bg-red-50/40" : "text-gray-600"}`}
+                    >
+                      <span className="truncate">{b.name}</span>
+                      {selectedBranch === b.id && <Check size={12} className="text-[#C62828]" />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
+
+        <div className="relative w-full">
+          <button
+            onClick={openNotifs}
+            title="Thông báo"
+            className={`w-full flex items-center gap-2 rounded-xl hover:bg-white/8 transition-all text-white/55 hover:text-white/85 relative
+              ${collapsed ? "justify-center p-2.5" : "px-3 py-2.5 text-sm"}`}
+          >
+            <Bell size={18} className="flex-shrink-0" />
+            {!collapsed && <span className="font-medium flex-1 text-left truncate">Thông báo</span>}
+            {notifBadge > 0 && (
+              <span className={`min-w-[18px] h-[18px] bg-[#C62828] text-white text-[9px] font-extrabold rounded-full flex items-center justify-center border-2 border-[#160606] px-1
+                ${collapsed ? "absolute -top-0.5 -right-0.5" : ""}`}>
+                {notifBadge}
+              </span>
+            )}
+          </button>
+          {showNotifDrop && (
+            <>
+              <div className="fixed inset-0 z-[90]" onClick={() => setShowNotifDrop(false)} />
+              <div className={`${dropPos} w-80 bg-white rounded-2xl shadow-xl border border-black/8 z-[100] overflow-hidden`}>
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <p className="text-sm font-black text-gray-800">Thông báo</p>
+                  <button onClick={markAllRead} className="text-[11px] font-bold text-[#C62828] hover:underline">Đọc tất cả</button>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {pendingUpdates.map((req: any) => {
+                    const reqEmp = employees.find(e => e.id === req.employeeId)
+                    const empName = reqEmp?.name || req.employeeId
+                    return (
+                      <button key={req.id} onClick={() => {
+                        onSelectUpdateReq?.(req.id)
+                        onNavigate("nhan-su")
+                        setShowNotifDrop(false)
+                      }}
+                        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-orange-50 bg-orange-50/20 transition-colors text-left border-b border-gray-50 last:border-0">
+                        <div className="relative flex h-2 w-2 mt-1.5 flex-shrink-0">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs leading-relaxed font-bold text-gray-800">
+                            Hồ sơ cập nhật của <span className="text-orange-600 font-extrabold">{empName}</span> đang chờ duyệt
+                          </p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">Nhấp để đi tới trang duyệt hồ sơ</p>
+                        </div>
+                      </button>
+                    )
+                  })}
+                  {loadingNotifs ? (
+                    <div className="p-8 text-center">
+                      <div className="w-6 h-6 rounded-full border-2 border-[#C62828]/30 border-t-[#C62828] animate-spin mx-auto" />
+                    </div>
+                  ) : notifs.length === 0 && pendingUpdates.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-gray-400">Không có thông báo nào</div>
+                  ) : notifs.map((n: any) => (
+                    <button key={n.id} onClick={async () => {
+                      await api.notifications.markRead(n.id)
+                      setNotifs(ns => ns.filter(x => x.id !== n.id))
+                      onReloadNotifCount?.()
+                    }}
+                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0 bg-red-50/30">
+                      <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-[#C62828]" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs leading-relaxed font-bold text-gray-800">{n.message}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5">{n.time}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                {isAdmin && (
+                  <div className="border-t border-gray-100 p-2">
+                    <button onClick={() => { setShowNotifDrop(false); onNavigate("thong-bao") }}
+                      className="w-full text-center text-xs font-bold text-[#C62828] py-2 hover:bg-red-50 rounded-xl transition-colors">
+                      Quản lý thông báo hệ thống →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 space-y-0.5 py-2" style={{ scrollbarWidth: "none" }}>
         {hasAccess("dashboard") && <NavItem page="dashboard" icon={LayoutDashboard} label="Dashboard" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        <NavItem page="staff-portal" icon={Fingerprint} label="Cổng nhân viên" active={active} onNavigate={onNavigate} collapsed={collapsed} />
 
         {(hasAccess("nhan-su") || hasAccess("co-cau") || hasAccess("cham-cong") || hasAccess("duyet-don")) && (
           <GroupNav
@@ -875,7 +1125,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
             label="Quản lý nhân sự"
             pages={["nhan-su", "co-cau", "cham-cong", "duyet-don"].filter(hasAccess) as Page[]}
             active={active} onNavigate={onNavigate} collapsed={collapsed}
-            expanded={expanded} onToggle={toggle}
+            expanded={expanded} onToggle={toggle} onFlyoutOpen={closeOverlays}
           >
             {hasAccess("nhan-su") && <SubItem page="nhan-su" label="Danh sách nhân viên" active={active} onNavigate={onNavigate} />}
             {hasAccess("co-cau") && <SubItem page="co-cau" label="Cơ cấu tổ chức" active={active} onNavigate={onNavigate} />}
@@ -891,7 +1141,7 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
             label="Quản trị hệ thống"
             pages={["tai-khoan", "phan-quyen", "ip"].filter(hasAccess) as Page[]}
             active={active} onNavigate={onNavigate} collapsed={collapsed}
-            expanded={expanded} onToggle={toggle}
+            expanded={expanded} onToggle={toggle} onFlyoutOpen={closeOverlays}
           >
             {hasAccess("tai-khoan") && <SubItem page="tai-khoan" label="Quản lý tài khoản" active={active} onNavigate={onNavigate} />}
             {hasAccess("phan-quyen") && <SubItem page="phan-quyen" label="Phân quyền vai trò" active={active} onNavigate={onNavigate} />}
@@ -900,28 +1150,73 @@ function UserAwareSidebar({ active, onNavigate, collapsed, role, roleName, modul
         )}
 
         {hasAccess("thong-ke") && <NavItem page="thong-ke" icon={BarChart3} label="Báo cáo thống kê" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Thông báo" badge={2} active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Quản lý thông báo" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("lead") && <NavItem page="lead" icon={User} label="Cơ hội" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
 
-      {/* Role badge */}
-      {!collapsed && (
-        <div className="px-3 pb-2">
-          <div className={`rounded-xl px-3 py-2 text-center text-xs font-bold
-            ${(role === "role-admin" || role === "role-super-admin") ? "bg-amber-500/20 text-amber-300" : "bg-white/8 text-white/50"}`}>
-            {roleName}
-          </div>
-        </div>
-      )}
-
-      {/* Logout */}
       <div className="p-2 border-t border-white/5">
-        <button onClick={onLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/40 hover:text-red-400 hover:bg-red-50/10 transition-all">
-          <LogOut size={18} />
-          {!collapsed && <span className="font-medium">Đăng xuất</span>}
-        </button>
+        {currentUser && (
+          <div>
+            <button
+              ref={userBtnRef}
+              onClick={() => { setShowUserDrop(p => !p); setShowBranchDrop(false); setShowNotifDrop(false); setExpanded([]) }}
+              title={currentUser.name}
+              className={`w-full flex items-center gap-2.5 rounded-xl transition-all px-2 py-2
+                ${showUserDrop ? "bg-white/10" : "hover:bg-white/8"}
+                ${collapsed ? "justify-center" : ""}`}
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ring-2 ring-white/10">
+                {initials(currentUser.name)}
+              </div>
+              {!collapsed && (
+                <>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="text-xs font-semibold text-white/90 truncate leading-tight">{shortName}</div>
+                    <div className="text-[10px] text-white/35 truncate mt-0.5">{roleName}</div>
+                  </div>
+                  <ChevronDown size={13} className={`text-white/35 flex-shrink-0 transition-transform duration-200 ${showUserDrop ? "rotate-180" : ""}`} />
+                </>
+              )}
+            </button>
+
+            {showUserDrop && !collapsed && (
+              <div className="mt-1 px-1 pb-1 space-y-0.5">
+                {userMenuItems}
+              </div>
+            )}
+
+            {showUserDrop && collapsed && (
+              <>
+                <div className="fixed inset-0 z-[90]" onClick={() => setShowUserDrop(false)} />
+                <div
+                  className="fixed w-52 bg-[#1c0a0a] border border-white/10 rounded-2xl shadow-2xl py-2 z-[100]"
+                  style={{ left: userFlyoutPos.left, bottom: userFlyoutPos.bottom }}
+                >
+                  <div className="px-3 pb-2 mb-1 border-b border-white/8">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {initials(currentUser.name)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-white/90 truncate">{currentUser.name}</div>
+                        <div className="text-[10px] text-white/40 truncate">{currentUser.position}</div>
+                      </div>
+                    </div>
+                    <div className={`inline-block mt-2 text-[9px] font-bold px-2 py-0.5 rounded-md
+                      ${isAdmin ? "bg-amber-500/15 text-amber-300" : "bg-white/8 text-white/45"}`}>
+                      {roleName}
+                    </div>
+                  </div>
+                  <div className="px-1">{userMenuItems}</div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   )

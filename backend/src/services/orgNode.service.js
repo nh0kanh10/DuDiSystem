@@ -1,8 +1,15 @@
 import * as repo from "../repositories/orgNode.repository.js"
 import * as empRepo from "../repositories/employee.repository.js"
+import * as asgRepo from "../repositories/assignment.repository.js"
+import {
+  validateOrgNodePayload,
+  syncEmployeeOrgFields,
+  getNodeById,
+  getDescendantIdSet,
+} from "../utils/orgUtils.js"
 
 function buildNodeSet(nodeId) {
-  return new Set([nodeId, ...repo.getDescendantIds(nodeId)])
+  return getDescendantIdSet(nodeId, repo.getAll())
 }
 
 function computeMemberCount(nodeId, allEmployees) {
@@ -19,6 +26,38 @@ function withComputed(node, allEmployees) {
   }
 }
 
+function findRehomeTarget(orgNodeId, deleteSet, nodes) {
+  let current = getNodeById(nodes, orgNodeId)
+  while (current) {
+    if (!deleteSet.has(current.id)) return current.id
+    current = current.parentId ? getNodeById(nodes, current.parentId) : null
+  }
+  return ""
+}
+
+function rehomeEmployeesFromDeletedNodes(deleteSet) {
+  const allNodes = repo.getAll()
+  const employees = empRepo.getAll()
+  employees.forEach(emp => {
+    if (!emp.orgNodeId || !deleteSet.has(emp.orgNodeId)) return
+    const rehomeId = findRehomeTarget(emp.orgNodeId, deleteSet, allNodes)
+    if (rehomeId) {
+      empRepo.update(emp.id, syncEmployeeOrgFields({ orgNodeId: rehomeId }, rehomeId, allNodes))
+    } else {
+      empRepo.update(emp.id, { orgNodeId: "", branchId: "", department: "", position: "" })
+    }
+  })
+
+  asgRepo.getAll().forEach(asg => {
+    if (asg.status === "active" && deleteSet.has(asg.nodeId)) {
+      asgRepo.update(asg.id, {
+        status: "completed",
+        endDate: new Date().toISOString().split("T")[0],
+      })
+    }
+  })
+}
+
 export function listOrgNodes(filter) {
   const nodes = repo.getAll(filter)
   const allEmployees = empRepo.getAll()
@@ -33,6 +72,14 @@ export function getOrgNode(id) {
 }
 
 export function createOrgNode(data) {
+  const nodes = repo.getAll()
+  const err = validateOrgNodePayload(data, nodes)
+  if (err) throw new Error(err)
+
+  if (data.managerId && !empRepo.getById(data.managerId)) {
+    throw new Error("Quản lý được chọn không tồn tại")
+  }
+
   const node = repo.create({
     id: `node-${Date.now()}`,
     name: data.name,
@@ -48,21 +95,40 @@ export function createOrgNode(data) {
 }
 
 export function updateOrgNode(id, patch) {
+  const existing = repo.getById(id)
+  if (!existing) return null
+
   const ALLOWED = ["name", "code", "type", "managerId", "managerTitle", "parentId", "status"]
   const safe = Object.fromEntries(Object.entries(patch).filter(([k]) => ALLOWED.includes(k)))
+  const merged = { ...existing, ...safe }
+  const nodes = repo.getAll()
+  const err = validateOrgNodePayload(merged, nodes, id)
+  if (err) throw new Error(err)
+
+  if (merged.managerId && !empRepo.getById(merged.managerId)) {
+    throw new Error("Quản lý được chọn không tồn tại")
+  }
+
   const node = repo.update(id, safe)
   if (!node) return null
   return withComputed(node, empRepo.getAll())
 }
 
 export function changeStatus(id, status) {
+  const node = repo.getById(id)
+  if (!node) return null
   const ids = [id, ...repo.getDescendantIds(id)]
   ids.forEach(i => repo.update(i, { status }))
   return { affected: ids.length }
 }
 
 export function deleteOrgNode(id) {
+  const node = repo.getById(id)
+  if (!node) return null
+
   const ids = [id, ...repo.getDescendantIds(id)]
+  const deleteSet = new Set(ids)
+  rehomeEmployeesFromDeletedNodes(deleteSet)
   ids.forEach(i => repo.remove(i))
   return { deleted: ids.length }
 }

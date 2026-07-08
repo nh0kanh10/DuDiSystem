@@ -6,7 +6,7 @@ export function getModel(collection) {
   if (modelCache.has(collection)) return modelCache.get(collection)
 
   const schema = new mongoose.Schema(
-    { id: { type: String, index: true } },
+    { id: { type: String, unique: true, sparse: true } },
     { strict: false, collection, versionKey: false }
   )
 

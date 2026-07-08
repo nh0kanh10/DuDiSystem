@@ -12,13 +12,21 @@ export function getOne(req, res) {
 }
 
 export function create(req, res) {
-  created(res, svc.createOrgNode(req.body))
+  try {
+    created(res, svc.createOrgNode(req.body))
+  } catch (err) {
+    fail(res, err.message || "Không thể tạo đơn vị")
+  }
 }
 
 export function update(req, res) {
-  const node = svc.updateOrgNode(req.params.id, req.body)
-  if (!node) return notFound(res, "Không tìm thấy đơn vị")
-  ok(res, node)
+  try {
+    const node = svc.updateOrgNode(req.params.id, req.body)
+    if (!node) return notFound(res, "Không tìm thấy đơn vị")
+    ok(res, node)
+  } catch (err) {
+    fail(res, err.message || "Không thể cập nhật đơn vị")
+  }
 }
 
 export function changeStatus(req, res) {
@@ -26,11 +34,15 @@ export function changeStatus(req, res) {
   if (!["active", "inactive"].includes(status)) {
     return fail(res, "Trạng thái không hợp lệ")
   }
-  ok(res, svc.changeStatus(req.params.id, status))
+  const result = svc.changeStatus(req.params.id, status)
+  if (!result) return notFound(res, "Không tìm thấy đơn vị")
+  ok(res, result)
 }
 
 export function remove(req, res) {
-  ok(res, svc.deleteOrgNode(req.params.id))
+  const result = svc.deleteOrgNode(req.params.id)
+  if (!result) return notFound(res, "Không tìm thấy đơn vị")
+  ok(res, result)
 }
 
 export function members(req, res) {

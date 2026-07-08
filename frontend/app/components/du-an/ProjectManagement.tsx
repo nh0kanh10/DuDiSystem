@@ -1,14 +1,26 @@
 import React, { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import {
-  Plus, Search, Edit2, Trash2, X, FolderOpen,
+  Plus, Search, Edit2, Trash2, ArrowLeft, FolderOpen,
   Calendar, Paperclip, Link2, FileText,
   CheckSquare, TrendingUp, Clock, CheckCircle2, PauseCircle,
   AlertCircle, File, Trash, ExternalLink, Check,
   CircleDot, PlayCircle, User, Eye, Bell, Users2, Crown,
+  Lock, Bug, RefreshCw, BadgeCheck, Loader2
 } from "lucide-react"
+import { mergeProjectRequirementDemo } from "./projectRequirementMock"
+import { ProjectRequirementsTab } from "./ProjectRequirementsTab"
+import { mergeTaskList, subscribeTaskSocket } from "@/lib/taskSocket"
+import { ProjectDocVaultTab, formatHref } from "./ProjectDocVaultTab"
+import { buildRequirementFormsFromLead } from "../lead/leadRequirementForm"
+import { downloadVaultAttachment } from "./VaultFileDropzone"
+import { DocxFilePreview } from "../lead/DocxFilePreview"
+import { canOpenVaultUrl, vaultFileName } from "../../utils/vaultItemCapabilities"
+import { ProjectTestingTab } from "./ProjectTestingTab"
+import { ProjectTasksTab } from "./ProjectTasksTab"
+import { ProjectDetailTabShell, ProjectTabEmptyState, ProjectTabSection, tabDashedAddBtn } from "./ProjectDetailTabShell"
 import { api } from "@/lib/api"
-import { Project, ProjectTeam, ProjectStatus, Employee, Group, OrgNode, Role } from "../../types"
+import { Project, ProjectTeam, ProjectStatus, Employee, Group, OrgNode, Role, TestSession, ProjectVaultAudience, ProjectVaultCategory, ProjectVaultItem } from "../../types"
 import { initials } from "../../utils"
 import { CustomDatePicker as DateInput } from "../ui/CustomDatePicker"
 import { CustomSelect } from "../ui/CustomSelect"
@@ -95,18 +107,65 @@ const EMPTY_FORM = {
   branchId: "",
 }
 
-const EMPTY_TASK_FORM = {
-  title: "", assigneeId: "", dueDate: "", priority: "medium" as "low" | "medium" | "high",
+function defaultTestSessions(projectId: string): TestSession[] {
+  if (projectId !== "PRJ001") return []
+  const now = new Date().toISOString()
+  return [
+    {
+      id: "TS-PRJ001-1",
+      projectId,
+      version: "v2.0.0-beta",
+      testDate: "28/06/2026",
+      testerId: "NV006",
+      testerName: "Trần Văn Lực",
+      testType: "regression",
+      bugsFound: 14,
+      bugsPassed: 9,
+      bugsRejected: 2,
+      bugsReviewing: 3,
+      bugsBillable: 4,
+      confirmedById: "NV004",
+      confirmedByName: "Phạm Đức Thành",
+      confirmedAt: "29/06/2026",
+      handlingStatus: "in-progress",
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "TS-PRJ001-2",
+      projectId,
+      version: "v2.0.0-rc1",
+      testDate: "02/07/2026",
+      testerId: "NV002",
+      testerName: "Nguyễn Văn B",
+      testType: "uat",
+      bugsFound: 6,
+      bugsPassed: 4,
+      bugsRejected: 1,
+      bugsReviewing: 1,
+      bugsBillable: 2,
+      confirmedById: "NV001",
+      confirmedByName: "Admin",
+      confirmedAt: "03/07/2026",
+      handlingStatus: "pending",
+      createdAt: now,
+      updatedAt: now,
+    },
+  ]
 }
 
 export function ProjectManagement({
   currentUserId,
   currentUserRole,
   selectedBranch = "all",
+  projectId,
+  onNavigateToProject,
 }: {
   currentUserId?: string
   currentUserRole?: Role
   selectedBranch?: string
+  projectId?: string
+  onNavigateToProject?: (id: string | null) => void
 }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -129,7 +188,20 @@ export function ProjectManagement({
   const [teamProjectFilter, setTeamProjectFilter] = useState("all")
 
   const [detail, setDetail] = useState<Project | null>(null)
-  const [detailTab, setDetailTab] = useState<"overview" | "tasks" | "attachments">("overview")
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [detailTab, setDetailTab] = useState<"overview" | "tasks" | "requirements" | "documents" | "testing">("overview")
+      const [localVaultItems, setLocalVaultItems] = useState<ProjectVaultItem[]>([])
+      const [vaultPreview, setVaultPreview] = useState<{
+        title: string
+        downloadName: string
+        loadBlob: () => Promise<Blob>
+      } | null>(null)
+      const [previewKey, setPreviewKey] = useState(0)
+      const [localTestSessions, setLocalTestSessions] = useState<TestSession[]>([])
+  const [showCloseChecklist, setShowCloseChecklist] = useState(false)
+  const [closingProject, setClosingProject] = useState(false)
+  const [checklistError, setChecklistError] = useState("")
+  const [autoAddVaultCategory, setAutoAddVaultCategory] = useState<ProjectVaultCategory | null>(null)
   const [tasks, setTasks] = useState<any[]>([])
   const [loadingTasks, setLoadingTasks] = useState(false)
 
@@ -149,11 +221,6 @@ export function ProjectManagement({
   const [attachForm, setAttachForm] = useState({ name: "", url: "", type: "file" as "file" | "link" })
   const [showAttachForm, setShowAttachForm] = useState(false)
 
-  const [showTaskForm, setShowTaskForm] = useState(false)
-  const [taskForm, setTaskForm] = useState({ ...EMPTY_TASK_FORM })
-  const [savingTask, setSavingTask] = useState(false)
-  const [taskDeleteConfirm, setTaskDeleteConfirm] = useState<string | null>(null)
-
   useEffect(() => {
     load()
     api.employees.list().then(d => setEmployees(d as Employee[]))
@@ -166,6 +233,155 @@ export function ProjectManagement({
     }).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    if (!projectId) {
+      setDetail(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      setLoadingDetail(true)
+      try {
+        const p = mergeProjectRequirementDemo(await api.projects.getById(projectId) as Project)
+        if (cancelled) return
+        setDetail(p)
+        setDetailTab("overview")
+        loadTasksFor(projectId)
+
+        let loadedVaultItems: ProjectVaultItem[] = []
+        try {
+          loadedVaultItems = await api.projects.listVault(p.id)
+        } catch (e) {
+          console.error("Failed to load project vault", e)
+        }
+        if (p.leadId) {
+          try {
+            const docs = await api.leadDocuments.list(p.leadId)
+            const docVaultItems = docs.map(d => {
+              const downloadName = d.downloadName || `${d.label || d.type || "tai-lieu"}.docx`
+              const hasFile = Boolean(d.hasFile ?? d.fileSize)
+              return {
+                id: `doc-${d.id}`,
+                projectId: p.id,
+                audience: "client" as ProjectVaultAudience,
+                category: (d.type === "quote" ? "quotation" : d.type === "solution" ? "client-file" : "contract") as ProjectVaultCategory,
+                name: d.label || (d.isAppendix ? "Phụ lục hợp đồng" : (d.type === "quote" ? "Báo giá" : d.type === "solution" ? "Giải pháp" : "Hợp đồng")),
+                description: "Khởi tạo từ Lead",
+                createdAt: d.createdAt || new Date().toISOString(),
+                updatedAt: d.updatedAt || new Date().toISOString(),
+                parentId: d.parentDocumentId ? `doc-${d.parentDocumentId}` : null,
+                isAppendix: d.isAppendix,
+                hasFile,
+                fileAttachment: hasFile ? {
+                  name: downloadName,
+                  size: d.fileSize || 0,
+                  mimeType: "application/octet-stream",
+                  hasFile: true,
+                } : undefined,
+              }
+            })
+            loadedVaultItems = [...loadedVaultItems, ...docVaultItems]
+            
+            const leadData = await api.leads.get(p.leadId)
+            
+            if (leadData) {
+              const mappedForms = buildRequirementFormsFromLead(leadData as import("../../types").Lead)
+              p.requirementForms = [...(p.requirementForms || []), ...mappedForms]
+              setDetail({ ...p }) 
+            }
+          } catch (e) {
+            console.error("Failed to load lead documents/requirements", e)
+          }
+        }
+
+        if (p.requirementForms && p.requirementForms.length > 0) {
+          const reqVaultItems = p.requirementForms.map(req => ({
+            id: `req-${req.id}`,
+            projectId: p.id,
+            audience: "client" as ProjectVaultAudience,
+            category: "requirement" as ProjectVaultCategory,
+            name: req.title || "Phiếu thu thập yêu cầu",
+            url: req.publicLink || "",
+            description: "Yêu cầu từ khách hàng",
+            createdAt: req.createdAt || new Date().toISOString(),
+            updatedAt: req.createdAt || new Date().toISOString()
+          }))
+          loadedVaultItems = [...loadedVaultItems, ...reqVaultItems]
+        }
+
+        setLocalVaultItems(loadedVaultItems)
+        setLocalTestSessions(defaultTestSessions(projectId))
+      } catch {
+        if (!cancelled) onNavigateToProject?.(null)
+      } finally {
+        if (!cancelled) setLoadingDetail(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [projectId])
+
+  useEffect(() => {
+    if (!projectId) return
+    const unsub = subscribeTaskSocket({
+      onChange: ({ action, task }) => {
+        if (task.projectId && task.projectId !== projectId) return
+        setTasks(prev => mergeTaskList(prev, { action, task }))
+        refreshProject(projectId)
+      },
+    })
+    return () => { unsub() }
+  }, [projectId])
+
+  const handleQuickAddVaultItem = (category: ProjectVaultCategory) => {
+    setShowCloseChecklist(false)
+    setDetailTab("documents")
+    setAutoAddVaultCategory(category)
+  }
+
+  const checkProjectDocuments = (vaultItems: ProjectVaultItem[]) => {
+    const requirements = [
+      { category: "requirement", label: "Yêu cầu dự án (SRS / Phiếu yêu cầu)" },
+      { category: "quotation", label: "Báo giá dự án" },
+      { category: "contract", label: "Hợp đồng dự án" },
+      { category: "tech-doc", label: "Hướng dẫn sử dụng / tài liệu vận hành" },
+      { category: "client-handover", label: "Biên bản nghiệm thu và bàn giao khách hàng" },
+      { category: "internal-handover", label: "Tài liệu bàn giao nội bộ dev" },
+    ]
+    return requirements.map(r => ({
+      ...r,
+      exists: vaultItems.some(item => item.category === r.category)
+    }))
+  }
+
+  const projectChecklist = checkProjectDocuments(localVaultItems)
+  const isChecklistValid = projectChecklist.every(item => item.exists)
+
+  const handleCloseProjectConfirm = async () => {
+    if (!isChecklistValid || !detail) return
+    setClosingProject(true)
+    setChecklistError("")
+    try {
+      await api.projects.update(detail.id, { status: "completed" })
+      await refreshProject(detail.id)
+      setShowCloseChecklist(false)
+    } catch (e) {
+      setChecklistError(e instanceof Error ? e.message : "Đóng dự án thất bại")
+    } finally {
+      setClosingProject(false)
+    }
+  }
+
+  const handleReopenProject = async () => {
+    if (!detail) return
+    if (!window.confirm("Bạn có chắc chắn muốn mở lại dự án này?")) return
+    try {
+      await api.projects.update(detail.id, { status: "active" })
+      await refreshProject(detail.id)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Mở lại dự án thất bại")
+    }
+  }
+
   async function load() {
     setLoading(true)
     try {
@@ -177,7 +393,7 @@ export function ProjectManagement({
   }
 
   async function refreshProject(projectId: string) {
-    const updated = await api.projects.getById(projectId) as Project
+    const updated = mergeProjectRequirementDemo(await api.projects.getById(projectId) as Project)
     setProjects(ps => ps.map(p => p.id === updated.id ? updated : p))
     setDetail(prev => prev?.id === updated.id ? updated : prev)
   }
@@ -283,16 +499,15 @@ export function ProjectManagement({
   async function handleDelete(p: Project) {
     await api.projects.delete(p.id)
     setProjects(ps => ps.filter(x => x.id !== p.id))
-    if (detail?.id === p.id) setDetail(null)
+    if (detail?.id === p.id) {
+      setDetail(null)
+      onNavigateToProject?.(null)
+    }
     setShowDeleteConfirm(null)
   }
 
-  async function openDetail(p: Project) {
-    setDetail(p)
-    setDetailTab("overview")
-    setShowTaskForm(false)
-    setTaskForm({ ...EMPTY_TASK_FORM })
-    loadTasksFor(p.id)
+  function openDetail(p: Project) {
+    onNavigateToProject?.(p.id)
   }
 
   async function loadTasksFor(projectId: string) {
@@ -305,50 +520,17 @@ export function ProjectManagement({
     }
   }
 
-  async function handleCreateTask() {
-    if (!detail || !taskForm.title.trim()) return
-    setSavingTask(true)
-    try {
-      const created = await api.tasks.create({
-        title: taskForm.title.trim(),
-        assigneeId: taskForm.assigneeId || undefined,
-        dueDate: taskForm.dueDate || undefined,
-        priority: taskForm.priority,
-        status: "todo",
-        projectId: detail.id,
-      }) as any
-      setTasks(ts => [...ts, created])
-      setTaskForm({ ...EMPTY_TASK_FORM })
-      setShowTaskForm(false)
-      refreshProject(detail.id)
-    } finally {
-      setSavingTask(false)
-    }
-  }
-
-  async function cycleTaskStatus(t: any) {
+  async function handleAddAttachment(data?: { name: string; url: string; type: "file" | "link" }) {
     if (!detail) return
-    const next = t.status === "todo" ? "in-progress" : t.status === "in-progress" ? "done" : "todo"
-    setTasks(ts => ts.map(x => x.id === t.id ? { ...x, status: next } : x))
-    await api.tasks.update(t.id, { status: next })
-    refreshProject(detail.id)
-  }
-
-  async function handleDeleteTask(taskId: string) {
-    if (!detail) return
-    setTasks(ts => ts.filter(x => x.id !== taskId))
-    setTaskDeleteConfirm(null)
-    await api.tasks.delete(taskId)
-    refreshProject(detail.id)
-  }
-
-  async function handleAddAttachment() {
-    if (!detail || !attachForm.name.trim() || !attachForm.url.trim()) return
-    const updated = await api.projects.addAttachment(detail.id, attachForm) as Project
+    const payload = data ?? attachForm
+    if (!payload.name.trim() || !payload.url.trim()) return
+    const updated = await api.projects.addAttachment(detail.id, payload) as Project
     setProjects(ps => ps.map(p => p.id === updated.id ? updated : p))
     setDetail(updated)
-    setAttachForm({ name: "", url: "", type: "file" })
-    setShowAttachForm(false)
+    if (!data) {
+      setAttachForm({ name: "", url: "", type: "file" })
+      setShowAttachForm(false)
+    }
   }
 
   async function handleRemoveAttachment(attachId: string) {
@@ -441,8 +623,92 @@ export function ProjectManagement({
     }))
   }
 
+  const handleDownloadVaultItem = async (item: ProjectVaultItem) => {
+    if (!detail) return
+    if (item.fileAttachment?.dataUrl) {
+      downloadVaultAttachment(item.fileAttachment)
+      return
+    }
+    if (item.hasFile || item.fileAttachment?.hasFile) {
+      try {
+        await api.projects.downloadVaultFile(
+          detail.id,
+          item.id,
+          item.fileAttachment?.name || item.name,
+        )
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "Tải file thất bại")
+      }
+      return
+    }
+    if (item.id.startsWith("doc-") && detail.leadId) {
+      try {
+        await api.leadDocuments.downloadFile(
+          detail.leadId,
+          item.id.replace("doc-", ""),
+          item.name + ".docx"
+        )
+      } catch (e) {
+        alert(e instanceof Error ? e.message : "Tải file thất bại")
+      }
+    } else if (item.url) {
+      window.open(item.url, "_blank")
+    }
+  }
+
+  const handlePreviewVaultItem = async (item: ProjectVaultItem) => {
+    if (!detail) return
+    if (item.fileAttachment?.dataUrl) {
+      const dataUrl = item.fileAttachment.dataUrl
+      setVaultPreview({
+        title: item.name,
+        downloadName: item.fileAttachment.name,
+        loadBlob: async () => {
+          const res = await fetch(dataUrl)
+          return res.blob()
+        },
+      })
+      setPreviewKey((k) => k + 1)
+      return
+    }
+    if (item.hasFile || item.fileAttachment?.hasFile) {
+      const name = vaultFileName(item)
+      setVaultPreview({
+        title: item.name,
+        downloadName: name,
+        loadBlob: () => api.projects.vaultFileBlob(detail.id, item.id),
+      })
+      setPreviewKey((k) => k + 1)
+      return
+    }
+    if (item.id.startsWith("doc-") && detail.leadId) {
+      const docId = item.id.replace("doc-", "")
+      setVaultPreview({
+        title: item.name,
+        downloadName: item.fileAttachment?.name || `${item.name}.docx`,
+        loadBlob: () => api.leadDocuments.fileBlob(detail.leadId!, docId),
+      })
+      setPreviewKey((k) => k + 1)
+      return
+    }
+    if (canOpenVaultUrl(item) && item.url) {
+      window.open(formatHref(item.url), "_blank", "noopener,noreferrer")
+    }
+  }
+
   return (
     <div className="space-y-5">
+      {projectId && (loadingDetail || !detail) && (
+        <div className="py-24 text-center flex items-center justify-center gap-1.5">
+          {[0, 1, 2].map(i => (
+            <span key={i} className="w-2 h-2 rounded-full bg-[#C62828]/40 animate-bounce"
+              style={{ animationDelay: `${i * 0.15}s` }} />
+          ))}
+        </div>
+      )}
+
+      {!projectId && (
+      <>
       <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
         <div className="flex items-center">
           <div className="flex gap-1.5 items-center mr-4 shrink-0">
@@ -671,7 +937,8 @@ export function ProjectManagement({
               const isMyProject = currentUserId && (p.memberIds.includes(currentUserId) || p.managerId === currentUserId)
               return (
                 <div key={p.id}
-                  className="border border-black/[0.06] rounded-2xl p-4 hover:border-[#C62828]/20 hover:shadow-md transition-all group space-y-3">
+                  onClick={() => openDetail(p)}
+                  className="border border-black/[0.06] rounded-2xl p-4 hover:border-[#C62828]/20 hover:shadow-md transition-all group space-y-3 cursor-pointer">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -682,12 +949,11 @@ export function ProjectManagement({
                         )}
                       </div>
                       <h3
-                        className="font-black text-gray-800 text-sm leading-snug line-clamp-2 cursor-pointer hover:text-[#C62828] transition-colors"
-                        onClick={() => openDetail(p)}>
+                        className="font-black text-gray-800 text-sm leading-snug line-clamp-2 hover:text-[#C62828] transition-colors">
                         {p.name}
                       </h3>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
                       <button onClick={() => openDetail(p)}
                         className="p-1.5 rounded-lg hover:bg-[#C62828]/8 text-gray-400 hover:text-[#C62828] transition-colors" title="Xem chi tiết">
                         <Eye size={13} />
@@ -743,6 +1009,9 @@ export function ProjectManagement({
           </div>
         )}
       </div></>)}
+
+      </>
+      )}
 
       <Modal
         open={showForm}
@@ -950,319 +1219,309 @@ export function ProjectManagement({
             </div>
       </Modal>
 
-      {detail && createPortal(
-        <div className="fixed inset-0 z-50 flex" onClick={() => setDetail(null)}>
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
-          <div className="relative ml-auto w-full max-w-2xl bg-white h-full shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+      {projectId && detail && (
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => onNavigateToProject?.(null)}
+            className="inline-flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-[#C62828] transition-colors"
+          >
+            <ArrowLeft size={18} />
+            Danh sách dự án
+          </button>
+
+          <div className="bg-white rounded-3xl border border-black/5 shadow-xs flex flex-col min-h-[calc(100vh-11rem)] overflow-hidden">
             <div className="flex items-start justify-between p-6 border-b border-gray-100 flex-shrink-0">
               <div className="flex-1 min-w-0 pr-4">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-[11px] font-black text-gray-400 font-mono">{detail.code}</span>
                   <StatusBadge status={detail.status} />
                 </div>
-                <h3 className="text-base font-black text-gray-800 leading-snug">{detail.name}</h3>
+                <h3 className="text-xl font-black text-gray-800 leading-snug">{detail.name}</h3>
               </div>
-              <div className="flex items-center gap-1 flex-shrink-0">
-                <button onClick={() => { setDetail(null); openEdit(detail) }}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {detail.status === "completed" ? (
+                  <button
+                    type="button"
+                    onClick={handleReopenProject}
+                    className="h-8 px-3 border border-emerald-200 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50 text-xs font-bold rounded-xl flex items-center gap-1 shadow-sm transition-all"
+                  >
+                    <RefreshCw size={12} /> Mở lại dự án
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChecklistError("")
+                      setShowCloseChecklist(true)
+                    }}
+                    className="h-8 px-3 border border-red-200 text-[#C62828] bg-red-50/30 hover:bg-red-50 text-xs font-bold rounded-xl flex items-center gap-1 shadow-sm transition-all"
+                  >
+                    <Lock size={12} /> Đóng dự án
+                  </button>
+                )}
+                <button onClick={() => openEdit(detail)}
                   className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-gray-700 transition-colors">
                   <Edit2 size={16} />
-                </button>
-                <button onClick={() => setDetail(null)}
-                  className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 transition-colors">
-                  <X size={18} />
                 </button>
               </div>
             </div>
 
-            <div className="flex border-b border-gray-100 flex-shrink-0">
-              {(["overview", "tasks", "attachments"] as const).map(tab => (
+            <div className="flex border-b border-gray-100 flex-shrink-0 overflow-x-auto bg-white sticky top-0 z-10 shadow-[0_1px_0_rgba(0,0,0,0.04)]">
+              {(["overview", "tasks", "requirements", "documents", "testing"] as const).map(tab => (
                 <button key={tab} onClick={() => setDetailTab(tab)}
-                  className={`px-5 py-3 text-xs font-bold transition-colors border-b-2 ${detailTab === tab ? "border-[#C62828] text-[#C62828]" : "border-transparent text-gray-400 hover:text-gray-600"}`}>
+                  className={`px-5 py-3.5 text-xs font-bold transition-colors border-b-2 whitespace-nowrap ${detailTab === tab ? "border-[#C62828] text-[#C62828] bg-[#C62828]/[0.03]" : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/80"}`}>
                   {tab === "overview" ? "Tổng quan"
                     : tab === "tasks" ? `Công việc (${tasks.length})`
-                    : `Tài liệu (${detail.attachments.length})`}
+                    : tab === "requirements" ? "Yêu cầu"
+                    : tab === "documents" ? (
+                        <span className="flex items-center gap-1">
+                          <Lock size={12} />
+                          Tài liệu & Vault
+                          {(localVaultItems.length + detail.attachments.length) > 0 && (
+                            <span className="ml-0.5 px-1.5 py-0.5 bg-gray-100 rounded-full text-[10px] font-black text-gray-500">
+                              {localVaultItems.length + detail.attachments.length}
+                            </span>
+                          )}
+                        </span>
+                      )
+                    : <span className="flex items-center gap-1"><Bug size={12} /> Testing</span>}
                 </button>
               ))}
-              <button onClick={() => { setDetail(null); setMainTab("teams"); setTeamProjectFilter(detail.id) }}
-                className="px-5 py-3 text-xs font-bold transition-colors border-b-2 border-transparent text-gray-400 hover:text-gray-600 ml-auto flex items-center gap-1">
+              <button onClick={() => { onNavigateToProject?.(null); setMainTab("teams"); setTeamProjectFilter(detail.id) }}
+                className="px-4 py-3 text-xs font-bold transition-colors border-b-2 border-transparent text-gray-400 hover:text-gray-600 ml-auto flex items-center gap-1 whitespace-nowrap">
                 <Users2 size={12} /> Nhóm →
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
+            <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-50/50 to-white pb-8" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
               {detailTab === "overview" && (
-                <div className="p-6 space-y-5">
+                <ProjectDetailTabShell
+                  icon={FolderOpen}
+                  title="Tổng quan dự án"
+                  description="Thông tin tiến độ, thời gian và nhóm thực hiện"
+                  stats={[
+                    { label: "Tiến độ", value: `${detail.progress}%`, cls: detail.progress >= 100 ? "text-emerald-600" : "text-[#C62828]" },
+                    { label: "Công việc", value: `${detail.doneCount ?? 0}/${detail.taskCount ?? 0}` },
+                    { label: "Thành viên", value: detail.memberIds.length },
+                    { label: "Tài liệu", value: detail.attachments.length },
+                  ]}
+                >
                   {detail.description && (
-                    <p className="text-sm text-gray-500 leading-relaxed">{detail.description}</p>
+                    <ProjectTabSection title="Mô tả">
+                      <p className="text-sm text-gray-600 leading-relaxed">{detail.description}</p>
+                    </ProjectTabSection>
                   )}
 
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-gray-500">Tiến độ</span>
-                      <span className="text-xs font-black text-gray-700">{detail.progress}%</span>
-                    </div>
-                    <ProgressBar value={detail.progress} done={detail.doneCount} total={detail.taskCount} />
-                    <p className="text-[11px] text-gray-400">{detail.doneCount ?? 0} / {detail.taskCount ?? 0} task hoàn thành</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { label: "Ngày bắt đầu", value: detail.startDate },
-                      { label: "Ngày kết thúc", value: detail.endDate },
-                    ].map(({ label, value }) => (
-                      <div key={label} className="bg-gray-50 rounded-xl p-3">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <Calendar size={12} className="text-gray-400" />
-                          <span className="text-[10px] font-bold text-gray-400">{label}</span>
-                        </div>
-                        <p className="text-sm font-bold text-gray-700">{value || "—"}</p>
+                  <ProjectTabSection title="Tiến độ thực hiện">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-gray-500">Hoàn thành</span>
+                        <span className="text-sm font-black text-gray-800">{detail.progress}%</span>
                       </div>
-                    ))}
-                  </div>
+                      <ProgressBar value={detail.progress} done={detail.doneCount} total={detail.taskCount} />
+                      <p className="text-[11px] text-gray-400">{detail.doneCount ?? 0} / {detail.taskCount ?? 0} task hoàn thành</p>
+                    </div>
+                  </ProjectTabSection>
 
-                  <div>
-                    <p className="text-xs font-bold text-gray-500 mb-2">Quản lý dự án</p>
-                    {(() => {
-                      const m = empById(detail.managerId)
-                      return m ? (
-                        <div className="flex items-center gap-2.5">
-                          <AvatarCircle name={m.name} photo={m.photos?.[0]} size="md" />
-                          <div>
-                            <p className="text-sm font-bold text-gray-700">{m.name}</p>
-                            <p className="text-[11px] text-gray-400">{m.position} · {m.department}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ProjectTabSection title="Thời gian">
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { label: "Bắt đầu", value: detail.startDate },
+                          { label: "Kết thúc", value: detail.endDate },
+                        ].map(({ label, value }) => (
+                          <div key={label} className="bg-gray-50 rounded-xl p-3">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Calendar size={12} className="text-gray-400" />
+                              <span className="text-[10px] font-bold text-gray-400 uppercase">{label}</span>
+                            </div>
+                            <p className="text-sm font-bold text-gray-700">{value || "—"}</p>
                           </div>
-                        </div>
-                      ) : <p className="text-sm text-gray-400">—</p>
-                    })()}
-                  </div>
+                        ))}
+                      </div>
+                    </ProjectTabSection>
 
-                  <div>
-                    <p className="text-xs font-bold text-gray-500 mb-2">Thành viên ({detail.memberIds.length})</p>
-                    <div className="flex flex-wrap gap-2">
-                      {detail.memberIds.map(mid => {
-                        const emp = empById(mid)
-                        return emp ? (
-                          <div key={mid} className="flex items-center gap-1.5 bg-gray-50 rounded-lg px-2.5 py-1.5">
-                            <AvatarCircle name={emp.name} photo={emp.photos?.[0]} />
+                    <ProjectTabSection title="Quản lý dự án">
+                      {(() => {
+                        const m = empById(detail.managerId)
+                        return m ? (
+                          <div className="flex items-center gap-2.5">
+                            <AvatarCircle name={m.name} photo={m.photos?.[0]} size="md" />
                             <div>
-                              <p className="text-xs font-bold text-gray-700 leading-none">{emp.name}</p>
-                              <p className="text-[10px] text-gray-400">{emp.department}</p>
+                              <p className="text-sm font-bold text-gray-700">{m.name}</p>
+                              <p className="text-[11px] text-gray-400">{m.position} · {m.department}</p>
                             </div>
                           </div>
-                        ) : null
-                      })}
-                      {detail.memberIds.length === 0 && <p className="text-sm text-gray-400">Chưa có thành viên</p>}
-                    </div>
+                        ) : <p className="text-sm text-gray-400">Chưa phân công</p>
+                      })()}
+                    </ProjectTabSection>
                   </div>
-                </div>
-              )}
 
-              {detailTab === "tasks" && (
-                <div className="p-6 space-y-3">
-                  {!showTaskForm ? (
-                    <button onClick={() => setShowTaskForm(true)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-[#C62828]/30 hover:text-[#C62828] transition-colors">
-                      <Plus size={15} /> Thêm công việc
-                    </button>
-                  ) : (
-                    <div className="border border-gray-200 rounded-2xl p-4 space-y-3 bg-gray-50/50">
-                      <p className="text-xs font-black text-gray-700">Tạo công việc mới</p>
-                      <input
-                        value={taskForm.title}
-                        onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))}
-                        placeholder="Tên công việc..."
-                        autoFocus
-                        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-500 mb-1">Giao cho</p>
-                          <CustomCombobox
-                            value={taskForm.assigneeId}
-                            onChange={v => setTaskForm(f => ({ ...f, assigneeId: v }))}
-                            heightClass="h-9"
-                            placeholder="Chọn thành viên..."
-                            options={projectMembers.map(e => ({ value: e.id, label: e.name, desc: e.position }))}
-                          />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-500 mb-1">Ưu tiên</p>
-                          <CustomSelect
-                            value={taskForm.priority}
-                            onChange={v => setTaskForm(f => ({ ...f, priority: v as any }))}
-                            heightClass="h-9"
-                            options={[
-                              { value: "high",   label: "Cao" },
-                              { value: "medium", label: "Trung bình" },
-                              { value: "low",    label: "Thấp" },
-                            ]}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-500 mb-1">Deadline</p>
-                        <DateInput
-                          value={taskForm.dueDate}
-                          onChange={v => setTaskForm(f => ({ ...f, dueDate: v }))}
-                          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
-                        />
-                      </div>
-                      <div className="flex gap-2 justify-end">
-                        <button onClick={() => { setShowTaskForm(false); setTaskForm({ ...EMPTY_TASK_FORM }) }}
-                          className="px-4 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">
-                          Hủy
-                        </button>
-                        <button onClick={handleCreateTask} disabled={savingTask || !taskForm.title.trim()}
-                          className="px-4 py-1.5 text-xs font-bold bg-[#C62828] text-white rounded-lg hover:bg-[#B71C1C] disabled:opacity-50 transition-colors">
-                          {savingTask ? "Đang lưu..." : "Tạo"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {loadingTasks ? (
-                    <div className="py-10 text-center text-gray-300 text-sm">Đang tải...</div>
-                  ) : tasks.length === 0 ? (
-                    <div className="py-10 text-center">
-                      <CheckSquare size={32} className="mx-auto text-gray-200 mb-2" />
-                      <p className="text-sm text-gray-400">Chưa có task nào trong dự án này</p>
-                    </div>
-                  ) : (
-                    tasks.map(t => {
-                      const statusCfg = TASK_STATUS_CFG[t.status as keyof typeof TASK_STATUS_CFG] ?? TASK_STATUS_CFG.todo
-                      const StatusIcon = statusCfg.icon
-                      const priorityCfg = PRIORITY_CFG[t.priority as keyof typeof PRIORITY_CFG] ?? PRIORITY_CFG.medium
-                      const assignee = empById(t.assigneeId)
-                      return (
-                        <div key={t.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:border-gray-200 transition-colors group">
-                          <button
-                            onClick={() => cycleTaskStatus(t)}
-                            title={`${statusCfg.label} — click để đổi`}
-                            className={`flex-shrink-0 transition-transform hover:scale-110 ${statusCfg.cls}`}>
-                            <StatusIcon size={18} />
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-xs font-bold truncate ${t.status === "done" ? "line-through text-gray-400" : "text-gray-700"}`}>{t.title}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              {assignee && (
-                                <span className="text-[11px] text-gray-400 flex items-center gap-1">
-                                  <AvatarCircle name={assignee.name} photo={assignee.photos?.[0]} size="sm" />
-                                  {assignee.name}
-                                </span>
-                              )}
-                              {t.dueDate && (
-                                <span className="text-[11px] text-gray-400">· {t.dueDate}</span>
-                              )}
+                  <ProjectTabSection title={`Thành viên (${detail.memberIds.length})`}>
+                    {detail.memberIds.length === 0 ? (
+                      <p className="text-sm text-gray-400">Chưa có thành viên trong dự án</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {detail.memberIds.map(mid => {
+                          const emp = empById(mid)
+                          return emp ? (
+                            <div key={mid} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
+                              <AvatarCircle name={emp.name} photo={emp.photos?.[0]} />
+                              <div>
+                                <p className="text-xs font-bold text-gray-700 leading-none">{emp.name}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">{emp.department}</p>
+                              </div>
                             </div>
-                          </div>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex-shrink-0 ${priorityCfg.cls}`}>
-                            {priorityCfg.label}
-                          </span>
-                          <button
-                            onClick={() => setTaskDeleteConfirm(t.id)}
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0">
-                            <Trash size={13} />
-                          </button>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
+                          ) : null
+                        })}
+                      </div>
+                    )}
+                  </ProjectTabSection>
+                </ProjectDetailTabShell>
               )}
 
-              {detailTab === "attachments" && (
-                <div className="p-6 space-y-3">
-                  {!showAttachForm ? (
-                    <button onClick={() => setShowAttachForm(true)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-[#C62828]/30 hover:text-[#C62828] transition-colors">
-                      <Plus size={15} /> Thêm tài liệu
-                    </button>
-                  ) : (
-                    <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50/50">
-                      <div className="flex gap-2">
-                        <button onClick={() => setAttachForm(f => ({ ...f, type: "file" }))}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${attachForm.type === "file" ? "bg-[#C62828] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
-                          <File size={12} /> File
-                        </button>
-                        <button onClick={() => setAttachForm(f => ({ ...f, type: "link" }))}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${attachForm.type === "link" ? "bg-[#C62828] text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
-                          <Link2 size={12} /> Link
-                        </button>
-                      </div>
-                      <input
-                        value={attachForm.name} onChange={e => setAttachForm(f => ({ ...f, name: e.target.value }))}
-                        placeholder="Tên tài liệu..."
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20"
-                      />
-                      {attachForm.type === "link" ? (
-                        <input
-                          value={attachForm.url} onChange={e => setAttachForm(f => ({ ...f, url: e.target.value }))}
-                          placeholder="https://..."
-                          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#C62828]/20"
-                        />
-                      ) : (
-                        <label className="flex items-center gap-2 w-full px-3 py-2 border border-dashed border-gray-300 rounded-lg text-sm text-gray-400 hover:border-[#C62828]/40 hover:text-[#C62828] cursor-pointer transition-colors">
-                          <File size={14} className="shrink-0" />
-                          <span className="truncate">{attachForm.url ? attachForm.url : "Chọn file từ máy..."}</span>
-                          <input
-                            type="file" className="hidden"
-                            onChange={e => {
-                              const file = e.target.files?.[0]
-                              if (!file) return
-                              setAttachForm(f => ({
-                                ...f,
-                                url: file.name,
-                                name: f.name || file.name,
-                              }))
-                            }}
-                          />
-                        </label>
-                      )}
-                      <div className="flex gap-2 justify-end">
-                        <button onClick={() => setShowAttachForm(false)}
-                          className="px-4 py-1.5 text-xs font-bold text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">Hủy</button>
-                        <button onClick={handleAddAttachment}
-                          className="px-4 py-1.5 text-xs font-bold bg-[#C62828] text-white rounded-lg hover:bg-[#B71C1C] transition-colors">Thêm</button>
-                      </div>
-                    </div>
-                  )}
+              {detailTab === "tasks" && detail && (
+                <ProjectTasksTab
+                  projectId={detail.id}
+                  tasks={tasks}
+                  loading={loadingTasks}
+                  projectMembers={projectMembers}
+                  onTasksChange={setTasks}
+                  onProjectRefresh={() => refreshProject(detail.id)}
+                />
+              )}
 
-                  {detail.attachments.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <Paperclip size={28} className="mx-auto text-gray-200 mb-2" />
-                      <p className="text-sm text-gray-400">Chưa có tài liệu đính kèm</p>
-                    </div>
-                  ) : (
-                    detail.attachments.map(a => (
-                      <div key={a.id} className="flex items-center gap-3 p-3 border border-gray-100 rounded-xl hover:border-gray-200 group transition-colors">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${a.type === "link" ? "bg-blue-50" : "bg-gray-100"}`}>
-                          {a.type === "link" ? <Link2 size={16} className="text-blue-500" /> : <FileText size={16} className="text-gray-500" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-gray-700 truncate">{a.name}</p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">{a.uploadedAt}{a.size ? ` · ${a.size}` : ""}</p>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {a.type === "link" && (
-                            <a href={a.url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                              className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors">
-                              <ExternalLink size={13} />
-                            </a>
-                          )}
-                          <button onClick={() => handleRemoveAttachment(a.id)}
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors">
-                            <Trash size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+              {detailTab === "requirements" && (
+                <ProjectRequirementsTab requirementForms={detail.requirementForms} requirementForm={detail.requirementForm} />
+              )}
+
+              {detailTab === "documents" && (
+                <ProjectDocVaultTab
+                  vaultItems={localVaultItems}
+                  legacyAttachments={detail.attachments}
+                  autoOpenCategory={autoAddVaultCategory}
+                  onAutoOpenTriggered={() => setAutoAddVaultCategory(null)}
+                  onAddItem={async (payload, file) => {
+                    const created = await api.projects.createVaultItem(detail.id, payload, file ?? undefined)
+                    setLocalVaultItems(prev => [...prev, { ...created, projectId: detail.id }])
+                  }}
+                  onEditItem={async (id, patch, file) => {
+                    const updated = await api.projects.updateVaultItem(detail.id, id, patch, file ?? undefined)
+                    setLocalVaultItems(prev => prev.map(x => x.id === id ? { ...updated, projectId: detail.id } : x))
+                  }}
+                  onDeleteItem={async (id) => {
+                    await api.projects.deleteVaultItem(detail.id, id)
+                    setLocalVaultItems(prev => prev.filter(x => x.id !== id))
+                  }}
+                  onAddAttachment={handleAddAttachment}
+                  onRemoveAttachment={handleRemoveAttachment}
+                  onDownload={handleDownloadVaultItem}
+                  onPreview={handlePreviewVaultItem}
+                />
+              )}
+
+              {detailTab === "testing" && detail && (
+                <ProjectTestingTab
+                  projectId={detail.id}
+                  sessions={localTestSessions}
+                  employees={employees}
+                  onAdd={(data) => setLocalTestSessions(prev => [...prev, {
+                    ...data,
+                    id: `TS-${Date.now()}`,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                  }])}
+                  onEdit={(id, patch) => setLocalTestSessions(prev => prev.map(s => s.id === id ? { ...s, ...patch, updatedAt: new Date().toISOString() } : s))}
+                  onDelete={(id) => setLocalTestSessions(prev => prev.filter(s => s.id !== id))}
+                />
               )}
             </div>
           </div>
         </div>
-      , document.body)}
+      )}
+
+      <Modal
+        open={showCloseChecklist}
+        onClose={() => setShowCloseChecklist(false)}
+        title="Đóng dự án: Kiểm tra hồ sơ tài liệu bắt buộc"
+        icon={BadgeCheck}
+        width="md"
+        footer={
+          <>
+            <ModalCancelButton onClick={() => setShowCloseChecklist(false)} />
+            <ModalSubmitButton
+              onClick={handleCloseProjectConfirm}
+              loading={closingProject}
+              disabled={!isChecklistValid}
+              label="Xác nhận đóng dự án"
+              loadingLabel="Đang xử lý..."
+            />
+          </>
+        }
+      >
+        <div className="space-y-4 p-6">
+          <p className="text-xs text-gray-500 leading-relaxed">
+            Dự án chỉ được đóng (hoàn thành) sau khi đã cập nhật đầy đủ 6 loại hồ sơ tài liệu nghiệp vụ bắt buộc dưới đây:
+          </p>
+
+          <div className="space-y-2.5">
+            {projectChecklist.map((item) => (
+              <div
+                key={item.category}
+                className={`flex items-center justify-between border rounded-2xl px-4 py-3 ${
+                  item.exists ? "border-emerald-100 bg-emerald-50/20" : "border-red-100 bg-red-50/10"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                      item.exists ? "bg-emerald-100/60 text-emerald-700" : "bg-red-100/60 text-[#C62828]"
+                    }`}
+                  >
+                    {item.exists ? <Check size={14} strokeWidth={3} /> : <AlertCircle size={14} />}
+                  </div>
+                  <span className={`text-xs font-bold ${item.exists ? "text-gray-700" : "text-gray-500"}`}>
+                    {item.label}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span
+                    className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                      item.exists ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-[#C62828]"
+                    }`}
+                  >
+                    {item.exists ? "Đã có" : "Thiếu"}
+                  </span>
+                  {!item.exists && (
+                    <button
+                      type="button"
+                      onClick={() => handleQuickAddVaultItem(item.category as ProjectVaultCategory)}
+                      className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 flex items-center justify-center transition-colors"
+                      title="Tải lên tài liệu này"
+                    >
+                      <Plus size={13} strokeWidth={3} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {!isChecklistValid && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-[11px] text-amber-700 flex items-start gap-2">
+              <AlertCircle size={14} className="shrink-0 mt-0.5" />
+              <span>
+                Lưu ý: Vui lòng tải các file còn thiếu lên mục Tài liệu & Vault của dự án trước khi thực hiện đóng dự án.
+              </span>
+            </div>
+          )}
+
+          {checklistError && (
+            <p className="text-xs text-red-600 font-semibold">{checklistError}</p>
+          )}
+        </div>
+      </Modal>
 
       <Modal
         open={showTeamForm}
@@ -1401,33 +1660,6 @@ export function ProjectManagement({
         </div>
       , document.body)}
 
-      {taskDeleteConfirm && createPortal(
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setTaskDeleteConfirm(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
-                <AlertCircle size={20} className="text-red-500" />
-              </div>
-              <div>
-                <h4 className="font-black text-gray-800 text-sm">Xóa công việc</h4>
-                <p className="text-xs text-gray-400 mt-0.5">Tiến độ dự án sẽ được cập nhật lại</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setTaskDeleteConfirm(null)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors">
-                Hủy
-              </button>
-              <button onClick={() => handleDeleteTask(taskDeleteConfirm)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-red-500 hover:bg-red-600 transition-colors">
-                Xóa
-              </button>
-            </div>
-          </div>
-        </div>
-      , document.body)}
-
       <ConfirmModal
         isOpen={deleteGroup !== null}
         onClose={() => setDeleteGroup(null)}
@@ -1440,6 +1672,29 @@ export function ProjectManagement({
         cancelText="Hủy"
         type="danger"
       />
+
+      <Modal
+        open={vaultPreview !== null}
+        onClose={() => setVaultPreview(null)}
+        title={vaultPreview?.title || "Xem trước tài liệu"}
+        icon={Eye}
+        width="5xl"
+        bodyClassName="p-4 flex flex-col h-[75vh]"
+        footer={
+          <button type="button" className={tabDashedAddBtn} onClick={() => setPreviewKey((k) => k + 1)}>
+            <RefreshCw size={13} className="mr-1 inline-block" /> Làm mới
+          </button>
+        }
+      >
+        {vaultPreview && (
+          <DocxFilePreview
+            downloadName={vaultPreview.downloadName}
+            refreshKey={previewKey}
+            loadBlob={vaultPreview.loadBlob}
+          />
+        )}
+      </Modal>
+
     </div>
   )
 }

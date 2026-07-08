@@ -1,11 +1,12 @@
 import "dotenv/config"
+import http from "http"
 import express from "express"
 import cors from "cors"
-import dns from "dns"
 import { PORT, CORS_ORIGINS } from "./config/index.js"
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js"
 import { connectDB, isConnected } from "./db/connect.js"
 import { loadCache } from "./db/index.js"
+import { initChatSocket } from "./socket/chat.socket.js"
 
 import authRoutes from "./routes/auth.routes.js"
 import employeeRoutes from "./routes/employee.routes.js"
@@ -25,11 +26,18 @@ import positionRoutes from "./routes/position.routes.js"
 import roleRoutes from "./routes/role.routes.js"
 import crmRoutes from "./routes/crm.routes.js"
 import allowedIPRoutes from "./routes/allowedIP.routes.js"
+import timeOffSlotRoutes from "./routes/timeOffSlot.routes.js"
+import profileUpdateRoutes from "./routes/profileUpdate.routes.js"
+import staffChatRoutes from "./routes/staffChat.routes.js"
+import quoteRoutes from "./routes/quote.routes.js"
+import contractRoutes from "./routes/contract.routes.js"
+import leadRoutes from "./routes/lead.routes.js"
+import customerRoutes from "./routes/customer.routes.js"
+import leadFormPublicRoutes from "./routes/leadForm.public.routes.js"
+import templateRoutes from "./routes/template.routes.js"
+import storageRoutes from "./routes/storage.routes.js"
 
 const app = express()
-
-// Force DNS Cloudflare
-dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 app.use(cors({ origin: CORS_ORIGINS }))
 app.use(express.json())
@@ -41,6 +49,7 @@ app.get("/api/health", (_, res) =>
       status: "ok",
       version: "2.0.0",
       db: isConnected() ? "mongodb" : "disconnected",
+      realtime: "socket.io",
     },
   })
 )
@@ -63,6 +72,16 @@ app.use("/api/positions", positionRoutes)
 app.use("/api/roles", roleRoutes)
 app.use("/api/crm", crmRoutes)
 app.use("/api/allowed-ips", allowedIPRoutes)
+app.use("/api/time-off-slots", timeOffSlotRoutes)
+app.use("/api/profile-updates", profileUpdateRoutes)
+app.use("/api/staff-chat", staffChatRoutes)
+app.use("/api/quotes", quoteRoutes)
+app.use("/api/contracts", contractRoutes)
+app.use("/api/leads", leadRoutes)
+app.use("/api/customers", customerRoutes)
+app.use("/api/public/lead-forms", leadFormPublicRoutes)
+app.use("/api/templates", templateRoutes)
+app.use("/api/storage", storageRoutes)
 
 app.use(notFoundHandler)
 app.use(errorHandler)
@@ -71,7 +90,14 @@ async function start() {
   try {
     await connectDB()
     await loadCache()
-    app.listen(PORT, () => console.log(`DuDi Backend v2.0 running on http://localhost:${PORT}`))
+
+    const httpServer = http.createServer(app)
+    initChatSocket(httpServer)
+
+    httpServer.listen(PORT, () => {
+      console.log(`DuDi Backend v2.0 running on http://localhost:${PORT}`)
+      console.log(`Realtime chat: ws://localhost:${PORT}/socket.io`)
+    })
   } catch (err) {
     console.error("Failed to start server:", err.message)
     process.exit(1)
