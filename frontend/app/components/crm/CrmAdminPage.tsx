@@ -68,6 +68,11 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   const [formErrors, setFormErrors] = useState<any>({})
   const [selectedEmpId, setSelectedEmpId] = useState("")
   const [autoAssignLoading, setAutoAssignLoading] = useState(false)
+  const [autoAssignOpen, setAutoAssignOpen] = useState(false)
+  const [autoAssignTab, setAutoAssignTab] = useState<"department" | "specific">("department")
+  const [autoAssignDept, setAutoAssignDept] = useState("")
+  const [autoAssignSpecificEmp, setAutoAssignSpecificEmp] = useState("")
+  const [autoAssignQuantity, setAutoAssignQuantity] = useState("")
   const [importLoading, setImportLoading] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [tempNote, setTempNote] = useState("")
@@ -157,6 +162,14 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
 
   const handleAssign = async () => {
     if (!selectedEmpId) return
+    if (selectedIds.length > 0) {
+      const selectedRecords = records.filter(r => selectedIds.includes(r.id))
+      const alreadyAssigned = selectedRecords.filter(r => r.assignedTo)
+      if (alreadyAssigned.length > 0) {
+        notify(`Có ${alreadyAssigned.length} khách đã có người phụ trách. Vui lòng huỷ tích!`, "error")
+        return
+      }
+    }
     try {
       if (selectedIds.length > 0) await api.crm.assignBulk(selectedIds, selectedEmpId)
       else if (current) await api.crm.assignOne(current.id, selectedEmpId)
@@ -170,16 +183,32 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
     catch { notify("Không thể xóa", "error") }
   }
 
-  const handleAutoAssign = async () => {
-    const active = employees.filter((e: any) => e.status === "active")
-    if (!active.length) { notify("Không có nhân viên active", "error"); return }
-    setAutoAssignLoading(true)
-    try {
-      const r = await api.crm.autoAssign(active.map((e: any) => e.id))
-      notify("Đã chia tự động " + (r?.assignedCount ?? 0) + " data!")
-      refresh()
-    } catch { notify("Lỗi chia tự động", "error") }
-    finally { setAutoAssignLoading(false) }
+  const submitAutoAssign = async () => {
+    if (autoAssignTab === "department") {
+      if (!autoAssignDept) { notify("Vui lòng chọn phòng ban", "error"); return }
+      const active = employees.filter((e: any) => e.status === "active" && e.department === autoAssignDept)
+      if (!active.length) { notify(`Không có nhân viên active ở phòng ban này`, "error"); return }
+      
+      setAutoAssignLoading(true)
+      try {
+        const r = await api.crm.autoAssign(active.map((e: any) => e.id))
+        notify("Đã chia tự động " + (r?.assignedCount ?? 0) + " data cho phòng ban!")
+        setAutoAssignOpen(false); refresh()
+      } catch { notify("Lỗi chia tự động", "error") }
+      finally { setAutoAssignLoading(false) }
+    } else {
+      if (!autoAssignSpecificEmp) { notify("Vui lòng chọn nhân viên", "error"); return }
+      const q = parseInt(autoAssignQuantity, 10)
+      if (isNaN(q) || q <= 0) { notify("Vui lòng nhập số lượng hợp lệ", "error"); return }
+      
+      setAutoAssignLoading(true)
+      try {
+        const r = await api.crm.assignSpecific(autoAssignSpecificEmp, q)
+        notify("Đã giao " + (r?.assignedCount ?? 0) + " data cho nhân viên!")
+        setAutoAssignOpen(false); refresh()
+      } catch { notify("Lỗi giao data số lượng", "error") }
+      finally { setAutoAssignLoading(false) }
+    }
   }
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -236,6 +265,7 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   const toggleOne = (id: string) => setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
 
   const empOptions = employees.map((e: any) => ({ value: e.id, label: e.name }))
+  const deptOptions = Array.from(new Set(employees.map((e: any) => e.department).filter(Boolean))).map(d => ({ value: d as string, label: d as string }))
   const inlineEmpOptions = [{ value: "", label: "Bỏ giao (để trống)" }, ...empOptions]
   const assignedFilterOptions = [
     { value: "", label: "Tất cả nhân viên" },
@@ -415,7 +445,7 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
                 </div>
               )}
               <button
-                onClick={handleAutoAssign}
+                onClick={() => setAutoAssignOpen(true)}
                 disabled={autoAssignLoading}
                 className="flex items-center px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-bold transition disabled:opacity-60"
               >
@@ -721,6 +751,83 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
             placeholder="Tìm và chọn nhân viên..."
             showSearchIcon
           />
+        </div>
+      </Modal>
+
+      <Modal
+        open={autoAssignOpen}
+        onClose={() => setAutoAssignOpen(false)}
+        title="Chia Data Tự Động"
+        icon={UserPlus}
+        width="md"
+        footer={
+          <div className="flex gap-3">
+            <ModalCancelButton onClick={() => setAutoAssignOpen(false)} />
+            <ModalSubmitButton onClick={submitAutoAssign} label="Xác nhận chia" disabled={autoAssignLoading} />
+          </div>
+        }
+      >
+        <div className="p-6 space-y-5">
+          <div className="flex bg-gray-100 p-1 rounded-xl gap-1">
+            <button
+              onClick={() => setAutoAssignTab("department")}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${autoAssignTab === "department" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:bg-gray-200"}`}
+            >
+              Theo phòng ban
+            </button>
+            <button
+              onClick={() => setAutoAssignTab("specific")}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${autoAssignTab === "specific" ? "bg-white text-purple-600 shadow-sm" : "text-gray-500 hover:bg-gray-200"}`}
+            >
+              Theo nhân viên
+            </button>
+          </div>
+
+          {autoAssignTab === "department" && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="p-3 bg-blue-50 text-blue-800 rounded-xl text-xs font-medium border border-blue-100">
+                Data sẽ được ưu tiên chia đều cho các nhân sự thuộc phòng ban được chọn (ưu tiên người đang có ít data hơn).
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Chọn phòng ban</label>
+                <CustomCombobox
+                  value={autoAssignDept}
+                  onChange={setAutoAssignDept}
+                  options={deptOptions}
+                  placeholder="Chọn một phòng ban..."
+                  showSearchIcon
+                />
+              </div>
+            </div>
+          )}
+
+          {autoAssignTab === "specific" && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <div className="p-3 bg-purple-50 text-purple-800 rounded-xl text-xs font-medium border border-purple-100">
+                Bốc đích danh số lượng khách trống để giao cho một nhân viên cụ thể.
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Chọn nhân viên</label>
+                <CustomCombobox
+                  value={autoAssignSpecificEmp}
+                  onChange={setAutoAssignSpecificEmp}
+                  options={empOptions}
+                  placeholder="Chọn một nhân viên..."
+                  showSearchIcon
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Số lượng Data muốn giao</label>
+                <input
+                  type="number"
+                  value={autoAssignQuantity}
+                  onChange={e => setAutoAssignQuantity(e.target.value)}
+                  placeholder="Ví dụ: 10"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+                />
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
 

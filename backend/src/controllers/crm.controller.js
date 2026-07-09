@@ -157,6 +157,17 @@ export function autoAssign(req, res) {
   } catch (err) { res.status(400).json({ success: false, error: err.message }) }
 }
 
+export function assignSpecific(req, res) {
+  try {
+    const { employeeId, quantity } = req.body
+    if (!employeeId || !quantity || quantity <= 0) {
+      return res.status(400).json({ success: false, error: "Vui lòng chọn nhân viên và số lượng hợp lệ" })
+    }
+    const result = svc.assignSpecific(employeeId, parseInt(quantity, 10))
+    res.json({ success: true, data: result })
+  } catch (err) { res.status(400).json({ success: false, error: err.message }) }
+}
+
 export function adminDashboard(req, res) {
   try {
     res.json({ success: true, data: svc.getAdminDashboard() })

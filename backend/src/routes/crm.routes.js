@@ -16,6 +16,7 @@ router.delete("/data/:id",       requireCrmAdmin, ctrl.deleteData)
 router.post("/data/delete-bulk", requireCrmAdmin, ctrl.deleteBulkData)
 router.post("/data/import-csv",  requireCrmAdmin, upload.single("file"), ctrl.importCsv)
 router.post("/data/auto-assign", requireCrmAdmin, ctrl.autoAssign)
+router.post("/data/assign-specific", requireCrmAdmin, ctrl.assignSpecific)
 router.post("/data/:id/convert-to-lead", requireEmployeeCrm, ctrl.convertToLead)
 router.get("/data/:id/leads", requireEmployeeCrm, ctrl.listCrmLeads)
 

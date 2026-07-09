@@ -396,6 +396,7 @@ export const api = {
       }).then(r => r.json()).then(j => j.data)
     },
     autoAssign: (employeeIds: string[]) => req<any>("POST", "/crm/data/auto-assign", { employeeIds }),
+    assignSpecific: (employeeId: string, quantity: number) => req<any>("POST", "/crm/data/assign-specific", { employeeId, quantity }),
     assignOne: (dataId: string, employeeId: string) => req<any>("POST", "/crm/assignments/assign", { dataId, employeeId }),
     assignBulk: (dataIds: string[], employeeId: string) => req<any>("POST", "/crm/assignments/assign-bulk", { dataIds, employeeId }),
     adminDashboard: () => req<any>("GET", "/crm/dashboard/admin"),

@@ -172,19 +172,48 @@ export function autoAssign(employeeIds) {
   const unassigned = repo.getAll().filter(r => !r.assignedTo)
   if (unassigned.length === 0) return { totalUnassigned: 0, assignedCount: 0, result: [] }
 
-  const countsMap = {}
-  resolved.forEach(e => { countsMap[e.id] = 0 })
+  const currentAssigned = repo.getAll().filter(r => r.assignedTo);
+  const employeeStats = resolved.map(e => ({
+    id: e.id,
+    name: e.name,
+    count: currentAssigned.filter(r => r.assignedTo === e.id).length,
+    newAssigned: 0
+  }));
 
-  unassigned.forEach((record, i) => {
-    const emp = resolved[i % resolved.length]
-    repo.update(record.id, { assignedTo: emp.id, assignedToName: emp.name, updatedAt: now() })
-    countsMap[emp.id]++
+  unassigned.forEach((record) => {
+    employeeStats.sort((a, b) => a.count - b.count);
+    const target = employeeStats[0];
+
+    repo.update(record.id, { assignedTo: target.id, assignedToName: target.name, updatedAt: now() })
+    target.count++;
+    target.newAssigned++;
   })
 
   return {
     totalUnassigned: unassigned.length,
     assignedCount: unassigned.length,
-    result: resolved.map(e => ({ employeeId: e.id, employeeName: e.name, assignedCount: countsMap[e.id] }))
+    result: employeeStats.map(e => ({ employeeId: e.id, employeeName: e.name, assignedCount: e.newAssigned }))
+  }
+}
+
+export function assignSpecific(employeeId, quantity) {
+  const emp = getEmployee(employeeId)
+  if (!emp) throw new Error(`Không tìm thấy nhân viên: ${employeeId}`)
+  if (emp.status !== "active") throw new Error(`Nhân viên ${emp.name} không còn hoạt động.`)
+
+  let unassigned = repo.getAll().filter(r => !r.assignedTo)
+  if (quantity > 0) {
+    unassigned = unassigned.slice(0, quantity)
+  }
+
+  unassigned.forEach(record => {
+    repo.update(record.id, { assignedTo: emp.id, assignedToName: emp.name, updatedAt: now() })
+  })
+
+  return {
+    assignedCount: unassigned.length,
+    employeeId: emp.id,
+    employeeName: emp.name
   }
 }
 
