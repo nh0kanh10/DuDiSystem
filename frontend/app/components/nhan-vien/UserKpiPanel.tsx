@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   CalendarDays, BarChart3, Plus, FileText, ChevronLeft, ChevronRight, Eye, RefreshCw, X, Check, ClipboardList, HelpCircle,
@@ -26,6 +26,88 @@ const RenderCircleDot = (props: any) => {
       stroke={stroke}
       strokeWidth={1.5}
     />
+  );
+};
+
+const getVietnameseMonthName = (monthStr: string) => {
+  if (!monthStr) return "";
+  const [year, month] = monthStr.split("-");
+  const monthMap: { [key: string]: string } = {
+    "01": "Tháng Giêng", "02": "Tháng Hai", "03": "Tháng Ba", "04": "Tháng Tư",
+    "05": "Tháng Năm", "06": "Tháng Sáu", "07": "Tháng Bảy", "08": "Tháng Tám",
+    "09": "Tháng Chín", "10": "Tháng Mười", "11": "Tháng Mười Một", "12": "Tháng Mười Hai"
+  };
+  return `${monthMap[month] || `Tháng ${month}`} ${year}`;
+};
+
+const MONTH_LABELS_USER = ["Thg1","Thg2","Thg3","Thg4","Thg5","Thg6","Thg7","Thg8","Thg9","Thg10","Thg11","Thg12"];
+
+const UserCustomMonthPicker = ({ value, onChange }: { value: string; onChange: (val: string) => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const currentYear = value ? parseInt(value.split("-")[0]) : new Date().getFullYear();
+  const currentMonthIdx = value ? parseInt(value.split("-")[1]) - 1 : new Date().getMonth();
+  const [viewYear, setViewYear] = useState(currentYear);
+  const todayYear = new Date().getFullYear();
+  const todayMonth = new Date().getMonth();
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelectMonth = (monthIdx: number) => {
+    onChange(`${viewYear}-${String(monthIdx + 1).padStart(2, "0")}`);
+    setIsOpen(false);
+  };
+
+  const handleThisMonth = () => {
+    const now = new Date();
+    onChange(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button type="button" onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1.5 text-xs font-black text-gray-800 cursor-pointer hover:text-[#C62828] transition-colors">
+        {getVietnameseMonthName(value)}
+        <Calendar size={12} className="text-gray-400" />
+      </button>
+      {isOpen && (
+        <div className="absolute top-[calc(100%+8px)] right-0 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 p-4 w-56">
+          <div className="flex items-center justify-between mb-3">
+            <button type="button" onClick={() => setViewYear(y => y - 1)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+              <ChevronRight size={14} className="text-gray-500 rotate-180" />
+            </button>
+            <span className="text-xs font-black text-gray-700">{viewYear}</span>
+            <button type="button" onClick={() => setViewYear(y => y + 1)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+              <ChevronRight size={14} className="text-gray-500" />
+            </button>
+          </div>
+          <div className="grid grid-cols-4 gap-1 mb-3">
+            {MONTH_LABELS_USER.map((label, idx) => {
+              const isSelected = viewYear === currentYear && idx === currentMonthIdx;
+              const isToday = viewYear === todayYear && idx === todayMonth;
+              return (
+                <button key={idx} type="button" onClick={() => handleSelectMonth(idx)}
+                  className={`py-1.5 text-[11px] font-bold rounded-xl transition-all cursor-pointer
+                    ${isSelected ? "bg-[#C62828] text-white shadow-md" : isToday ? "bg-red-100 text-[#C62828]" : "text-gray-600 hover:bg-red-50 hover:text-[#C62828]"}`}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+            <button type="button" onClick={() => { onChange(""); setIsOpen(false); }} className="text-[11px] font-bold text-gray-400 hover:text-gray-600 cursor-pointer">Xóa</button>
+            <button type="button" onClick={handleThisMonth} className="text-[11px] font-bold text-[#C62828] hover:opacity-75 cursor-pointer">Tháng này</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -429,18 +511,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
               <div className="flex-1 sm:flex-none justify-center flex items-center gap-2 text-xs font-bold text-gray-500 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-xs">
                 <span>CHỌN THÁNG:</span>
-                <div className="relative">
-                  <span className="text-gray-800 cursor-pointer flex items-center gap-1 font-extrabold">
-                    {getVietnameseMonthName(selectedMonth)}
-                    <Calendar size={14} className="text-gray-500 ml-1 inline-block" />
-                  </span>
-                  <input
-                    type="month"
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                </div>
+                <UserCustomMonthPicker value={selectedMonth} onChange={setSelectedMonth} />
               </div>
             </div>
           </div>

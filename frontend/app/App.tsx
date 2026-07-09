@@ -133,7 +133,7 @@ function AppContent() {
         "dashboard", "nhan-su", "cham-cong", "thong-ke",
         "duyet-don", "thong-bao", "cong-viec", "du-an", "lead",
         "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
-        "crm", "staff-portal", "kpi",
+        "crm", "staff-portal", "kpi", "kpi-stats", "kpi-compare",
         "user-profile", "user-attendance", "user-timeoff", "user-directory",
         "user-chat", "user-workflow", "user-settings", "user-crm"
       ]
@@ -574,12 +574,18 @@ function AppContent() {
       case "crm": return (
         <CrmAdminPage onOpenLead={(id) => navigate(`/lead/${id}`)} />
       )
-      case "kpi": return (
-        <KpiManagementAdmin
-          employees={employees}
-          selectedBranch={selectedBranch}
-        />
-      )
+      case "kpi":
+      case "kpi-stats":
+      case "kpi-compare": {
+        const view = activePage === "kpi" ? "overview" : (activePage === "kpi-stats" ? "stats" : "compare");
+        return (
+          <KpiManagementAdmin
+            employees={employees}
+            selectedBranch={selectedBranch}
+            activeTab={view}
+          />
+        );
+      }
       case "staff-portal": return (
         <div className="w-full h-[calc(100vh-2.5rem)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
           <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} embed={true} />
@@ -744,7 +750,13 @@ function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate
     if (!collapsed || !open || !btnRef.current) return
     const update = () => {
       const rect = btnRef.current!.getBoundingClientRect()
-      setFlyoutPos({ top: rect.top, left: rect.right + 8 })
+      const itemCount = React.Children.count(children)
+      const flyoutHeight = 36 + (itemCount * 36) + 16
+      let top = rect.top
+      if (top + flyoutHeight > window.innerHeight) {
+        top = Math.max(8, window.innerHeight - flyoutHeight - 8)
+      }
+      setFlyoutPos({ top, left: rect.right + 8 })
     }
     update()
     window.addEventListener("scroll", update, true)
@@ -753,7 +765,7 @@ function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate
       window.removeEventListener("scroll", update, true)
       window.removeEventListener("resize", update)
     }
-  }, [collapsed, open])
+  }, [collapsed, open, children])
 
   const handleClick = () => {
     if (collapsed) {
@@ -787,7 +799,7 @@ function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate
         <>
           <div className="fixed inset-0 z-[90]" onClick={() => onToggle(gKey)} />
           <div
-            className="fixed w-56 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl py-1.5 z-[100] flex flex-col"
+            className="fixed w-56 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl py-1.5 z-[100] flex flex-col max-h-[90vh] overflow-y-auto"
             style={{ top: flyoutPos.top, left: flyoutPos.left }}
           >
             <div className="px-4 py-2 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">
@@ -1169,7 +1181,20 @@ function UserAwareSidebar({
         {hasAccess("lead") && <NavItem page="lead" icon={User} label="Cơ hội" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("kpi") && <NavItem page="kpi" icon={TrendingUp} label="Quản lý KPI" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("kpi") && (
+          <GroupNav
+            gKey="kpi"
+            icon={TrendingUp}
+            label="Quản lý KPI"
+            pages={["kpi", "kpi-stats", "kpi-compare"]}
+            active={active} onNavigate={onNavigate} collapsed={collapsed}
+            expanded={expanded} onToggle={toggle} onFlyoutOpen={closeOverlays}
+          >
+            <SubItem page="kpi" label="Tổng quan" active={active} onNavigate={onNavigate} />
+            <SubItem page="kpi-stats" label="Thống kê KPI" active={active} onNavigate={onNavigate} />
+            <SubItem page="kpi-compare" label="So sánh" active={active} onNavigate={onNavigate} />
+          </GroupNav>
+        )}
       </nav>
 
       <div className="p-2 border-t border-white/5">
