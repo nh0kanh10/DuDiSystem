@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react"
-import { 
-  Users, Clock, AlertCircle, TrendingUp, Award, Calendar, 
+import {
+  Users, Clock, AlertCircle, TrendingUp, Award, Calendar,
   ChevronRight, ArrowRight, UserCheck, UserX, FileText, Bell
 } from "lucide-react"
 import {
@@ -14,9 +14,9 @@ import { StatCard } from "../ui/StatCard"
 import { CalendarWidget } from "../ui/CalendarWidget"
 import { DigitalClock } from "../ui/DigitalClock"
 import { calcHours } from "../../utils"
-import { 
-  WEEKLY_STATS, MONTHLY_STATS, PIE_DATA, VIOLATIONS, 
-  NOTIFICATIONS, ATTENDANCE, INIT_TASKS 
+import {
+  WEEKLY_STATS, MONTHLY_STATS, PIE_DATA, VIOLATIONS,
+  NOTIFICATIONS, ATTENDANCE, INIT_TASKS
 } from "../../constants"
 
 export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }) {
@@ -32,12 +32,10 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
   return (
     <div className="space-y-6 select-none">
       {/* Top Banner widgets */}
-      <div className="bg-gradient-to-br from-[#160606] to-[#360D0D] rounded-3xl p-6 text-white relative overflow-hidden shadow-lg shadow-red-950/20">
-        <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
+      <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:10px_10px] rounded-3xl p-6 text-white relative overflow-hidden shadow-md shadow-red-900/20">
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
-            <span className="bg-[#FF6D00]/20 text-[#FF8A00] text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">Hôm nay</span>
-            <h2 className="text-2xl font-black mt-3 tracking-tight">Chào buổi sáng, Quản trị viên!</h2>
+            <h2 className="text-2xl font-black tracking-tight">Xin chào, Quản trị viên!</h2>
             <p className="text-xs text-white/50 mt-1 max-w-md leading-relaxed">
               Hệ thống ghi nhận mọi hoạt động chấm công ổn định. Hiện có {summary.present}/{summary.total} nhân sự đang làm việc trực tiếp tại văn phòng.
             </p>
@@ -56,7 +54,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
 
       {/* Main Charts & Side Widgets */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
+
         {/* Left Column: Chart */}
         <div className="lg:col-span-8 bg-white rounded-3xl p-6 border border-black/5 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -94,7 +92,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
 
       {/* Bottom Lists */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
+
         {/* Recent Violations */}
         <div className="lg:col-span-4 bg-white rounded-3xl p-6 border border-black/5 shadow-xs">
           <h3 className="font-bold text-gray-800 text-sm mb-4">Nhân viên đi muộn nhiều</h3>
@@ -102,7 +100,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
             {VIOLATIONS.map((v, i) => (
               <div key={v.name} className="flex items-center justify-between pb-3 border-b border-gray-50 last:border-0 last:pb-0">
                 <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 bg-red-50 text-red-600 rounded-lg flex items-center justify-center text-xs font-bold">{i+1}</div>
+                  <div className="w-7 h-7 bg-red-50 text-red-600 rounded-lg flex items-center justify-center text-xs font-bold">{i + 1}</div>
                   <span className="text-xs font-semibold text-gray-700">{v.name}</span>
                 </div>
                 <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{v.count} lần</span>
