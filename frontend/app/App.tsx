@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Routes, Route } from "react-router-dom"
 import {
   LayoutDashboard, Users, Clock, BarChart3, Bell,
   Wrench, LogOut, ChevronDown, ChevronRight,
-  Shield, Wifi, CheckSquare, FileText, Calendar, User, Fingerprint, Settings, MessageCircle, Layers, Menu, Check, Building2, X
+  Shield, Wifi, CheckSquare, FileText, Calendar, User, Fingerprint, Settings, MessageCircle, Layers, Menu, Check, Building2, X, TrendingUp
 } from "lucide-react"
 
 import UserPortalApp from "./components/nhan-vien/UserApp"
@@ -40,6 +40,7 @@ import { UserDirectory } from "./components/nhan-vien/UserDirectory"
 import { UserChat } from "./components/nhan-vien/UserChat"
 import { UserWorkflow } from "./components/nhan-vien/UserWorkflow"
 import UserSettings from "./components/nhan-vien/UserSettings"
+import { KpiManagementAdmin } from "./components/kpi/KpiManagementAdmin";
 
 import { Role, Page, Employee, OrgNode, Assignment, RoleDefinition } from "./types"
 import { INIT_EMPLOYEES, INIT_ORG_NODES, NOTIFICATIONS, INIT_ASSIGNMENTS } from "./constants"
@@ -132,7 +133,7 @@ function AppContent() {
         "dashboard", "nhan-su", "cham-cong", "thong-ke",
         "duyet-don", "thong-bao", "cong-viec", "du-an", "lead",
         "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
-        "crm", "staff-portal",
+        "crm", "staff-portal", "kpi",
         "user-profile", "user-attendance", "user-timeoff", "user-directory",
         "user-chat", "user-workflow", "user-settings", "user-crm"
       ]
@@ -163,10 +164,16 @@ function AppContent() {
   }, [activePage])
 
   const activeRolePermissions = useMemo(() => {
-    if (effectivePermissions.length > 0) return effectivePermissions
-    const currentRole = rolesList.find(r => r.id === role)
-    if (currentRole?.modules?.length) return [...currentRole.modules]
-    return []
+    let list: string[] = []
+    if (effectivePermissions.length > 0) list = [...effectivePermissions]
+    else {
+      const currentRole = rolesList.find(r => r.id === role)
+      if (currentRole?.modules?.length) list = [...currentRole.modules]
+    }
+    if (list.length > 0 && !list.includes("kpi")) {
+      list.push("kpi")
+    }
+    return list as Page[]
   }, [effectivePermissions, rolesList, role])
 
   const roleName = useMemo(() => {
@@ -566,6 +573,12 @@ function AppContent() {
       case "tien-ich": return <SystemConfigPage />
       case "crm": return (
         <CrmAdminPage onOpenLead={(id) => navigate(`/lead/${id}`)} />
+      )
+      case "kpi": return (
+        <KpiManagementAdmin
+          employees={employees}
+          selectedBranch={selectedBranch}
+        />
       )
       case "staff-portal": return (
         <div className="w-full h-[calc(100vh-2.5rem)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
@@ -1156,6 +1169,7 @@ function UserAwareSidebar({
         {hasAccess("lead") && <NavItem page="lead" icon={User} label="Cơ hội" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("kpi") && <NavItem page="kpi" icon={TrendingUp} label="Quản lý KPI" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
 
       <div className="p-2 border-t border-white/5">

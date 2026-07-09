@@ -51,6 +51,7 @@ import { CrmStaffPage } from "../crm/CrmStaffPage";
 import { Modal, ModalCancelButton } from "../ui/Modal";
 import { EmployeeModal } from "../nhan-su/EmployeeManagement";
 import { removeVietnameseTones } from "../../utils";
+import { UserKpiPanel } from "./UserKpiPanel";
 const BRAND = "#E8231A"; 
 const CRIMSON = "#C01525"; 
 const GOLD = "#FF8800"; 
@@ -1271,7 +1272,7 @@ function EmployeeContent({ employee }: { employee: Employee }) {
           marginTop: 4,
         }}
       >
-        {["Thông tin chung", "Công việc", "Liên hệ"].map((t, i) => (
+        {["Thông tin chung", "Công việc", "Liên hệ", "Quản lý KPI"].map((t, i) => (
           <button
             key={t}
             onClick={() => setActiveTab(i)}
@@ -1362,59 +1363,64 @@ function EmployeeContent({ employee }: { employee: Employee }) {
           </div>
         </div>
       )}
-      <div
-        style={{
-          padding: "16px 18px",
-          background: "#FFFFFF",
-          border: "1px solid #efd7da",
-          borderRadius: 16,
-        }}
-      >
-        <SectionLabel>Quá trình công tác</SectionLabel>
-        {history.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#7f5f63" }}>Chưa có dữ liệu</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {history.map((entry: WorkHistoryEntry, idx: number) => (
-              <div
-                key={entry.id}
-                style={{ display: "flex", alignItems: "flex-start", gap: 10 }}
-              >
+      {activeTab === 3 && (
+        <UserKpiPanel employee={employee} />
+      )}
+      {activeTab !== 3 && (
+        <div
+          style={{
+            padding: "16px 18px",
+            background: "#FFFFFF",
+            border: "1px solid #efd7da",
+            borderRadius: 16,
+          }}
+        >
+          <SectionLabel>Quá trình công tác</SectionLabel>
+          {history.length === 0 ? (
+            <p style={{ fontSize: 13, color: "#7f5f63" }}>Chưa có dữ liệu</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {history.map((entry: WorkHistoryEntry, idx: number) => (
                 <div
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: idx === 0 ? BRAND : "rgba(255,255,255,0.2)",
-                    marginTop: 5,
-                    boxShadow: idx === 0 ? `0 0 8px ${BRAND}` : "none",
-                  }}
-                />
-                <div>
-                  <p
+                  key={entry.id}
+                  style={{ display: "flex", alignItems: "flex-start", gap: 10 }}
+                >
+                  <div
                     style={{
-                      fontSize: 14,
-                      fontWeight: idx === 0 ? 800 : 700,
-                      color: idx === 0 ? "#241416" : "#5f4246",
+                      width: 8,
+                      height: 8,
+                      borderRadius: "50%",
+                      background: idx === 0 ? BRAND : "rgba(255,255,255,0.2)",
+                      marginTop: 5,
+                      boxShadow: idx === 0 ? `0 0 8px ${BRAND}` : "none",
                     }}
-                  >
-                    {entry.title}
-                  </p>
-                  <p style={{ fontSize: 12, color: "#7f5f63", marginTop: 2 }}>
-                    {[
-                      entry.snapshot,
-                      entry.date,
-                      entry.toDate ? `– ${entry.toDate}` : "– Hiện tại",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
+                  />
+                  <div>
+                    <p
+                      style={{
+                        fontSize: 14,
+                        fontWeight: idx === 0 ? 800 : 700,
+                        color: idx === 0 ? "#241416" : "#5f4246",
+                      }}
+                    >
+                      {entry.title}
+                    </p>
+                    <p style={{ fontSize: 12, color: "#7f5f63", marginTop: 2 }}>
+                      {[
+                        entry.snapshot,
+                        entry.date,
+                        entry.toDate ? `– ${entry.toDate}` : "– Hiện tại",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2837,6 +2843,10 @@ export default function UserPortalApp({
     >
       <style>{`
         ${floatKeyframes}
+        html, body, #root, .user-portal-shell, .portal-panel-root, .portal-panel-content {
+          max-width: 100vw !important;
+          overflow-x: hidden !important;
+        }
         .user-portal-shell {
           font-synthesis-weight: none;
           text-rendering: geometricPrecision;

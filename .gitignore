@@ -142,3 +142,5 @@ scratch/
 _template_unzip/
 *.docx
 
+# Vite configuration temporary compilation timestamps
+vite.config.ts.timestamp-*
