@@ -980,8 +980,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Inbox Zalo</label>
                     <input
                       type="number"
+                      min={0}
+                      max={100}
                       value={formMetrics.zalo}
-                      onChange={(e) => setFormMetrics(prev => ({ ...prev, zalo: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                        setFormMetrics(prev => ({ ...prev, zalo: val }));
+                      }}
                       className={`w-full py-2.5 px-4 border ${formMetrics.zalo >= getDailyTarget("zalo") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
                       required
                     />
@@ -999,8 +1004,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Inbox Facebook</label>
                     <input
                       type="number"
+                      min={0}
+                      max={100}
                       value={formMetrics.fb}
-                      onChange={(e) => setFormMetrics(prev => ({ ...prev, fb: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                        setFormMetrics(prev => ({ ...prev, fb: val }));
+                      }}
                       className={`w-full py-2.5 px-4 border ${formMetrics.fb >= getDailyTarget("fb") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
                       required
                     />
@@ -1018,8 +1028,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Comment</label>
                     <input
                       type="number"
+                      min={0}
+                      max={100}
                       value={formMetrics.comment}
-                      onChange={(e) => setFormMetrics(prev => ({ ...prev, comment: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                        setFormMetrics(prev => ({ ...prev, comment: val }));
+                      }}
                       className={`w-full py-2.5 px-4 border ${formMetrics.comment >= getDailyTarget("comment") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
                       required
                     />
@@ -1037,8 +1052,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Bài đăng</label>
                     <input
                       type="number"
+                      min={0}
+                      max={100}
                       value={formMetrics.post}
-                      onChange={(e) => setFormMetrics(prev => ({ ...prev, post: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                        setFormMetrics(prev => ({ ...prev, post: val }));
+                      }}
                       className={`w-full py-2.5 px-4 border ${formMetrics.post >= getDailyTarget("post") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
                       required
                     />
@@ -1062,8 +1082,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Khách rep</label>
                     <input
                       type="number"
+                      min={0}
+                      max={100}
                       value={formMetrics.clientReply}
-                      onChange={(e) => setFormMetrics(prev => ({ ...prev, clientReply: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                        setFormMetrics(prev => ({ ...prev, clientReply: val }));
+                      }}
                       className={`w-full py-2.5 px-4 border ${formMetrics.clientReply >= getDailyTarget("clientReply") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
                       required
                     />
@@ -1081,8 +1106,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Khách chủ động IB</label>
                     <input
                       type="number"
+                      min={0}
+                      max={100}
                       value={formMetrics.khachChuDongIB}
-                      onChange={(e) => setFormMetrics(prev => ({ ...prev, khachChuDongIB: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                        setFormMetrics(prev => ({ ...prev, khachChuDongIB: val }));
+                      }}
                       className={`w-full py-2.5 px-4 border ${formMetrics.khachChuDongIB >= getDailyTarget("khachChuDongIB") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
                       required
                     />
@@ -1100,8 +1130,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Follow-up</label>
                     <input
                       type="number"
+                      min={0}
+                      max={100}
                       value={formMetrics.followUp}
-                      onChange={(e) => setFormMetrics(prev => ({ ...prev, followUp: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                        setFormMetrics(prev => ({ ...prev, followUp: val }));
+                      }}
                       className={`w-full py-2.5 px-4 border ${formMetrics.followUp >= getDailyTarget("followUp") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
                       required
                     />
@@ -1279,8 +1314,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Báo giá gửi</label>
                     <input
                       type="number"
+                      min={0}
+                      max={100}
                       value={formMetrics.quote}
-                      onChange={(e) => setFormMetrics(prev => ({ ...prev, quote: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                        setFormMetrics(prev => ({ ...prev, quote: val }));
+                      }}
                       className={`w-full py-2.5 px-4 border ${formMetrics.quote >= getDailyTarget("quote") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
                       required
                     />
@@ -1298,8 +1338,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Chốt Deal</label>
                     <input
                       type="number"
+                      min={0}
+                      max={100}
                       value={formMetrics.deal}
-                      onChange={(e) => setFormMetrics(prev => ({ ...prev, deal: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => {
+                        const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                        setFormMetrics(prev => ({ ...prev, deal: val }));
+                      }}
                       className={`w-full py-2.5 px-4 border ${formMetrics.deal >= getDailyTarget("deal") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
                       required
                     />
