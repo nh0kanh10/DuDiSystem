@@ -51,13 +51,12 @@ import { CrmStaffPage } from "../crm/CrmStaffPage";
 import { Modal, ModalCancelButton } from "../ui/Modal";
 import { EmployeeModal } from "../nhan-su/EmployeeManagement";
 import { removeVietnameseTones } from "../../utils";
-import { UserKpiPanel } from "./UserKpiPanel";
-const BRAND = "#E8231A"; 
-const CRIMSON = "#C01525"; 
-const GOLD = "#FF8800"; 
-const BG = "#2a0a0f"; 
-const GR = "rgba(232,35,26,0.28)"; 
-const GG = "rgba(255,136,0,0.14)"; 
+const BRAND = "#E8231A";
+const CRIMSON = "#C01525";
+const GOLD = "#FF8800";
+const BG = "#2a0a0f";
+const GR = "rgba(232,35,26,0.28)";
+const GG = "rgba(255,136,0,0.14)";
 const INPUT_S: React.CSSProperties = {
   background: "#FFFFFF",
   border: "1px solid rgba(36,20,22,0.12)",
@@ -131,254 +130,254 @@ const BUBBLES: {
   delay: number;
   isCenter?: boolean;
 }[] = [
-  {
-    id: "checkin",
-    label: "Check-in",
-    sub: "Chấm công",
-    emoji: "⚡",
-    lx: "50%",
-    ty: "48%",
-    size: 200,
-    dur: 8.8,
-    delay: 0,
-    isCenter: true,
-  },
-  {
-    id: "employee",
-    label: "Hồ sơ",
-    sub: "Cá nhân",
-    emoji: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        width="36"
-        height="36"
-        color="#FF8800"
-        style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
-      >
-        <path
-          fillRule="evenodd"
-          d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z"
-          clipRule="evenodd"
-        />
-      </svg>
-    ),
-    lx: "22%",
-    ty: "28%",
-    size: 140,
-    dur: 9.3,
-    delay: 0.6,
-  },
-  {
-    id: "leave",
-    label: "Xin nghỉ",
-    sub: "Tạo đơn · Lịch sử",
-    emoji: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        width="36"
-        height="36"
-        color="#FF8800"
-        style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
-      >
-        <path
-          fillRule="evenodd"
-          d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z"
-          clipRule="evenodd"
-        />
-      </svg>
-    ),
-    lx: "78%",
-    ty: "28%",
-    size: 140,
-    dur: 8.9,
-    delay: 1.1,
-  },
-  {
-    id: "directory",
-    label: "Danh bạ",
-    sub: "Nội bộ",
-    emoji: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        width="36"
-        height="36"
-        color="#FF8800"
-        style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
-      >
-        <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157v.003Z" />
-      </svg>
-    ),
-    lx: "88%",
-    ty: "55%",
-    size: 136,
-    dur: 9.8,
-    delay: 1.5,
-  },
-  {
-    id: "workflow",
-    label: "Quy trình",
-    sub: "Trình duyệt",
-    emoji: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        width="36"
-        height="36"
-        color="#FF8800"
-        style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
-      >
-        <path d="M21.731 2.269a2.625 2.625 0 0 0-3.712 0l-1.157 1.157 3.712 3.712 1.157-1.157a2.625 2.625 0 0 0 0-3.712ZM19.513 8.199l-3.712-3.712-8.4 8.4a5.25 5.25 0 0 0-1.32 2.214l-.8 2.685a.75.75 0 0 0 .933.933l2.685-.8a5.25 5.25 0 0 0 2.214-1.32l8.4-8.4Z" />
-        <path d="M5.25 5.25a3 3 0 0 0-3 3v10.5a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3V13.5a.75.75 0 0 0-1.5 0v5.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5V8.25a1.5 1.5 0 0 1 1.5-1.5h5.25a.75.75 0 0 0 0-1.5H5.25Z" />
-      </svg>
-    ),
-    lx: "88%",
-    ty: "55%",
-    size: 136,
-    dur: 9.8,
-    delay: 1.5,
-  },
-  {
-    id: "tasks",
-    label: "Công việc",
-    sub: "Quản lý task",
-    emoji: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        width="36"
-        height="36"
-        color="#FF8800"
-        style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
-      >
-        <path
-          fillRule="evenodd"
-          d="M6 3.75A2.75 2.75 0 0 1 8.75 1h2.5A2.75 2.75 0 0 1 14 3.75v.443c.572.055 1.14.122 1.706.2C17.053 4.582 18 5.75 18 7.07v3.469c0 1.126-.694 2.191-1.83 2.54-1.952.599-4.024.921-6.17.921s-4.219-.322-6.17-.921C2.694 12.73 2 11.665 2 10.539V7.07c0-1.321.947-2.489 2.294-2.676A41.047 41.047 0 0 1 6 4.193V3.75Zm6.5 0v.325a41.622 41.622 0 0 0-5 0V3.75c0-.69.56-1.25 1.25-1.25h2.5c.69 0 1.25.56 1.25 1.25ZM10 10a1 1 0 0 0-1 1v.01a1 1 0 0 0 1 1h.01a1 1 0 0 0 1-1V11a1 1 0 0 0-1-1H10Z"
-          clipRule="evenodd"
-        />
-        <path d="M3 15.055v-.684c.126.053.255.1.39.142 2.092.642 4.313.987 6.61.987 2.297 0 4.518-.345 6.61-.987.135-.041.264-.089.39-.142v.684c0 1.347-.985 2.53-2.363 2.686a41.454 41.454 0 0 1-9.274 0C3.985 17.585 3 16.402 3 15.055Z" />
-      </svg>
-    ),
-    lx: "12%",
-    ty: "55%",
-    size: 136,
-    dur: 9.6,
-    delay: 0.4,
-  },
-  {
-    id: "chat",
-    label: "Tin nhắn",
-    sub: "Chat nội bộ",
-    emoji: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        width="36"
-        height="36"
-        color="#FF8800"
-        style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
-      >
-        <path
-          fillRule="evenodd"
-          d="M12 2.25c-2.429 0-4.817.178-7.152.521C2.87 3.061 1.5 4.795 1.5 6.741v6.018c0 1.946 1.37 3.68 3.348 3.97.877.129 1.761.234 2.652.316V21a.75.75 0 0 0 1.28.53l4.184-4.183a.39.39 0 0 1 .266-.112c2.006-.05 3.982-.22 5.922-.506 1.978-.29 3.348-2.023 3.348-3.97V6.741c0-1.947-1.37-3.68-3.348-3.97A49.145 49.145 0 0 0 12 2.25ZM8.25 8.625a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25Zm2.625 1.125a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Zm4.875-1.125a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25Z"
-          clipRule="evenodd"
-        />
-      </svg>
-    ),
-    lx: "70%",
-    ty: "80%",
-    size: 128,
-    dur: 9.2,
-    delay: 1.2,
-  },
-  {
-    id: "settings",
-    label: "Cài đặt",
-    sub: "Tài khoản",
-    emoji: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        width="36"
-        height="36"
-        color="#FF8800"
-        style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
-      >
-        <path d="M13.024 9.25c.47 0 .827-.433.637-.863a4 4 0 0 0-4.094-2.364c-.468.05-.665.576-.43.984l1.08 1.868a.75.75 0 0 0 .649.375h2.158ZM7.84 7.758c-.236-.408-.79-.5-1.068-.12A3.982 3.982 0 0 0 6 10c0 .884.287 1.7.772 2.363.278.38.832.287 1.068-.12l1.078-1.868a.75.75 0 0 0 0-.75L7.839 7.758ZM9.138 12.993c-.235.408-.039.934.43.984a4 4 0 0 0 4.094-2.364c.19-.43-.168-.863-.638-.863h-2.158a.75.75 0 0 0-.65.375l-1.078 1.868Z" />
-        <path
-          fillRule="evenodd"
-          d="m14.13 4.347.644-1.117a.75.75 0 0 0-1.299-.75l-.644 1.116a6.954 6.954 0 0 0-2.081-.556V1.75a.75.75 0 0 0-1.5 0v1.29a6.954 6.954 0 0 0-2.081.556L6.525 2.48a.75.75 0 1 0-1.3.75l.645 1.117A7.04 7.04 0 0 0 4.347 5.87L3.23 5.225a.75.75 0 1 0-.75 1.3l1.116.644A6.954 6.954 0 0 0 3.04 9.25H1.75a.75.75 0 0 0 0 1.5h1.29c.078.733.27 1.433.556 2.081l-1.116.645a.75.75 0 1 0 .75 1.298l1.117-.644a7.04 7.04 0 0 0 1.523 1.523l-.645 1.117a.75.75 0 1 0 1.3.75l.644-1.116a6.954 6.954 0 0 0 2.081.556v1.29a.75.75 0 0 0 1.5 0v-1.29a6.954 6.954 0 0 0 2.081-.556l.645 1.116a.75.75 0 0 0 1.299-.75l-.645-1.117a7.042 7.042 0 0 0 1.523-1.523l1.117.644a.75.75 0 0 0 .75-1.298l-1.116-.645a6.954 6.954 0 0 0 .556-2.081h1.29a.75.75 0 0 0 0-1.5h-1.29a6.954 6.954 0 0 0-.556-2.081l1.116-.644a.75.75 0 0 0-.75-1.3l-1.117.645a7.04 7.04 0 0 0-1.524-1.523ZM10 4.5a5.475 5.475 0 0 0-2.781.754A5.527 5.527 0 0 0 5.22 7.277 5.475 5.475 0 0 0 4.5 10a5.475 5.475 0 0 0 .752 2.777 5.527 5.527 0 0 0 2.028 2.004c.802.458 1.73.719 2.72.719a5.474 5.474 0 0 0 2.78-.753 5.527 5.527 0 0 0 2.001-2.027c.458-.802.719-1.73.719-2.72a5.475 5.475 0 0 0-.753-2.78 5.528 5.528 0 0 0-2.028-2.002A5.475 5.475 0 0 0 10 4.5Z"
-          clipRule="evenodd"
-        />
-      </svg>
-    ),
-    lx: "30%",
-    ty: "80%",
-    size: 128,
-    dur: 8.4,
-    delay: 1.8,
-  },
-  {
-    id: "notifications",
-    label: "Thông báo",
-    sub: "Hệ thống",
-    emoji: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        width="36"
-        height="36"
-        color="#FF8800"
-        style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
-      >
-        <path d="M4.214 3.227a.75.75 0 0 0-1.156-.955 8.97 8.97 0 0 0-1.856 3.825.75.75 0 0 0 1.466.316 7.47 7.47 0 0 1 1.546-3.186ZM16.942 2.272a.75.75 0 0 0-1.157.955 7.47 7.47 0 0 1 1.547 3.186.75.75 0 0 0 1.466-.316 8.971 8.971 0 0 0-1.856-3.825Z" />
-        <path
-          fillRule="evenodd"
-          d="M10 2a6 6 0 0 0-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 0 0 .515 1.076 32.91 32.91 0 0 0 3.256.508 3.5 3.5 0 0 0 6.972 0 32.903 32.903 0 0 0 3.256-.508.75.75 0 0 0 .515-1.076A11.448 11.448 0 0 1 16 8a6 6 0 0 0-6-6Zm0 14.5a2 2 0 0 1-1.95-1.557 33.54 33.54 0 0 0 3.9 0A2 2 0 0 1 10 16.5Z"
-          clipRule="evenodd"
-        />
-      </svg>
-    ),
-    lx: "50%",
-    ty: "88%",
-    size: 128,
-    dur: 8.7,
-    delay: 0.5,
-  },
-  {
-    id: "crm",
-    label: "Quản lý KH",
-    sub: "Khách hàng",
-    emoji: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        width="36"
-        height="36"
-        color="#FF8800"
-        style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
-      >
-        <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157v.003Z" />
-      </svg>
-    ),
-    lx: "50%",
-    ty: "15%",
-    size: 128,
-    dur: 9.1,
-    delay: 0.9,
-  },
-];
+    {
+      id: "checkin",
+      label: "Check-in",
+      sub: "Chấm công",
+      emoji: "⚡",
+      lx: "50%",
+      ty: "48%",
+      size: 200,
+      dur: 8.8,
+      delay: 0,
+      isCenter: true,
+    },
+    {
+      id: "employee",
+      label: "Hồ sơ",
+      sub: "Cá nhân",
+      emoji: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          width="36"
+          height="36"
+          color="#FF8800"
+          style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
+        >
+          <path
+            fillRule="evenodd"
+            d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      ),
+      lx: "22%",
+      ty: "28%",
+      size: 140,
+      dur: 9.3,
+      delay: 0.6,
+    },
+    {
+      id: "leave",
+      label: "Xin nghỉ",
+      sub: "Tạo đơn · Lịch sử",
+      emoji: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          width="36"
+          height="36"
+          color="#FF8800"
+          style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
+        >
+          <path
+            fillRule="evenodd"
+            d="M9.528 1.718a.75.75 0 0 1 .162.819A8.97 8.97 0 0 0 9 6a9 9 0 0 0 9 9 8.97 8.97 0 0 0 3.463-.69.75.75 0 0 1 .981.98 10.503 10.503 0 0 1-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 0 1 .818.162Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      ),
+      lx: "78%",
+      ty: "28%",
+      size: 140,
+      dur: 8.9,
+      delay: 1.1,
+    },
+    {
+      id: "directory",
+      label: "Danh bạ",
+      sub: "Nội bộ",
+      emoji: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          width="36"
+          height="36"
+          color="#FF8800"
+          style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
+        >
+          <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157v.003Z" />
+        </svg>
+      ),
+      lx: "88%",
+      ty: "55%",
+      size: 136,
+      dur: 9.8,
+      delay: 1.5,
+    },
+    {
+      id: "workflow",
+      label: "Quy trình",
+      sub: "Trình duyệt",
+      emoji: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          width="36"
+          height="36"
+          color="#FF8800"
+          style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
+        >
+          <path d="M21.731 2.269a2.625 2.625 0 0 0-3.712 0l-1.157 1.157 3.712 3.712 1.157-1.157a2.625 2.625 0 0 0 0-3.712ZM19.513 8.199l-3.712-3.712-8.4 8.4a5.25 5.25 0 0 0-1.32 2.214l-.8 2.685a.75.75 0 0 0 .933.933l2.685-.8a5.25 5.25 0 0 0 2.214-1.32l8.4-8.4Z" />
+          <path d="M5.25 5.25a3 3 0 0 0-3 3v10.5a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3V13.5a.75.75 0 0 0-1.5 0v5.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5V8.25a1.5 1.5 0 0 1 1.5-1.5h5.25a.75.75 0 0 0 0-1.5H5.25Z" />
+        </svg>
+      ),
+      lx: "88%",
+      ty: "55%",
+      size: 136,
+      dur: 9.8,
+      delay: 1.5,
+    },
+    {
+      id: "tasks",
+      label: "Công việc",
+      sub: "Quản lý task",
+      emoji: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          width="36"
+          height="36"
+          color="#FF8800"
+          style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
+        >
+          <path
+            fillRule="evenodd"
+            d="M6 3.75A2.75 2.75 0 0 1 8.75 1h2.5A2.75 2.75 0 0 1 14 3.75v.443c.572.055 1.14.122 1.706.2C17.053 4.582 18 5.75 18 7.07v3.469c0 1.126-.694 2.191-1.83 2.54-1.952.599-4.024.921-6.17.921s-4.219-.322-6.17-.921C2.694 12.73 2 11.665 2 10.539V7.07c0-1.321.947-2.489 2.294-2.676A41.047 41.047 0 0 1 6 4.193V3.75Zm6.5 0v.325a41.622 41.622 0 0 0-5 0V3.75c0-.69.56-1.25 1.25-1.25h2.5c.69 0 1.25.56 1.25 1.25ZM10 10a1 1 0 0 0-1 1v.01a1 1 0 0 0 1 1h.01a1 1 0 0 0 1-1V11a1 1 0 0 0-1-1H10Z"
+            clipRule="evenodd"
+          />
+          <path d="M3 15.055v-.684c.126.053.255.1.39.142 2.092.642 4.313.987 6.61.987 2.297 0 4.518-.345 6.61-.987.135-.041.264-.089.39-.142v.684c0 1.347-.985 2.53-2.363 2.686a41.454 41.454 0 0 1-9.274 0C3.985 17.585 3 16.402 3 15.055Z" />
+        </svg>
+      ),
+      lx: "12%",
+      ty: "55%",
+      size: 136,
+      dur: 9.6,
+      delay: 0.4,
+    },
+    {
+      id: "chat",
+      label: "Tin nhắn",
+      sub: "Chat nội bộ",
+      emoji: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          width="36"
+          height="36"
+          color="#FF8800"
+          style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
+        >
+          <path
+            fillRule="evenodd"
+            d="M12 2.25c-2.429 0-4.817.178-7.152.521C2.87 3.061 1.5 4.795 1.5 6.741v6.018c0 1.946 1.37 3.68 3.348 3.97.877.129 1.761.234 2.652.316V21a.75.75 0 0 0 1.28.53l4.184-4.183a.39.39 0 0 1 .266-.112c2.006-.05 3.982-.22 5.922-.506 1.978-.29 3.348-2.023 3.348-3.97V6.741c0-1.947-1.37-3.68-3.348-3.97A49.145 49.145 0 0 0 12 2.25ZM8.25 8.625a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25Zm2.625 1.125a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Zm4.875-1.125a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      ),
+      lx: "70%",
+      ty: "80%",
+      size: 128,
+      dur: 9.2,
+      delay: 1.2,
+    },
+    {
+      id: "settings",
+      label: "Cài đặt",
+      sub: "Tài khoản",
+      emoji: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          width="36"
+          height="36"
+          color="#FF8800"
+          style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
+        >
+          <path d="M13.024 9.25c.47 0 .827-.433.637-.863a4 4 0 0 0-4.094-2.364c-.468.05-.665.576-.43.984l1.08 1.868a.75.75 0 0 0 .649.375h2.158ZM7.84 7.758c-.236-.408-.79-.5-1.068-.12A3.982 3.982 0 0 0 6 10c0 .884.287 1.7.772 2.363.278.38.832.287 1.068-.12l1.078-1.868a.75.75 0 0 0 0-.75L7.839 7.758ZM9.138 12.993c-.235.408-.039.934.43.984a4 4 0 0 0 4.094-2.364c.19-.43-.168-.863-.638-.863h-2.158a.75.75 0 0 0-.65.375l-1.078 1.868Z" />
+          <path
+            fillRule="evenodd"
+            d="m14.13 4.347.644-1.117a.75.75 0 0 0-1.299-.75l-.644 1.116a6.954 6.954 0 0 0-2.081-.556V1.75a.75.75 0 0 0-1.5 0v1.29a6.954 6.954 0 0 0-2.081.556L6.525 2.48a.75.75 0 1 0-1.3.75l.645 1.117A7.04 7.04 0 0 0 4.347 5.87L3.23 5.225a.75.75 0 1 0-.75 1.3l1.116.644A6.954 6.954 0 0 0 3.04 9.25H1.75a.75.75 0 0 0 0 1.5h1.29c.078.733.27 1.433.556 2.081l-1.116.645a.75.75 0 1 0 .75 1.298l1.117-.644a7.04 7.04 0 0 0 1.523 1.523l-.645 1.117a.75.75 0 1 0 1.3.75l.644-1.116a6.954 6.954 0 0 0 2.081.556v1.29a.75.75 0 0 0 1.5 0v-1.29a6.954 6.954 0 0 0 2.081-.556l.645 1.116a.75.75 0 0 0 1.299-.75l-.645-1.117a7.042 7.042 0 0 0 1.523-1.523l1.117.644a.75.75 0 0 0 .75-1.298l-1.116-.645a6.954 6.954 0 0 0 .556-2.081h1.29a.75.75 0 0 0 0-1.5h-1.29a6.954 6.954 0 0 0-.556-2.081l1.116-.644a.75.75 0 0 0-.75-1.3l-1.117.645a7.04 7.04 0 0 0-1.524-1.523ZM10 4.5a5.475 5.475 0 0 0-2.781.754A5.527 5.527 0 0 0 5.22 7.277 5.475 5.475 0 0 0 4.5 10a5.475 5.475 0 0 0 .752 2.777 5.527 5.527 0 0 0 2.028 2.004c.802.458 1.73.719 2.72.719a5.474 5.474 0 0 0 2.78-.753 5.527 5.527 0 0 0 2.001-2.027c.458-.802.719-1.73.719-2.72a5.475 5.475 0 0 0-.753-2.78 5.528 5.528 0 0 0-2.028-2.002A5.475 5.475 0 0 0 10 4.5Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      ),
+      lx: "30%",
+      ty: "80%",
+      size: 128,
+      dur: 8.4,
+      delay: 1.8,
+    },
+    {
+      id: "notifications",
+      label: "Thông báo",
+      sub: "Hệ thống",
+      emoji: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          width="36"
+          height="36"
+          color="#FF8800"
+          style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
+        >
+          <path d="M4.214 3.227a.75.75 0 0 0-1.156-.955 8.97 8.97 0 0 0-1.856 3.825.75.75 0 0 0 1.466.316 7.47 7.47 0 0 1 1.546-3.186ZM16.942 2.272a.75.75 0 0 0-1.157.955 7.47 7.47 0 0 1 1.547 3.186.75.75 0 0 0 1.466-.316 8.971 8.971 0 0 0-1.856-3.825Z" />
+          <path
+            fillRule="evenodd"
+            d="M10 2a6 6 0 0 0-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 0 0 .515 1.076 32.91 32.91 0 0 0 3.256.508 3.5 3.5 0 0 0 6.972 0 32.903 32.903 0 0 0 3.256-.508.75.75 0 0 0 .515-1.076A11.448 11.448 0 0 1 16 8a6 6 0 0 0-6-6Zm0 14.5a2 2 0 0 1-1.95-1.557 33.54 33.54 0 0 0 3.9 0A2 2 0 0 1 10 16.5Z"
+            clipRule="evenodd"
+          />
+        </svg>
+      ),
+      lx: "50%",
+      ty: "88%",
+      size: 128,
+      dur: 8.7,
+      delay: 0.5,
+    },
+    {
+      id: "crm",
+      label: "Quản lý KH",
+      sub: "Khách hàng",
+      emoji: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          width="36"
+          height="36"
+          color="#FF8800"
+          style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
+        >
+          <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157v.003Z" />
+        </svg>
+      ),
+      lx: "50%",
+      ty: "15%",
+      size: 128,
+      dur: 9.1,
+      delay: 0.9,
+    },
+  ];
 function SectionLabel({ children }: { children: string }) {
   return (
     <p
@@ -932,7 +931,7 @@ function Panel({
             {activePage === "settings" && (
               <SettingsContent onLogout={onLogout} embed={embed} />
             )}
-            {activePage === "crm" && <CrmStaffContent />}
+            {activePage === "crm" && <CrmStaffContent employee={employee} />}
           </div>
         </div>
       </div>
@@ -1272,7 +1271,7 @@ function EmployeeContent({ employee }: { employee: Employee }) {
           marginTop: 4,
         }}
       >
-        {["Thông tin chung", "Công việc", "Liên hệ", "Quản lý KPI"].map((t, i) => (
+        {["Thông tin chung", "Công việc", "Liên hệ"].map((t, i) => (
           <button
             key={t}
             onClick={() => setActiveTab(i)}
@@ -1363,10 +1362,7 @@ function EmployeeContent({ employee }: { employee: Employee }) {
           </div>
         </div>
       )}
-      {activeTab === 3 && (
-        <UserKpiPanel employee={employee} />
-      )}
-      {activeTab !== 3 && (
+      {(
         <div
           style={{
             padding: "16px 18px",
@@ -1689,10 +1685,45 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
     </div>
   );
 }
-function CrmStaffContent() {
+function CrmStaffContent({ employee }: { employee: Employee | null }) {
+  const [activeTab, setActiveTab] = useState<"data" | "kpi">("data");
   return (
     <div style={{ width: "100%" }}>
-      <CrmStaffPage />
+      <div style={{ display: "flex", justifyContent: "center", borderBottom: "1px solid #efd7da", marginBottom: 20 }}>
+        <button
+          onClick={() => setActiveTab("data")}
+          style={{
+            padding: "10px 20px",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+            border: "none",
+            background: "transparent",
+            borderBottom: activeTab === "data" ? "2px solid #C62828" : "2px solid transparent",
+            color: activeTab === "data" ? "#C62828" : "#8b6b70",
+            transition: "all 0.2s",
+          }}
+        >
+          Danh sách data
+        </button>
+        <button
+          onClick={() => setActiveTab("kpi")}
+          style={{
+            padding: "10px 20px",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+            border: "none",
+            background: "transparent",
+            borderBottom: activeTab === "kpi" ? "2px solid #C62828" : "2px solid transparent",
+            color: activeTab === "kpi" ? "#C62828" : "#8b6b70",
+            transition: "all 0.2s",
+          }}
+        >
+          Quản lý KPI
+        </button>
+      </div>
+      <CrmStaffPage employee={employee} activeTab={activeTab} />
     </div>
   );
 }
@@ -1729,7 +1760,7 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
         );
         setAnnouncements(active);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingAnnouncements(false));
   };
   const loadAdminRequests = () => {
@@ -1743,14 +1774,14 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
         );
         setAdminRequests(filtered);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingAdminRequests(false));
   };
   useEffect(() => {
     api.orgNodes
       .list()
       .then(setOrgNodes)
-      .catch(() => {});
+      .catch(() => { });
   }, []);
   useEffect(() => {
     loadAdminRequests();
@@ -1808,11 +1839,10 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
       <div className="flex border-b border-gray-100 mb-2">
         <button
           onClick={() => setActiveSubTab("inbox")}
-          className={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition-all ${
-            activeSubTab === "inbox"
+          className={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition-all ${activeSubTab === "inbox"
               ? "border-red-500 text-red-600 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
+            }`}
         >
           Tin nhắn cá nhân{" "}
           {unread > 0 && (
@@ -1823,11 +1853,10 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
         </button>
         <button
           onClick={() => setActiveSubTab("admin_req")}
-          className={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition-all ${
-            activeSubTab === "admin_req"
+          className={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition-all ${activeSubTab === "admin_req"
               ? "border-red-500 text-red-600 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
+            }`}
         >
           Yêu cầu từ Admin{" "}
           {adminRequests.length > 0 && (
@@ -1838,11 +1867,10 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
         </button>
         <button
           onClick={() => setActiveSubTab("broadcast")}
-          className={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition-all ${
-            activeSubTab === "broadcast"
+          className={`flex-1 py-3 text-sm font-bold border-b-2 text-center transition-all ${activeSubTab === "broadcast"
               ? "border-red-500 text-red-600 font-extrabold"
               : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
+            }`}
         >
           Thông báo hệ thống
         </button>
@@ -1885,18 +1913,18 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
         : activeSubTab === "admin_req"
           ? loadingAdminRequests
           : loadingAnnouncements) && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: 16,
-            color: "#7f5f63",
-          }}
-        >
-          <span style={{ fontSize: 13 }}>Đang tải...</span>
-        </div>
-      )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: 16,
+              color: "#7f5f63",
+            }}
+          >
+            <span style={{ fontSize: 13 }}>Đang tải...</span>
+          </div>
+        )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {activeSubTab === "inbox" && (
           <>
@@ -2673,7 +2701,7 @@ export default function UserPortalApp({
         );
         setAdminReqCount(filtered.length);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [employee?.id, activePage]);
 
   const totalUnread = notifUnread + adminReqCount;
@@ -3732,18 +3760,18 @@ function PortalNoticeBar({
   const notices =
     announcements.length > 0
       ? announcements.map((item) => ({
-          id: item.id,
-          text: `${item.title}${item.content ? ` - ${item.content}` : ""}`,
-          priority: item.priority,
-        }))
+        id: item.id,
+        text: `${item.title}${item.content ? ` - ${item.content}` : ""}`,
+        priority: item.priority,
+      }))
       : defaultAnnouncement
         ? [
-            {
-              id: "default",
-              text: defaultAnnouncement,
-              priority: "low" as const,
-            },
-          ]
+          {
+            id: "default",
+            text: defaultAnnouncement,
+            priority: "low" as const,
+          },
+        ]
         : [];
   const duration = Math.max(
     18,

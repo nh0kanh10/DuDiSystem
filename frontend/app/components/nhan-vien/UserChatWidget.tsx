@@ -189,6 +189,7 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
       <button
         ref={bubbleRef}
         onClick={handleToggleOpen}
+        className="chat-widget-fab"
         style={{
           position: embed ? "absolute" : "fixed",
           right: 24,

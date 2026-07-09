@@ -47,7 +47,7 @@ export const KPI_METRIC_LABELS: Record<keyof KpiMetrics, string> = {
   comment: "Comment",
   post: "Bài đăng",
   clientReply: "Khách rep",
-  khachChuDongIB: "khachChuDongIB",
+  khachChuDongIB: "Khách chủ động IB",
   followUp: "Follow-up",
   quote: "Báo giá",
   deal: "Chốt Deal",

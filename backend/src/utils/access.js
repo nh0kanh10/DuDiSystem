@@ -34,7 +34,6 @@ export function isStaffUser(user) {
   return role.roleType === "staff"
 }
 
-/** Raw effective permissions: user override or role.modules */
 export function resolveEffectivePermissions(user) {
   if (!user) return []
   if (user.permissions && Array.isArray(user.permissions) && user.permissions.length > 0) {
@@ -54,14 +53,16 @@ function capStaffModulesByRole(permissions, roleModules) {
   })
 }
 
-/** Permissions shaped for client UI (staff cap + strip admin modules for staff roles) */
 export function resolveClientPermissions(user) {
   let perms = resolveEffectivePermissions(user)
   if (perms.includes("all")) return perms
 
   const role = roleRepo.getById(user?.roleId)
+  const hasCustom = user?.permissions && Array.isArray(user.permissions) && user.permissions.length > 0
   if (isStaffUser(user) && role) {
-    perms = capStaffModulesByRole(perms, role.modules ?? [])
+    if (!hasCustom) {
+      perms = capStaffModulesByRole(perms, role.modules ?? [])
+    }
     perms = perms.filter(p => !ADMIN_MODULE_SET.has(p))
     const hasStaff = perms.some(p => STAFF_MODULE_SET.has(p))
     if (hasStaff && !perms.includes("staff-portal")) {

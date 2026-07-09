@@ -604,7 +604,7 @@ function AppContent() {
       case "user-workflow": return <UserWorkflow />
       case "user-settings": return <UserSettings onLogout={handleLogout} />
       case "user-crm": return (
-        <CrmStaffPage onOpenLead={(id) => navigate(`/lead/${id}`)} />
+        <CrmStaffPage employee={currentEmp} onOpenLead={(id) => navigate(`/lead/${id}`)} />
       )
         case "lead": {
           const leadId = location.pathname.match(/^\/lead\/([^/]+)/)?.[1]
