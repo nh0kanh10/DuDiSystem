@@ -59,27 +59,29 @@ const GR = "rgba(232,35,26,0.28)";
 const GG = "rgba(255,136,0,0.14)";
 const INPUT_S: React.CSSProperties = {
   background: "#FFFFFF",
-  border: "1px solid rgba(36,20,22,0.12)",
+  border: "1px solid #e5e7eb",
   borderRadius: 12,
-  color: "#241416",
-  fontSize: 14,
-  padding: "10px 12px",
+  color: "#374151",
+  fontSize: 12,
+  padding: "8px 12px",
   width: "100%",
   outline: "none",
   fontFamily: "inherit",
+  transition: "border-color 0.15s ease",
 };
 const BTN_S: React.CSSProperties = {
   width: "100%",
-  padding: "13px",
-  borderRadius: 14,
-  fontWeight: 800,
-  fontSize: 14,
+  padding: "10px 14px",
+  borderRadius: 12,
+  fontWeight: 750,
+  fontSize: 12,
   border: "none",
   cursor: "pointer",
   color: "#fff",
-  background: `linear-gradient(135deg, ${BRAND}, ${GOLD})`,
-  boxShadow: `0 0 24px ${GR}`,
+  background: "#C62828",
+  boxShadow: "0 4px 12px rgba(198, 40, 40, 0.15)",
   fontFamily: "inherit",
+  transition: "all 0.2s ease",
 };
 function empInitials(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -382,12 +384,12 @@ function SectionLabel({ children }: { children: string }) {
   return (
     <p
       style={{
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: 800,
-        letterSpacing: "0.16em",
+        letterSpacing: "0.15em",
         textTransform: "uppercase",
-        color: "#8b5f64",
-        marginBottom: 14,
+        color: "#C62828",
+        marginBottom: 10,
       }}
     >
       {children}
@@ -398,12 +400,12 @@ function FieldLabel({ children }: { children: string }) {
   return (
     <p
       style={{
-        fontSize: 11,
-        fontWeight: 800,
-        letterSpacing: "0.08em",
+        fontSize: 10,
+        fontWeight: 750,
+        letterSpacing: "0.06em",
         textTransform: "uppercase",
-        color: "#8b5f64",
-        marginBottom: 6,
+        color: "#4B5563",
+        marginBottom: 5,
       }}
     >
       {children}
@@ -2472,15 +2474,15 @@ function SettingsContent({
           style={{
             ...BTN_S,
             width: "auto",
-            padding: "8px 16px",
-            fontSize: 13,
+            padding: "6px 14px",
+            fontSize: 11,
             display: "flex",
             alignItems: "center",
             gap: 6,
             background: "#FFFFFF",
-            border: "1px solid #efd7da",
-            color: "#7a1d22",
-            boxShadow: "0 10px 24px rgba(95,15,22,0.06)",
+            border: "1px solid #e5e7eb",
+            color: "#C62828",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
           }}
         >
           Thay ảnh đại diện
@@ -2514,14 +2516,16 @@ function SettingsContent({
                   right: 12,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  color: "#7a1d22",
+                  color: "#6b7280",
                   background: "none",
                   border: "none",
                   cursor: "pointer",
-                  fontWeight: 750,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                {shows[i] ? "Ẩn" : "Hiện"}
+                {shows[i] ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
@@ -2642,19 +2646,6 @@ function SettingsContent({
             Đăng xuất
           </button>
         </div>
-      </div>
-      <div style={{ marginTop: 20 }}>
-        <button
-          onClick={onLogout}
-          style={{
-            ...BTN_S,
-            background: "rgba(232,35,26,0.1)",
-            color: "#FF5555",
-            boxShadow: "none",
-          }}
-        >
-          Đăng xuất khỏi hệ thống
-        </button>
       </div>
     </div>
   );

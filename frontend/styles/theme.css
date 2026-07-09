@@ -228,3 +228,9 @@
     display: none !important;
   }
 }
+
+/* Hide Microsoft Edge / Internet Explorer native password reveal eye button */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+}

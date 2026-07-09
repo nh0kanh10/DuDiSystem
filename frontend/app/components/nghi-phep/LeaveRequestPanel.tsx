@@ -37,8 +37,8 @@ interface Props {
   variant?: "default" | "portal"
 }
 
-const inputClass = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/50 bg-white"
-const portalInputClass = "w-full px-4 py-3 rounded-xl text-base focus:outline-none focus:border-[#E8231A] bg-white border border-[#e7c8cc] text-[#241416] placeholder:text-[#8b6b70]"
+const inputClass = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#C62828]/50 bg-white"
+const portalInputClass = "w-full px-4 py-2.5 border border-gray-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-[#C62828]/50 bg-white text-gray-700 placeholder:text-gray-400 transition-all"
 
 export default function LeaveRequestPanel({ employee, variant = "default" }: Props) {
   const portal = variant === "portal"
@@ -132,17 +132,17 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
   }
 
   const fieldInput = portal ? portalInputClass : inputClass
-  const labelCls = portal ? "block text-sm font-black text-[#7f5f63] uppercase mb-2 tracking-wide" : "block text-xs font-bold text-gray-500 uppercase mb-1.5"
+  const labelCls = portal ? "block text-xs font-bold text-gray-700 uppercase mb-1.5 tracking-wide" : "block text-xs font-bold text-gray-500 uppercase mb-1.5"
   const scopeBtn = (active: boolean) => portal
-    ? `py-3.5 px-3 rounded-xl text-base font-black border transition-all ${active ? "bg-[#E8231A] text-white border-[#E8231A] shadow-sm" : "bg-white text-[#5f4246] border-[#e7c8cc] hover:border-[#E8231A]/50"}`
-    : `py-3 px-2 rounded-xl text-sm font-bold border transition-all ${active ? "bg-[#C62828] text-white border-[#C62828] shadow-sm" : "bg-gray-50 text-gray-600 border-gray-200 hover:border-[#C62828]/30"}`
+    ? `py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${active ? "bg-[#C62828] text-white border-[#C62828] shadow-sm" : "bg-white text-gray-600 border-gray-200 hover:border-[#C62828]/30"}`
+    : `py-3 px-2 rounded-xl text-sm font-bold border transition-all cursor-pointer ${active ? "bg-[#C62828] text-white border-[#C62828] shadow-sm" : "bg-gray-50 text-gray-600 border-gray-200 hover:border-[#C62828]/30"}`
   const sessionBtn = (active: boolean) => portal
-    ? `py-3 rounded-xl text-base font-black border ${active ? "bg-[#E8231A] text-white border-[#E8231A]" : "bg-white border-[#e7c8cc] text-[#5f4246]"}`
-    : `py-2.5 rounded-xl text-sm font-bold border ${active ? "bg-[#C62828] text-white border-[#C62828]" : "bg-gray-50 border-gray-200 text-gray-600"}`
+    ? `py-2 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${active ? "bg-[#C62828] text-white border-[#C62828]" : "bg-white border-gray-200 text-gray-600 hover:border-[#C62828]/30"}`
+    : `py-2.5 rounded-xl text-sm font-bold border transition-all cursor-pointer ${active ? "bg-[#C62828] text-white border-[#C62828]" : "bg-gray-50 border-gray-200 text-gray-600"}`
   const cardCls = portal
-    ? "bg-white rounded-2xl border border-[#efd7da] overflow-hidden shadow-[0_18px_50px_rgba(95,15,22,0.08)]"
+    ? "bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs"
     : "bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden"
-  const cardHeadCls = portal ? "p-6 border-b border-[#efd7da] space-y-5 bg-[#fff8f8]" : "p-5 border-b border-gray-100 space-y-4"
+  const cardHeadCls = portal ? "p-5 border-b border-gray-100 space-y-4 bg-white" : "p-5 border-b border-gray-100 space-y-4"
 
   return (
     <div className={`space-y-5 ${portal ? "" : "max-w-5xl mx-auto"}`}>
