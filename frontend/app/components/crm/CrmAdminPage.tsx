@@ -212,7 +212,12 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   }
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]; if (!file) return
+    const file = e.target.files?.[0]; 
+    if (!file) return
+    if (!window.confirm(`Bạn có chắc chắn muốn import file "${file.name}"?`)) {
+      e.target.value = ""
+      return
+    }
     setImportLoading(true)
     try {
       const r = await api.crm.importCsv(file)
@@ -431,6 +436,7 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
                   </button>
                   <button
                     onClick={async () => {
+                      if (!window.confirm(`Bạn có chắc chắn muốn xoá ${selectedIds.length} mục đã chọn? Hành động này không thể hoàn tác.`)) return
                       try {
                         await api.crm.deleteBulk(selectedIds)
                         notify("Đã xóa " + selectedIds.length + " mục")
