@@ -1,8 +1,9 @@
+import fs from "fs"
 import { serverError } from "../utils/response.js"
 
 export function errorHandler(err, req, res, next) {
   console.error(`[${new Date().toISOString()}] ${err.stack}`)
-  serverError(res)
+  serverError(res, err)
 }
 
 export function notFoundHandler(req, res) {

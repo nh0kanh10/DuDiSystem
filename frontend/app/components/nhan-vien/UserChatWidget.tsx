@@ -8,12 +8,7 @@ const GR = "rgba(232,35,26,0.28)";
 
 function branchLabel(branchId: string) {
   if (!branchId) return "";
-  const map: Record<string, string> = {
-    "branch-hcm": "HCM",
-    "branch-hn": "HN",
-    "branch-dn": "ĐN",
-  };
-  return map[branchId] ?? branchId.replace("branch-", "").toUpperCase();
+  return branchId.replace("branch-", "").toUpperCase();
 }
 
 function empInitials(name: string) {

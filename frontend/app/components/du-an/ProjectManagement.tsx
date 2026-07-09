@@ -108,50 +108,7 @@ const EMPTY_FORM = {
 }
 
 function defaultTestSessions(projectId: string): TestSession[] {
-  if (projectId !== "PRJ001") return []
-  const now = new Date().toISOString()
-  return [
-    {
-      id: "TS-PRJ001-1",
-      projectId,
-      version: "v2.0.0-beta",
-      testDate: "28/06/2026",
-      testerId: "NV006",
-      testerName: "Trần Văn Lực",
-      testType: "regression",
-      bugsFound: 14,
-      bugsPassed: 9,
-      bugsRejected: 2,
-      bugsReviewing: 3,
-      bugsBillable: 4,
-      confirmedById: "NV004",
-      confirmedByName: "Phạm Đức Thành",
-      confirmedAt: "29/06/2026",
-      handlingStatus: "in-progress",
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: "TS-PRJ001-2",
-      projectId,
-      version: "v2.0.0-rc1",
-      testDate: "02/07/2026",
-      testerId: "NV002",
-      testerName: "Nguyễn Văn B",
-      testType: "uat",
-      bugsFound: 6,
-      bugsPassed: 4,
-      bugsRejected: 1,
-      bugsReviewing: 1,
-      bugsBillable: 2,
-      confirmedById: "NV001",
-      confirmedByName: "Admin",
-      confirmedAt: "03/07/2026",
-      handlingStatus: "pending",
-      createdAt: now,
-      updatedAt: now,
-    },
-  ]
+  return []
 }
 
 export function ProjectManagement({

@@ -57,13 +57,6 @@ const SEED_LEADS = [
 let seeded = false
 
 function ensureSeed() {
-  if (seeded || repo.count() > 0) {
-    seeded = true
-    return
-  }
-  for (const lead of SEED_LEADS) {
-    repo.create({ ...lead })
-  }
   seeded = true
 }
 

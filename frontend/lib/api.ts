@@ -16,7 +16,7 @@ export async function detectPublicIP(): Promise<string> {
 
 
 function token() {
-  return localStorage.getItem("dudi_token") ?? ""
+  return localStorage.getItem("dudi_token") ?? sessionStorage.getItem("dudi_token") ?? ""
 }
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -31,13 +31,15 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   if (res.status === 401) {
     const text = await res.text()
     let json: Record<string, unknown> = {}
-    try { json = text ? JSON.parse(text) as Record<string, unknown> : {} } catch { /* ignore */ }
+    try { json = text ? JSON.parse(text) as Record<string, unknown> : {} } catch {  }
     if (path.startsWith("/auth/login")) {
       const msg = json.message ?? json.error
       throw new Error(typeof msg === "string" ? msg : "Mã đăng nhập hoặc mật khẩu không đúng")
     }
     localStorage.removeItem("dudi_token")
     localStorage.removeItem("dudi_user")
+    sessionStorage.removeItem("dudi_token")
+    sessionStorage.removeItem("dudi_user")
     window.dispatchEvent(new Event("dudi_unauthorized"))
     throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
   }
@@ -153,20 +155,29 @@ export const api = {
       req<any>("POST", "/auth/change-password", { oldPassword, newPassword }),
   },
   storage: {
-    upload: async (file: File): Promise<{ key: string; url: string; name: string }> => {
+    upload: async (file: File, overrideName?: string): Promise<{ key: string; url: string; name: string }> => {
       const form = new FormData()
-      form.append("file", file)
+      if (overrideName) {
+        form.append("file", file, overrideName)
+      } else {
+        form.append("file", file)
+      }
       const res = await fetch(`${BASE}/storage/upload`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token()}` },
         body: form,
       })
       const json = await res.json() as any
-      if (!res.ok || !json.success) throw new Error(json.error || "Upload file thất bại")
+      if (!res.ok || !json.success) throw new Error(json.error || json.message || "Upload file thất bại")
       touchSession()
-      return json.data
+      let url = json.data.url
+      if (url && url.startsWith('/api')) {
+        url = `${BASE.replace('/api', '')}${url}`
+      }
+      return { ...json.data, url }
     },
     downloadUrl: (key: string) => `${BASE}/storage/download?key=${encodeURIComponent(key)}`,
+    delete: (key: string) => req<any>("POST", "/storage/delete", { key }),
   },
   users: {
     list: (params?: { includeCoreAdmins?: boolean }) => req<any[]>("GET", `/users${qs(params as any)}`),
@@ -193,6 +204,7 @@ export const api = {
     update: (id: string, data: unknown) => req<unknown>("PUT", `/employees/${id}`, data),
     delete: (id: string) => req<unknown>("DELETE", `/employees/${id}`),
   },
+
 
   orgNodes: {
     list: (params?: { type?: string; status?: string }) =>
@@ -819,6 +831,8 @@ async function fetchAuthBlob(path: string, options?: { method?: string; body?: u
   if (res.status === 401) {
     localStorage.removeItem("dudi_token")
     localStorage.removeItem("dudi_user")
+    sessionStorage.removeItem("dudi_token")
+    sessionStorage.removeItem("dudi_user")
     window.dispatchEvent(new Event("dudi_unauthorized"))
     throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
   }
@@ -850,14 +864,16 @@ async function downloadBlob(path: string, body: unknown, filename: string, metho
   touchSession()
 }
 
-export function saveToken(t: string) {
-  localStorage.setItem("dudi_token", t)
+export function saveToken(t: string, rememberMe: boolean = false) {
+  const storage = rememberMe ? localStorage : sessionStorage
+  storage.setItem("dudi_token", t)
 }
 
 export function clearToken() {
   localStorage.removeItem("dudi_token")
+  sessionStorage.removeItem("dudi_token")
 }
 
 export function hasToken() {
-  return !!localStorage.getItem("dudi_token")
+  return !!localStorage.getItem("dudi_token") || !!sessionStorage.getItem("dudi_token")
 }

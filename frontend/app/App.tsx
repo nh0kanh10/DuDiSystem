@@ -91,10 +91,10 @@ export default function App() {
 
 function AppContent() {
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return !!localStorage.getItem("dudi_token")
+    return !!localStorage.getItem("dudi_token") || !!sessionStorage.getItem("dudi_token")
   })
   const [role, setRole] = useState<Role>(() => {
-    const saved = localStorage.getItem("dudi_user")
+    const saved = localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user")
     if (saved) {
       try {
         const u = JSON.parse(saved)
@@ -106,7 +106,7 @@ function AppContent() {
     return "role-admin"
   })
   const [loggedEmail, setLoggedEmail] = useState(() => {
-    const saved = localStorage.getItem("dudi_user")
+    const saved = localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user")
     if (saved) {
       try {
         const u = JSON.parse(saved)
@@ -149,7 +149,8 @@ function AppContent() {
   const [isPageLoading, setIsPageLoading] = useState(false)
   const [effectivePermissions, setEffectivePermissions] = useState<string[]>(() => {
     try {
-      const u = JSON.parse(localStorage.getItem("dudi_user") || "{}")
+      const saved = localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user")
+      const u = JSON.parse(saved || "{}")
       return Array.isArray(u.effectivePermissions) ? u.effectivePermissions : []
     } catch {
       return []
@@ -409,14 +410,29 @@ function AppContent() {
     }
   }, [isLoggedIn, role, orgNodes, employees, loggedEmail])
 
-  const handleLogin = async (email: string, pass: string) => {
+  const handleLogin = async (email: string, pass: string, rememberMe: boolean = false) => {
     setLoginError(null)
     setLoginLoading(true)
     try {
       const res = await api.auth.login(email, pass)
       if (res && res.token) {
-        localStorage.setItem("dudi_token", res.token)
-        localStorage.setItem("dudi_user", JSON.stringify(res.user))
+        const storage = rememberMe ? localStorage : sessionStorage
+        const otherStorage = rememberMe ? sessionStorage : localStorage
+        
+        storage.setItem("dudi_token", res.token)
+        storage.setItem("dudi_user", JSON.stringify(res.user))
+        
+        otherStorage.removeItem("dudi_token")
+        otherStorage.removeItem("dudi_user")
+
+        if (rememberMe) {
+          localStorage.setItem("dudi_saved_id", email)
+          localStorage.setItem("dudi_saved_pass", pass)
+        } else {
+          localStorage.removeItem("dudi_saved_id")
+          localStorage.removeItem("dudi_saved_pass")
+        }
+        
         const user = res.user as any
         const r = user.roleId as Role
         setRole(r)
@@ -451,13 +467,14 @@ function AppContent() {
     resetChatSocket()
     localStorage.removeItem("dudi_token")
     localStorage.removeItem("dudi_user")
-    resetSessionTouchClock()
+    sessionStorage.removeItem("dudi_token")
+    sessionStorage.removeItem("dudi_user")
     setIsLoggedIn(false)
     setRole("role-admin")
     setLoggedEmail("")
     setEffectivePermissions([])
     setSelectedBranch("all")
-    // Chuyển hướng sẽ do useEffect tự động xử lý khi isLoggedIn chuyển sang false
+    navigate("/login")
   }
 
   if (!isLoggedIn) return (
@@ -465,7 +482,11 @@ function AppContent() {
       {sessionAlertMsg && (
         <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
       )}
-      <LoginPage onLogin={handleLogin} loginError={loginError} isLoading={loginLoading} />
+      <LoginPage
+        onLogin={(id, pass, remember) => handleLogin(id, pass, remember)}
+        loginError={loginError}
+        isLoading={loginLoading}
+      />
     </>
   )
 
@@ -500,7 +521,7 @@ function AppContent() {
     joinDate: "—",
     status: "active" as "active" | "inactive" | "suspended",
     contractType: "staff",
-    orgNodeId: "branch-hcm"
+    orgNodeId: orgNodes.find(n => n.type === "branch")?.id || "branch-dudi"
   }
   const currentUserInfo = {
     name: currentEmp.name,

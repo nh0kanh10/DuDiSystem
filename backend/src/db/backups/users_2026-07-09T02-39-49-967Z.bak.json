@@ -1,0 +1,27 @@
+[
+  {
+    "id": "U010",
+    "employeeId": "0000000000",
+    "email": "0000000000",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-super-admin",
+    "status": "active",
+    "permissions": null
+  },
+  {
+    "id": "U014",
+    "employeeId": "1111111111",
+    "email": "1111111111",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-super-admin",
+    "status": "active"
+  },
+  {
+    "id": "U015",
+    "employeeId": "2222222222",
+    "email": "2222222222",
+    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "roleId": "role-super-admin",
+    "status": "active"
+  }
+]

@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from "react"
-import { Lock, User, ArrowRight, Loader2, ServerCrash } from "lucide-react"
+import { Lock, User, ArrowRight, Loader2, ServerCrash, Shield } from "lucide-react"
 import { BrandLogo } from "../ui/BrandLogo"
 
 export function LoginPage({ onLogin, loginError, isLoading }: {
-  onLogin: (id: string, pass: string) => void
+  onLogin: (id: string, pass: string, remember: boolean) => void
   loginError?: string | null
   isLoading?: boolean
 }) {
-  const [id, setId] = useState("")
-  const [pass, setPass] = useState("")
+  const [id, setId] = useState(() => localStorage.getItem("dudi_saved_id") || "")
+  const [pass, setPass] = useState(() => localStorage.getItem("dudi_saved_pass") || "")
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem("dudi_saved_id"))
+  const [showForgotModal, setShowForgotModal] = useState(false)
   const [showWarmup, setShowWarmup] = useState(false)
   const warmupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -25,7 +27,7 @@ export function LoginPage({ onLogin, loginError, isLoading }: {
   }, [isLoading])
 
   const handleSubmit = () => {
-    if (!isLoading) onLogin(id.trim(), pass)
+    if (!isLoading) onLogin(id.trim(), pass, rememberMe)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -35,7 +37,7 @@ export function LoginPage({ onLogin, loginError, isLoading }: {
   const quickLogin = (empId: string, password: string) => {
     setId(empId)
     setPass(password)
-    onLogin(empId, password)
+    onLogin(empId, password, rememberMe)
   }
 
   return (
@@ -129,10 +131,21 @@ export function LoginPage({ onLogin, loginError, isLoading }: {
             </div>
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-gray-500 cursor-pointer">
-                <input type="checkbox" className="rounded border-gray-300 accent-[#C62828]" />
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe}
+                  onChange={e => setRememberMe(e.target.checked)}
+                  className="rounded border-gray-300 accent-[#C62828]" 
+                />
                 Ghi nhớ đăng nhập
               </label>
-              <a href="#" className="text-[#C62828] font-semibold hover:underline">Quên mật khẩu?</a>
+              <button 
+                type="button"
+                onClick={() => setShowForgotModal(true)}
+                className="text-[#C62828] font-semibold hover:underline bg-transparent border-none p-0"
+              >
+                Quên mật khẩu?
+              </button>
             </div>
             <button
               onClick={handleSubmit}
@@ -149,45 +162,68 @@ export function LoginPage({ onLogin, loginError, isLoading }: {
               )}
             </button>
           </div>
-
-          <div className="mt-5 p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs text-gray-500 space-y-3">
-            <p className="font-semibold text-gray-700 text-sm">Đăng nhập nhanh:</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => quickLogin("0000000000", "123456")}
-                className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 transition-colors cursor-pointer text-violet-700"
-              >
-                <div className="font-bold mb-0.5">Quản trị viên</div>
-                <div className="font-mono text-[10px] opacity-75">0000000000 · CN HCM</div>
-              </button>
-              <button
-                onClick={() => quickLogin("NV009", "123456")}
-                className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors cursor-pointer text-amber-700"
-              >
-                <div className="font-bold mb-0.5">Nhân · Giám đốc CN</div>
-                <div className="font-mono text-[10px] opacity-75">NV009 · CN HCM</div>
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => quickLogin("NV001", "0901234567")}
-                className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer text-emerald-700"
-              >
-                <div className="font-bold mb-0.5">Bích Liên</div>
-                <div className="font-mono text-[10px] opacity-75">NV001 · Nhân viên</div>
-              </button>
-              <button
-                onClick={() => quickLogin("NV012", "123456")}
-                className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 transition-colors cursor-pointer text-sky-700"
-              >
-                <div className="font-bold mb-0.5">Thị Hà</div>
-                <div className="font-mono text-[10px] opacity-75">NV012 · CN Hà Nội</div>
-              </button>
-            </div>
-            <p className="text-gray-400 text-[10px] text-center pt-1">Hệ thống tự phân quyền dựa vào tài khoản đăng nhập.</p>
-          </div>
         </div>
       </div>
+
+      {showForgotModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <Shield className="text-[#C62828]" size={24} />
+                Quên mật khẩu
+              </h3>
+              <button 
+                onClick={() => setShowForgotModal(false)}
+                className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500"
+              >
+                <Lock size={18} className="hidden" /> {/* Placeholder just in case */}
+                <span className="text-xl leading-none">&times;</span>
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm leading-relaxed mb-6 border border-blue-100">
+                <p className="font-semibold mb-1">Quy định bảo mật hệ thống:</p>
+                Để đảm bảo an toàn thông tin nội bộ, hệ thống <strong>không hỗ trợ tự động đặt lại mật khẩu</strong> qua email hay số điện thoại cá nhân.
+              </div>
+              
+              <p className="text-gray-600 text-sm mb-4">
+                Vui lòng liên hệ bộ phận IT hoặc Quản trị viên hệ thống để được cấp lại mật khẩu mới:
+              </p>
+              
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  <div className="w-10 h-10 rounded-full bg-[#C62828]/10 flex items-center justify-center text-[#C62828]">
+                    <User size={20} />
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 font-medium">Người liên hệ</div>
+                    <div className="text-sm font-bold text-gray-800">IT Support / Quản trị viên</div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                  <div className="w-10 h-10 rounded-full bg-[#C62828]/10 flex items-center justify-center text-[#C62828]">
+                    <span className="font-bold">@</span>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500 font-medium">Kênh liên hệ nội bộ</div>
+                    <div className="text-sm font-bold text-gray-800">Nhắn tin qua nhóm Zalo Công ty</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+              <button 
+                onClick={() => setShowForgotModal(false)}
+                className="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-medium transition-colors text-sm"
+              >
+                Đã hiểu và Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
