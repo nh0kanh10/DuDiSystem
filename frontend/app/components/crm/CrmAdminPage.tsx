@@ -194,7 +194,7 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
         const r = await api.crm.autoAssign(active.map((e: any) => e.id))
         notify("Đã chia tự động " + (r?.assignedCount ?? 0) + " data cho phòng ban!")
         setAutoAssignOpen(false); refresh()
-      } catch { notify("Lỗi chia tự động", "error") }
+      } catch (err: any) { notify(err.message || "Lỗi chia tự động", "error") }
       finally { setAutoAssignLoading(false) }
     } else {
       if (!autoAssignSpecificEmp) { notify("Vui lòng chọn nhân viên", "error"); return }
@@ -206,7 +206,7 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
         const r = await api.crm.assignSpecific(autoAssignSpecificEmp, q)
         notify("Đã giao " + (r?.assignedCount ?? 0) + " data cho nhân viên!")
         setAutoAssignOpen(false); refresh()
-      } catch { notify("Lỗi giao data số lượng", "error") }
+      } catch (err: any) { notify(err.message || "Lỗi giao data số lượng", "error") }
       finally { setAutoAssignLoading(false) }
     }
   }
@@ -299,7 +299,7 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   return (
     <div className="space-y-5">
       {toast && (
-        <div className={"fixed bottom-5 right-5 z-50 flex items-center px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold animate-in slide-in-from-bottom duration-300 " + (toast.type === "error" ? "bg-red-50 text-red-800 border-red-100" : "bg-emerald-50 text-emerald-800 border-emerald-100")}>
+        <div className={"fixed bottom-5 right-5 z-[100] flex items-center px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold animate-in slide-in-from-bottom duration-300 " + (toast.type === "error" ? "bg-red-50 text-red-800 border-red-100" : "bg-emerald-50 text-emerald-800 border-emerald-100")}>
           {toast.msg}
         </div>
       )}
