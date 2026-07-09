@@ -4,8 +4,10 @@ import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 import { CrmLeadCell } from "./CrmLeadCell"
 import {
   Search, RefreshCw, Phone, Globe, MapPin, Copy,
-  Loader2, Briefcase, Clock, Activity, CheckCircle, Info
+  Loader2, Briefcase, Clock, Activity, CheckCircle, Info, TrendingUp
 } from "lucide-react"
+import { UserKpiPanel } from "../nhan-vien/UserKpiPanel"
+import { Employee } from "../../types"
 
 const STATUSES = ["Chưa xử lý", "Chặn người lạ", "Đã gửi tin nhắn", "Không có Zalo", "Trả lời"]
 
@@ -20,7 +22,7 @@ function statusColor(s: string) {
   }
 }
 
-export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => void }) {
+export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }: { employee?: Employee | null; activeTab?: "data" | "kpi"; onOpenLead?: (leadId: string) => void }) {
   const [stats, setStats] = useState<any>(null)
   const [records, setRecords] = useState<any[]>([])
   const [total, setTotal] = useState(0)
@@ -55,7 +57,7 @@ export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   }
 
   const refresh = () => { fetchStats(); fetchRecords() }
-  useEffect(() => { refresh() }, [statusFilter, search, pageSize])
+  useEffect(() => { if (activeTab === "data") refresh() }, [statusFilter, search, pageSize, activeTab])
 
   const handleStatusChange = async (id: string, status: string) => {
     setUpdatingId(id)
@@ -117,18 +119,10 @@ export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold text-[#241416]">Không gian làm việc</h1>
-          <p className="text-sm text-[#7f5f63] mt-0.5">Xem và cập nhật tiến độ xử lý data được giao</p>
-        </div>
-        <button onClick={refresh} className="p-2.5 bg-white border border-[#efd7da] rounded-xl hover:bg-[#fff1f2] transition active:scale-95 shadow-sm">
-          <RefreshCw size={16} className="text-[#7a1d22]" />
-        </button>
-      </div>
-
-      {/* Stats */}
+      {activeTab === "kpi" ? (
+        <UserKpiPanel employee={employee} />
+      ) : (
+        <>
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-3xl p-5 border border-[#efd7da] shadow-sm flex items-center justify-between">
@@ -292,6 +286,8 @@ export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
           </div>
         )}
       </div>
+      </>
+      )}
 
       <Modal
         open={Boolean(convertModalRecord)}

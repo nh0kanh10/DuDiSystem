@@ -71,7 +71,7 @@ const UserCustomMonthPicker = ({ value, onChange }: { value: string; onChange: (
   };
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div ref={containerRef}>
       <button type="button" onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-1.5 text-xs font-black text-gray-800 cursor-pointer hover:text-[#C62828] transition-colors">
         {getVietnameseMonthName(value)}
@@ -94,7 +94,7 @@ const UserCustomMonthPicker = ({ value, onChange }: { value: string; onChange: (
               const isToday = viewYear === todayYear && idx === todayMonth;
               return (
                 <button key={idx} type="button" onClick={() => handleSelectMonth(idx)}
-                  className={`py-1.5 text-[11px] font-bold rounded-xl transition-all cursor-pointer
+                  className={`w-full text-center py-1.5 text-[11px] font-bold rounded-xl transition-all cursor-pointer
                     ${isSelected ? "bg-[#C62828] text-white shadow-md" : isToday ? "bg-red-100 text-[#C62828]" : "text-gray-600 hover:bg-red-50 hover:text-[#C62828]"}`}>
                   {label}
                 </button>
@@ -164,6 +164,36 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0
   });
   const [formNotes, setFormNotes] = useState("");
+  const [customerDetails, setCustomerDetails] = useState<{
+    clientReply: { name: string; content: string }[];
+    khachChuDongIB: { name: string; content: string }[];
+    followUp: { name: string; content: string }[];
+  }>({
+    clientReply: [],
+    khachChuDongIB: [],
+    followUp: []
+  });
+
+  React.useEffect(() => {
+    setCustomerDetails(prev => {
+      const syncCategory = (cat: "clientReply" | "khachChuDongIB" | "followUp") => {
+        const count = formMetrics[cat] || 0;
+        const currentList = prev[cat] || [];
+        if (currentList.length === count) return currentList;
+        if (currentList.length < count) {
+          const added = Array.from({ length: count - currentList.length }, () => ({ name: "", content: "" }));
+          return [...currentList, ...added];
+        }
+        return currentList.slice(0, count);
+      };
+      
+      return {
+        clientReply: syncCategory("clientReply"),
+        khachChuDongIB: syncCategory("khachChuDongIB"),
+        followUp: syncCategory("followUp")
+      };
+    });
+  }, [formMetrics.clientReply, formMetrics.khachChuDongIB, formMetrics.followUp]);
 
   // Lock background scroll when modals are open
   React.useEffect(() => {
@@ -267,6 +297,59 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
       }
     }
     return { nhuCau, taiSao };
+  };
+
+  const renderEntryNotes = (notesText: string) => {
+    if (!notesText) return <p className="text-gray-400 font-medium mt-1">Không có chi tiết tương tác</p>;
+    try {
+      const parsed = JSON.parse(notesText);
+      if (parsed && (parsed.clientReply || parsed.khachChuDongIB || parsed.followUp)) {
+        const renderCategoryList = (title: string, items: { name: string; content: string }[]) => {
+          const filled = items.filter(x => x.name.trim() || x.content.trim());
+          if (filled.length === 0) return null;
+          return (
+            <div className="space-y-2 mt-3">
+              <h5 className="font-bold text-gray-700 border-l-2 border-[#C62828] pl-2 text-xs">{title}</h5>
+              <div className="space-y-1.5 pl-3">
+                {filled.map((item, i) => (
+                  <div key={i} className="text-xs bg-gray-50 p-2 rounded-xl border border-gray-100">
+                    <span className="font-bold text-gray-850">Khách: {item.name || "—"}</span>
+                    <p className="text-gray-600 mt-0.5"><span className="font-medium text-gray-400">Nội dung:</span> {item.content || "—"}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        };
+
+        const hasAny = [...(parsed.clientReply || []), ...(parsed.khachChuDongIB || []), ...(parsed.followUp || [])].some(x => x.name.trim() || x.content.trim());
+        if (!hasAny) return <p className="text-gray-400 font-medium mt-1">Không có chi tiết tương tác</p>;
+
+        return (
+          <div className="space-y-4 pt-2">
+            {renderCategoryList("Khách rep", parsed.clientReply || [])}
+            {renderCategoryList("Khách chủ động IB", parsed.khachChuDongIB || [])}
+            {renderCategoryList("Follow-up", parsed.followUp || [])}
+          </div>
+        );
+      }
+    } catch {
+      // Fallback to legacy parsing
+    }
+
+    const { nhuCau, taiSao } = parseNotes(notesText);
+    return (
+      <div className="space-y-4 pt-2 text-xs">
+        <div>
+          <span className="font-medium text-gray-400">Nhu cầu khách</span>
+          <p className="mt-1 font-semibold text-gray-800 break-words">{nhuCau || "Không có"}</p>
+        </div>
+        <div>
+          <span className="font-medium text-gray-400">Tại sao mất khách</span>
+          <p className="mt-1 font-semibold text-gray-800 break-words">{taiSao || "Không có"}</p>
+        </div>
+      </div>
+    );
   };
 
   // Aggregate current metrics totals for the month
@@ -419,7 +502,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
       employeeId: employee.id,
       date: formDate,
       metrics: formMetrics,
-      notes: formNotes
+      notes: JSON.stringify(customerDetails)
     };
 
     let nextEntries = [...currentEntries];
@@ -446,9 +529,20 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     if (todayEntry) {
       setFormMetrics(todayEntry.metrics);
       setFormNotes(todayEntry.notes);
+      try {
+        const parsed = JSON.parse(todayEntry.notes);
+        if (parsed && (parsed.clientReply || parsed.khachChuDongIB || parsed.followUp)) {
+          setCustomerDetails(parsed);
+        } else {
+          setCustomerDetails({ clientReply: [], khachChuDongIB: [], followUp: [] });
+        }
+      } catch {
+        setCustomerDetails({ clientReply: [], khachChuDongIB: [], followUp: [] });
+      }
     } else {
       setFormMetrics({ zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0 });
       setFormNotes("");
+      setCustomerDetails({ clientReply: [], khachChuDongIB: [], followUp: [] });
     }
     setIsInputModalOpen(true);
   };
@@ -462,27 +556,27 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
   };
 
   return (
-    <div className="space-y-6 text-gray-700 select-none max-w-full overflow-x-hidden">
+    <div className="space-y-6 text-gray-700 max-w-full overflow-x-hidden">
 
       {/* Sub navigation bar */}
-      <div className="flex justify-center border-b border-gray-200 w-full mb-6">
-        <div className="flex gap-8">
+      <div className="flex justify-start mb-6">
+        <div className="flex gap-1 rounded-xl p-1 bg-[#fff0f1] border border-[#efd7da]">
           <button
             onClick={() => setActiveSubTab("overview")}
-            className={`px-4 py-2.5 text-xs font-bold transition-all cursor-pointer relative -mb-[1px] ${
+            className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeSubTab === "overview"
-                ? "text-[#C62828] border-b-2 border-[#C62828]"
-                : "text-gray-400 hover:text-gray-700"
+                ? "bg-white text-[#E8231A] shadow-sm"
+                : "text-[#8b6b70] hover:text-[#C62828]"
             }`}
           >
             Tổng quan
           </button>
           <button
             onClick={() => setActiveSubTab("history")}
-            className={`px-4 py-2.5 text-xs font-bold transition-all cursor-pointer relative -mb-[1px] ${
+            className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeSubTab === "history"
-                ? "text-[#C62828] border-b-2 border-[#C62828]"
-                : "text-gray-400 hover:text-gray-700"
+                ? "bg-white text-[#E8231A] shadow-sm"
+                : "text-[#8b6b70] hover:text-[#C62828]"
             }`}
           >
             Lịch sử KPI
@@ -509,7 +603,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                 Nhập KPI
               </button>
 
-              <div className="flex-1 sm:flex-none justify-center flex items-center gap-2 text-xs font-bold text-gray-500 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-xs">
+              <div className="relative flex-1 sm:flex-none justify-center flex items-center gap-2 text-xs font-bold text-gray-500 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-xs">
                 <span>CHỌN THÁNG:</span>
                 <UserCustomMonthPicker value={selectedMonth} onChange={setSelectedMonth} />
               </div>
@@ -525,7 +619,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">KPI hôm nay</p>
                   <Calendar className="text-[#C62828] opacity-60" size={16} />
                 </div>
-                <h3 className="text-2xl font-black text-gray-800 mt-1 font-mono">{todayKpiPoints}</h3>
+                <h3 className="text-2xl font-black text-gray-800 mt-1">{todayKpiPoints}</h3>
               </div>
               <div className="mt-2 text-[9px] font-bold">
                 {todayKpiDelta.diff >= 0 ? (
@@ -547,11 +641,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Doanh thu tuần</p>
                   <DollarSign className="text-green-600 opacity-60" size={16} />
                 </div>
-                <h3 className="text-2xl font-black text-gray-800 mt-1 font-mono">
-                  {currentWeekRevenue >= 1000000
-                    ? `${(currentWeekRevenue / 1000000).toFixed(1).replace(/\.0$/, "")}M`
-                    : currentWeekRevenue.toLocaleString()
-                  }
+                <h3 className="text-2xl font-black text-gray-800 mt-1">
+                  {currentWeekRevenue.toLocaleString("vi-VN")}
                 </h3>
               </div>
               <div className="mt-2 text-[9px] font-bold">
@@ -574,11 +665,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Doanh thu tháng</p>
                   <DollarSign className="text-blue-600 opacity-60" size={16} />
                 </div>
-                <h3 className="text-2xl font-black text-gray-800 mt-1 font-mono">
-                  {currentMonthTotals.revenue >= 1000000
-                    ? `${(currentMonthTotals.revenue / 1000000).toFixed(1).replace(/\.0$/, "")}M`
-                    : currentMonthTotals.revenue.toLocaleString()
-                  }
+                <h3 className="text-2xl font-black text-gray-800 mt-1">
+                  {currentMonthTotals.revenue.toLocaleString("vi-VN")}
                 </h3>
               </div>
               <div className="mt-2 text-[9px] font-bold">
@@ -601,7 +689,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Chốt Deal tháng</p>
                   <Target className="text-orange-500 opacity-60" size={16} />
                 </div>
-                <h3 className="text-2xl font-black text-gray-800 mt-1 font-mono">{currentMonthTotals.deal}</h3>
+                <h3 className="text-2xl font-black text-gray-800 mt-1">{currentMonthTotals.deal}</h3>
               </div>
               <div className="mt-2 text-[9px] font-bold">
                 {monthDealDelta.diff >= 0 ? (
@@ -837,7 +925,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
       {/* Entry Daily Form Modal */}
       {isInputModalOpen && createPortal(
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setIsInputModalOpen(false)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col" style={{ animation: "sessionModalIn 0.2s ease", maxHeight: "90vh" }} onClick={(e) => e.stopPropagation()}>
             <div className="h-1.5 bg-gradient-to-r from-[#E8231A] to-[#FF8800]" />
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -862,9 +950,20 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     if (match) {
                       setFormMetrics(match.metrics);
                       setFormNotes(match.notes);
+                      try {
+                        const parsed = JSON.parse(match.notes);
+                        if (parsed && (parsed.clientReply || parsed.khachChuDongIB || parsed.followUp)) {
+                          setCustomerDetails(parsed);
+                        } else {
+                          setCustomerDetails({ clientReply: [], khachChuDongIB: [], followUp: [] });
+                        }
+                      } catch {
+                        setCustomerDetails({ clientReply: [], khachChuDongIB: [], followUp: [] });
+                      }
                     } else {
                       setFormMetrics({ zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0 });
                       setFormNotes("");
+                      setCustomerDetails({ clientReply: [], khachChuDongIB: [], followUp: [] });
                     }
                   }}
                   className="w-full sm:w-auto py-2 px-4 border border-gray-200 rounded-xl focus:outline-none font-bold text-gray-700 bg-white"
@@ -888,9 +987,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
                       {formMetrics.zalo >= getDailyTarget("zalo") ? (
-                        <span className="text-green-600 flex items-center gap-0.5">✅ Đạt KPI (Yêu cầu: {getDailyTarget("zalo")})</span>
+                        <span className="text-green-600 flex items-center gap-0.5">Đạt KPI (Yêu cầu: {getDailyTarget("zalo")})</span>
                       ) : (
-                        <span className="text-[#EF4444] flex items-center gap-0.5">⚠️ Chưa đủ KPI (Yêu cầu: {getDailyTarget("zalo")})</span>
+                        <span className="text-[#EF4444] flex items-center gap-0.5">Chưa đủ KPI (Yêu cầu: {getDailyTarget("zalo")})</span>
                       )}
                     </div>
                   </div>
@@ -907,9 +1006,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
                       {formMetrics.fb >= getDailyTarget("fb") ? (
-                        <span className="text-green-600 flex items-center gap-0.5">✅ Đạt KPI (Yêu cầu: {getDailyTarget("fb")})</span>
+                        <span className="text-green-600 flex items-center gap-0.5">Đạt KPI (Yêu cầu: {getDailyTarget("fb")})</span>
                       ) : (
-                        <span className="text-[#EF4444] flex items-center gap-0.5">⚠️ Chưa đủ KPI (Yêu cầu: {getDailyTarget("fb")})</span>
+                        <span className="text-[#EF4444] flex items-center gap-0.5">Chưa đủ KPI (Yêu cầu: {getDailyTarget("fb")})</span>
                       )}
                     </div>
                   </div>
@@ -926,9 +1025,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
                       {formMetrics.comment >= getDailyTarget("comment") ? (
-                        <span className="text-green-600 flex items-center gap-0.5">✅ Đạt KPI (Yêu cầu: {getDailyTarget("comment")})</span>
+                        <span className="text-green-600 flex items-center gap-0.5">Đạt KPI (Yêu cầu: {getDailyTarget("comment")})</span>
                       ) : (
-                        <span className="text-[#EF4444] flex items-center gap-0.5">⚠️ Chưa đủ KPI (Yêu cầu: {getDailyTarget("comment")})</span>
+                        <span className="text-[#EF4444] flex items-center gap-0.5">Chưa đủ KPI (Yêu cầu: {getDailyTarget("comment")})</span>
                       )}
                     </div>
                   </div>
@@ -945,9 +1044,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
                       {formMetrics.post >= getDailyTarget("post") ? (
-                        <span className="text-green-600 flex items-center gap-0.5">✅ Đạt KPI (Yêu cầu: {getDailyTarget("post")})</span>
+                        <span className="text-green-600 flex items-center gap-0.5">Đạt KPI (Yêu cầu: {getDailyTarget("post")})</span>
                       ) : (
-                        <span className="text-[#EF4444] flex items-center gap-0.5">⚠️ Chưa đủ KPI (Yêu cầu: {getDailyTarget("post")})</span>
+                        <span className="text-[#EF4444] flex items-center gap-0.5">Chưa đủ KPI (Yêu cầu: {getDailyTarget("post")})</span>
                       )}
                     </div>
                   </div>
@@ -970,9 +1069,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
                       {formMetrics.clientReply >= getDailyTarget("clientReply") ? (
-                        <span className="text-green-600 flex items-center gap-0.5">✅ Đạt KPI (Yêu cầu: {getDailyTarget("clientReply")})</span>
+                        <span className="text-green-600 flex items-center gap-0.5">Đạt KPI (Yêu cầu: {getDailyTarget("clientReply")})</span>
                       ) : (
-                        <span className="text-[#EF4444] flex items-center gap-0.5">⚠️ Chưa đủ KPI (Yêu cầu: {getDailyTarget("clientReply")})</span>
+                        <span className="text-[#EF4444] flex items-center gap-0.5">Chưa đủ KPI (Yêu cầu: {getDailyTarget("clientReply")})</span>
                       )}
                     </div>
                   </div>
@@ -989,9 +1088,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
                       {formMetrics.khachChuDongIB >= getDailyTarget("khachChuDongIB") ? (
-                        <span className="text-green-600 flex items-center gap-0.5">✅ Đạt KPI (Yêu cầu: {getDailyTarget("khachChuDongIB")})</span>
+                        <span className="text-green-600 flex items-center gap-0.5">Đạt KPI (Yêu cầu: {getDailyTarget("khachChuDongIB")})</span>
                       ) : (
-                        <span className="text-[#EF4444] flex items-center gap-0.5">⚠️ Chưa đủ KPI (Yêu cầu: {getDailyTarget("khachChuDongIB")})</span>
+                        <span className="text-[#EF4444] flex items-center gap-0.5">Chưa đủ KPI (Yêu cầu: {getDailyTarget("khachChuDongIB")})</span>
                       )}
                     </div>
                   </div>
@@ -1008,13 +1107,167 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
                       {formMetrics.followUp >= getDailyTarget("followUp") ? (
-                        <span className="text-green-600 flex items-center gap-0.5">✅ Đạt KPI (Yêu cầu: {getDailyTarget("followUp")})</span>
+                        <span className="text-green-600 flex items-center gap-0.5">Đạt KPI (Yêu cầu: {getDailyTarget("followUp")})</span>
                       ) : (
-                        <span className="text-[#EF4444] flex items-center gap-0.5">⚠️ Chưa đủ KPI (Yêu cầu: {getDailyTarget("followUp")})</span>
+                        <span className="text-[#EF4444] flex items-center gap-0.5">Chưa đủ KPI (Yêu cầu: {getDailyTarget("followUp")})</span>
                       )}
                     </div>
                   </div>
                 </div>
+
+                {/* Details Section */}
+                {(customerDetails.clientReply.length > 0 || customerDetails.khachChuDongIB.length > 0 || customerDetails.followUp.length > 0) && (
+                  <div className="pt-4 border-t border-gray-100 space-y-4">
+                    <h5 className="font-extrabold text-gray-800 text-xs">Chi tiết danh sách khách hàng tương tác</h5>
+                    
+                    {/* Render clientReply details */}
+                    {customerDetails.clientReply.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-bold text-[#C62828] text-[11px] border-l-2 border-[#C62828] pl-2">Khách rep ({customerDetails.clientReply.length})</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {customerDetails.clientReply.map((item, index) => (
+                            <div key={index} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+                              <div>
+                                <label className="block text-[10px] text-gray-400 font-bold mb-1">Tên khách hàng {index + 1}</label>
+                                <input
+                                  type="text"
+                                  value={item.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomerDetails(prev => {
+                                      const next = [...prev.clientReply];
+                                      next[index] = { ...next[index], name: val };
+                                      return { ...prev, clientReply: next };
+                                    });
+                                  }}
+                                  className="w-full py-1.5 px-3 border border-gray-200 rounded-lg focus:outline-none text-[11px] font-semibold bg-white"
+                                  placeholder="Nhập tên..."
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-gray-400 font-bold mb-1">Nội dung trao đổi</label>
+                                <input
+                                  type="text"
+                                  value={item.content}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomerDetails(prev => {
+                                      const next = [...prev.clientReply];
+                                      next[index] = { ...next[index], content: val };
+                                      return { ...prev, clientReply: next };
+                                    });
+                                  }}
+                                  className="w-full py-1.5 px-3 border border-gray-200 rounded-lg focus:outline-none text-[11px] font-semibold bg-white"
+                                  placeholder="Nội dung chính..."
+                                  required
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Render khachChuDongIB details */}
+                    {customerDetails.khachChuDongIB.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-bold text-[#C62828] text-[11px] border-l-2 border-[#C62828] pl-2">Khách chủ động IB ({customerDetails.khachChuDongIB.length})</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {customerDetails.khachChuDongIB.map((item, index) => (
+                            <div key={index} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+                              <div>
+                                <label className="block text-[10px] text-gray-400 font-bold mb-1">Tên khách hàng {index + 1}</label>
+                                <input
+                                  type="text"
+                                  value={item.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomerDetails(prev => {
+                                      const next = [...prev.khachChuDongIB];
+                                      next[index] = { ...next[index], name: val };
+                                      return { ...prev, khachChuDongIB: next };
+                                    });
+                                  }}
+                                  className="w-full py-1.5 px-3 border border-gray-200 rounded-lg focus:outline-none text-[11px] font-semibold bg-white"
+                                  placeholder="Nhập tên..."
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-gray-400 font-bold mb-1">Nội dung trao đổi</label>
+                                <input
+                                  type="text"
+                                  value={item.content}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomerDetails(prev => {
+                                      const next = [...prev.khachChuDongIB];
+                                      next[index] = { ...next[index], content: val };
+                                      return { ...prev, khachChuDongIB: next };
+                                    });
+                                  }}
+                                  className="w-full py-1.5 px-3 border border-gray-200 rounded-lg focus:outline-none text-[11px] font-semibold bg-white"
+                                  placeholder="Nội dung chính..."
+                                  required
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Render followUp details */}
+                    {customerDetails.followUp.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="font-bold text-[#C62828] text-[11px] border-l-2 border-[#C62828] pl-2">Follow-up ({customerDetails.followUp.length})</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {customerDetails.followUp.map((item, index) => (
+                            <div key={index} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+                              <div>
+                                <label className="block text-[10px] text-gray-400 font-bold mb-1">Tên khách hàng {index + 1}</label>
+                                <input
+                                  type="text"
+                                  value={item.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomerDetails(prev => {
+                                      const next = [...prev.followUp];
+                                      next[index] = { ...next[index], name: val };
+                                      return { ...prev, followUp: next };
+                                    });
+                                  }}
+                                  className="w-full py-1.5 px-3 border border-gray-200 rounded-lg focus:outline-none text-[11px] font-semibold bg-white"
+                                  placeholder="Nhập tên..."
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-gray-400 font-bold mb-1">Nội dung trao đổi</label>
+                                <input
+                                  type="text"
+                                  value={item.content}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setCustomerDetails(prev => {
+                                      const next = [...prev.followUp];
+                                      next[index] = { ...next[index], content: val };
+                                      return { ...prev, followUp: next };
+                                    });
+                                  }}
+                                  className="w-full py-1.5 px-3 border border-gray-200 rounded-lg focus:outline-none text-[11px] font-semibold bg-white"
+                                  placeholder="Nội dung chính..."
+                                  required
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Section 3: Báo giá & Deal */}
@@ -1033,9 +1286,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
                       {formMetrics.quote >= getDailyTarget("quote") ? (
-                        <span className="text-green-600 flex items-center gap-0.5">✅ Đạt KPI (Yêu cầu: {getDailyTarget("quote")})</span>
+                        <span className="text-green-600 flex items-center gap-0.5">Đạt KPI (Yêu cầu: {getDailyTarget("quote")})</span>
                       ) : (
-                        <span className="text-[#EF4444] flex items-center gap-0.5">⚠️ Chưa đủ KPI (Yêu cầu: {getDailyTarget("quote")})</span>
+                        <span className="text-[#EF4444] flex items-center gap-0.5">Chưa đủ KPI (Yêu cầu: {getDailyTarget("quote")})</span>
                       )}
                     </div>
                   </div>
@@ -1052,9 +1305,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
                       {formMetrics.deal >= getDailyTarget("deal") ? (
-                        <span className="text-green-600 flex items-center gap-0.5">✅ Đạt KPI (Yêu cầu: {getDailyTarget("deal")})</span>
+                        <span className="text-green-600 flex items-center gap-0.5">Đạt KPI (Yêu cầu: {getDailyTarget("deal")})</span>
                       ) : (
-                        <span className="text-[#EF4444] flex items-center gap-0.5">⚠️ Chưa đủ KPI (Yêu cầu: {getDailyTarget("deal")})</span>
+                        <span className="text-[#EF4444] flex items-center gap-0.5">Chưa đủ KPI (Yêu cầu: {getDailyTarget("deal")})</span>
                       )}
                     </div>
                   </div>
@@ -1071,38 +1324,27 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
                       {formMetrics.revenue >= getDailyTarget("revenue") ? (
-                        <span className="text-green-600 flex items-center gap-0.5">✅ Đạt KPI (Yêu cầu: {getDailyTarget("revenue").toLocaleString()}đ)</span>
+                        <span className="text-green-600 flex items-center gap-0.5">Đạt KPI (Yêu cầu: {getDailyTarget("revenue").toLocaleString()}đ)</span>
                       ) : (
-                        <span className="text-[#EF4444] flex items-center gap-0.5">⚠️ Chưa đủ KPI (Yêu cầu: {getDailyTarget("revenue").toLocaleString()}đ)</span>
+                        <span className="text-[#EF4444] flex items-center gap-0.5">Chưa đủ KPI (Yêu cầu: {getDailyTarget("revenue").toLocaleString()}đ)</span>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Ghi chú */}
-              <div className="bg-white p-4 sm:p-5 border border-gray-150 rounded-2xl shadow-xs space-y-4">
-                <label className="block text-gray-700 font-bold mb-1 text-xs">Ghi chú công việc nhật trình</label>
-                <textarea
-                  value={formNotes}
-                  onChange={(e) => setFormNotes(e.target.value)}
-                  rows={3}
-                  className="w-full py-2.5 px-4 border border-gray-200 rounded-xl focus:outline-none leading-relaxed text-xs"
-                  placeholder="Ghi chú chi tiết công việc hôm nay..."
-                />
-              </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+              <div className="flex justify-end gap-2.5 pt-4 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setIsInputModalOpen(false)}
-                  className="py-2 px-5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer font-bold transition-colors"
+                  className="py-1.5 px-4 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer font-bold text-[11px] transition-colors"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
-                  className="py-2 px-8 rounded-xl bg-[#C62828] text-white hover:opacity-90 transition-all font-bold cursor-pointer"
+                  className="py-1.5 px-5 rounded-xl bg-[#C62828] text-white hover:opacity-90 transition-all font-bold text-[11px] cursor-pointer"
                 >
                   Gửi báo cáo
                 </button>
@@ -1116,16 +1358,16 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
       {/* Entry Detail Modal Component */}
       {selectedEntryForDetail && createPortal(
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setSelectedEntryForDetail(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 overflow-hidden flex flex-col" style={{ animation: "sessionModalIn 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]" style={{ animation: "sessionModalIn 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
             
             {/* Title */}
-            <div className="mb-4">
+            <div className="pt-6 px-6 mb-4">
               <h3 className="text-sm font-extrabold text-gray-800">Chi tiết KPI — {formatKpiDate(selectedEntryForDetail.date)}</h3>
             </div>
  
             {/* Content list */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
-              <div className="divide-y divide-gray-100 text-xs">
+            <div className="flex-1 overflow-y-auto space-y-4 scrollbar-thin w-full">
+              <div className="divide-y divide-gray-100 text-xs px-6">
                 <div className="flex justify-between items-center py-2.5">
                   <span className="text-gray-500 font-medium">IB Zalo</span>
                   <span className="font-bold text-gray-950 text-right">{selectedEntryForDetail.metrics.zalo}</span>
@@ -1169,25 +1411,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
               </div>
  
               {/* Notes parsed */}
-              {(() => {
-                const { nhuCau, taiSao } = parseNotes(selectedEntryForDetail.notes);
-                return (
-                  <div className="space-y-4 pt-2 text-xs">
-                    <div>
-                      <span className="font-medium text-gray-400">Nhu cầu khách</span>
-                      <p className="mt-1 font-semibold text-gray-800 break-words">{nhuCau || "Không có"}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-400">Tại sao mất khách</span>
-                      <p className="mt-1 font-semibold text-gray-800 break-words">{taiSao || "Không có"}</p>
-                    </div>
-                  </div>
-                );
-              })()}
+              <div className="px-6 pb-2">
+                {renderEntryNotes(selectedEntryForDetail.notes)}
+              </div>
             </div>
  
             {/* Footer */}
-            <div className="mt-6">
+            <div className="p-6 pt-4 border-t border-gray-100 flex justify-end">
               <button
                 type="button"
                 onClick={() => setSelectedEntryForDetail(null)}

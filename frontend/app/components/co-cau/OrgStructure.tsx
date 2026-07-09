@@ -665,22 +665,34 @@ export default function OrgStructure({
         </div>
       </div>
 
-      <div className="flex bg-gray-100 rounded-xl p-1 shadow-inner border border-gray-200 w-fit">
+      <div className="flex bg-white rounded-2xl p-1 border border-gray-200 w-fit gap-1">
         <button
           onClick={() => { setSelectedNodeId(null); setViewMode("diagram") }}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "diagram" && !selectedNodeId ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+          className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            viewMode === "diagram" && !selectedNodeId
+              ? "bg-[#C62828] text-white shadow-sm"
+              : "text-[#8b6b70] hover:text-[#C62828]"
+          }`}
         >
           Sơ đồ
         </button>
         <button
           onClick={() => { setSelectedNodeId(null); setViewMode("list") }}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "list" && !selectedNodeId ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+          className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            viewMode === "list" && !selectedNodeId
+              ? "bg-[#C62828] text-white shadow-sm"
+              : "text-[#8b6b70] hover:text-[#C62828]"
+          }`}
         >
           Danh sách
         </button>
         <button
           onClick={() => { setSelectedNodeId(null); setViewMode("catalog") }}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${viewMode === "catalog" ? "bg-white text-[#C62828] shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+          className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+            viewMode === "catalog"
+              ? "bg-[#C62828] text-white shadow-sm"
+              : "text-[#8b6b70] hover:text-[#C62828]"
+          }`}
         >
           <Briefcase size={11} />Chức danh
         </button>

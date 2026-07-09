@@ -151,7 +151,7 @@ const CustomMonthPicker = ({ value, onChange }: CustomMonthPickerProps) => {
   };
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div ref={containerRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -184,7 +184,7 @@ const CustomMonthPicker = ({ value, onChange }: CustomMonthPickerProps) => {
                   key={idx}
                   type="button"
                   onClick={() => handleSelectMonth(idx)}
-                  className={`py-1.5 text-[11px] font-bold rounded-xl transition-all cursor-pointer
+                  className={`w-full text-center py-1.5 text-[11px] font-bold rounded-xl transition-all cursor-pointer
                     ${isSelected ? "bg-[#C62828] text-white shadow-md" : isToday ? "bg-red-100 text-[#C62828]" : "text-gray-600 hover:bg-red-50 hover:text-[#C62828]"}
                   `}
                 >
@@ -1233,7 +1233,7 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
   };
 
   return (
-    <div className="space-y-6 select-none pb-12">
+    <div className="space-y-6 pb-12">
       {/* Top Banner widgets */}
       <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:10px_10px] rounded-3xl p-6 text-white relative overflow-hidden shadow-md shadow-red-900/20">
         <div className="relative z-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -1261,39 +1261,45 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
 
       {/* Navigation tabs header with Month Picker on the right */}
       {activeTab === "overview" && (
-        <div className="flex border-b border-gray-200 justify-between items-center w-full mb-6">
-          <div className="flex">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full mb-6">
+          <div className="flex gap-1.5 rounded-2xl p-1 bg-white border border-gray-200">
             <button
               onClick={() => setOverviewSubTab("charts")}
-              className={`px-6 py-3 font-bold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-                overviewSubTab === "charts" ? "border-[#C62828] text-[#C62828]" : "border-transparent text-gray-500 hover:text-gray-700"
+              className={`py-2 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
+                overviewSubTab === "charts"
+                  ? "bg-[#C62828] text-white shadow-sm"
+                  : "text-[#8b6b70] hover:text-[#C62828]"
               }`}
             >
-              <BarChart3 size={15} />
+              <BarChart3 size={14} />
               Tổng quan
             </button>
             <button
               onClick={() => setOverviewSubTab("reports")}
-              className={`px-6 py-3 font-bold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-                overviewSubTab === "reports" ? "border-[#C62828] text-[#C62828]" : "border-transparent text-gray-500 hover:text-gray-700"
+              className={`py-2 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
+                overviewSubTab === "reports"
+                  ? "bg-[#C62828] text-white shadow-sm"
+                  : "text-[#8b6b70] hover:text-[#C62828]"
               }`}
             >
-              <FileText size={15} />
+              <FileText size={14} />
               Báo cáo
             </button>
             <button
               onClick={() => setOverviewSubTab("targets")}
-              className={`px-6 py-3 font-bold text-xs border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
-                overviewSubTab === "targets" ? "border-[#C62828] text-[#C62828]" : "border-transparent text-gray-500 hover:text-gray-700"
+              className={`py-2 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
+                overviewSubTab === "targets"
+                  ? "bg-[#C62828] text-white shadow-sm"
+                  : "text-[#8b6b70] hover:text-[#C62828]"
               }`}
             >
-              <Settings size={15} />
+              <Settings size={14} />
               KPI Target
             </button>
           </div>
 
           {overviewSubTab === "charts" && (
-            <div className="flex items-center gap-2 text-xs font-bold text-gray-500 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-xs mr-2 mb-1">
+            <div className="relative flex items-center gap-2 text-xs font-bold text-gray-500 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-xs">
               <span>CHỌN THÁNG:</span>
               <CustomMonthPicker value={selectedMonth} onChange={setSelectedMonth} />
             </div>
@@ -1903,7 +1909,7 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
 
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] uppercase tracking-wider text-gray-400">Tháng</label>
-                        <div className="w-full py-2 px-3 border border-gray-200 rounded-xl focus-within:border-[#C62828] bg-white flex items-center justify-between h-[34px]">
+                        <div className="relative w-full py-2 px-3 border border-gray-200 rounded-xl focus-within:border-[#C62828] bg-white flex items-center justify-between h-[34px]">
                           <CustomMonthPicker
                             value={targetForm.month}
                             onChange={(val) => setTargetForm(prev => ({ ...prev, month: val }))}
@@ -2440,7 +2446,7 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
                 {/* Tháng A */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tháng A (So sánh)</label>
-                  <div className="w-full py-2 px-4 border border-gray-200 rounded-2xl bg-white flex items-center justify-between h-[38px] focus-within:border-[#C62828] shadow-sm">
+                  <div className="relative w-full py-2 px-4 border border-gray-200 rounded-2xl bg-white flex items-center justify-between h-[38px] focus-within:border-[#C62828] shadow-sm">
                     <CustomMonthPicker
                       value={compMonth1}
                       onChange={(val) => setCompMonth1(val)}
@@ -2451,7 +2457,7 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
                 {/* Tháng B */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tháng B (Đối chiếu)</label>
-                  <div className="w-full py-2 px-4 border border-gray-200 rounded-2xl bg-white flex items-center justify-between h-[38px] focus-within:border-[#C62828] shadow-sm">
+                  <div className="relative w-full py-2 px-4 border border-gray-200 rounded-2xl bg-white flex items-center justify-between h-[38px] focus-within:border-[#C62828] shadow-sm">
                     <CustomMonthPicker
                       value={compMonth2}
                       onChange={(val) => setCompMonth2(val)}
