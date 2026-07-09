@@ -53,7 +53,6 @@ function capStaffModulesByRole(permissions, roleModules) {
   })
 }
 
-/** Permissions shaped for client UI (staff cap + strip admin modules for staff roles) */
 export function resolveClientPermissions(user) {
   let perms = resolveEffectivePermissions(user)
   if (perms.includes("all")) return perms

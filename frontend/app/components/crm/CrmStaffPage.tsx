@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
+import { useToast } from "@/app/hooks/useToast"
 import { CrmLeadCell } from "./CrmLeadCell"
 import {
   Search, RefreshCw, Phone, Globe, MapPin, Copy,
@@ -28,7 +29,7 @@ export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [pageSize, setPageSize] = useState<number | "all">(50)
-  const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
+  const { showToast: notify } = useToast()
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [tempNote, setTempNote] = useState("")
   const [updatingId, setUpdatingId] = useState<string | null>(null)
@@ -36,9 +37,7 @@ export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   const [convertModalRecord, setConvertModalRecord] = useState<any>(null)
   const [convertLeadName, setConvertLeadName] = useState("")
 
-  const notify = (msg: string, type = "success") => {
-    setToast({ msg, type }); setTimeout(() => setToast(null), 3000)
-  }
+
 
   const fetchStats = async () => {
     try { setStats(await api.crm.employeeDashboard()) } catch { }
@@ -108,14 +107,7 @@ export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   }
 
   return (
-    <div className="space-y-5">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed bottom-5 right-5 z-[9999] flex items-center px-4 py-3 rounded-2xl shadow-2xl border text-sm font-semibold backdrop-blur-md animate-in slide-in-from-bottom duration-300 ${toast.type === "error" ? "bg-red-950/95 text-red-200 border-red-500/35" : "bg-emerald-950/95 text-emerald-200 border-emerald-500/35"}`}>
-          <div className={`w-1.5 h-1.5 rounded-full mr-2.5 animate-pulse ${toast.type === "error" ? "bg-red-400" : "bg-emerald-400"}`} />
-          {toast.msg}
-        </div>
-      )}
+    <div className="space-y-4">
 
       {/* Header */}
       <div className="flex items-center justify-between">

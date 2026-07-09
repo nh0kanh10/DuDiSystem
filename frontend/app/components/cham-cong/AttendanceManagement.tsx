@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react"
+import { useToast } from "@/app/hooks/useToast"
 import { createPortal } from "react-dom"
 import {
   Search, Download, Edit2, UserCheck, Clock, UserX, CalendarDays,
@@ -158,15 +159,6 @@ function InternSessionBadges({ record }: { record: AttendanceRecord }) {
   )
 }
 
-function Toast({ msg, type, onClose }: { msg: string; type: "success" | "error"; onClose: () => void }) {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t) }, [])
-  return (
-    <div className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border backdrop-blur-sm animate-in slide-in-from-right duration-300 ${type === "success" ? "bg-gray-900/95 border-white/10 text-white" : "bg-red-900/95 border-red-500/20 text-white"}`}>
-      <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${type === "success" ? "bg-emerald-400" : "bg-red-400"}`} />
-      <span className="text-sm font-semibold">{msg}</span>
-    </div>
-  )
-}
 
 function SkeletonRow() {
   return (
@@ -405,7 +397,10 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [employees, setEmployees] = useState<any[]>([])
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null)
+  const { showToast } = useToast()
+  const setToast = useCallback((t: { msg: string; type: "success" | "error" } | null) => {
+    if (t) showToast(t.msg, t.type)
+  }, [showToast])
 
   useEffect(() => { api.employees.list().then(d => setEmployees(d as any[])) }, [])
 
@@ -533,7 +528,6 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
 
   return (
     <div className="space-y-5">
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       {editRecord && <EditModal record={editRecord} onClose={() => setEditRecord(null)} onSave={handleSaveEdit} />}
       {showAdd && <AddModal date={selectedDate} employees={branchEmployees} onClose={() => setShowAdd(false)} onSave={handleAdd} />}
 
@@ -715,7 +709,10 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
   const [loading, setLoading] = useState(true)
   const [filterDept, setFilterDept] = useState("all")
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
-  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null)
+  const { showToast } = useToast()
+  const setToast = useCallback((t: { msg: string; type: "success" | "error" } | null) => {
+    if (t) showToast(t.msg, t.type)
+  }, [showToast])
 
   const daysInMonth = new Date(year, month, 0).getDate()
   const dayNumbers = Array.from({ length: daysInMonth }, (_, i) => i + 1)
@@ -792,7 +789,6 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
 
   return (
     <div className="space-y-5">
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       {editRecord && <EditModal record={editRecord} onClose={() => setEditRecord(null)} onSave={handleSaveEdit} />}
 
       <div className="flex items-center justify-between flex-wrap gap-3 w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-3">

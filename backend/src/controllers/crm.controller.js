@@ -4,9 +4,9 @@ import { fail } from "../utils/response.js"
 
 export function listData(req, res) {
   try {
-    const { status, assignedTo, area, search, page, size } = req.query
+    const { status, assignedTo, area, search, page, size, branchId } = req.query
     const result = svc.listRecords({
-      status, assignedTo, area, search,
+      status, assignedTo, area, search, branchId,
       page: page ? parseInt(page, 10) : 0,
       size: size ? parseInt(size, 10) : 20
     })
@@ -170,7 +170,8 @@ export function assignSpecific(req, res) {
 
 export function adminDashboard(req, res) {
   try {
-    res.json({ success: true, data: svc.getAdminDashboard() })
+    const { branchId } = req.query
+    res.json({ success: true, data: svc.getAdminDashboard({ branchId }) })
   } catch (err) { fail(res, err.message) }
 }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react"
+import { useToast } from "@/app/hooks/useToast"
 import { createPortal } from "react-dom"
 import {
   Search, Check, X, Plus, FileText,
@@ -534,8 +535,7 @@ export default function ApprovalManagement({
     }
   }
   const [adminNote, setAdminNote] = useState("")
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [toastType, setToastType] = useState<"success" | "error">("success")
+  const { showToast } = useToast()
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1)
   const [weekFilter, setWeekFilter] = useState(() => `W${getISOWeek(new Date())}`)
@@ -639,10 +639,6 @@ export default function ApprovalManagement({
     return list
   }, [requests, weekFilter, employees, selectedBranch, orgNodes])
 
-  const showToast = (msg: string, type: "success" | "error" = "success") => {
-    setToastMessage(msg); setToastType(type)
-    setTimeout(() => setToastMessage(null), 2800)
-  }
   const addProcessing    = (id: string) => setProcessingIds(p => [...p, id])
   const removeProcessing = (id: string) => setProcessingIds(p => p.filter(x => x !== id))
 
@@ -1253,17 +1249,6 @@ export default function ApprovalManagement({
 
   return (
     <div className="space-y-4 pb-24">
-      {toastMessage && createPortal(
-        <div className={`fixed bottom-6 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] border backdrop-blur-sm animate-in slide-in-from-right duration-300
-          ${toastType === "success"
-            ? "bg-gray-900/95 text-white border-white/10"
-            : "bg-red-900/95 text-white border-red-500/20"}`}>
-          <div className={`w-2.5 h-2.5 rounded-full ${toastType === "success" ? "bg-emerald-400" : "bg-red-400"} animate-pulse`} />
-          <span className="text-sm font-semibold">{toastMessage}</span>
-        </div>,
-        document.body
-      )}
-
       <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
         <div className="flex items-center">
           <div className="flex gap-1.5 items-center mr-4 shrink-0">

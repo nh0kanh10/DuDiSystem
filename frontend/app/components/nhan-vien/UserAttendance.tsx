@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { Fingerprint, CheckCircle, Clock, AlertCircle, Calendar, Loader2, RefreshCw, Wifi } from "lucide-react"
 import { useEmployeeAttendance, todayISO } from "../../hooks/useEmployeeAttendance"
 import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL, ATT_STATUS_STYLE } from "../cham-cong/attendanceDisplay"
@@ -333,7 +334,7 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
-      {error && (
+      {error && createPortal(
         <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-red-950/95 border border-red-500/30 text-red-200 shadow-2xl backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-5">
           <div className="w-1.5 h-6 rounded-full bg-red-500 flex-shrink-0" />
           <span className="text-xs font-semibold tracking-wide">{error}</span>
@@ -343,7 +344,8 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
           >
             Thử lại
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
       <WifiStatusBannerLight ipStatus={ipStatus} checking={loading && !ipStatus} />

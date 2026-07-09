@@ -131,7 +131,7 @@ export function updateUser(id, patch) {
     if (primary) {
       raRepo.update(primary.id, {
         scopeType,
-        scopeId: scopeType === "branch" ? (patch.scopeId || primary.scopeId) : null
+        scopeId: scopeType === "branch" ? (patch.scopeId !== undefined ? patch.scopeId : primary.scopeId) : null
       })
     }
   }

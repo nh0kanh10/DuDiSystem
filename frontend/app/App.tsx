@@ -586,7 +586,7 @@ function AppContent() {
       case "cong-viec": return <TaskManagement selectedBranch={selectedBranch} />
       case "tien-ich": return <SystemConfigPage />
       case "crm": return (
-        <CrmAdminPage onOpenLead={(id) => navigate(`/lead/${id}`)} />
+        <CrmAdminPage selectedBranch={selectedBranch} onOpenLead={(id) => navigate(`/lead/${id}`)} />
       )
       case "staff-portal": return (
         <div className="w-full h-[calc(100vh-2.5rem)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
@@ -1051,87 +1051,7 @@ function UserAwareSidebar({
           </div>
         )}
 
-        <div className="relative w-full">
-          <button
-            onClick={openNotifs}
-            title="Thông báo"
-            className={`w-full flex items-center gap-2 rounded-xl hover:bg-white/8 transition-all text-white/55 hover:text-white/85 relative
-              ${collapsed ? "justify-center p-2.5" : "px-3 py-2.5 text-sm"}`}
-          >
-            <Bell size={18} className="flex-shrink-0" />
-            {!collapsed && <span className="font-medium flex-1 text-left truncate">Thông báo</span>}
-            {notifBadge > 0 && (
-              <span className={`min-w-[18px] h-[18px] bg-[#C62828] text-white text-[9px] font-extrabold rounded-full flex items-center justify-center border-2 border-[#160606] px-1
-                ${collapsed ? "absolute -top-0.5 -right-0.5" : ""}`}>
-                {notifBadge}
-              </span>
-            )}
-          </button>
-          {showNotifDrop && (
-            <>
-              <div className="fixed inset-0 z-[90]" onClick={() => setShowNotifDrop(false)} />
-              <div className={`${dropPos} w-80 bg-white rounded-2xl shadow-xl border border-black/8 z-[100] overflow-hidden`}>
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                  <p className="text-sm font-black text-gray-800">Thông báo</p>
-                  <button onClick={markAllRead} className="text-[11px] font-bold text-[#C62828] hover:underline">Đọc tất cả</button>
-                </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {pendingUpdates.map((req: any) => {
-                    const reqEmp = employees.find(e => e.id === req.employeeId)
-                    const empName = reqEmp?.name || req.employeeId
-                    return (
-                      <button key={req.id} onClick={() => {
-                        onSelectUpdateReq?.(req.id)
-                        onNavigate("nhan-su")
-                        setShowNotifDrop(false)
-                      }}
-                        className="w-full flex items-start gap-3 px-4 py-3 hover:bg-orange-50 bg-orange-50/20 transition-colors text-left border-b border-gray-50 last:border-0">
-                        <div className="relative flex h-2 w-2 mt-1.5 flex-shrink-0">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75" />
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs leading-relaxed font-bold text-gray-800">
-                            Hồ sơ cập nhật của <span className="text-orange-600 font-extrabold">{empName}</span> đang chờ duyệt
-                          </p>
-                          <p className="text-[10px] text-gray-400 mt-0.5">Nhấp để đi tới trang duyệt hồ sơ</p>
-                        </div>
-                      </button>
-                    )
-                  })}
-                  {loadingNotifs ? (
-                    <div className="p-8 text-center">
-                      <div className="w-6 h-6 rounded-full border-2 border-[#C62828]/30 border-t-[#C62828] animate-spin mx-auto" />
-                    </div>
-                  ) : notifs.length === 0 && pendingUpdates.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-gray-400">Không có thông báo nào</div>
-                  ) : notifs.map((n: any) => (
-                    <button key={n.id} onClick={async () => {
-                      await api.notifications.markRead(n.id)
-                      setNotifs(ns => ns.filter(x => x.id !== n.id))
-                      onReloadNotifCount?.()
-                    }}
-                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50 last:border-0 bg-red-50/30">
-                      <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0 bg-[#C62828]" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs leading-relaxed font-bold text-gray-800">{n.message}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5">{n.time}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                {isAdmin && (
-                  <div className="border-t border-gray-100 p-2">
-                    <button onClick={() => { setShowNotifDrop(false); onNavigate("thong-bao") }}
-                      className="w-full text-center text-xs font-bold text-[#C62828] py-2 hover:bg-red-50 rounded-xl transition-colors">
-                      Quản lý thông báo hệ thống →
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+
       </div>
 
       {/* Navigation */}

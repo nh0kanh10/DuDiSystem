@@ -37,7 +37,7 @@ import { isStaffTypeRole } from "../../utils/staffModules"
 
 const ADMIN_MODULE_IDS = new Set([
   "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don",
-  "tai-khoan", "phan-quyen", "ip", "thong-ke", "du-an", "tien-ich", "crm",
+  "tai-khoan", "phan-quyen", "ip", "thong-ke", "du-an", "tien-ich",
 ])
 
 function stripAdminModules(modules: string[]): string[] {

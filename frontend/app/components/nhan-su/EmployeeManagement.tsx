@@ -1152,12 +1152,25 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
   }, [])
 
 
+  const lastContractType = useRef(form.contractType)
+
   useEffect(() => {
     if (internshipMonths == null) return
-    if (form.contractType !== "intern" || !form.joinDate) return
-    const nextEnd = addMonthsToVNDate(form.joinDate, internshipMonths)
-    if (!nextEnd) return
-    setForm((p) => (p.internEndDate === nextEnd ? p : { ...p, internEndDate: nextEnd }))
+    if (form.contractType !== "intern" || !form.joinDate) {
+      lastContractType.current = form.contractType
+      return
+    }
+    
+    const justSwitched = lastContractType.current !== "intern" && form.contractType === "intern"
+    const isEmpty = !form.internEndDate
+    
+    if (justSwitched || isEmpty) {
+      const nextEnd = addMonthsToVNDate(form.joinDate, internshipMonths)
+      if (nextEnd) {
+        setForm(p => ({ ...p, internEndDate: nextEnd }))
+      }
+    }
+    lastContractType.current = form.contractType
   }, [internshipMonths, form.contractType, form.joinDate])
 
   const inp = "w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/50 focus:ring-1 focus:ring-[#C62828]/10 transition-all text-gray-700 bg-white"

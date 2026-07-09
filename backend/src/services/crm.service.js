@@ -24,8 +24,14 @@ function resolveAssignee(employeeId) {
   return { assignedTo: emp.id, assignedToName: emp.name }
 }
 
-export function listRecords({ status, assignedTo, area, department, search, page = 0, size = 20 } = {}) {
+export function listRecords({ status, assignedTo, area, department, search, branchId, page = 0, size = 20 } = {}) {
   let records = repo.getAll()
+
+  if (branchId?.trim() && branchId !== "all") {
+    const branchStaffs = empRepo.getAll({ branchId })
+    const staffIds = branchStaffs.map(e => e.id)
+    records = records.filter(r => !r.assignedTo || staffIds.includes(r.assignedTo))
+  }
 
   if (status?.trim()) records = records.filter(r => r.status === status)
   if (assignedTo?.trim()) {
@@ -217,8 +223,13 @@ export function assignSpecific(employeeId, quantity) {
   }
 }
 
-export function getAdminDashboard() {
-  const all = repo.getAll()
+export function getAdminDashboard({ branchId } = {}) {
+  let all = repo.getAll()
+  if (branchId?.trim() && branchId !== "all") {
+    const branchStaffs = empRepo.getAll({ branchId })
+    const staffIds = branchStaffs.map(e => e.id)
+    all = all.filter(r => !r.assignedTo || staffIds.includes(r.assignedTo))
+  }
   const assigned = all.filter(r => r.assignedTo).length
   const statusBreakdown = {}
   CRM_STATUSES.forEach(s => { statusBreakdown[s] = 0 })

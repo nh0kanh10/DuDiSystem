@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react"
 import { api } from "@/lib/api"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 import ConfirmModal from "../ui/ConfirmModal"
+import { useToast } from "@/app/hooks/useToast"
 import { CrmLeadCell } from "./CrmLeadCell"
 import { StatCard } from "../ui/StatCard"
 import { CustomCombobox } from "../ui/CustomCombobox"
@@ -45,7 +46,7 @@ const emptyForm = {
 
 type TabType = "dashboard" | "data"
 
-export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => void }) {
+export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedBranch?: string; onOpenLead?: (leadId: string) => void }) {
   const [tab, setTab] = useState<TabType>("dashboard")
   const [stats, setStats] = useState<any>(null)
   const [records, setRecords] = useState<any[]>([])
@@ -59,7 +60,6 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   const [showFilters, setShowFilters] = useState(false)
   const [pageSize, setPageSize] = useState<number | "all">(50)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [toast, setToast] = useState<{ msg: string; type: string } | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -81,13 +81,10 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   const [inlineAssignLoading, setInlineAssignLoading] = useState(false)
   const [confirmInlineOpen, setConfirmInlineOpen] = useState(false)
   const [convertingId, setConvertingId] = useState<string | null>(null)
+  const [deleteBulkLoading, setDeleteBulkLoading] = useState(false)
+  const { showToast: notify } = useToast()
   const [convertModalRecord, setConvertModalRecord] = useState<any>(null)
   const [convertLeadName, setConvertLeadName] = useState("")
-
-  const notify = (msg: string, type = "success") => {
-    setToast({ msg, type })
-    setTimeout(() => setToast(null), 3500)
-  }
 
   const handleConvertToLead = (record: { id: string; convertedLeadId?: string; businessName?: string }) => {
     setConvertModalRecord(record)
@@ -121,14 +118,14 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
 
   const fetchStats = async () => {
     setStatsLoading(true)
-    try { setStats(await api.crm.adminDashboard()) } catch { } finally { setStatsLoading(false) }
+    try { setStats(await api.crm.adminDashboard({ branchId: selectedBranch })) } catch { } finally { setStatsLoading(false) }
   }
 
   const fetchRecords = async () => {
     setLoading(true)
     try {
       const size = pageSize === "all" ? 100000 : pageSize
-      const data = await api.crm.listData({ status: statusFilter, assignedTo: assignedFilter, search, page: 0, size })
+      const data = await api.crm.listData({ status: statusFilter, assignedTo: assignedFilter, search, page: 0, size, branchId: selectedBranch })
       setRecords(data?.content ?? [])
       setTotal(data?.totalElements ?? 0)
     } catch { } finally { setLoading(false) }
@@ -139,7 +136,7 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   }
 
   const refresh = () => { fetchStats(); fetchRecords(); fetchEmployees() }
-  useEffect(() => { refresh() }, [statusFilter, assignedFilter, search, pageSize])
+  useEffect(() => { refresh() }, [statusFilter, assignedFilter, search, pageSize, selectedBranch])
 
   const phoneReg = /^(\+84|0)(\s*\d){9,11}$/
   const validate = () => {
@@ -186,8 +183,8 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   const submitAutoAssign = async () => {
     if (autoAssignTab === "department") {
       if (!autoAssignDept) { notify("Vui lòng chọn phòng ban", "error"); return }
-      const active = employees.filter((e: any) => e.status === "active" && e.department === autoAssignDept)
-      if (!active.length) { notify(`Không có nhân viên active ở phòng ban này`, "error"); return }
+      const active = activeEmployees.filter((e: any) => e.department === autoAssignDept)
+      if (!active.length) { notify(`Không có nhân viên hoạt động ở phòng ban này`, "error"); return }
       
       setAutoAssignLoading(true)
       try {
@@ -269,13 +266,20 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   const toggleAll = () => setSelectedIds(p => p.length === records.length ? [] : records.map(r => r.id))
   const toggleOne = (id: string) => setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
 
-  const empOptions = employees.map((e: any) => ({ value: e.id, label: e.name }))
-  const deptOptions = Array.from(new Set(employees.map((e: any) => e.department).filter(Boolean))).map(d => ({ value: d as string, label: d as string }))
+  const activeEmployees = employees.filter(
+    (e: any) => e.status === "active" && (selectedBranch === "all" || e.branchId === selectedBranch)
+  )
+  const allEmployeesInBranch = employees.filter(
+    (e: any) => selectedBranch === "all" || e.branchId === selectedBranch
+  )
+
+  const empOptions = activeEmployees.map((e: any) => ({ value: e.id, label: e.name }))
+  const deptOptions = Array.from(new Set(activeEmployees.map((e: any) => e.department).filter(Boolean))).map(d => ({ value: d as string, label: d as string }))
   const inlineEmpOptions = [{ value: "", label: "Bỏ giao (để trống)" }, ...empOptions]
   const assignedFilterOptions = [
     { value: "", label: "Tất cả nhân viên" },
     { value: "unassigned", label: "Chưa giao" },
-    ...empOptions
+    ...allEmployeesInBranch.map((e: any) => ({ value: e.id, label: e.name }))
   ]
   const statusFilterOptions = [
     { value: "", label: "Tất cả trạng thái" },
@@ -298,12 +302,6 @@ export function CrmAdminPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
 
   return (
     <div className="space-y-5">
-      {toast && (
-        <div className={"fixed bottom-5 right-5 z-[100] flex items-center px-4 py-3 rounded-xl shadow-lg border text-sm font-semibold animate-in slide-in-from-bottom duration-300 " + (toast.type === "error" ? "bg-red-50 text-red-800 border-red-100" : "bg-emerald-50 text-emerald-800 border-emerald-100")}>
-          {toast.msg}
-        </div>
-      )}
-
       <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
         <div className="flex items-center">
           <div className="flex gap-1.5 items-center mr-4 shrink-0">

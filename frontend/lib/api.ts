@@ -399,7 +399,7 @@ export const api = {
     assignSpecific: (employeeId: string, quantity: number) => req<any>("POST", "/crm/data/assign-specific", { employeeId, quantity }),
     assignOne: (dataId: string, employeeId: string) => req<any>("POST", "/crm/assignments/assign", { dataId, employeeId }),
     assignBulk: (dataIds: string[], employeeId: string) => req<any>("POST", "/crm/assignments/assign-bulk", { dataIds, employeeId }),
-    adminDashboard: () => req<any>("GET", "/crm/dashboard/admin"),
+    adminDashboard: (params?: Record<string, any>) => req<any>("GET", `/crm/dashboard/admin${qs(params)}`),
     convertToLead: (id: string, body: { leadName: string; forceNew?: boolean }) =>
       req<{ lead: import("../app/types").Lead; record: Record<string, unknown>; customer?: import("../app/types").Customer; alreadyExists: boolean }>(
         "POST",
