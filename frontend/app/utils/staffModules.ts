@@ -7,6 +7,7 @@ export const STAFF_PORTAL_MODULES = [
   "user-workflow",
   "user-settings",
   "user-crm",
+  "user-kpi",
   "crm-employee-data",
   "cong-viec",
   "thong-bao",

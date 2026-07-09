@@ -134,7 +134,13 @@ const BUBBLES: {
     id: "checkin",
     label: "Check-in",
     sub: "Chấm công",
-    emoji: "⚡",
+    emoji: (
+      <Zap
+        size={36}
+        color="#FF8800"
+        style={{ filter: "drop-shadow(0 0 8px rgba(255,136,0,0.4))" }}
+      />
+    ),
     lx: "50%",
     ty: "48%",
     size: 200,
@@ -727,12 +733,14 @@ function Panel({
   onClose,
   onLogout,
   employee,
+  canUseKpi = false,
   embed = false,
 }: {
   activePage: BubbleId;
   onClose: () => void;
   onLogout: () => void;
   employee: Employee | null;
+  canUseKpi?: boolean;
   embed?: boolean;
 }) {
   const [visible, setVisible] = useState(false);
@@ -931,7 +939,7 @@ function Panel({
             {activePage === "settings" && (
               <SettingsContent onLogout={onLogout} embed={embed} />
             )}
-            {activePage === "crm" && <CrmStaffContent />}
+            {activePage === "crm" && <CrmStaffContent employee={employee} canUseKpi={canUseKpi} />}
           </div>
         </div>
       </div>
@@ -1683,10 +1691,47 @@ function TasksContent({ employeeId }: { employeeId?: string }) {
     </div>
   );
 }
-function CrmStaffContent() {
+function CrmStaffContent({ employee, canUseKpi }: { employee: Employee | null; canUseKpi: boolean }) {
+  const [activeTab, setActiveTab] = useState<"data" | "kpi">("data");
   return (
     <div style={{ width: "100%" }}>
-      <CrmStaffPage />
+      <div style={{ display: "flex", justifyContent: "center", borderBottom: "1px solid #efd7da", marginBottom: 20 }}>
+        <button
+          onClick={() => setActiveTab("data")}
+          style={{
+            padding: "10px 20px",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+            border: "none",
+            background: "transparent",
+            borderBottom: activeTab === "data" ? "2px solid #C62828" : "2px solid transparent",
+            color: activeTab === "data" ? "#C62828" : "#8b6b70",
+            transition: "all 0.2s",
+          }}
+        >
+          Danh sách data
+        </button>
+        {canUseKpi && (
+          <button
+            onClick={() => setActiveTab("kpi")}
+            style={{
+              padding: "10px 20px",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              border: "none",
+              background: "transparent",
+              borderBottom: activeTab === "kpi" ? "2px solid #C62828" : "2px solid transparent",
+              color: activeTab === "kpi" ? "#C62828" : "#8b6b70",
+              transition: "all 0.2s",
+            }}
+          >
+            Quản lý KPI
+          </button>
+        )}
+      </div>
+      <CrmStaffPage employee={employee} activeTab={canUseKpi ? activeTab : "data"} />
     </div>
   );
 }
@@ -3323,6 +3368,7 @@ export default function UserPortalApp({
           onClose={() => setActivePage(null)}
           onLogout={onLogout}
           employee={employee}
+          canUseKpi={hasStaffModule(staffModules, "user-kpi")}
           embed={embed}
         />
       ) : (

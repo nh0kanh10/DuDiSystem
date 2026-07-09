@@ -128,10 +128,23 @@ export function updateUser(id, patch) {
     const roleObj = roleRepo.getById(roleId)
     const scopeType = roleObj?.scopeType || "self"
     const primary = raRepo.getPrimary(id)
+    const resolvedScopeId = scopeType === "branch"
+      ? (patch.scopeId !== undefined
+        ? patch.scopeId
+        : (primary?.scopeId || resolveScopeFromEmployee(updated.employeeId) || null))
+      : null
     if (primary) {
       raRepo.update(primary.id, {
         scopeType,
-        scopeId: scopeType === "branch" ? (patch.scopeId !== undefined ? patch.scopeId : primary.scopeId) : null
+        scopeId: resolvedScopeId
+      })
+    } else {
+      raRepo.create({
+        id: `ra-${Date.now()}`,
+        userId: id,
+        scopeType,
+        scopeId: resolvedScopeId,
+        isPrimary: true
       })
     }
   }

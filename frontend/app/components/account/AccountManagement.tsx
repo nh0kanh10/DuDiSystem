@@ -37,7 +37,7 @@ import { isStaffTypeRole } from "../../utils/staffModules"
 
 const ADMIN_MODULE_IDS = new Set([
   "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don",
-  "tai-khoan", "phan-quyen", "ip", "thong-ke", "du-an", "tien-ich",
+  "tai-khoan", "phan-quyen", "ip", "thong-ke", "kpi", "du-an", "tien-ich",
 ])
 
 function stripAdminModules(modules: string[]): string[] {
@@ -85,6 +85,7 @@ const MODULE_TREE = [
     label: "Báo cáo & Tiện ích",
     children: [
       { id: "thong-ke", label: "Báo cáo thống kê" },
+      { id: "kpi", label: "Quản lý KPI" },
       { id: "tien-ich", label: "Tiện ích hệ thống" }
     ]
   },
@@ -137,7 +138,8 @@ const STAFF_MODULE_TREE = [
     id: "staff-crm",
     label: "Quản lý khách hàng (nhân viên)",
     children: [
-      { id: "user-crm", label: "Quản lý khách hàng" }
+      { id: "user-crm", label: "Quản lý khách hàng" },
+      { id: "user-kpi", label: "KPI nhân viên" }
     ]
   }
 ]

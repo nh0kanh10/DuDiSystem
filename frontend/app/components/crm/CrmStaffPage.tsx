@@ -3,6 +3,8 @@ import { api } from "@/lib/api"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 import { useToast } from "@/app/hooks/useToast"
 import { CrmLeadCell } from "./CrmLeadCell"
+import { UserKpiPanel } from "../nhan-vien/UserKpiPanel"
+import { Employee } from "../../types"
 import {
   Search, RefreshCw, Phone, Globe, MapPin, Copy,
   Loader2, Briefcase, Clock, Activity, CheckCircle, Info
@@ -21,7 +23,7 @@ function statusColor(s: string) {
   }
 }
 
-export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => void }) {
+export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }: { employee?: Employee | null; activeTab?: "data" | "kpi"; onOpenLead?: (leadId: string) => void }) {
   const [stats, setStats] = useState<any>(null)
   const [records, setRecords] = useState<any[]>([])
   const [total, setTotal] = useState(0)
@@ -54,7 +56,7 @@ export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
   }
 
   const refresh = () => { fetchStats(); fetchRecords() }
-  useEffect(() => { refresh() }, [statusFilter, search, pageSize])
+  useEffect(() => { if (activeTab === "data") refresh() }, [statusFilter, search, pageSize, activeTab])
 
   const handleStatusChange = async (id: string, status: string) => {
     setUpdatingId(id)
@@ -108,6 +110,10 @@ export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
 
   return (
     <div className="space-y-4">
+      {activeTab === "kpi" ? (
+        <UserKpiPanel employee={employee} />
+      ) : (
+        <>
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -314,6 +320,8 @@ export function CrmStaffPage({ onOpenLead }: { onOpenLead?: (leadId: string) => 
           </div>
         </div>
       </Modal>
+      </>
+      )}
     </div>
   )
 }

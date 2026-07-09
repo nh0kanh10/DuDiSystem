@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Routes, Route } from "react-router-dom"
 import {
   LayoutDashboard, Users, Clock, BarChart3, Bell,
   Wrench, LogOut, ChevronDown, ChevronRight,
-  Shield, Wifi, CheckSquare, FileText, Calendar, User, Fingerprint, Settings, MessageCircle, Layers, Menu, Check, Building2, X
+  Shield, Wifi, CheckSquare, FileText, Calendar, User, Fingerprint, Settings, MessageCircle, Layers, Menu, Check, Building2, X, TrendingUp
 } from "lucide-react"
 
 import UserPortalApp from "./components/nhan-vien/UserApp"
@@ -32,6 +32,8 @@ import { CrmAdminPage } from "./components/crm/CrmAdminPage"
 import { CrmStaffPage } from "./components/crm/CrmStaffPage"
 import { LeadManagement } from "./components/lead/LeadManagement"
 import { PublicRequirementForm } from "./components/lead/PublicRequirementForm"
+import { KpiManagementAdmin } from "./components/kpi/KpiManagementAdmin"
+import { clearKpiMockData } from "./components/kpi/kpiMockData"
 
 // Imported user portal components
 import UserAttendance from "./components/nhan-vien/UserAttendance"
@@ -132,7 +134,7 @@ function AppContent() {
         "dashboard", "nhan-su", "cham-cong", "thong-ke",
         "duyet-don", "thong-bao", "cong-viec", "du-an", "lead",
         "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
-        "crm", "staff-portal",
+        "crm", "staff-portal", "kpi", "kpi-stats", "kpi-compare",
         "user-profile", "user-attendance", "user-timeoff", "user-directory",
         "user-chat", "user-workflow", "user-settings", "user-crm"
       ]
@@ -158,16 +160,31 @@ function AppContent() {
   })
 
   useEffect(() => {
+    const cleaned = localStorage.getItem("dudi_kpi_mock_cleared_v2")
+    if (!cleaned) {
+      clearKpiMockData()
+      localStorage.removeItem("dudi_kpi_mock_cleared_v1")
+      localStorage.setItem("dudi_kpi_mock_cleared_v2", "1")
+    }
+  }, [])
+
+  useEffect(() => {
     setIsPageLoading(true)
     const t = setTimeout(() => setIsPageLoading(false), 300)
     return () => clearTimeout(t)
   }, [activePage])
 
   const activeRolePermissions = useMemo(() => {
-    if (effectivePermissions.length > 0) return effectivePermissions
-    const currentRole = rolesList.find(r => r.id === role)
-    if (currentRole?.modules?.length) return [...currentRole.modules]
-    return []
+    let list: string[] = []
+    if (effectivePermissions.length > 0) list = [...effectivePermissions]
+    else {
+      const currentRole = rolesList.find(r => r.id === role)
+      if (currentRole?.modules?.length) list = [...currentRole.modules]
+    }
+    if (list.length > 0 && !list.includes("kpi")) {
+      list.push("kpi")
+    }
+    return list
   }, [effectivePermissions, rolesList, role])
 
   const roleName = useMemo(() => {
@@ -588,6 +605,12 @@ function AppContent() {
       case "crm": return (
         <CrmAdminPage selectedBranch={selectedBranch} onOpenLead={(id) => navigate(`/lead/${id}`)} />
       )
+      case "kpi":
+      case "kpi-stats":
+      case "kpi-compare": {
+        const view = activePage === "kpi" ? "overview" : (activePage === "kpi-stats" ? "stats" : "compare")
+        return <KpiManagementAdmin employees={employees} activeTab={view} />
+      }
       case "staff-portal": return (
         <div className="w-full h-[calc(100vh-2.5rem)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
           <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} embed={true} />
@@ -1095,6 +1118,20 @@ function UserAwareSidebar({
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("lead") && <NavItem page="lead" icon={User} label="Cơ hội" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("kpi") && (
+          <GroupNav
+            gKey="kpi"
+            icon={TrendingUp}
+            label="Quản lý KPI"
+            pages={["kpi", "kpi-stats", "kpi-compare"]}
+            active={active} onNavigate={onNavigate} collapsed={collapsed}
+            expanded={expanded} onToggle={toggle} onFlyoutOpen={closeOverlays}
+          >
+            <SubItem page="kpi" label="Tổng quan" active={active} onNavigate={onNavigate} />
+            <SubItem page="kpi-stats" label="Thống kê KPI" active={active} onNavigate={onNavigate} />
+            <SubItem page="kpi-compare" label="So sánh" active={active} onNavigate={onNavigate} />
+          </GroupNav>
+        )}
         {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
