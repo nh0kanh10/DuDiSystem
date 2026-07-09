@@ -69,7 +69,7 @@ export function createRecord(body, createdBy) {
   const { businessName, address = "", area = "", phone = "", website = "", businessType = "", googleMapUrl = "", note = "", status = "Chưa xử lý" } = body
   if (!businessName?.trim()) throw new Error("Tên doanh nghiệp không được để trống")
   return repo.create({
-    id: `crm-${uuidv4().slice(0, 8)}`,
+    id: body.id || `crm-${uuidv4().slice(0, 8)}`,
     businessName: businessName.trim(),
     address, area, phone, website, businessType, googleMapUrl,
     status, assignedTo: null, assignedToName: null,

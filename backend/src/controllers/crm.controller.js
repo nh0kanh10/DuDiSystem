@@ -70,6 +70,7 @@ export function importCsv(req, res) {
       return -1
     }
 
+    const idIdx    = colIdx(["id", "mã", "ma", "mã khách hàng", "ma khach hang", "stt", "số thứ tự", "so thu tu"])
     const nameIdx  = colIdx(["tên doanh nghiệp","ten doanh nghiep","business name","businessname","name"])
     const addrIdx  = colIdx(["địa chỉ","dia chi","address"])
     const areaIdx  = colIdx(["khu vực","khu vuc","area"])
@@ -93,6 +94,7 @@ export function importCsv(req, res) {
 
       const businessName = nameIdx !== -1 ? String(cols[nameIdx] ?? "").trim() : ""
       const phone        = phoneIdx !== -1 ? String(cols[phoneIdx] ?? "").trim() : ""
+      const customId     = idIdx !== -1 ? String(cols[idIdx] ?? "").trim() : ""
 
       if (!businessName) {
         failedCount++; errors.push({ row: i + 2, message: "Thiếu tên doanh nghiệp" }); return
@@ -103,6 +105,7 @@ export function importCsv(req, res) {
       if (phone) phoneSeen.add(phone)
 
       svc.createRecord({
+        id: customId ? `crm-${customId}` : undefined,
         businessName,
         address:      addrIdx !== -1 ? String(cols[addrIdx] ?? "").trim() : "",
         area:         areaIdx !== -1  ? String(cols[areaIdx] ?? "").trim() : "",
