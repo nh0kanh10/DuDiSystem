@@ -347,12 +347,17 @@ import {
 
 interface KpiManagementAdminProps {
   employees: Employee[];
-  selectedBranch: string;
   activeTab?: "overview" | "stats" | "compare";
 }
 
-export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "overview" }: KpiManagementAdminProps) {
+export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overview" }: KpiManagementAdminProps) {
   const { showToast } = useToast();
+  const employees = React.useMemo(() => {
+    return rawEmployees.filter(e => {
+      const dept = (e.department || "").toLowerCase().trim();
+      return dept === "phòng kinh doanh" || dept === "kinh doanh" || dept.includes("kinh doanh");
+    });
+  }, [rawEmployees]);
   const [selectedMonth, setSelectedMonth] = useState("2026-07");
   
   // Dashboard Sub-tabs for "Tổng quan"
@@ -472,11 +477,8 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
   const [compYear2, setCompYear2] = useState("2025");
   const [compareEmployeeId, setCompareEmployeeId] = useState("all");
 
-  // Filter lists by selected branch
-  const filteredEmployees = useMemo(() => {
-    if (!selectedBranch || selectedBranch === "all") return employees;
-    return employees.filter(e => e.branchId === selectedBranch || e.orgNodeId === selectedBranch);
-  }, [employees, selectedBranch]);
+  // All employees are from Phòng Kinh doanh — no additional branch filter needed
+  const filteredEmployees = employees;
 
   const filteredEmployeeIds = useMemo(() => {
     return new Set(filteredEmployees.map(e => e.id));
@@ -602,7 +604,6 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
     });
 
     return Array.from(map.entries())
-      .filter(([_, data]) => data.daysCount > 0)
       .map(([employeeId, data]) => {
         const emp = employees.find(e => e.id === employeeId);
         const points = calculateKpiPoints(data);
@@ -751,6 +752,63 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
       const weekNo = Math.ceil((((tempDate.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
       return `Tuần ${weekNo} (${tempDate.getFullYear()})`;
     };
+
+    // Pre-populate keys to ensure the chart always renders coordinate axes and grid even when empty
+    const start = new Date(reportStartDate);
+    const end = new Date(reportEndDate);
+    const todayStr = new Date().toISOString().split("T")[0];
+    if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+      const cur = new Date(start);
+      let limit = 0;
+      while (cur <= end && limit < 366) {
+        const dateStr = cur.toISOString().split("T")[0];
+        if (dateStr > todayStr) {
+          break; // Do not render future dates
+        }
+        let key = dateStr;
+        if (reportGroupBy === "week") {
+          key = getWeekString(dateStr);
+        }
+        
+        if (reportGroupBy !== "employee") {
+          map.set(key, {
+            groupKey: key,
+            zalo: 0,
+            fb: 0,
+            comment: 0,
+            post: 0,
+            clientReply: 0,
+            followUp: 0,
+            quote: 0,
+            deal: 0,
+            revenue: 0,
+            khachChuDongIB: 0,
+            entriesCount: 0
+          });
+        }
+        cur.setDate(cur.getDate() + 1);
+        limit++;
+      }
+    }
+
+    if (reportGroupBy === "employee") {
+      employees.forEach(emp => {
+        map.set(emp.name, {
+          groupKey: emp.name,
+          zalo: 0,
+          fb: 0,
+          comment: 0,
+          post: 0,
+          clientReply: 0,
+          followUp: 0,
+          quote: 0,
+          deal: 0,
+          revenue: 0,
+          khachChuDongIB: 0,
+          entriesCount: 0
+        });
+      });
+    }
 
     filteredReportEntries.forEach(entry => {
       let key = entry.date;
@@ -1395,25 +1453,32 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
                         <h4 className="font-bold text-gray-800 text-sm">Xu hướng doanh thu 30 ngày</h4>
                         <p className="text-[10px] text-gray-400 mt-0.5">Biểu đồ tổng hợp doanh thu phát sinh trong tháng</p>
                       </div>
-                      <div className="h-64 w-full text-xs overflow-x-auto" style={{ scrollbarWidth: "thin" }}>
-                        <div style={{ width: minChartWidth, height: "100%" }}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartDailyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                              <defs>
-                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#C62828" stopOpacity={0.2}/>
-                                  <stop offset="95%" stopColor="#C62828" stopOpacity={0}/>
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                              <XAxis dataKey="date" stroke="#9ca3af" axisLine={false} tickLine={false} tickFormatter={(val) => val.split("-")[1]} interval={1} />
-                              <YAxis stroke="#9ca3af" axisLine={false} tickLine={false} tickFormatter={(val) => `${(val/1000000).toFixed(0)}M`} />
-                              <Tooltip formatter={(value) => [`${(value as number).toLocaleString()} đ`, "Doanh thu"]} />
-                              <Area type="monotone" dataKey="revenue" stroke="#C62828" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
-                            </AreaChart>
-                          </ResponsiveContainer>
+                      {chartDailyData.length === 0 || chartDailyData.every(d => d.revenue === 0) ? (
+                        <div className="h-64 flex flex-col items-center justify-center gap-2">
+                          <BarChart3 size={32} className="text-gray-200" />
+                          <p className="text-xs text-gray-400 font-medium">Chưa có dữ liệu doanh thu</p>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="h-64 w-full text-xs overflow-x-auto" style={{ scrollbarWidth: "thin" }}>
+                          <div style={{ width: minChartWidth, height: "100%" }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart data={chartDailyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                                <defs>
+                                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#C62828" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="#C62828" stopOpacity={0}/>
+                                  </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                <XAxis dataKey="date" stroke="#9ca3af" axisLine={false} tickLine={false} tickFormatter={(val) => val.split("-")[1]} interval={1} />
+                                <YAxis stroke="#9ca3af" axisLine={false} tickLine={false} tickFormatter={(val) => `${(val/1000000).toFixed(0)}M`} />
+                                <Tooltip formatter={(value) => [`${(value as number).toLocaleString()} đ`, "Doanh thu"]} />
+                                <Area type="monotone" dataKey="revenue" stroke="#C62828" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
+                              </AreaChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Conversion chart */}
@@ -1563,7 +1628,7 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
               </div>
 
               {/* Advanced Filter Box */}
-              <div className="bg-white rounded-3xl p-5 border border-black/5 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+              <div className="bg-white rounded-3xl p-5 border border-black/5 shadow-xs grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 <CustomSelect
                   label="Khoảng thời gian"
                   value={reportTimeRange}
@@ -1583,13 +1648,6 @@ export function KpiManagementAdmin({ employees, selectedBranch, activeTab = "ove
                   value={reportEmployeeId}
                   onChange={setReportEmployeeId}
                   options={employeeOptions}
-                />
-
-                <CustomSelect
-                  label="Phòng ban"
-                  value={reportDeptFilter}
-                  onChange={setReportDeptFilter}
-                  options={deptOptions}
                 />
 
                 <CustomDatePicker

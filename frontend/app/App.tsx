@@ -41,6 +41,7 @@ import { UserChat } from "./components/nhan-vien/UserChat"
 import { UserWorkflow } from "./components/nhan-vien/UserWorkflow"
 import UserSettings from "./components/nhan-vien/UserSettings"
 import { KpiManagementAdmin } from "./components/kpi/KpiManagementAdmin";
+import { clearKpiMockData } from "./components/kpi/kpiMockData";
 
 import { Role, Page, Employee, OrgNode, Assignment, RoleDefinition } from "./types"
 import { INIT_EMPLOYEES, INIT_ORG_NODES, NOTIFICATIONS, INIT_ASSIGNMENTS } from "./constants"
@@ -156,6 +157,16 @@ function AppContent() {
       return []
     }
   })
+
+  // One-time cleanup: remove old mock/seed KPI data from localStorage
+  useEffect(() => {
+    const cleaned = localStorage.getItem("dudi_kpi_mock_cleared_v2")
+    if (!cleaned) {
+      clearKpiMockData()
+      localStorage.removeItem("dudi_kpi_mock_cleared_v1")
+      localStorage.setItem("dudi_kpi_mock_cleared_v2", "1")
+    }
+  }, [])
 
   useEffect(() => {
     setIsPageLoading(true)
@@ -581,7 +592,6 @@ function AppContent() {
         return (
           <KpiManagementAdmin
             employees={employees}
-            selectedBranch={selectedBranch}
             activeTab={view}
           />
         );
