@@ -538,7 +538,13 @@ function withEmployee(record) {
   }
 }
 
-export function listAttendance(filter) {
+export function listAttendance(rawFilter) {
+  const filter = { ...rawFilter }
+  if (filter.date) {
+    if (!filter.startDate) filter.startDate = filter.date
+    if (!filter.endDate) filter.endDate = filter.date
+  }
+
   let records = repo.getAll()
   records = records.filter(r => !["0000000000", "1111111111", "2222222222"].includes(r.employeeId))
 
@@ -717,6 +723,25 @@ export function listAttendance(filter) {
       return emp?.department === filter.department
     })
   }
+
+  records.sort((a, b) => {
+    if (a.date !== b.date) {
+      return b.date.localeCompare(a.date)
+    }
+    const parseTime = (t) => {
+      if (!t || t === "--") return 0
+      return parseToSeconds(t)
+    }
+    const getLatestCheckIn = (r) => {
+      if (r.checkInAm !== undefined || r.checkInPm !== undefined) {
+        const am = parseTime(r.checkInAm)
+        const pm = parseTime(r.checkInPm)
+        return Math.max(am, pm)
+      }
+      return parseTime(r.checkIn)
+    }
+    return getLatestCheckIn(b) - getLatestCheckIn(a)
+  })
 
   return records.map(withEmployee)
 }
