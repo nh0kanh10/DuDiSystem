@@ -170,8 +170,8 @@ export function assignSpecific(req, res) {
 
 export function adminDashboard(req, res) {
   try {
-    const { branchId } = req.query
-    res.json({ success: true, data: svc.getAdminDashboard({ branchId }) })
+    const { branchId, period } = req.query
+    res.json({ success: true, data: svc.getAdminDashboard({ branchId, period }) })
   } catch (err) { fail(res, err.message) }
 }
 

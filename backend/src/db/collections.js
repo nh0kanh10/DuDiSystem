@@ -16,6 +16,7 @@ export const COLLECTIONS = [
   "systemConfig",
   "allowedIPs",
   "crmDataRecords",
+  "crmActivityLogs",
   "jobPostings",
   "candidates",
   "timeOffSlots",

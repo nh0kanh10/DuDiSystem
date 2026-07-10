@@ -53,6 +53,9 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [dashboardPeriod, setDashboardPeriod] = useState<"all" | "today" | "week" | "month">("all")
+  const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null)
+  const [expandedStatusMap, setExpandedStatusMap] = useState<Record<string, string | null>>({})
   const [employees, setEmployees] = useState<any[]>([])
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
@@ -125,7 +128,7 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
 
   const fetchStats = async () => {
     setStatsLoading(true)
-    try { setStats(await api.crm.adminDashboard({ branchId: selectedBranch })) } catch { } finally { setStatsLoading(false) }
+    try { setStats(await api.crm.adminDashboard({ branchId: selectedBranch, period: dashboardPeriod })) } catch { } finally { setStatsLoading(false) }
   }
 
   const fetchRecords = async () => {
@@ -143,7 +146,7 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
   }
 
   const refresh = () => { fetchStats(); fetchRecords(); fetchEmployees() }
-  useEffect(() => { refresh() }, [statusFilter, assignedFilter, search, pageSize, selectedBranch])
+  useEffect(() => { refresh() }, [statusFilter, assignedFilter, search, pageSize, selectedBranch, dashboardPeriod])
 
   useEffect(() => {
     if (!autoAssignOpen) {
@@ -444,62 +447,232 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
             </div>
           ) : stats && (
             <div>
+              {/* Period Filter Selector */}
+              <div className="flex bg-gray-100/80 p-1 rounded-2xl border border-gray-200/50 mb-5 max-w-xs">
+                {[
+                  { value: "all", label: "Tất cả" },
+                  { value: "today", label: "Hôm nay" },
+                  { value: "week", label: "Tuần này" },
+                  { value: "month", label: "Tháng này" }
+                ].map(p => (
+                  <button
+                    key={p.value}
+                    onClick={() => setDashboardPeriod(p.value as any)}
+                    className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                      dashboardPeriod === p.value
+                        ? "bg-[#C62828] text-white shadow-xs"
+                        : "text-gray-500 hover:text-[#C62828]"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-5">
                 <StatCard title="Tổng data" value={stats.totalData} icon={Database} iconBg="bg-slate-100" iconColor="text-slate-500" />
                 <StatCard title="Đã chia" value={stats.assignedData} icon={UserCheck} iconBg="bg-blue-50" iconColor="text-blue-500" />
                 <StatCard title="Chưa chia" value={stats.unassignedData} icon={UserMinus} iconBg="bg-amber-50" iconColor="text-amber-500" />
-                <StatCard title="Đã gửi" value={stats.totalData - (stats.statusCounts?.["Chưa xử lý"] ?? 0)} icon={Send} iconBg="bg-purple-50" iconColor="text-purple-500" />
-                <StatCard title="Trả lời" value={stats.statusCounts?.["Trả lời"] ?? 0} icon={MessageSquare} iconBg="bg-emerald-50" iconColor="text-emerald-500" />
+                <StatCard title={dashboardPeriod !== "all" ? "Đã gửi (Kỳ)" : "Đã gửi"} value={dashboardPeriod !== "all" ? (stats.statusCounts?.["Đã gửi tin nhắn"] ?? 0) : (stats.totalData - (stats.statusCounts?.["Chưa xử lý"] ?? 0))} icon={Send} iconBg="bg-purple-50" iconColor="text-purple-500" />
+                <StatCard title={dashboardPeriod !== "all" ? "Trả lời (Kỳ)" : "Trả lời"} value={stats.statusCounts?.["Trả lời"] ?? 0} icon={MessageSquare} iconBg="bg-emerald-50" iconColor="text-emerald-500" />
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="space-y-5">
                 <div className="bg-white p-5 rounded-3xl border border-black/5 shadow-xs space-y-4">
                   <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Trạng thái xử lý</p>
-                  {STATUSES_VN_DISPLAY.map(s => {
-                    const count = stats.statusCounts?.[s] ?? 0
-                    const pct = stats.totalData > 0 ? +((count / stats.totalData) * 100).toFixed(1) : 0
-                    return (
-                      <div key={s}>
-                        <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
-                          <span>{s}</span><span>{count} ({pct}%)</span>
+                  {(() => {
+                    const totalForPct = dashboardPeriod === "all"
+                      ? stats.totalData
+                      : (stats.statusCounts?.["Chặn người lạ"] ?? 0) +
+                        (stats.statusCounts?.["Đã gửi tin nhắn"] ?? 0) +
+                        (stats.statusCounts?.["Không có Zalo"] ?? 0) +
+                        (stats.statusCounts?.["Trả lời"] ?? 0)
+                    
+                    const displayStatuses = dashboardPeriod === "all"
+                      ? STATUSES_VN_DISPLAY
+                      : STATUSES_VN_DISPLAY.filter(s => s !== "Chưa xử lý")
+
+                    return displayStatuses.map(s => {
+                      const count = stats.statusCounts?.[s] ?? 0
+                      const pct = totalForPct > 0 ? +((count / totalForPct) * 100).toFixed(1) : 0
+                      return (
+                        <div key={s}>
+                          <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
+                            <span>{s}</span><span>{count} ({pct}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                            <div
+                              className={s === "Chưa xử lý" ? "h-full rounded-full bg-slate-300" : s === "Chặn người lạ" ? "h-full rounded-full bg-amber-400" : s === "Đã gửi tin nhắn" ? "h-full rounded-full bg-blue-400" : s === "Không có Zalo" ? "h-full rounded-full bg-red-500" : "h-full rounded-full bg-emerald-500"}
+                              style={{ width: pct + "%" }}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                          <div
-                            className={s === "Chưa xử lý" ? "h-full rounded-full bg-slate-300" : s === "Chặn người lạ" ? "h-full rounded-full bg-amber-400" : s === "Đã gửi tin nhắn" ? "h-full rounded-full bg-blue-400" : s === "Không có Zalo" ? "h-full rounded-full bg-red-500" : "h-full rounded-full bg-emerald-500"}
-                            style={{ width: pct + "%" }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })
+                  })()}
                 </div>
-                <div className="bg-white p-5 rounded-3xl border border-black/5 shadow-xs space-y-4">
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Tiến độ nhân viên</p>
+
+                <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-xs space-y-5">
+                  <div className="border-b border-gray-100 pb-3">
+                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Tiến độ nhân viên</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Bấm vào từng nhân viên để xem chi tiết trạng thái và danh sách khách hàng</p>
+                  </div>
                   {!stats.employeeProgress?.length ? (
                     <div className="flex flex-col items-center justify-center py-8 text-gray-400">
                       <Users size={32} className="mb-2 stroke-1" />
                       <p className="text-sm">Chưa có dữ liệu</p>
                     </div>
                   ) : (
-                    <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
+                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
                       {stats.employeeProgress.map((emp: any) => {
-                        const cPct = emp.totalAssigned > 0 ? +((emp.completedCount / emp.totalAssigned) * 100).toFixed(0) : 0
-                        const pPct = emp.totalAssigned > 0 ? +((emp.processingCount / emp.totalAssigned) * 100).toFixed(0) : 0
+                        const cPct = emp.totalAssigned > 0 ? (emp.completedCount / emp.totalAssigned) * 100 : 0
+                        const pPct = emp.totalAssigned > 0 ? (emp.processingCount / emp.totalAssigned) * 100 : 0
+                        const bPct = emp.isTimeBound && emp.totalAssigned > 0 ? (emp.blockedCount / emp.totalAssigned) * 100 : 0
+                        const nPct = emp.isTimeBound && emp.totalAssigned > 0 ? (emp.noZaloCount / emp.totalAssigned) * 100 : 0
+                        const isExpanded = expandedEmpId === emp.employeeId
+
                         return (
-                          <div key={emp.employeeId} className="pb-3 border-b border-gray-50 last:border-0 last:pb-0">
-                            <div className="flex justify-between items-center mb-1.5">
+                          <div key={emp.employeeId} className="pb-4 border-b border-gray-100 last:border-0 last:pb-0 space-y-3">
+                            <div
+                              onClick={() => {
+                                setExpandedEmpId(isExpanded ? null : emp.employeeId)
+                                setExpandedStatusMap(prev => ({ ...prev, [emp.employeeId]: null }))
+                              }}
+                              className="flex justify-between items-start mb-1.5 flex-wrap gap-2 cursor-pointer hover:bg-gray-50/50 p-2 -mx-2 rounded-2xl transition active:scale-[0.99]"
+                            >
                               <div>
-                                <p className="text-sm font-bold text-gray-800">{emp.employeeName}</p>
-                                <p className="text-xs text-gray-400">{"Được giao: " + emp.totalAssigned}</p>
+                                <p className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                                  <span>{emp.employeeName}</span>
+                                  <span className="text-[10px] font-medium text-gray-400">({emp.employeeId})</span>
+                                </p>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {emp.isTimeBound ? "Đã xử lý: " : "Được giao: "}
+                                  <span className="font-extrabold text-gray-700">{emp.totalAssigned} khách</span>
+                                </p>
                               </div>
-                              <div className="flex gap-1.5">
-                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-600 text-white">{"Trả lời: " + emp.completedCount}</span>
-                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">{"Gửi: " + emp.processingCount}</span>
+                              <div className="flex gap-1.5 flex-wrap">
+                                {emp.isTimeBound ? (
+                                  <>
+                                    {emp.completedCount > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200/50">{"Trả lời: " + emp.completedCount}</span>}
+                                    {emp.processingCount > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200/50">{"Đã gửi: " + emp.processingCount}</span>}
+                                    {emp.blockedCount > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200/50">{"Chặn: " + emp.blockedCount}</span>}
+                                    {emp.noZaloCount > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-50 text-red-700 border border-red-200/50">{"Ko Zalo: " + emp.noZaloCount}</span>}
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200/50">{"Trả lời: " + emp.completedCount}</span>
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200/50">{"Gửi: " + emp.processingCount}</span>
+                                  </>
+                                )}
                               </div>
                             </div>
-                            <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden flex">
-                              <div className="bg-emerald-500 h-full transition-all" style={{ width: cPct + "%" }} />
-                              <div className="bg-blue-400 h-full transition-all" style={{ width: pPct + "%" }} />
+                            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden flex">
+                              <div className="bg-emerald-500 h-full transition-all" style={{ width: cPct + "%" }} title={`Trả lời: ${emp.completedCount}`} />
+                              <div className="bg-blue-400 h-full transition-all" style={{ width: pPct + "%" }} title={`Đã gửi: ${emp.processingCount}`} />
+                              {emp.isTimeBound && (
+                                <>
+                                  <div className="bg-amber-400 h-full transition-all" style={{ width: bPct + "%" }} title={`Chặn: ${emp.blockedCount}`} />
+                                  <div className="bg-red-500 h-full transition-all" style={{ width: nPct + "%" }} title={`Không có Zalo: ${emp.noZaloCount}`} />
+                                </>
+                              )}
                             </div>
+
+                            {isExpanded && (
+                              <div className="mt-3 pl-4 border-l-2 border-red-100 space-y-3 transition-all">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Chọn trạng thái để xem danh sách khách:</p>
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                  {STATUSES_VN_DISPLAY.filter(status => !emp.isTimeBound || status !== "Chưa xử lý").map(status => {
+                                    const list = emp.details?.[status] ?? []
+                                    const count = list.length
+                                    const isSelected = expandedStatusMap[emp.employeeId] === status
+
+                                    return (
+                                      <button
+                                        key={status}
+                                        onClick={() => {
+                                          if (count === 0) return
+                                          setExpandedStatusMap(prev => ({
+                                            ...prev,
+                                            [emp.employeeId]: isSelected ? null : status
+                                          }))
+                                        }}
+                                        disabled={count === 0}
+                                        className={`p-2 rounded-xl border text-left transition ${
+                                          count === 0
+                                            ? "bg-gray-50 border-gray-100 opacity-40 cursor-not-allowed"
+                                            : isSelected
+                                              ? "bg-red-50/50 border-[#C62828] text-[#C62828] shadow-2xs font-extrabold"
+                                              : "bg-white border-gray-200 hover:border-gray-300 text-gray-700 cursor-pointer shadow-3xs"
+                                        }`}
+                                      >
+                                        <div className="text-[9px] font-black uppercase tracking-wide opacity-80">{status}</div>
+                                        <div className="text-xs font-black mt-0.5">{count} khách</div>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+
+                                {(() => {
+                                  const activeStatus = expandedStatusMap[emp.employeeId]
+                                  if (!activeStatus) return null
+                                  const list = emp.details?.[activeStatus] ?? []
+                                  if (list.length === 0) return null
+
+                                  return (
+                                    <div className="mt-3 bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-3">
+                                      <div className="flex justify-between items-center pb-2 border-b border-gray-200/60">
+                                        <span className="text-xs font-black text-gray-600 uppercase tracking-wider">
+                                          Danh sách khách — {activeStatus} ({list.length})
+                                        </span>
+                                      </div>
+                                      <div className="overflow-x-auto max-h-60 overflow-y-auto pr-1">
+                                        <table className="w-full text-xs text-left">
+                                          <thead>
+                                            <tr className="text-gray-400 font-bold border-b border-gray-100">
+                                              <th className="py-2 px-3">Doanh nghiệp / Khách</th>
+                                              <th className="py-2 px-3">SĐT</th>
+                                              <th className="py-2 px-3">Thời gian cập nhật</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
+                                            {list.map((item: any) => {
+                                              const dateObj = new Date(item.updatedAt)
+                                              const timeStr = isNaN(dateObj.getTime()) ? "--:--" : dateObj.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+                                              const dateStr = isNaN(dateObj.getTime()) ? "" : dateObj.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
+                                              return (
+                                                <tr key={item.id} className="hover:bg-white/60 transition-colors">
+                                                  <td className="py-2 px-3 font-semibold text-gray-800">{item.businessName || "Không có tên"}</td>
+                                                  <td className="py-2 px-3 font-mono text-gray-500">
+                                                    {item.phone ? (
+                                                      <div className="flex items-center gap-1.5">
+                                                        <span>{item.phone}</span>
+                                                        <button
+                                                          onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            navigator.clipboard.writeText(item.phone)
+                                                            notify("Đã sao chép số điện thoại!")
+                                                          }}
+                                                          className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600 cursor-pointer"
+                                                          title="Sao chép SĐT"
+                                                        >
+                                                          <Copy size={11} />
+                                                        </button>
+                                                      </div>
+                                                    ) : "--"}
+                                                  </td>
+                                                  <td className="py-2 px-3 text-gray-400 text-[10px]">
+                                                    {timeStr} <span className="opacity-75">{dateStr}</span>
+                                                  </td>
+                                                </tr>
+                                              )
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  )
+                                })()}
+                              </div>
+                            )}
                           </div>
                         )
                       })}
