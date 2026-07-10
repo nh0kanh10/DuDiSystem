@@ -4,7 +4,6 @@ import {
   Bell, Settings, LogOut, Sun, Moon, Check,
   ChevronRight, Building2, Shield, Palette, Fingerprint,
 } from "lucide-react";
-import { canShowStaffBlock } from "../../utils/staffModules";
 
 /* ─── Background canvas ─────────────────────────────────── */
 export function Background({ dark }: { dark: boolean }) {
@@ -314,14 +313,11 @@ function BlockCard({
 
 
 /* ─── App ────────────────────────────────────────────────── */
-export default function GreetingMessageApp({ employee, onNavigate, onLogout, dark, onToggleDark, modules = [] }: any) {
+export default function GreetingMessageApp({ employee, onNavigate, onLogout, dark, onToggleDark }: any) {
 
   const [now, setNow] = useState(new Date());
   const [checkedIn, setCheckedIn] = useState(false);
   const [checkInTime, setCheckInTime] = useState<string | null>(null);
-
-  const leftBlocks = LEFT_BLOCKS.filter(b => b.id && canShowStaffBlock(modules, b.id));
-  const rightBlocks = RIGHT_BLOCKS.filter(b => b.id && canShowStaffBlock(modules, b.id));
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -413,8 +409,8 @@ export default function GreetingMessageApp({ employee, onNavigate, onLogout, dar
       >
         {/* LEFT blocks */}
         <div className="flex flex-col pl-2 pr-2 gap-3 justify-center items-end">
-          {leftBlocks.map((block, i) => (
-            <div key={block.label} className="flex justify-start" style={{ width: WIDTHS[i] ?? WIDTHS[WIDTHS.length - 1] }}>
+          {LEFT_BLOCKS.map((block, i) => (
+            <div key={block.label} className="flex justify-start" style={{ width: WIDTHS[i] }}>
               <BlockCard block={block} dark={dark} side="left" onClick={() => block.id && onNavigate(block.id)} />
             </div>
           ))}
@@ -463,8 +459,8 @@ export default function GreetingMessageApp({ employee, onNavigate, onLogout, dar
 
         {/* RIGHT blocks */}
         <div className="flex flex-col pr-2 pl-2 gap-3 justify-center items-start">
-          {rightBlocks.map((block, i) => (
-            <div key={block.label} className="flex justify-end" style={{ width: WIDTHS[i] ?? WIDTHS[WIDTHS.length - 1] }}>
+          {RIGHT_BLOCKS.map((block, i) => (
+            <div key={block.label} className="flex justify-end" style={{ width: WIDTHS[i] }}>
               <BlockCard
                 block={block} dark={dark} side="right"
                 onClick={() => block.id && onNavigate(block.id)}
