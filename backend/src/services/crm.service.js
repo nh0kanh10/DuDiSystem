@@ -5,6 +5,7 @@ import * as crmActivityLogRepo from "../repositories/crmActivityLog.repository.j
 import * as leadSvc from "./lead.service.js"
 import * as customerSvc from "./customer.service.js"
 import { v4 as uuidv4 } from "uuid"
+import { emitCrmChanged } from "../socket/chat.socket.js"
 
 export const CRM_STATUSES = [
   "Chưa xử lý", "Chặn người lạ", "Đã gửi tin nhắn", "Không có Zalo", "Trả lời"
@@ -23,6 +24,14 @@ function resolveAssignee(employeeId) {
   if (!emp) throw new Error(`Không tìm thấy nhân viên: ${employeeId}`)
   if (emp.status !== "active") throw new Error(`Nhân viên ${emp.name} (${employeeId}) không còn hoạt động`)
   return { assignedTo: emp.id, assignedToName: emp.name }
+}
+
+function notifyChange(action, details = {}) {
+  try {
+    emitCrmChanged(action, details)
+  } catch (err) {
+    console.error("Failed to emit crm changed socket event:", err)
+  }
 }
 
 export function listRecords({ status, assignedTo, area, department, search, branchId, page = 0, size = 20 } = {}) {
@@ -92,7 +101,7 @@ export function createRecord(body, createdBy) {
     newId = String(maxId > 0 ? maxId + 1 : 1)
   }
 
-  return repo.create({
+  const created = repo.create({
     id: newId,
     businessName: businessName.trim(),
     address, area, phone, website, businessType, googleMapUrl,
@@ -100,6 +109,8 @@ export function createRecord(body, createdBy) {
     createdBy, note,
     createdAt: now(), updatedAt: now()
   })
+  notifyChange("created", { id: newId })
+  return created
 }
 
 export function updateRecord(id, body) {
@@ -108,7 +119,9 @@ export function updateRecord(id, body) {
   ;["businessName", "address", "area", "phone", "website", "businessType", "googleMapUrl", "status", "note"]
     .forEach(k => { if (body[k] !== undefined) patch[k] = body[k] })
   patch.updatedAt = now()
-  return repo.update(id, patch)
+  const updated = repo.update(id, patch)
+  notifyChange("updated", { id })
+  return updated
 }
 
 export function deleteRecord(id) {
@@ -119,7 +132,9 @@ export function deleteRecord(id) {
     const codes = leads.map(l => l.code).join(", ")
     throw new Error(`Không thể xóa khách "${record.businessName}" vì đã được tạo cơ hội (Lead: ${codes}). Vui lòng xóa cơ hội trước!`)
   }
-  return repo.remove(id)
+  const removed = repo.remove(id)
+  notifyChange("deleted", { id })
+  return removed
 }
 
 export function deleteRecordsBulk(ids) {
@@ -142,6 +157,7 @@ export function deleteRecordsBulk(ids) {
 
   let count = 0
   ids.forEach(id => { if (repo.remove(id)) count++ })
+  notifyChange("deleted_bulk", { ids })
   return { deletedCount: count }
 }
 
@@ -154,7 +170,9 @@ export function updateNote(id, note, currentUser) {
     err.status = 403
     throw err
   }
-  return repo.update(id, { note, updatedAt: now() })
+  const updated = repo.update(id, { note, updatedAt: now() })
+  notifyChange("updated", { id })
+  return updated
 }
 
 export function updateStatusByEmployee(id, status, currentUser) {
@@ -191,16 +209,21 @@ export function updateStatusByEmployee(id, status, currentUser) {
     })
   }
 
+  notifyChange("status_updated", { id, employeeId: currentUser.employeeId, status })
   return updated
 }
 
 export function assignOne(dataId, employeeId) {
   if (!repo.getById(dataId)) throw new Error("Không tìm thấy dữ liệu")
+  let updated
   if (!employeeId || employeeId === "unassigned") {
-    return repo.update(dataId, { assignedTo: null, assignedToName: null, updatedAt: now() })
+    updated = repo.update(dataId, { assignedTo: null, assignedToName: null, updatedAt: now() })
+  } else {
+    const { assignedTo, assignedToName } = resolveAssignee(employeeId)
+    updated = repo.update(dataId, { assignedTo, assignedToName, updatedAt: now() })
   }
-  const { assignedTo, assignedToName } = resolveAssignee(employeeId)
-  return repo.update(dataId, { assignedTo, assignedToName, updatedAt: now() })
+  notifyChange("assigned", { id: dataId, employeeId })
+  return updated
 }
 
 export function assignBulk(dataIds, employeeId) {
@@ -218,6 +241,7 @@ export function assignBulk(dataIds, employeeId) {
       count++
     }
   })
+  notifyChange("bulk_assigned", { ids: dataIds, employeeId })
   return { assignedCount: count }
 }
 
@@ -225,6 +249,7 @@ export function reassign(fromEmployeeId, toEmployeeId) {
   const { assignedTo, assignedToName } = resolveAssignee(toEmployeeId)
   const records = repo.getAll().filter(r => r.assignedTo === fromEmployeeId)
   records.forEach(r => repo.update(r.id, { assignedTo, assignedToName, updatedAt: now() }))
+  notifyChange("reassigned", { fromEmployeeId, toEmployeeId })
   return { movedCount: records.length }
 }
 
@@ -260,6 +285,8 @@ export function autoAssign(employeeIds) {
     target.newAssigned++;
   })
 
+  notifyChange("auto_assigned", { employeeIds })
+
   return {
     totalUnassigned: unassigned.length,
     assignedCount: unassigned.length,
@@ -280,6 +307,8 @@ export function assignSpecific(employeeId, quantity) {
   unassigned.forEach(record => {
     repo.update(record.id, { assignedTo: emp.id, assignedToName: emp.name, updatedAt: now() })
   })
+
+  notifyChange("assigned_specific", { employeeId, quantity })
 
   return {
     assignedCount: unassigned.length,
@@ -432,8 +461,11 @@ export function getAdminDashboard({ branchId, period = "all" } = {}) {
       employeeId: emp.employeeId,
       employeeName: emp.employeeName,
       totalAssigned: emp.total,
-      completedCount: emp.converted,
-      processingCount: Math.max(emp.total - emp.converted, 0),
+      completedCount: emp.statusCounts["Trả lời"] ?? 0,
+      processingCount: emp.statusCounts["Đã gửi tin nhắn"] ?? 0,
+      blockedCount: emp.statusCounts["Chặn người lạ"] ?? 0,
+      noZaloCount: emp.statusCounts["Không có Zalo"] ?? 0,
+      untreatedCount: emp.statusCounts["Chưa xử lý"] ?? 0,
       isTimeBound: false,
       details: emp.details,
     }))

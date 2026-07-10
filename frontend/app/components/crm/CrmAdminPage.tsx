@@ -4,6 +4,7 @@ import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 import ConfirmModal from "../ui/ConfirmModal"
 import { useToast } from "@/app/hooks/useToast"
 import { CrmLeadCell } from "./CrmLeadCell"
+import { getChatSocket } from "@/lib/chatSocket"
 import { StatCard } from "../ui/StatCard"
 import { CustomCombobox } from "../ui/CustomCombobox"
 import { AvatarCircle } from "../ui/AvatarCircle"
@@ -147,6 +148,40 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
 
   const refresh = () => { fetchStats(); fetchRecords(); fetchEmployees() }
   useEffect(() => { refresh() }, [statusFilter, assignedFilter, search, pageSize, selectedBranch, dashboardPeriod])
+
+  const refreshRef = React.useRef(refresh)
+  useEffect(() => {
+    refreshRef.current = refresh
+  }, [refresh])
+
+  useEffect(() => {
+    let boundSocket: any = null
+
+    const handleCrmChanged = () => {
+      refreshRef.current()
+    }
+
+    const tryBind = () => {
+      const socket = getChatSocket()
+      if (socket) {
+        if (boundSocket && boundSocket !== socket) {
+          boundSocket.off("crm:changed", handleCrmChanged)
+        }
+        boundSocket = socket
+        socket.on("crm:changed", handleCrmChanged)
+      }
+    }
+
+    tryBind()
+    window.addEventListener("dudi:chat-socket-connect", tryBind)
+
+    return () => {
+      if (boundSocket) {
+        boundSocket.off("crm:changed", handleCrmChanged)
+      }
+      window.removeEventListener("dudi:chat-socket-connect", tryBind)
+    }
+  }, [])
 
   useEffect(() => {
     if (!autoAssignOpen) {
@@ -511,10 +546,10 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                   })()}
                 </div>
 
-                <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-xs space-y-5">
+                <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-xs space-y-4">
                   <div className="border-b border-gray-100 pb-3">
-                    <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Tiến độ nhân viên</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Bấm vào từng nhân viên để xem chi tiết trạng thái và danh sách khách hàng</p>
+                    <p className="text-xs font-black text-gray-600 uppercase tracking-wider">Tiến độ nhân viên</p>
+                    <p className="text-xs text-gray-500 font-semibold mt-0.5">Bấm vào từng nhân viên để xem chi tiết trạng thái và danh sách khách hàng</p>
                   </div>
                   {!stats.employeeProgress?.length ? (
                     <div className="flex flex-col items-center justify-center py-8 text-gray-400">
@@ -522,161 +557,197 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                       <p className="text-sm">Chưa có dữ liệu</p>
                     </div>
                   ) : (
-                    <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
-                      {stats.employeeProgress.map((emp: any) => {
-                        const cPct = emp.totalAssigned > 0 ? (emp.completedCount / emp.totalAssigned) * 100 : 0
-                        const pPct = emp.totalAssigned > 0 ? (emp.processingCount / emp.totalAssigned) * 100 : 0
-                        const bPct = emp.isTimeBound && emp.totalAssigned > 0 ? (emp.blockedCount / emp.totalAssigned) * 100 : 0
-                        const nPct = emp.isTimeBound && emp.totalAssigned > 0 ? (emp.noZaloCount / emp.totalAssigned) * 100 : 0
-                        const isExpanded = expandedEmpId === emp.employeeId
-
-                        return (
-                          <div key={emp.employeeId} className="pb-4 border-b border-gray-100 last:border-0 last:pb-0 space-y-3">
-                            <div
-                              onClick={() => {
-                                setExpandedEmpId(isExpanded ? null : emp.employeeId)
-                                setExpandedStatusMap(prev => ({ ...prev, [emp.employeeId]: null }))
-                              }}
-                              className="flex justify-between items-start mb-1.5 flex-wrap gap-2 cursor-pointer hover:bg-gray-50/50 p-2 -mx-2 rounded-2xl transition active:scale-[0.99]"
-                            >
-                              <div>
-                                <p className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
-                                  <span>{emp.employeeName}</span>
-                                  <span className="text-[10px] font-medium text-gray-400">({emp.employeeId})</span>
-                                </p>
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                  {emp.isTimeBound ? "Đã xử lý: " : "Được giao: "}
-                                  <span className="font-extrabold text-gray-700">{emp.totalAssigned} khách</span>
-                                </p>
-                              </div>
-                              <div className="flex gap-1.5 flex-wrap">
-                                {emp.isTimeBound ? (
-                                  <>
-                                    {emp.completedCount > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200/50">{"Trả lời: " + emp.completedCount}</span>}
-                                    {emp.processingCount > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200/50">{"Đã gửi: " + emp.processingCount}</span>}
-                                    {emp.blockedCount > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-50 text-amber-700 border border-amber-200/50">{"Chặn: " + emp.blockedCount}</span>}
-                                    {emp.noZaloCount > 0 && <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-red-50 text-red-700 border border-red-200/50">{"Ko Zalo: " + emp.noZaloCount}</span>}
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200/50">{"Trả lời: " + emp.completedCount}</span>
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200/50">{"Gửi: " + emp.processingCount}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden flex">
-                              <div className="bg-emerald-500 h-full transition-all" style={{ width: cPct + "%" }} title={`Trả lời: ${emp.completedCount}`} />
-                              <div className="bg-blue-400 h-full transition-all" style={{ width: pPct + "%" }} title={`Đã gửi: ${emp.processingCount}`} />
-                              {emp.isTimeBound && (
-                                <>
-                                  <div className="bg-amber-400 h-full transition-all" style={{ width: bPct + "%" }} title={`Chặn: ${emp.blockedCount}`} />
-                                  <div className="bg-red-500 h-full transition-all" style={{ width: nPct + "%" }} title={`Không có Zalo: ${emp.noZaloCount}`} />
-                                </>
+                    <>
+                      <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                        <table className="w-full min-w-[640px] text-sm border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 text-gray-600">
+                              <th className="border border-gray-200 px-4 py-2.5 text-left text-xs font-bold whitespace-nowrap">Nhân viên</th>
+                              <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Tổng</th>
+                              <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Đã gửi</th>
+                              <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Chặn</th>
+                              {!stats.employeeProgress.some((e: any) => e.isTimeBound) && (
+                                <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Chưa xử lý</th>
                               )}
-                            </div>
+                              <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Trả lời</th>
+                              <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Ko Zalo</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stats.employeeProgress.map((emp: any) => {
+                              const isExpanded = expandedEmpId === emp.employeeId
+                              const showUntreated = !emp.isTimeBound
+                              const colSpan = showUntreated ? 7 : 6
 
-                            {isExpanded && (
-                              <div className="mt-3 pl-4 border-l-2 border-red-100 space-y-3 transition-all">
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Chọn trạng thái để xem danh sách khách:</p>
-                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                                  {STATUSES_VN_DISPLAY.filter(status => !emp.isTimeBound || status !== "Chưa xử lý").map(status => {
-                                    const list = emp.details?.[status] ?? []
-                                    const count = list.length
-                                    const isSelected = expandedStatusMap[emp.employeeId] === status
+                              return (
+                                <React.Fragment key={emp.employeeId}>
+                                  <tr
+                                    onClick={() => {
+                                      setExpandedEmpId(isExpanded ? null : emp.employeeId)
+                                      setExpandedStatusMap(prev => ({ ...prev, [emp.employeeId]: null }))
+                                    }}
+                                    className={`cursor-pointer transition-colors ${isExpanded ? "bg-red-50/60" : "hover:bg-gray-50/80"}`}
+                                  >
+                                    <td className="border border-gray-200 px-4 py-2.5 text-left font-semibold text-gray-900 whitespace-nowrap">
+                                      {emp.employeeName}
+                                      <span className="block text-[10px] font-mono text-gray-400 mt-0.5">{emp.employeeId}</span>
+                                    </td>
+                                    <td className="border border-gray-200 px-3 py-2.5 text-center font-bold text-gray-900 tabular-nums">{emp.totalAssigned}</td>
+                                    <td className="border border-gray-200 px-3 py-2.5 text-center font-semibold text-blue-700 tabular-nums">{emp.processingCount || ""}</td>
+                                    <td className="border border-gray-200 px-3 py-2.5 text-center font-semibold text-amber-700 tabular-nums">{emp.blockedCount || ""}</td>
+                                    {showUntreated && (
+                                      <td className="border border-gray-200 px-3 py-2.5 text-center font-semibold text-gray-500 tabular-nums">{emp.untreatedCount || ""}</td>
+                                    )}
+                                    <td className="border border-gray-200 px-3 py-2.5 text-center font-semibold text-emerald-700 tabular-nums">{emp.completedCount || ""}</td>
+                                    <td className="border border-gray-200 px-3 py-2.5 text-center font-semibold text-red-600 tabular-nums">{emp.noZaloCount || ""}</td>
+                                  </tr>
+                                  {isExpanded && (
+                                    <tr>
+                                      <td colSpan={colSpan} className="border border-gray-200 bg-gray-50/50 p-4">
+                                        <div className="space-y-3">
+                                          <p className="text-xs font-black text-gray-500 uppercase tracking-wider">Chọn trạng thái để xem danh sách khách:</p>
+                                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                            {STATUSES_VN_DISPLAY.filter(status => !emp.isTimeBound || status !== "Chưa xử lý").map(status => {
+                                              const list = emp.details?.[status] ?? []
+                                              const count = list.length
+                                              const isSelected = expandedStatusMap[emp.employeeId] === status
 
-                                    return (
-                                      <button
-                                        key={status}
-                                        onClick={() => {
-                                          if (count === 0) return
-                                          setExpandedStatusMap(prev => ({
-                                            ...prev,
-                                            [emp.employeeId]: isSelected ? null : status
-                                          }))
-                                        }}
-                                        disabled={count === 0}
-                                        className={`p-2 rounded-xl border text-left transition ${
-                                          count === 0
-                                            ? "bg-gray-50 border-gray-100 opacity-40 cursor-not-allowed"
-                                            : isSelected
-                                              ? "bg-red-50/50 border-[#C62828] text-[#C62828] shadow-2xs font-extrabold"
-                                              : "bg-white border-gray-200 hover:border-gray-300 text-gray-700 cursor-pointer shadow-3xs"
-                                        }`}
-                                      >
-                                        <div className="text-[9px] font-black uppercase tracking-wide opacity-80">{status}</div>
-                                        <div className="text-xs font-black mt-0.5">{count} khách</div>
-                                      </button>
-                                    )
-                                  })}
-                                </div>
-
-                                {(() => {
-                                  const activeStatus = expandedStatusMap[emp.employeeId]
-                                  if (!activeStatus) return null
-                                  const list = emp.details?.[activeStatus] ?? []
-                                  if (list.length === 0) return null
-
-                                  return (
-                                    <div className="mt-3 bg-gray-50 rounded-2xl p-4 border border-gray-150 space-y-3">
-                                      <div className="flex justify-between items-center pb-2 border-b border-gray-200/60">
-                                        <span className="text-xs font-black text-gray-600 uppercase tracking-wider">
-                                          Danh sách khách — {activeStatus} ({list.length})
-                                        </span>
-                                      </div>
-                                      <div className="overflow-x-auto max-h-60 overflow-y-auto pr-1">
-                                        <table className="w-full text-xs text-left">
-                                          <thead>
-                                            <tr className="text-gray-400 font-bold border-b border-gray-100">
-                                              <th className="py-2 px-3">Doanh nghiệp / Khách</th>
-                                              <th className="py-2 px-3">SĐT</th>
-                                              <th className="py-2 px-3">Thời gian cập nhật</th>
-                                            </tr>
-                                          </thead>
-                                          <tbody className="divide-y divide-gray-100 text-gray-700 font-medium">
-                                            {list.map((item: any) => {
-                                              const dateObj = new Date(item.updatedAt)
-                                              const timeStr = isNaN(dateObj.getTime()) ? "--:--" : dateObj.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-                                              const dateStr = isNaN(dateObj.getTime()) ? "" : dateObj.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })
                                               return (
-                                                <tr key={item.id} className="hover:bg-white/60 transition-colors">
-                                                  <td className="py-2 px-3 font-semibold text-gray-800">{item.businessName || "Không có tên"}</td>
-                                                  <td className="py-2 px-3 font-mono text-gray-500">
-                                                    {item.phone ? (
-                                                      <div className="flex items-center gap-1.5">
-                                                        <span>{item.phone}</span>
-                                                        <button
-                                                          onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            navigator.clipboard.writeText(item.phone)
-                                                            notify("Đã sao chép số điện thoại!")
-                                                          }}
-                                                          className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600 cursor-pointer"
-                                                          title="Sao chép SĐT"
-                                                        >
-                                                          <Copy size={11} />
-                                                        </button>
-                                                      </div>
-                                                    ) : "--"}
-                                                  </td>
-                                                  <td className="py-2 px-3 text-gray-400 text-[10px]">
-                                                    {timeStr} <span className="opacity-75">{dateStr}</span>
-                                                  </td>
-                                                </tr>
+                                                <button
+                                                  key={status}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    if (count === 0) return
+                                                    setExpandedStatusMap(prev => ({
+                                                      ...prev,
+                                                      [emp.employeeId]: isSelected ? null : status
+                                                    }))
+                                                  }}
+                                                  disabled={count === 0}
+                                                  className={`p-2.5 rounded-xl border text-left transition ${
+                                                    count === 0
+                                                      ? "bg-gray-50/70 border-gray-100 opacity-50 cursor-not-allowed text-gray-400"
+                                                      : isSelected
+                                                        ? "bg-red-50 border-[#C62828] text-[#C62828] ring-1 ring-[#C62828]/30 shadow-xs"
+                                                        : "bg-white border-gray-200 hover:border-gray-400 hover:bg-gray-50 text-gray-700 cursor-pointer"
+                                                  }`}
+                                                >
+                                                  <div className={`text-[10px] font-black uppercase tracking-wide ${count === 0 ? "text-gray-400" : isSelected ? "text-[#C62828]" : "text-gray-600"}`}>
+                                                    {status}
+                                                  </div>
+                                                  <div className={`text-xs font-black mt-0.5 ${count === 0 ? "text-gray-400" : isSelected ? "text-[#C62828]" : "text-gray-900"}`}>
+                                                    {count} khách
+                                                  </div>
+                                                </button>
                                               )
                                             })}
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    </div>
-                                  )
-                                })()}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
+                                          </div>
+
+                                          {(() => {
+                                            const activeStatus = expandedStatusMap[emp.employeeId]
+                                            if (!activeStatus) return null
+                                            const list = emp.details?.[activeStatus] ?? []
+                                            if (list.length === 0) return null
+
+                                            return (
+                                              <div className="mt-3 bg-white rounded-2xl p-4 border border-gray-200 space-y-3">
+                                                <div className="flex justify-between items-center pb-2 border-b border-gray-200">
+                                                  <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                                                    Danh sách khách — {activeStatus} ({list.length})
+                                                  </span>
+                                                </div>
+                                                <div className="max-h-60 overflow-y-auto overflow-x-hidden">
+                                                  <table className="w-full text-xs text-left">
+                                                    <thead>
+                                                      <tr className="text-gray-600 font-extrabold border-b border-gray-200 text-[11px] uppercase tracking-wider">
+                                                        <th className="py-2.5 px-3">Doanh nghiệp / Khách</th>
+                                                        <th className="py-2.5 px-3">SĐT</th>
+                                                        <th className="py-2.5 px-3">Thời gian cập nhật</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-200 text-gray-700 font-medium">
+                                                      {list.map((item: any) => {
+                                                        const dateObj = new Date(item.updatedAt)
+                                                        let timeStr = "--:--"
+                                                        let dateStr = ""
+                                                        if (!isNaN(dateObj.getTime())) {
+                                                          const hours = String(dateObj.getHours()).padStart(2, "0")
+                                                          const minutes = String(dateObj.getMinutes()).padStart(2, "0")
+                                                          const day = String(dateObj.getDate()).padStart(2, "0")
+                                                          const month = String(dateObj.getMonth() + 1).padStart(2, "0")
+                                                          const year = dateObj.getFullYear()
+                                                          timeStr = `${hours}:${minutes}`
+                                                          dateStr = `${day}/${month}/${year}`
+                                                        }
+                                                        return (
+                                                          <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="py-2.5 px-3 font-bold text-gray-900">{item.businessName || "Không có tên"}</td>
+                                                            <td className="py-2.5 px-3 font-mono text-gray-800">
+                                                              {item.phone ? (
+                                                                <div className="flex items-center gap-1.5">
+                                                                  <span>{item.phone}</span>
+                                                                  <button
+                                                                    onClick={(e) => {
+                                                                      e.stopPropagation()
+                                                                      navigator.clipboard.writeText(item.phone)
+                                                                      notify("Đã sao chép số điện thoại!")
+                                                                    }}
+                                                                    className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600 cursor-pointer"
+                                                                    title="Sao chép SĐT"
+                                                                  >
+                                                                    <Copy size={11} />
+                                                                  </button>
+                                                                </div>
+                                                              ) : "--"}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 font-mono whitespace-nowrap">
+                                                              <span className="font-extrabold text-gray-900">{timeStr}</span>
+                                                              <span className="text-gray-400 mx-2">|</span>
+                                                              <span className="text-gray-700">{dateStr}</span>
+                                                            </td>
+                                                          </tr>
+                                                        )
+                                                      })}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              </div>
+                                            )
+                                          })()}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              )
+                            })}
+                            <tr className="bg-gray-50 font-bold text-gray-800">
+                              <td className="border border-gray-200 px-4 py-2.5 text-left text-xs uppercase tracking-wide">Tổng cộng</td>
+                              <td className="border border-gray-200 px-3 py-2.5 text-center tabular-nums">
+                                {stats.employeeProgress.reduce((s: number, e: any) => s + e.totalAssigned, 0)}
+                              </td>
+                              <td className="border border-gray-200 px-3 py-2.5 text-center text-blue-700 tabular-nums">
+                                {stats.employeeProgress.reduce((s: number, e: any) => s + (e.processingCount || 0), 0) || ""}
+                              </td>
+                              <td className="border border-gray-200 px-3 py-2.5 text-center text-amber-700 tabular-nums">
+                                {stats.employeeProgress.reduce((s: number, e: any) => s + (e.blockedCount || 0), 0) || ""}
+                              </td>
+                              {!stats.employeeProgress.some((e: any) => e.isTimeBound) && (
+                                <td className="border border-gray-200 px-3 py-2.5 text-center text-gray-500 tabular-nums">
+                                  {stats.employeeProgress.reduce((s: number, e: any) => s + (e.untreatedCount || 0), 0) || ""}
+                                </td>
+                              )}
+                              <td className="border border-gray-200 px-3 py-2.5 text-center text-emerald-700 tabular-nums">
+                                {stats.employeeProgress.reduce((s: number, e: any) => s + (e.completedCount || 0), 0) || ""}
+                              </td>
+                              <td className="border border-gray-200 px-3 py-2.5 text-center text-red-600 tabular-nums">
+                                {stats.employeeProgress.reduce((s: number, e: any) => s + (e.noZaloCount || 0), 0) || ""}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
