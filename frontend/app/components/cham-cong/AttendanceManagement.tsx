@@ -163,8 +163,8 @@ function InternSessionBadges({ record }: { record: AttendanceRecord }) {
 function SkeletonRow() {
   return (
     <tr className="animate-pulse">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <td key={i} className="py-3.5 px-4"><div className="h-3.5 bg-gray-100 rounded-full" style={{ width: `${60 + i * 8}%` }} /></td>
+      {Array.from({ length: 11 }).map((_, i) => (
+        <td key={i} className="py-3.5 px-4"><div className="h-3.5 bg-gray-100 rounded-full" style={{ width: `${60 + (i % 5) * 8}%` }} /></td>
       ))}
     </tr>
   )
@@ -630,7 +630,7 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
           <table className="w-full text-sm text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/80 text-gray-400 font-semibold text-xs border-b border-gray-100">
-                {["Mã NV", "Họ và tên", "Phòng ban", "Loại", "Check-in", "Check-out", "Tổng giờ", "Trạng thái", "Ghi chú", ""].map(h => (
+                {["#", "Mã NV", "Họ và tên", "Phòng ban", "Loại", "Check-in", "Check-out", "Tổng giờ", "Trạng thái", "Ghi chú", ""].map(h => (
                   <th key={h} className="py-3 px-4 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -641,7 +641,7 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
                 : filtered.length === 0
                   ? (
                     <tr>
-                      <td colSpan={10} className="py-16 text-center">
+                      <td colSpan={11} className="py-16 text-center">
                         <div className="flex flex-col items-center gap-2 text-gray-400">
                           <FileText size={32} className="opacity-30" />
                           <p className="text-sm font-medium">Không có bản ghi chấm công</p>
@@ -650,10 +650,11 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
                       </td>
                     </tr>
                   )
-                  : filtered.map(r => {
+                  : filtered.map((r, idx) => {
                     const kind = employeeKindMeta(r.employeeStatus)
                     return (
                     <tr key={r.id} className="hover:bg-gray-50/40 transition-colors group">
+                      <td className="py-3 px-4 text-xs font-semibold text-gray-400">{idx + 1}</td>
                       <td className="py-3 px-4 font-mono text-xs text-gray-500">{r.employeeId}</td>
                       <td className="py-3 px-4 font-bold text-gray-800 whitespace-nowrap">{r.employeeName}</td>
                       <td className="py-3 px-4 text-gray-500 text-xs">{r.department}</td>

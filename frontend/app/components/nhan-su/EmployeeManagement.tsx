@@ -5,7 +5,7 @@ import {
   Building2, Paperclip, Briefcase, ExternalLink, FileText, Image as ImageIcon,
   File, Link2, AlertCircle, CheckCircle2, UserPlus, UserMinus, ArrowRightLeft,
   TrendingUp, RefreshCw, ChevronLeft, ChevronRight, Maximize2,
-  User, Camera, ClipboardList, Upload, Calendar, Loader2
+  User, Camera, ClipboardList, Upload, Calendar, Loader2, Copy
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import { Employee, EmpExtForm, WorkHistoryEntry, WorkHistoryType, Attachment, OrgNode } from "../../types"
@@ -1727,6 +1727,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
               <tr className="bg-gray-50/80 text-gray-400 text-xs border-b border-gray-100">
                 <th className="px-4 py-3.5 text-left font-semibold w-10">#</th>
                 <th className="px-4 py-3.5 text-left font-semibold">Nhân viên</th>
+                <th className="px-4 py-3.5 text-left font-semibold">Số điện thoại</th>
                 <th className="px-4 py-3.5 text-left font-semibold">Chi nhánh</th>
                 <th className="px-4 py-3.5 text-left font-semibold">Phòng ban · Chức vụ</th>
                 <th className="px-4 py-3.5 text-left font-semibold">Hợp đồng</th>
@@ -1759,6 +1760,25 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                           <p className="text-xs text-gray-400 font-mono">{emp.id} · {emp.email}</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      {emp.phone ? (
+                        <div className="flex items-center gap-1.5 group/phone">
+                          <span className="text-sm font-mono text-gray-600 whitespace-nowrap">{emp.phone}</span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(emp.phone)
+                              showToast("Đã sao chép số điện thoại!", "success")
+                            }}
+                            className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-[#C62828] transition-colors cursor-pointer opacity-0 group-hover/phone:opacity-100 focus:opacity-100"
+                            title="Sao chép số điện thoại"
+                          >
+                            <Copy size={13} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-4">
                       {branchName && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-lg font-medium whitespace-nowrap">{branchName}</span>}

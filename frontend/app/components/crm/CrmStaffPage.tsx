@@ -227,7 +227,7 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
             <table className="w-full min-w-[960px] text-left text-xs">
               <thead>
                 <tr className="bg-[#fff1f2] border-b border-[#efd7da]">
-                  {["Tên doanh nghiệp","Loại hình","Địa chỉ","Khu vực","SĐT","Website","Maps","Trạng thái","Lead","Ghi chú"].map(h => (
+                  {["ID", "Tên doanh nghiệp","Loại hình","Địa chỉ","Khu vực","SĐT","Website","Maps","Trạng thái","Lead","Ghi chú"].map(h => (
                     <th key={h} className="py-3 px-3 text-[10px] font-bold text-[#8b6b70] uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -235,6 +235,7 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
               <tbody className="divide-y divide-[#f0dadd]">
                 {records.map(r => (
                   <tr key={r.id} className="hover:bg-[#fffafa] transition">
+                    <td className="py-2.5 px-3 font-mono text-[10px] text-[#8b6b70] font-bold whitespace-nowrap">{(r.id || "").replace("crm-", "")}</td>
                     <td className="py-2.5 px-3 font-bold text-[#241416] max-w-[160px] break-words">{r.businessName}</td>
                     <td className="py-2.5 px-3"><span className="px-1.5 py-0.5 bg-[#fff1f2] text-[#7a1d22] rounded text-[10px] font-semibold border border-[#efd7da]">{r.businessType || "—"}</span></td>
                     <td className="py-2.5 px-3 text-[#5f4246] max-w-[180px] break-words">{r.address}</td>

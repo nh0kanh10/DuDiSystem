@@ -631,7 +631,7 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                             : <Square size={15} className="text-gray-400" />}
                         </button>
                       </th>
-                      {["Tên doanh nghiệp", "Loại hình", "Địa chỉ", "Khu vực", "SĐT", "Website", "Maps", "Trạng thái", "Nhân viên", "Lead", "Ghi chú", ""].map(h => (
+                      {["ID", "Tên doanh nghiệp", "Loại hình", "Địa chỉ", "Khu vực", "SĐT", "Website", "Maps", "Trạng thái", "Nhân viên", "Lead", "Ghi chú", ""].map(h => (
                         <th key={h} className="py-3 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -646,6 +646,7 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                               : <Square size={15} className="text-gray-400" />}
                           </button>
                         </td>
+                        <td className="py-2 px-2 font-mono text-[10px] text-gray-400 font-bold whitespace-nowrap">{(r.id || "").replace("crm-", "")}</td>
                         <td className="py-2 px-2 font-bold text-gray-800 max-w-[160px] break-words">{r.businessName}</td>
                         <td className="py-2 px-2">
                           <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-semibold border border-gray-200">
