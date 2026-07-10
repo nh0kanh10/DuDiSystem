@@ -372,10 +372,10 @@ function AppContent() {
         }),
         api.assignments.list().then(d => {
           if (d && Array.isArray(d)) setAssignments(d as Assignment[])
-        }),
+        }).catch(() => { }),
         api.requests.list().then(d => {
           if (d && Array.isArray(d)) setRequests(d as any[])
-        }),
+        }).catch(() => { }),
         api.profileUpdates.list().then(d => {
           if (d && Array.isArray(d)) setProfileUpdates(d as any[])
         }).catch(() => { })
@@ -511,7 +511,7 @@ function AppContent() {
         {sessionAlertMsg && (
           <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
         )}
-        <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} />
+        <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} onOpenLead={(id) => navigate(`/lead/${id}`)} />
       </>
     )
   }
@@ -547,10 +547,10 @@ function AppContent() {
 
   const renderPage = () => {
     if (!hasPageAccess(activeRolePermissions, activePage)) {
-      return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
+      return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} onOpenLead={(id) => navigate(`/lead/${id}`)} /> : <AdminDashboard onNavigate={setActivePage} />
     }
     switch (activePage) {
-      case "dashboard": return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
+      case "dashboard": return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} onOpenLead={(id) => navigate(`/lead/${id}`)} /> : <AdminDashboard onNavigate={setActivePage} />
       case "nhan-su": return (
         <EmployeeManagement
           employees={employees}
@@ -610,7 +610,7 @@ function AppContent() {
       }
       case "staff-portal": return (
         <div className="w-full h-[calc(100vh-2.5rem)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
-          <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} embed={true} />
+          <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} embed={true} onOpenLead={(id) => navigate(`/lead/${id}`)} />
         </div>
       )
       case "user-profile": return (
@@ -641,7 +641,7 @@ function AppContent() {
           />
         )
       }
-      default: return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
+      default: return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} onOpenLead={(id) => navigate(`/lead/${id}`)} /> : <AdminDashboard onNavigate={setActivePage} />
     }
   }
 
