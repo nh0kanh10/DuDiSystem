@@ -17,7 +17,6 @@ import IPManagement from "./components/IPManagement"
 import AccountManagement from "./components/account/AccountManagement"
 import StatisticsPage from "./components/thong-ke/StatisticsPage"
 
-// Imported Vietnamese subfolders / modular components
 import { LoginPage } from "./components/xac-thuc/LoginPage"
 import { BrandLogo } from "./components/ui/BrandLogo"
 import { AdminDashboard } from "./components/tong-quan/AdminDashboard"
@@ -35,7 +34,6 @@ import { PublicRequirementForm } from "./components/lead/PublicRequirementForm"
 import { KpiManagementAdmin } from "./components/kpi/KpiManagementAdmin"
 import { clearKpiMockData } from "./components/kpi/kpiMockData"
 
-// Imported user portal components
 import UserAttendance from "./components/nhan-vien/UserAttendance"
 import UserTimeOff from "./components/nhan-vien/UserTimeOff"
 import { UserDirectory } from "./components/nhan-vien/UserDirectory"
@@ -131,13 +129,13 @@ function AppContent() {
       return "dashboard"
     }
     const validPages: Page[] = [
-        "dashboard", "nhan-su", "cham-cong", "thong-ke",
-        "duyet-don", "thong-bao", "cong-viec", "du-an", "lead",
-        "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
-        "crm", "staff-portal", "kpi", "kpi-stats", "kpi-compare",
-        "user-profile", "user-attendance", "user-timeoff", "user-directory",
-        "user-chat", "user-workflow", "user-settings", "user-crm"
-      ]
+      "dashboard", "nhan-su", "cham-cong", "thong-ke",
+      "duyet-don", "thong-bao", "cong-viec", "du-an", "lead",
+      "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
+      "crm", "staff-portal", "kpi", "kpi-stats", "kpi-compare",
+      "user-profile", "user-attendance", "user-timeoff", "user-directory",
+      "user-chat", "user-workflow", "user-settings", "user-crm"
+    ]
     const firstSegment = rawPath.split("/")[0]
     if (validPages.includes(firstSegment as Page)) {
       return firstSegment as Page
@@ -216,205 +214,205 @@ function AppContent() {
       const target = hasPageAccess(activeRolePermissions, "dashboard") ? "/dashboard" : "/staff-portal"
       navigate(target)
     }
-    }, [isLoggedIn, location.pathname, navigate, activeRolePermissions])
+  }, [isLoggedIn, location.pathname, navigate, activeRolePermissions])
 
-    useEffect(() => {
-      const handleUnauthorized = () => {
-        handleLogout()
-        setSessionAlertMsg("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
-      }
-      window.addEventListener("dudi_unauthorized", handleUnauthorized)
-      return () => {
-        window.removeEventListener("dudi_unauthorized", handleUnauthorized)
-      }
-    }, [])
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      handleLogout()
+      setSessionAlertMsg("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+    }
+    window.addEventListener("dudi_unauthorized", handleUnauthorized)
+    return () => {
+      window.removeEventListener("dudi_unauthorized", handleUnauthorized)
+    }
+  }, [])
 
-    const lastActivityRef = useRef<number>(Date.now())
+  const lastActivityRef = useRef<number>(Date.now())
 
-    useEffect(() => {
-      if (!isLoggedIn) return
+  useEffect(() => {
+    if (!isLoggedIn) return
 
-      const SESSION_MS = sessionTimeout * 60 * 1000
-      let idleTimeoutId: ReturnType<typeof setTimeout> | undefined
+    const SESSION_MS = sessionTimeout * 60 * 1000
+    let idleTimeoutId: ReturnType<typeof setTimeout> | undefined
 
-      const scheduleIdleCheck = () => {
-        if (idleTimeoutId) clearTimeout(idleTimeoutId)
-        const remaining = SESSION_MS - (Date.now() - lastActivityRef.current)
-        idleTimeoutId = setTimeout(() => {
-          const idleDuration = Date.now() - lastActivityRef.current
-          if (idleDuration >= SESSION_MS) {
-            handleLogout()
-            setSessionAlertMsg(
-              `Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`
-            )
-          } else {
-            scheduleIdleCheck()
-          }
-        }, Math.max(remaining, 1000))
-      }
+    const scheduleIdleCheck = () => {
+      if (idleTimeoutId) clearTimeout(idleTimeoutId)
+      const remaining = SESSION_MS - (Date.now() - lastActivityRef.current)
+      idleTimeoutId = setTimeout(() => {
+        const idleDuration = Date.now() - lastActivityRef.current
+        if (idleDuration >= SESSION_MS) {
+          handleLogout()
+          setSessionAlertMsg(
+            `Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`
+          )
+        } else {
+          scheduleIdleCheck()
+        }
+      }, Math.max(remaining, 1000))
+    }
 
-      const onActivity = () => {
-        lastActivityRef.current = Date.now()
-        touchSession()
-        scheduleIdleCheck()
-      }
-
-      const events = ["mousedown", "keydown", "scroll", "touchstart", "click"] as const
-
+    const onActivity = () => {
       lastActivityRef.current = Date.now()
       touchSession()
       scheduleIdleCheck()
-
-      events.forEach(event => {
-        window.addEventListener(event, onActivity, { capture: true, passive: true })
-      })
-
-      return () => {
-        if (idleTimeoutId) clearTimeout(idleTimeoutId)
-        events.forEach(event => {
-          window.removeEventListener(event, onActivity, { capture: true })
-        })
-      }
-    }, [isLoggedIn, sessionTimeout])
-
-    const [employees, setEmployees] = useState<Employee[]>(INIT_EMPLOYEES)
-    const [orgNodes, setOrgNodes] = useState<OrgNode[]>(INIT_ORG_NODES)
-    const [assignments, setAssignments] = useState<Assignment[]>(INIT_ASSIGNMENTS)
-    const [requests, setRequests] = useState<any[]>([])
-
-    const pendingRequestsCount = useMemo(() => {
-      const currentWeekVal = `W${getISOWeek(new Date())}`
-      return requests.filter(r => {
-        if (r.status !== "pending") return false
-        try {
-          const dates = getDateRange(r.startDate, r.endDate)
-          return dates.some(d => `W${getISOWeek(d)}` === currentWeekVal)
-        } catch {
-          return false
-        }
-      }).length
-    }, [requests])
-    const [loginError, setLoginError] = useState<string | null>(null)
-    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-    const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
-    const {
-      unread: unreadNotifs,
-      latest: notifPreview,
-      reload: reloadNotificationsCount,
-      setLatest: setNotifPreview,
-      setUnread: setUnreadNotifCount,
-    } = useNotificationBadge(isLoggedIn)
-    const [profileUpdates, setProfileUpdates] = useState<any[]>([])
-    const [autoOpenUpdateReqId, setAutoOpenUpdateReqId] = useState<string | null>(null)
-
-    const reloadProfileUpdates = () => {
-      if (isLoggedIn) {
-        api.profileUpdates.list().then(d => {
-          if (d && Array.isArray(d)) setProfileUpdates(d as any[])
-        }).catch(err => console.error("Lỗi tải profile updates:", err))
-      }
     }
 
-    const [selectedBranch, setSelectedBranch] = useState(() => {
-      const saved = localStorage.getItem("dudi_user")
-      if (saved) {
-        try {
-          const u = JSON.parse(saved)
-          return u.branchId || "all"
-        } catch {
-          return "all"
-        }
-      }
-      return "all"
+    const events = ["mousedown", "keydown", "scroll", "touchstart", "click"] as const
+
+    lastActivityRef.current = Date.now()
+    touchSession()
+    scheduleIdleCheck()
+
+    events.forEach(event => {
+      window.addEventListener(event, onActivity, { capture: true, passive: true })
     })
 
-    const branches = orgNodes.filter(n => n.type === "branch")
+    return () => {
+      if (idleTimeoutId) clearTimeout(idleTimeoutId)
+      events.forEach(event => {
+        window.removeEventListener(event, onActivity, { capture: true })
+      })
+    }
+  }, [isLoggedIn, sessionTimeout])
 
-    const fetchRequests = () => {
-      if (isLoggedIn) {
+  const [employees, setEmployees] = useState<Employee[]>(INIT_EMPLOYEES)
+  const [orgNodes, setOrgNodes] = useState<OrgNode[]>(INIT_ORG_NODES)
+  const [assignments, setAssignments] = useState<Assignment[]>(INIT_ASSIGNMENTS)
+  const [requests, setRequests] = useState<any[]>([])
+
+  const pendingRequestsCount = useMemo(() => {
+    const currentWeekVal = `W${getISOWeek(new Date())}`
+    return requests.filter(r => {
+      if (r.status !== "pending") return false
+      try {
+        const dates = getDateRange(r.startDate, r.endDate)
+        return dates.some(d => `W${getISOWeek(d)}` === currentWeekVal)
+      } catch {
+        return false
+      }
+    }).length
+  }, [requests])
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
+  const {
+    unread: unreadNotifs,
+    latest: notifPreview,
+    reload: reloadNotificationsCount,
+    setLatest: setNotifPreview,
+    setUnread: setUnreadNotifCount,
+  } = useNotificationBadge(isLoggedIn)
+  const [profileUpdates, setProfileUpdates] = useState<any[]>([])
+  const [autoOpenUpdateReqId, setAutoOpenUpdateReqId] = useState<string | null>(null)
+
+  const reloadProfileUpdates = () => {
+    if (isLoggedIn) {
+      api.profileUpdates.list().then(d => {
+        if (d && Array.isArray(d)) setProfileUpdates(d as any[])
+      }).catch(err => console.error("Lỗi tải profile updates:", err))
+    }
+  }
+
+  const [selectedBranch, setSelectedBranch] = useState(() => {
+    const saved = localStorage.getItem("dudi_user")
+    if (saved) {
+      try {
+        const u = JSON.parse(saved)
+        return u.branchId || "all"
+      } catch {
+        return "all"
+      }
+    }
+    return "all"
+  })
+
+  const branches = orgNodes.filter(n => n.type === "branch")
+
+  const fetchRequests = () => {
+    if (isLoggedIn) {
+      api.requests.list().then(d => {
+        if (d && Array.isArray(d)) setRequests(d as any[])
+      }).catch(err => console.error("Lỗi tải requests:", err))
+    }
+  }
+
+  const reloadPermissionsAndRoles = () => {
+    api.roles.list().then(d => {
+      if (d && Array.isArray(d)) setRolesList(d as RoleDefinition[])
+    }).catch(err => console.error("Lỗi tải roles:", err))
+
+    api.auth.me().then(user => {
+      if (user) {
+        localStorage.setItem("dudi_user", JSON.stringify(user))
+        setRole(user.roleId || "role-admin")
+        setLoggedEmail(user.employeeId || user.email || "")
+        if (Array.isArray((user as any).effectivePermissions)) {
+          setEffectivePermissions((user as any).effectivePermissions)
+        }
+      }
+    }).catch(err => console.error("Lỗi tải thông tin tài khoản:", err))
+  }
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      reloadPermissionsAndRoles()
+
+      api.systemConfig.get().then(res => {
+        if (res && res.sessionTimeoutMinutes) {
+          setSessionTimeout(Number(res.sessionTimeoutMinutes))
+        }
+      }).catch(err => console.error("Lỗi tải cấu hình session:", err))
+
+      Promise.all([
+        api.employees.list().then(d => {
+          if (d && Array.isArray(d)) setEmployees(d as Employee[])
+        }),
+        api.orgNodes.list().then(d => {
+          if (d && Array.isArray(d)) setOrgNodes(d as OrgNode[])
+        }),
+        api.assignments.list().then(d => {
+          if (d && Array.isArray(d)) setAssignments(d as Assignment[])
+        }),
         api.requests.list().then(d => {
           if (d && Array.isArray(d)) setRequests(d as any[])
-        }).catch(err => console.error("Lỗi tải requests:", err))
+        }),
+        api.profileUpdates.list().then(d => {
+          if (d && Array.isArray(d)) setProfileUpdates(d as any[])
+        }).catch(() => { })
+      ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
+    }
+  }, [isLoggedIn])
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      resetChatSocket()
+      return
+    }
+    connectChatSocket()
+    const heartbeat = setInterval(() => {
+      if (getChatSocketStatus() === "connected") {
+        chatHeartbeat()
+      } else {
+        api.staffChat.heartbeat().catch(() => { })
       }
+    }, 25_000)
+    return () => {
+      clearInterval(heartbeat)
+      releaseChatSocket()
     }
+  }, [isLoggedIn])
 
-    const reloadPermissionsAndRoles = () => {
-      api.roles.list().then(d => {
-        if (d && Array.isArray(d)) setRolesList(d as RoleDefinition[])
-      }).catch(err => console.error("Lỗi tải roles:", err))
-
-      api.auth.me().then(user => {
-        if (user) {
-          localStorage.setItem("dudi_user", JSON.stringify(user))
-          setRole(user.roleId || "role-admin")
-          setLoggedEmail(user.employeeId || user.email || "")
-          if (Array.isArray((user as any).effectivePermissions)) {
-            setEffectivePermissions((user as any).effectivePermissions)
-          }
-        }
-      }).catch(err => console.error("Lỗi tải thông tin tài khoản:", err))
-    }
-
-    useEffect(() => {
+  useEffect(() => {
+    const handleUpdate = () => {
       if (isLoggedIn) {
         reloadPermissionsAndRoles()
-
-        api.systemConfig.get().then(res => {
-          if (res && res.sessionTimeoutMinutes) {
-            setSessionTimeout(Number(res.sessionTimeoutMinutes))
-          }
-        }).catch(err => console.error("Lỗi tải cấu hình session:", err))
-
-        Promise.all([
-          api.employees.list().then(d => {
-            if (d && Array.isArray(d)) setEmployees(d as Employee[])
-          }),
-          api.orgNodes.list().then(d => {
-            if (d && Array.isArray(d)) setOrgNodes(d as OrgNode[])
-          }),
-          api.assignments.list().then(d => {
-            if (d && Array.isArray(d)) setAssignments(d as Assignment[])
-          }),
-          api.requests.list().then(d => {
-            if (d && Array.isArray(d)) setRequests(d as any[])
-          }),
-          api.profileUpdates.list().then(d => {
-            if (d && Array.isArray(d)) setProfileUpdates(d as any[])
-          }).catch(() => {})
-        ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
       }
-    }, [isLoggedIn])
+    }
+    window.addEventListener("dudi_permissions_updated", handleUpdate)
+    return () => window.removeEventListener("dudi_permissions_updated", handleUpdate)
+  }, [isLoggedIn])
 
-    useEffect(() => {
-      if (!isLoggedIn) {
-        resetChatSocket()
-        return
-      }
-      connectChatSocket()
-      const heartbeat = setInterval(() => {
-        if (getChatSocketStatus() === "connected") {
-          chatHeartbeat()
-        } else {
-          api.staffChat.heartbeat().catch(() => {})
-        }
-      }, 25_000)
-      return () => {
-        clearInterval(heartbeat)
-        releaseChatSocket()
-      }
-    }, [isLoggedIn])
-
-    useEffect(() => {
-      const handleUpdate = () => {
-        if (isLoggedIn) {
-          reloadPermissionsAndRoles()
-        }
-      }
-      window.addEventListener("dudi_permissions_updated", handleUpdate)
-      return () => window.removeEventListener("dudi_permissions_updated", handleUpdate)
-    }, [isLoggedIn])
-
-    useEffect(() => {
+  useEffect(() => {
     if (isLoggedIn && role === "role-manager" && orgNodes.length > 0) {
       const emp = employees.find(e =>
         (e.email || "").toLowerCase() === (loggedEmail || "").toLowerCase() ||
@@ -435,10 +433,10 @@ function AppContent() {
       if (res && res.token) {
         const storage = rememberMe ? localStorage : sessionStorage
         const otherStorage = rememberMe ? sessionStorage : localStorage
-        
+
         storage.setItem("dudi_token", res.token)
         storage.setItem("dudi_user", JSON.stringify(res.user))
-        
+
         otherStorage.removeItem("dudi_token")
         otherStorage.removeItem("dudi_user")
 
@@ -449,7 +447,7 @@ function AppContent() {
           localStorage.removeItem("dudi_saved_id")
           localStorage.removeItem("dudi_saved_pass")
         }
-        
+
         const user = res.user as any
         const r = user.roleId as Role
         setRole(r)
@@ -507,7 +505,6 @@ function AppContent() {
     </>
   )
 
-  // ─── USER PORTAL: completely separate layout (no sidebar) ───
   if (isStaffRole) {
     return (
       <>
@@ -526,7 +523,7 @@ function AppContent() {
   let profileUser: { name?: string; email?: string; employeeId?: string; position?: string; department?: string } = {}
   try {
     profileUser = JSON.parse(localStorage.getItem("dudi_user") || "{}")
-  } catch { /* ignore */ }
+  } catch { }
   const isAdminRole = role === "role-admin" || role === "role-super-admin"
   const currentEmp: Employee = matchedEmp || {
     id: loggedEmail || profileUser.employeeId || "—",
@@ -631,21 +628,21 @@ function AppContent() {
       case "user-crm": return (
         <CrmStaffPage onOpenLead={(id) => navigate(`/lead/${id}`)} />
       )
-        case "lead": {
-          const leadId = location.pathname.match(/^\/lead\/([^/]+)/)?.[1]
-          return (
-            <LeadManagement
-              currentUserId={currentEmp.id}
-              employees={employees}
-              leadId={leadId}
-              selectedBranch={selectedBranch}
-              onNavigateToLead={(id) => navigate(id ? `/lead/${id}` : "/lead")}
-              onNavigateToProject={(id) => navigate(id ? `/du-an/${id}` : "/du-an")}
-            />
-          )
-        }
-        default: return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
+      case "lead": {
+        const leadId = location.pathname.match(/^\/lead\/([^/]+)/)?.[1]
+        return (
+          <LeadManagement
+            currentUserId={currentEmp.id}
+            employees={employees}
+            leadId={leadId}
+            selectedBranch={selectedBranch}
+            onNavigateToLead={(id) => navigate(id ? `/lead/${id}` : "/lead")}
+            onNavigateToProject={(id) => navigate(id ? `/du-an/${id}` : "/du-an")}
+          />
+        )
       }
+      default: return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
+    }
   }
 
 
@@ -653,9 +650,7 @@ function AppContent() {
 
   return (
     <Routes>
-      {/* Route dành cho khách hàng điền form */}
       <Route path="/form/:leadId" element={<PublicRequirementForm />} />
-      {/* Route dành cho admin */}
       <Route path="*" element={
         <>
           {sessionAlertMsg && (
@@ -1029,7 +1024,6 @@ function UserAwareSidebar({
         />
       </div>
 
-      {/* Chi nhánh + Thông báo */}
       <div className={`px-2 pt-2 pb-1 space-y-1 border-b border-white/5 ${collapsed ? "flex flex-col items-center" : ""}`}>
         {isAdmin && onBranchChange && (
           <div className="relative w-full">
@@ -1077,7 +1071,6 @@ function UserAwareSidebar({
 
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 space-y-0.5 py-2" style={{ scrollbarWidth: "none" }}>
         {hasAccess("dashboard") && <NavItem page="dashboard" icon={LayoutDashboard} label="Dashboard" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         <NavItem page="staff-portal" icon={Fingerprint} label="Cổng nhân viên" active={active} onNavigate={onNavigate} collapsed={collapsed} />
@@ -1200,7 +1193,6 @@ function UserAwareSidebar({
   )
 }
 
-// ─── SESSION ALERT MODAL (thay thế browser alert()) ───
 function SessionAlertModal({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <div
@@ -1211,10 +1203,7 @@ function SessionAlertModal({ message, onClose }: { message: string; onClose: () 
         className="bg-white rounded-2xl shadow-2xl w-[340px] overflow-hidden"
         style={{ animation: "sessionModalIn 0.22s cubic-bezier(.34,1.56,.64,1) both" }}
       >
-        {/* Gradient header strip */}
         <div className="h-1.5 w-full bg-gradient-to-r from-[#C62828] to-[#E64A19]" />
-
-        {/* Icon + message */}
         <div className="flex flex-col items-center gap-3 px-7 pt-7 pb-5">
           <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
@@ -1228,7 +1217,6 @@ function SessionAlertModal({ message, onClose }: { message: string; onClose: () 
           </p>
         </div>
 
-        {/* Action button */}
         <div className="px-7 pb-6 flex justify-center">
           <button
             id="session-alert-ok"

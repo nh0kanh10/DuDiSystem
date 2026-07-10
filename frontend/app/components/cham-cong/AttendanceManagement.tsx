@@ -401,7 +401,7 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
     if (t) showToast(t.msg, t.type)
   }, [showToast])
 
-  useEffect(() => { api.employees.list().then(d => setEmployees(d as any[])) }, [])
+  useEffect(() => { api.employees.list().then(d => setEmployees((d as any[]).filter(e => e.status === "active"))) }, [])
 
   const loadData = useCallback(async (start: string, end: string, empId: string) => {
     setLoading(true)
@@ -746,7 +746,7 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
           api.employees.list(),
           api.attendance.list(branchQuery(selectedBranch)),
         ])
-        setAllEmployees(empData as Employee[])
+        setAllEmployees((empData as Employee[]).filter(e => e.status === "active"))
         const monthStr = String(month).padStart(2, "0")
         const branchEmpIds = new Set(
           (empData as Employee[]).filter(e => inBranch(e, selectedBranch)).map(e => e.id),

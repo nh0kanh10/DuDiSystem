@@ -229,9 +229,23 @@ export function updateEmployee(id, patch) {
     safe.contractHistory = updatedHistory
   }
 
-  return repo.update(id, safe)
+  const updatedEmp = repo.update(id, safe)
+
+  if (patch.status !== undefined) {
+    const user = userRepo.getByEmployeeId(id)
+    if (user) {
+      const newUserStatus = patch.status === "inactive" ? "locked" : "active"
+      userRepo.update(user.id, { status: newUserStatus })
+    }
+  }
+
+  return updatedEmp
 }
 
 export function deleteEmployee(id) {
+  const user = userRepo.getByEmployeeId(id)
+  if (user) {
+    userRepo.remove(user.id)
+  }
   return repo.remove(id)
 }

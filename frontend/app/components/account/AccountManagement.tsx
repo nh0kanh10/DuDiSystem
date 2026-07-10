@@ -982,7 +982,7 @@ export default function AccountManagement({
                   <thead>
                     <tr className="bg-gray-50/80 text-gray-400 text-xs border-b border-gray-100 uppercase tracking-wider font-bold">
                       <th className="px-5 py-3.5 text-left font-bold w-16">STT</th>
-                      {["Mã NV", "Tên nhân viên", "Phòng ban", "Trạng thái", "Tài khoản", "Vai trò (Role)", "Hành động"].map(h => (
+                      {["Mã NV", "Tên nhân viên", "Phòng ban", "Trạng thái nhân sự", "Trạng thái tài khoản", "Tài khoản", "Vai trò (Role)", "Hành động"].map(h => (
                         <th key={h} className="px-5 py-3.5 text-left font-bold">{h}</th>
                       ))}
                     </tr>
@@ -990,7 +990,6 @@ export default function AccountManagement({
                   <tbody className="divide-y divide-gray-50">
                     {filteredEmployees.map((emp, index) => {
                       const acc = accounts.find(a => a.employeeId === emp.id)
-                      const isResigned = emp.status === "inactive"
                       const roleObj = acc ? rolesList.find(r => r.id === acc.roleId) : null
                       return (
                         <tr key={emp.id} className="hover:bg-gray-50/40 transition-colors">
@@ -1006,10 +1005,35 @@ export default function AccountManagement({
                             </div>
                           </td>
                           <td className="px-5 py-4 text-gray-500 font-bold">{emp.department || "—"}</td>
+                          {/* 1. Trạng thái nhân sự */}
                           <td className="px-5 py-4">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isResigned ? "bg-red-50 text-red-600 border border-red-100" : "bg-green-50 text-green-700 border border-green-100"}`}>
-                              {isResigned ? "Nghỉ việc" : "Đang làm việc"}
-                            </span>
+                            {emp.status === "active" ? (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100">
+                                Đang làm
+                              </span>
+                            ) : emp.status === "suspended" ? (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                                Tạm nghỉ
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-600 border border-red-100">
+                                Nghỉ việc
+                              </span>
+                            )}
+                          </td>
+                          {/* 2. Trạng thái tài khoản */}
+                          <td className="px-5 py-4">
+                            {acc ? (
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${acc.status === "active" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-amber-50 text-amber-700 border border-amber-100"}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${acc.status === "active" ? "bg-emerald-500" : "bg-amber-500"}`} />
+                                {acc.status === "active" ? "Hoạt động" : "Đã khóa"}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-400 border border-gray-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                                Chưa tạo
+                              </span>
+                            )}
                           </td>
                           <td className="px-5 py-4 text-xs font-mono font-bold text-gray-600">
                             {acc ? acc.email : <span className="text-gray-300 italic font-medium">Chưa tạo tài khoản</span>}
