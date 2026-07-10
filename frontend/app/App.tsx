@@ -17,7 +17,7 @@ import IPManagement from "./components/IPManagement"
 import AccountManagement from "./components/account/AccountManagement"
 import StatisticsPage from "./components/thong-ke/StatisticsPage"
 
-
+// Imported Vietnamese subfolders / modular components
 import { LoginPage } from "./components/xac-thuc/LoginPage"
 import { BrandLogo } from "./components/ui/BrandLogo"
 import { AdminDashboard } from "./components/tong-quan/AdminDashboard"
@@ -35,7 +35,7 @@ import { PublicRequirementForm } from "./components/lead/PublicRequirementForm"
 import { KpiManagementAdmin } from "./components/kpi/KpiManagementAdmin"
 import { clearKpiMockData } from "./components/kpi/kpiMockData"
 
-
+// Imported user portal components
 import UserAttendance from "./components/nhan-vien/UserAttendance"
 import UserTimeOff from "./components/nhan-vien/UserTimeOff"
 import { UserDirectory } from "./components/nhan-vien/UserDirectory"
@@ -507,7 +507,7 @@ function AppContent() {
     </>
   )
 
-  
+  // ─── USER PORTAL: completely separate layout (no sidebar) ───
   if (isStaffRole) {
     return (
       <>
@@ -526,7 +526,7 @@ function AppContent() {
   let profileUser: { name?: string; email?: string; employeeId?: string; position?: string; department?: string } = {}
   try {
     profileUser = JSON.parse(localStorage.getItem("dudi_user") || "{}")
-  } catch {  }
+  } catch { /* ignore */ }
   const isAdminRole = role === "role-admin" || role === "role-super-admin"
   const currentEmp: Employee = matchedEmp || {
     id: loggedEmail || profileUser.employeeId || "—",
@@ -653,9 +653,9 @@ function AppContent() {
 
   return (
     <Routes>
-      {}
+      {/* Route dành cho khách hàng điền form */}
       <Route path="/form/:leadId" element={<PublicRequirementForm />} />
-      {}
+      {/* Route dành cho admin */}
       <Route path="*" element={
         <>
           {sessionAlertMsg && (
@@ -907,23 +907,8 @@ function UserAwareSidebar({
   const [userFlyoutPos, setUserFlyoutPos] = useState({ left: 0, bottom: 0 })
   const [notifs, setNotifs] = useState<any[]>([])
   const [loadingNotifs, setLoadingNotifs] = useState(false)
-
-  const [isLargeScreen, setIsLargeScreen] = useState(true)
-  const [isHovered, setIsHovered] = useState(false)
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsLargeScreen(window.innerWidth >= 1024)
-    }
-    handleResize()
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
-
-  const isCollapsedForRender = collapsed && !(isHovered && isLargeScreen)
-
   const toggle = (k: string) => setExpanded(p => {
-    if (isCollapsedForRender) return p.includes(k) ? [] : [k]
+    if (collapsed) return p.includes(k) ? [] : [k]
     return p.includes(k) ? p.filter(x => x !== k) : [...p, k]
   })
 
@@ -958,7 +943,7 @@ function UserAwareSidebar({
     ? "Tất cả chi nhánh"
     : (branches.find(b => b.id === selectedBranch)?.name || "Chi nhánh")
 
-  const dropPos = isCollapsedForRender
+  const dropPos = collapsed
     ? "absolute left-full top-0 ml-2"
     : "absolute left-0 right-0 top-full mt-1.5"
 
@@ -999,7 +984,7 @@ function UserAwareSidebar({
   }
 
   useEffect(() => {
-    if (!isCollapsedForRender || !showUserDrop || !userBtnRef.current) return
+    if (!collapsed || !showUserDrop || !userBtnRef.current) return
     const update = () => {
       const rect = userBtnRef.current!.getBoundingClientRect()
       setUserFlyoutPos({ left: rect.right + 8, bottom: window.innerHeight - rect.bottom })
@@ -1011,7 +996,7 @@ function UserAwareSidebar({
       window.removeEventListener("scroll", update, true)
       window.removeEventListener("resize", update)
     }
-  }, [isCollapsedForRender, showUserDrop])
+  }, [collapsed, showUserDrop])
 
   const userMenuItems = currentUser ? (
     <>
@@ -1026,36 +1011,33 @@ function UserAwareSidebar({
   ) : null
 
   return (
-    <aside
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className={`${isCollapsedForRender ? "w-16" : "w-60"} bg-[#160606] flex flex-col transition-all duration-300 flex-shrink-0 overflow-visible relative z-40`}
-    >
-      <div className={`p-3 border-b border-white/5 flex ${isCollapsedForRender ? "flex-col items-center gap-2" : "items-center gap-2"}`}>
+    <aside className={`${collapsed ? "w-16" : "w-60"} bg-[#160606] flex flex-col transition-all duration-300 flex-shrink-0 overflow-visible relative z-40`}>
+      <div className={`p-3 border-b border-white/5 flex ${collapsed ? "flex-col items-center gap-2" : "items-center gap-2"}`}>
         <button
           onClick={onToggle}
-          title={isCollapsedForRender ? "Mở rộng menu" : "Thu gọn menu"}
+          title={collapsed ? "Mở rộng menu" : "Thu gọn menu"}
           className="p-1.5 rounded-lg hover:bg-white/10 text-white/45 hover:text-white/80 transition-colors flex-shrink-0"
         >
           <Menu size={18} />
         </button>
         <BrandLogo
-          size={isCollapsedForRender ? 28 : 34}
-          withText={!isCollapsedForRender}
-          collapsed={isCollapsedForRender}
+          size={collapsed ? 28 : 34}
+          withText={!collapsed}
+          collapsed={collapsed}
           textLight
-          className={isCollapsedForRender ? "" : "flex-1 min-w-0"}
+          className={collapsed ? "" : "flex-1 min-w-0"}
         />
       </div>
 
-      <div className={`px-2 pt-2 pb-1 space-y-1 border-b border-white/5 ${isCollapsedForRender ? "flex flex-col items-center" : ""}`}>
+      {/* Chi nhánh + Thông báo */}
+      <div className={`px-2 pt-2 pb-1 space-y-1 border-b border-white/5 ${collapsed ? "flex flex-col items-center" : ""}`}>
         {isAdmin && onBranchChange && (
           <div className="relative w-full">
             <button
               onClick={() => { setShowBranchDrop(p => !p); setShowNotifDrop(false); setShowUserDrop(false); setExpanded([]) }}
               title={branchLabel}
               className={`w-full flex items-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/75 cursor-pointer
-                ${isCollapsedForRender ? "justify-center p-2.5" : "px-3 py-2.5 text-xs font-bold"}`}
+                ${collapsed ? "justify-center p-2.5" : "px-3 py-2.5 text-xs font-bold"}`}
             >
               <Building2 size={16} className="text-white/45 flex-shrink-0" />
               {!collapsed && (
@@ -1095,9 +1077,10 @@ function UserAwareSidebar({
 
       </div>
 
+      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 space-y-0.5 py-2" style={{ scrollbarWidth: "none" }}>
-        {hasAccess("dashboard") && <NavItem page="dashboard" icon={LayoutDashboard} label="Dashboard" active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender} />}
-        <NavItem page="staff-portal" icon={Fingerprint} label="Cổng nhân viên" active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender} />
+        {hasAccess("dashboard") && <NavItem page="dashboard" icon={LayoutDashboard} label="Dashboard" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        <NavItem page="staff-portal" icon={Fingerprint} label="Cổng nhân viên" active={active} onNavigate={onNavigate} collapsed={collapsed} />
 
         {(hasAccess("nhan-su") || hasAccess("co-cau") || hasAccess("cham-cong") || hasAccess("duyet-don")) && (
           <GroupNav
@@ -1105,7 +1088,7 @@ function UserAwareSidebar({
             icon={Users}
             label="Quản lý nhân sự"
             pages={["nhan-su", "co-cau", "cham-cong", "duyet-don"].filter(hasAccess) as Page[]}
-            active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender}
+            active={active} onNavigate={onNavigate} collapsed={collapsed}
             expanded={expanded} onToggle={toggle} onFlyoutOpen={closeOverlays}
           >
             {hasAccess("nhan-su") && <SubItem page="nhan-su" label="Danh sách nhân viên" active={active} onNavigate={onNavigate} />}
@@ -1121,7 +1104,7 @@ function UserAwareSidebar({
             icon={Shield}
             label="Quản trị hệ thống"
             pages={["tai-khoan", "phan-quyen", "ip"].filter(hasAccess) as Page[]}
-            active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender}
+            active={active} onNavigate={onNavigate} collapsed={collapsed}
             expanded={expanded} onToggle={toggle} onFlyoutOpen={closeOverlays}
           >
             {hasAccess("tai-khoan") && <SubItem page="tai-khoan" label="Quản lý tài khoản" active={active} onNavigate={onNavigate} />}
@@ -1130,18 +1113,18 @@ function UserAwareSidebar({
           </GroupNav>
         )}
 
-        {hasAccess("thong-ke") && <NavItem page="thong-ke" icon={BarChart3} label="Báo cáo thống kê" active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender} />}
-        {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Quản lý thông báo" active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender} />}
-        {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender} />}
-        {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender} />}
-        {hasAccess("lead") && <NavItem page="lead" icon={User} label="Cơ hội" active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender} />}
+        {hasAccess("thong-ke") && <NavItem page="thong-ke" icon={BarChart3} label="Báo cáo thống kê" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Quản lý thông báo" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("lead") && <NavItem page="lead" icon={User} label="Cơ hội" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("kpi") && (
           <GroupNav
             gKey="kpi"
             icon={TrendingUp}
             label="Quản lý KPI"
             pages={["kpi", "kpi-stats", "kpi-compare"]}
-            active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender}
+            active={active} onNavigate={onNavigate} collapsed={collapsed}
             expanded={expanded} onToggle={toggle} onFlyoutOpen={closeOverlays}
           >
             <SubItem page="kpi" label="Tổng quan" active={active} onNavigate={onNavigate} />
@@ -1149,8 +1132,8 @@ function UserAwareSidebar({
             <SubItem page="kpi-compare" label="So sánh" active={active} onNavigate={onNavigate} />
           </GroupNav>
         )}
-        {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender} />}
-        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={isCollapsedForRender} />}
+        {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
 
       <div className="p-2 border-t border-white/5">
@@ -1162,12 +1145,12 @@ function UserAwareSidebar({
               title={currentUser.name}
               className={`w-full flex items-center gap-2.5 rounded-xl transition-all px-2 py-2
                 ${showUserDrop ? "bg-white/10" : "hover:bg-white/8"}
-                ${isCollapsedForRender ? "justify-center" : ""}`}
+                ${collapsed ? "justify-center" : ""}`}
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ring-2 ring-white/10">
                 {initials(currentUser.name)}
               </div>
-              {!isCollapsedForRender && (
+              {!collapsed && (
                 <>
                   <div className="flex-1 text-left min-w-0">
                     <div className="text-xs font-semibold text-white/90 truncate leading-tight">{shortName}</div>
@@ -1178,13 +1161,13 @@ function UserAwareSidebar({
               )}
             </button>
 
-            {showUserDrop && !isCollapsedForRender && (
+            {showUserDrop && !collapsed && (
               <div className="mt-1 px-1 pb-1 space-y-0.5">
                 {userMenuItems}
               </div>
             )}
 
-            {showUserDrop && isCollapsedForRender && (
+            {showUserDrop && collapsed && (
               <>
                 <div className="fixed inset-0 z-[90]" onClick={() => setShowUserDrop(false)} />
                 <div
@@ -1217,7 +1200,7 @@ function UserAwareSidebar({
   )
 }
 
-
+// ─── SESSION ALERT MODAL (thay thế browser alert()) ───
 function SessionAlertModal({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <div
@@ -1228,10 +1211,10 @@ function SessionAlertModal({ message, onClose }: { message: string; onClose: () 
         className="bg-white rounded-2xl shadow-2xl w-[340px] overflow-hidden"
         style={{ animation: "sessionModalIn 0.22s cubic-bezier(.34,1.56,.64,1) both" }}
       >
-        {}
+        {/* Gradient header strip */}
         <div className="h-1.5 w-full bg-gradient-to-r from-[#C62828] to-[#E64A19]" />
 
-        {}
+        {/* Icon + message */}
         <div className="flex flex-col items-center gap-3 px-7 pt-7 pb-5">
           <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
@@ -1245,7 +1228,7 @@ function SessionAlertModal({ message, onClose }: { message: string; onClose: () 
           </p>
         </div>
 
-        {}
+        {/* Action button */}
         <div className="px-7 pb-6 flex justify-center">
           <button
             id="session-alert-ok"
