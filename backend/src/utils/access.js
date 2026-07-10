@@ -68,9 +68,14 @@ export function resolveClientPermissions(user) {
     if (hasStaff && !perms.includes("staff-portal")) {
       perms = [...perms, "staff-portal"]
     }
-  } else if (!perms.includes("staff-portal")) {
-    const hasStaff = perms.some(p => STAFF_MODULE_SET.has(p))
-    if (hasStaff) perms = [...perms, "staff-portal"]
+  } else {
+    if (!perms.includes("staff-portal")) {
+      const hasStaff = perms.some(p => STAFF_MODULE_SET.has(p))
+      if (hasStaff) perms = [...perms, "staff-portal"]
+    }
+    if (perms.includes("cham-cong") && !perms.includes("thong-ke")) {
+      perms = [...perms, "thong-ke"]
+    }
   }
 
   return perms

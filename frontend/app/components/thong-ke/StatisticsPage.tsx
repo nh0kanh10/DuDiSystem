@@ -150,7 +150,7 @@ function addSessionToStats(
   }
 }
 
-export default function StatisticsPage({ selectedBranch = "all", currentUserEmail = "", currentUserRole = "user", modules = [] as string[] }: { selectedBranch?: string; currentUserEmail?: string; currentUserRole?: string; modules?: string[] }) {
+export default function StatisticsPage({ selectedBranch = "all", currentUserEmail = "", currentUserRole = "user", modules = [] as string[], hideHeader = false }: { selectedBranch?: string; currentUserEmail?: string; currentUserRole?: string; modules?: string[]; hideHeader?: boolean }) {
   const canSelectEmployee = modules.includes("all") || modules.includes("thong-ke")
   const now = useMemo(() => new Date(), [])
   const currentYearStr = useMemo(() => String(now.getFullYear()), [now])
@@ -206,7 +206,10 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           api.attendance.list(),
           api.systemConfig.get().catch(() => null)
         ])
-        const filteredEmps = (empData as Employee[] || []).filter(e => !["0000000000", "1111111111", "2222222222"].includes(e.id))
+        const filteredEmps = (empData as Employee[] || []).filter(e => 
+          !["0000000000", "1111111111", "2222222222"].includes(e.id) &&
+          e.status === "active"
+        )
         setEmployees(filteredEmps)
         setAttendance(attData as AttendanceRecord[])
         if (configData) {
@@ -421,12 +424,12 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
     employees.forEach(e => {
       map[e.id] = { late: 0, leave: 0, absent: 0, total: 0, onTime: 0 }
+      const isCurrentlyIntern = isInternContract(e.contractType)
 
       daysList.forEach(day => {
         const matched = attendance.find(r => r.employeeId === e.id && r.date === day)
         if (matched) {
-          const isInternRecord = isInternContract(getContractTypeForDate(e, day))
-          if (isInternRecord) {
+          if (isCurrentlyIntern) {
             addSessionToStats(matched.statusAm, map[e.id])
             addSessionToStats(matched.statusPm, map[e.id])
           } else if (matched.status === "late" || matched.status === "late_early" || matched.status === "early") {
@@ -441,8 +444,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
             map[e.id].total += 1
           }
         } else {
-          const isInternEmp = isInternContract(getContractTypeForDate(e, day))
-          map[e.id].absent += isInternEmp ? 2 : 1
+          map[e.id].absent += isCurrentlyIntern ? 2 : 1
         }
       })
     })
@@ -822,28 +824,31 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
   return (
     <div className="space-y-6">
-      <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
-        <div className="flex items-center">
-          <div className="flex gap-1.5 items-center mr-4 shrink-0">
-            <span className="w-2.5 h-2.5 rounded-full bg-white/30 animate-pulse"></span>
-            <span className="w-2.5 h-2.5 rounded-full bg-white/60 animate-pulse delay-75"></span>
-            <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150"></span>
+      {!hideHeader && (
+        <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
+          <div className="flex items-center">
+            <div className="flex gap-1.5 items-center mr-4 shrink-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-white/30 animate-pulse"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-white/60 animate-pulse delay-75"></span>
+              <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150"></span>
+            </div>
+            <div>
+              <h2 className="text-xl font-black tracking-tight text-white">Thống kê chấm công</h2>
+              <p className="text-xs text-white/80 mt-1">Báo cáo trực quan hiệu suất làm việc và vi phạm kỷ luật</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-black tracking-tight text-white">Thống kê chấm công</h2>
-            <p className="text-xs text-white/80 mt-1">Báo cáo trực quan hiệu suất làm việc và vi phạm kỷ luật</p>
-          </div>
+          {(activeTab !== "personal" || personalStats) && (
+            <button onClick={handleExport} disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50 cursor-pointer">
+              {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
+              {exporting ? "Đang xuất..." : "Xuất báo cáo"}
+            </button>
+          )}
         </div>
-        {(activeTab !== "personal" || personalStats) && (
-          <button onClick={handleExport} disabled={exporting}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50 cursor-pointer">
-            {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-            {exporting ? "Đang xuất..." : "Xuất báo cáo"}
-          </button>
-        )}
-      </div>
+      )}
 
       <div className="bg-[#FAF9F9] rounded-3xl p-4 border border-black/5 shadow-xs flex flex-wrap items-end gap-4">
+
         <div className="flex flex-col gap-1.5 min-w-[130px] flex-1 lg:flex-none">
           <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Loại bộ lọc</span>
           <CustomSelect
@@ -980,28 +985,33 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         )}
 
-        <div className="flex flex-col gap-1.5 ml-auto self-end w-full lg:w-auto">
-          <div className="flex items-center gap-2 justify-center lg:justify-start">
-            <button
-              onClick={() => {
-                setFilterType("month")
-                setSelectedYear(currentYearStr)
-                setSelectedMonth(currentMonthStr)
-                setSelectedWeekId("w1")
-                setPersonalDept("all")
-                setSearchQuery("")
-              }}
-              className="px-3 py-2 bg-white text-gray-500 hover:text-[#C62828] hover:bg-red-50 hover:border-red-100 rounded-xl text-xs font-bold border border-gray-200 transition-all shadow-2xs h-[34px] flex items-center gap-1.5"
-              title="Đặt lại bộ lọc"
-            >
-              <RefreshCw size={13} />
-              <span className="hidden sm:inline">Bỏ lọc</span>
-            </button>
-            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold border border-gray-150 shadow-2xs h-[34px]">
-              <Calendar size={13} className="text-gray-400" />
-              {dateRangeText}
-            </div>
+        <div className="flex items-center gap-2 ml-auto self-end w-full lg:w-auto justify-end flex-wrap">
+          <button
+            onClick={() => {
+              setFilterType("month")
+              setSelectedYear(currentYearStr)
+              setSelectedMonth(currentMonthStr)
+              setSelectedWeekId("w1")
+              setPersonalDept("all")
+              setSearchQuery("")
+            }}
+            className="px-3 py-2 bg-white text-gray-500 hover:text-[#C62828] hover:bg-red-50 hover:border-red-100 rounded-xl text-xs font-bold border border-gray-200 transition-all shadow-2xs h-[34px] flex items-center gap-1.5 cursor-pointer"
+            title="Đặt lại bộ lọc"
+          >
+            <RefreshCw size={13} />
+            <span>Bỏ lọc</span>
+          </button>
+          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold border border-gray-150 shadow-2xs h-[34px] whitespace-nowrap">
+            <Calendar size={13} className="text-gray-400" />
+            {dateRangeText}
           </div>
+          {hideHeader && (activeTab !== "personal" || personalStats) && (
+            <button onClick={handleExport} disabled={exporting}
+              className="flex items-center gap-2 px-4 py-2 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50 cursor-pointer h-[34px] whitespace-nowrap">
+              {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
+              {exporting ? "Đang xuất..." : "Xuất báo cáo"}
+            </button>
+          )}
         </div>
       </div>
 

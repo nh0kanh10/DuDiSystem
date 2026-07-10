@@ -1106,7 +1106,6 @@ function UserAwareSidebar({
           </GroupNav>
         )}
 
-        {hasAccess("thong-ke") && <NavItem page="thong-ke" icon={BarChart3} label="Báo cáo thống kê" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Quản lý thông báo" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}

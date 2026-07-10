@@ -97,7 +97,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
           type: "birthday",
           title: "Sinh nhật nhân viên",
           text: `Hôm nay là sinh nhật của ${emp.name}`,
-          accent: "border-pink-500/30 bg-pink-50/50 text-pink-700",
+          accent: "border-rose-100/70 bg-gradient-to-br from-rose-50/50 to-amber-50/20 border-l-rose-500 text-rose-600",
           icon: Gift
         })
       } else if (diffDays >= 1 && diffDays <= 3) {
@@ -105,7 +105,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
           type: "birthday",
           title: "Sinh nhật nhân viên",
           text: `Sinh nhật ${emp.name} sau ${diffDays} ngày`,
-          accent: "border-pink-300/30 bg-pink-50/20 text-pink-600",
+          accent: "border-rose-100/40 bg-gradient-to-br from-rose-50/20 to-amber-50/10 border-l-rose-400 text-rose-500",
           icon: Gift
         })
       }
@@ -125,7 +125,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
           type: "intern",
           title: "Kết thúc thực tập",
           text: `Hôm nay là ngày cuối. Hôm nay kết thúc thực tập của ${emp.name}`,
-          accent: "border-orange-500/30 bg-orange-50/50 text-orange-700",
+          accent: "border-amber-100/70 bg-gradient-to-br from-amber-50/50 to-orange-50/20 border-l-amber-500 text-amber-600",
           icon: CalendarDays
         })
       } else if (diffDays === 1) {
@@ -133,7 +133,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
           type: "intern",
           title: "Kết thúc thực tập",
           text: `${emp.name} kết thúc thực tập sau 1 ngày`,
-          accent: "border-orange-300/30 bg-orange-50/20 text-orange-600",
+          accent: "border-amber-100/40 bg-gradient-to-br from-amber-50/20 to-orange-50/10 border-l-amber-400 text-amber-500",
           icon: CalendarDays
         })
       } else if (diffDays === 2 || diffDays === 3) {
@@ -141,7 +141,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
           type: "intern",
           title: "Kết thúc thực tập",
           text: `${emp.name} kết thúc thực tập sau ${diffDays} ngày`,
-          accent: "border-orange-300/30 bg-orange-50/20 text-orange-600",
+          accent: "border-amber-100/40 bg-gradient-to-br from-amber-50/20 to-orange-50/10 border-l-amber-400 text-amber-500",
           icon: CalendarDays
         })
       }
@@ -165,7 +165,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
         type: "leave",
         title: "Đơn xin nghỉ phép",
         text: `${empName} đăng ký nghỉ phép ngày ${leaveDate} (${caNghi})`,
-        accent: "border-blue-500/30 bg-blue-50/50 text-blue-700",
+        accent: "border-blue-100/70 bg-blue-50/30 border-l-blue-500 text-blue-600",
         icon: FileText
       })
     })
@@ -179,7 +179,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
         type: "profile_update",
         title: "Duyệt hồ sơ cập nhật",
         text: `Hồ sơ cập nhật của ${empName} đang chờ duyệt`,
-        accent: "border-indigo-500/30 bg-indigo-50/50 text-indigo-700",
+        accent: "border-indigo-100/70 bg-indigo-50/30 border-l-indigo-500 text-indigo-600",
         icon: UserCheck
       })
     })
@@ -292,23 +292,23 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
                       if (notif.type === "leave") onNavigate("duyet-don")
                       else if (notif.type === "profile_update") onNavigate("nhan-su")
                     }}
-                    className={`p-4 rounded-2xl border-l-4 border shadow-xs transition-all flex gap-3 items-start ${notif.accent} ${
-                      isClickable ? "cursor-pointer hover:scale-[1.01] hover:shadow-sm" : ""
+                    className={`p-4 rounded-2xl border-l-4 border shadow-[0_2px_8px_-3px_rgba(0,0,0,0.02)] transition-all flex gap-3.5 items-start ${notif.accent} ${
+                      isClickable ? "cursor-pointer hover:scale-[1.01] hover:shadow-xs" : ""
                     }`}
                   >
-                    <div className="p-1 rounded-lg bg-white/60">
-                      <IconComponent size={16} />
+                    <div className="p-1.5 rounded-xl bg-white shadow-2xs flex-shrink-0 flex items-center justify-center">
+                      <IconComponent size={14} />
                     </div>
                     <div className="flex-1">
-                      <h4 className="text-xs font-bold uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <h4 className="text-[11px] font-extrabold uppercase tracking-wider mb-1 flex items-center justify-between text-gray-800">
                         <span>{notif.title}</span>
                         {isClickable && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-white/50 rounded-full flex items-center gap-0.5 text-gray-700">
+                          <span className="text-[9px] font-black px-2 py-0.5 bg-white shadow-2xs border border-gray-100 rounded-full flex items-center gap-0.5 text-gray-600">
                             Duyệt ngay <ChevronRight size={10} />
                           </span>
                         )}
                       </h4>
-                      <p className="text-xs font-medium leading-relaxed">{notif.text}</p>
+                      <p className="text-xs font-bold text-gray-600 leading-relaxed">{notif.text}</p>
                     </div>
                   </div>
                 )

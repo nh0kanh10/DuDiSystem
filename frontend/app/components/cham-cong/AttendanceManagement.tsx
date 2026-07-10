@@ -28,6 +28,7 @@ import {
 } from "./attendanceModel"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomTimePicker } from "../ui/CustomTimePicker"
+import StatisticsPage from "../thong-ke/StatisticsPage"
 
 const STATUS_MAP = {
   "on-time": { label: "Đúng giờ",  bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500"  },
@@ -485,31 +486,17 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
   const stats = useMemo(() => {
     const counts = { onTime: 0, late: 0, absent: 0, leave: 0 }
     filtered.forEach(r => {
-      if (isInternRecord(r)) {
-        const am = r.statusAm || "absent"
-        if (am === "on-time") counts.onTime += 0.5
-        else if (am === "late" || am === "late_early" || am === "early") counts.late += 0.5
-        else if (am === "absent") counts.absent += 0.5
-        else if (am === "leave") counts.leave += 0.5
-
-        const pm = r.statusPm || "absent"
-        if (pm === "on-time") counts.onTime += 0.5
-        else if (pm === "late" || pm === "late_early" || pm === "early") counts.late += 0.5
-        else if (pm === "absent") counts.absent += 0.5
-        else if (pm === "leave") counts.leave += 0.5
-      } else {
-        const s = r.status || "absent"
-        if (s === "on-time") counts.onTime += 1
-        else if (s === "late" || s === "late_early" || s === "early") counts.late += 1
-        else if (s === "absent") counts.absent += 1
-        else if (s === "leave") counts.leave += 1
-      }
+      const s = r.status || "absent"
+      if (s === "on-time") counts.onTime += 1
+      else if (s === "late" || s === "late_early" || s === "early") counts.late += 1
+      else if (s === "absent") counts.absent += 1
+      else if (s === "leave") counts.leave += 1
     })
     return {
-      onTime: Math.round(counts.onTime * 10) / 10,
-      late: Math.round(counts.late * 10) / 10,
-      absent: Math.round(counts.absent * 10) / 10,
-      leave: Math.round(counts.leave * 10) / 10,
+      onTime: counts.onTime,
+      late: counts.late,
+      absent: counts.absent,
+      leave: counts.leave,
       total: filtered.length
     }
   }, [filtered])
@@ -1297,7 +1284,27 @@ export function AttendanceManagement({ selectedBranch = "all" }: { selectedBranc
 
       {tab === "daily"   && <DailyTab selectedBranch={selectedBranch} />}
       {tab === "monthly" && <MonthlyTab selectedBranch={selectedBranch} />}
-      {tab === "stats"   && <StatsTab selectedBranch={selectedBranch} />}
+      {tab === "stats"   && (() => {
+        let user: any = null
+        try {
+          user = JSON.parse(localStorage.getItem("dudi_user") || "{}")
+        } catch {}
+        const loggedEmail = user?.employeeId || user?.email || ""
+        const role = user?.roleId || "user"
+        const permissions = user?.effectivePermissions || []
+        const statsPermissions = permissions.includes("cham-cong") && !permissions.includes("thong-ke")
+          ? [...permissions, "thong-ke"]
+          : permissions
+        return (
+          <StatisticsPage
+            selectedBranch={selectedBranch}
+            currentUserEmail={loggedEmail}
+            currentUserRole={role}
+            modules={statsPermissions}
+            hideHeader={true}
+          />
+        )
+      })()}
     </div>
   )
 }
