@@ -94,12 +94,34 @@ export function updateRecord(id, body) {
 }
 
 export function deleteRecord(id) {
-  if (!repo.getById(id)) throw new Error("Không tìm thấy dữ liệu")
+  const record = repo.getById(id)
+  if (!record) throw new Error("Không tìm thấy dữ liệu")
+  const { leads } = listLeadsForCrmRecord(id)
+  if (leads.length > 0) {
+    const codes = leads.map(l => l.code).join(", ")
+    throw new Error(`Không thể xóa khách "${record.businessName}" vì đã được tạo cơ hội (Lead: ${codes}). Vui lòng xóa cơ hội trước!`)
+  }
   return repo.remove(id)
 }
 
 export function deleteRecordsBulk(ids) {
   if (!Array.isArray(ids) || ids.length === 0) throw new Error("Danh sách ID không hợp lệ")
+  
+  const cannotDelete = []
+  ids.forEach(id => {
+    const record = repo.getById(id)
+    if (record) {
+      const { leads } = listLeadsForCrmRecord(id)
+      if (leads.length > 0) {
+        cannotDelete.push(`"${record.businessName}" (Lead: ${leads.map(l => l.code).join(", ")})`)
+      }
+    }
+  })
+
+  if (cannotDelete.length > 0) {
+    throw new Error(`Không thể xóa các dữ liệu CRM sau vì đã được tạo cơ hội:\n${cannotDelete.map(s => `- ${s}`).join("\n")}\nVui lòng xóa cơ hội trước!`)
+  }
+
   let count = 0
   ids.forEach(id => { if (repo.remove(id)) count++ })
   return { deletedCount: count }

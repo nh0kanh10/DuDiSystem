@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { api } from "@/lib/api"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 import ConfirmModal from "../ui/ConfirmModal"
@@ -73,6 +73,13 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
   const [autoAssignDept, setAutoAssignDept] = useState("")
   const [autoAssignSpecificEmp, setAutoAssignSpecificEmp] = useState("")
   const [autoAssignQuantity, setAutoAssignQuantity] = useState("")
+  const [autoAssignSelectedEmpIds, setAutoAssignSelectedEmpIds] = useState<string[]>([])
+  const [reassignWarnOpen, setReassignWarnOpen] = useState(false)
+  const [reassignWarnMsg, setReassignWarnMsg] = useState("")
+  const [reassignAction, setReassignAction] = useState<{ onConfirm: () => void } | null>(null)
+  const [importConfirmOpen, setImportConfirmOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [deleteBulkOpen, setDeleteBulkOpen] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [tempNote, setTempNote] = useState("")
@@ -138,12 +145,19 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
   const refresh = () => { fetchStats(); fetchRecords(); fetchEmployees() }
   useEffect(() => { refresh() }, [statusFilter, assignedFilter, search, pageSize, selectedBranch])
 
-  const phoneReg = /^(\+84|0)(\s*\d){9,11}$/
+  useEffect(() => {
+    if (!autoAssignOpen) {
+      setAutoAssignDept("")
+      setAutoAssignSelectedEmpIds([])
+      setAutoAssignSpecificEmp("")
+      setAutoAssignQuantity("")
+    }
+  }, [autoAssignOpen])
+
   const validate = () => {
     const errs: any = {}
     if (!form.businessName.trim()) errs.businessName = "Không được để trống"
     if (!form.phone.trim()) errs.phone = "Không được để trống"
-    else if (!phoneReg.test(form.phone.trim())) errs.phone = "SĐT không hợp lệ"
     setFormErrors(errs)
     return !Object.keys(errs).length
   }
@@ -161,9 +175,14 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
     if (!selectedEmpId) return
     if (selectedIds.length > 0) {
       const selectedRecords = records.filter(r => selectedIds.includes(r.id))
-      const alreadyAssigned = selectedRecords.filter(r => r.assignedTo)
-      if (alreadyAssigned.length > 0) {
-        notify(`Có ${alreadyAssigned.length} khách đã có người phụ trách. Vui lòng huỷ tích!`, "error")
+      const cannotReassign = selectedRecords.filter(r => r.status && r.status !== "Chưa xử lý")
+      if (cannotReassign.length > 0) {
+        notify(`Có ${cannotReassign.length} khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!`, "error")
+        return
+      }
+    } else if (current) {
+      if (current.status && current.status !== "Chưa xử lý") {
+        notify("Khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!", "error")
         return
       }
     }
@@ -176,19 +195,34 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
 
   const handleDelete = async () => {
     if (!current) return
-    try { await api.crm.deleteData(current.id); notify("Đã xóa!"); refresh() }
-    catch { notify("Không thể xóa", "error") }
+    try {
+      await api.crm.deleteData(current.id)
+      notify("Đã xóa!")
+      refresh()
+    } catch (err: any) {
+      notify(err.message || "Không thể xóa", "error")
+    }
+  }
+
+  const handleDeleteBulk = async () => {
+    try {
+      await api.crm.deleteBulk(selectedIds)
+      notify("Đã xóa " + selectedIds.length + " mục")
+      setSelectedIds([])
+      refresh()
+    } catch (err: any) {
+      notify(err.message || "Lỗi xóa hàng loạt", "error")
+    }
   }
 
   const submitAutoAssign = async () => {
     if (autoAssignTab === "department") {
       if (!autoAssignDept) { notify("Vui lòng chọn phòng ban", "error"); return }
-      const active = activeEmployees.filter((e: any) => e.department === autoAssignDept)
-      if (!active.length) { notify(`Không có nhân viên hoạt động ở phòng ban này`, "error"); return }
+      if (!autoAssignSelectedEmpIds.length) { notify("Vui lòng chọn ít nhất một nhân viên để chia data", "error"); return }
       
       setAutoAssignLoading(true)
       try {
-        const r = await api.crm.autoAssign(active.map((e: any) => e.id))
+        const r = await api.crm.autoAssign(autoAssignSelectedEmpIds)
         notify("Đã chia tự động " + (r?.assignedCount ?? 0) + " data cho phòng ban!")
         setAutoAssignOpen(false); refresh()
       } catch (err: any) { notify(err.message || "Lỗi chia tự động", "error") }
@@ -208,20 +242,23 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
     }
   }
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; 
     if (!file) return
-    if (!window.confirm(`Bạn có chắc chắn muốn import file "${file.name}"?`)) {
-      e.target.value = ""
-      return
-    }
+    setImportFile(file)
+    setImportConfirmOpen(true)
+    e.target.value = ""
+  }
+
+  const submitImport = async () => {
+    if (!importFile) return
     setImportLoading(true)
     try {
-      const r = await api.crm.importCsv(file)
+      const r = await api.crm.importCsv(importFile)
       notify("Import " + (r?.successCount ?? 0) + " dòng thành công!")
       refresh()
     } catch { notify("Lỗi import file", "error") }
-    finally { setImportLoading(false); e.target.value = "" }
+    finally { setImportLoading(false); setImportFile(null) }
   }
 
   const handleExport = () => {
@@ -240,6 +277,13 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
 
   const handleInlineAssignConfirm = async () => {
     if (!inlineAssignId) return
+    const target = records.find(r => r.id === inlineAssignId)
+    if (target && target.status && target.status !== "Chưa xử lý") {
+      notify("Khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!", "error")
+      setInlineAssignId(null)
+      setInlineAssignEmpId("")
+      return
+    }
     setInlineAssignLoading(true)
     try {
       if (inlineAssignEmpId === "") {
@@ -262,13 +306,71 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
     setFormErrors({})
     setFormOpen(true)
   }
-  const openAssign = (r?: any) => { if (r) setCurrent(r); else setCurrent(null); setSelectedEmpId(""); setAssignOpen(true) }
+  const openAssign = (r?: any) => {
+    if (r) {
+      if (r.status && r.status !== "Chưa xử lý") {
+        notify("Khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!", "error")
+        return
+      }
+      if (r.assignedTo) {
+        setReassignWarnMsg(`Khách hàng "${r.businessName}" đã có người phụ trách. Bạn vẫn muốn chia lại chứ?`)
+        setReassignAction({
+          onConfirm: () => {
+            setCurrent(r)
+            setSelectedEmpId("")
+            setAssignOpen(true)
+          }
+        })
+        setReassignWarnOpen(true)
+        return
+      }
+      setCurrent(r)
+    } else {
+      if (selectedIds.length > 0) {
+        const selectedRecords = records.filter(rec => selectedIds.includes(rec.id))
+        const cannotReassign = selectedRecords.filter(rec => rec.status && rec.status !== "Chưa xử lý")
+        if (cannotReassign.length > 0) {
+          notify(`Có ${cannotReassign.length} khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!`, "error")
+          return
+        }
+        const alreadyAssigned = selectedRecords.filter(rec => rec.assignedTo)
+        if (alreadyAssigned.length > 0) {
+          setReassignWarnMsg(`Có ${alreadyAssigned.length} khách đã có người phụ trách. Bạn vẫn muốn chia lại chứ?`)
+          setReassignAction({
+            onConfirm: () => {
+              setCurrent(null)
+              setSelectedEmpId("")
+              setAssignOpen(true)
+            }
+          })
+          setReassignWarnOpen(true)
+          return
+        }
+      }
+      setCurrent(null)
+    }
+    setSelectedEmpId("")
+    setAssignOpen(true)
+  }
   const toggleAll = () => setSelectedIds(p => p.length === records.length ? [] : records.map(r => r.id))
   const toggleOne = (id: string) => setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
 
-  const activeEmployees = employees.filter(
-    (e: any) => e.status === "active" && (selectedBranch === "all" || e.branchId === selectedBranch)
+  const activeEmployees = useMemo(
+    () => employees.filter(
+      (e: any) => e.status === "active" && (selectedBranch === "all" || e.branchId === selectedBranch)
+    ),
+    [employees, selectedBranch]
   )
+
+  const deptEmployees = useMemo(() => {
+    if (!autoAssignDept) return []
+    return activeEmployees.filter((e: any) => e.department === autoAssignDept)
+  }, [activeEmployees, autoAssignDept])
+
+  useEffect(() => {
+    setAutoAssignSelectedEmpIds(deptEmployees.map((e: any) => e.id))
+  }, [deptEmployees])
+
   const allEmployeesInBranch = employees.filter(
     (e: any) => selectedBranch === "all" || e.branchId === selectedBranch
   )
@@ -433,15 +535,7 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                     <UserPlus size={14} className="mr-1.5" /> {"Chia (" + selectedIds.length + ")"}
                   </button>
                   <button
-                    onClick={async () => {
-                      if (!window.confirm(`Bạn có chắc chắn muốn xoá ${selectedIds.length} mục đã chọn? Hành động này không thể hoàn tác.`)) return
-                      try {
-                        await api.crm.deleteBulk(selectedIds)
-                        notify("Đã xóa " + selectedIds.length + " mục")
-                        setSelectedIds([])
-                        refresh()
-                      } catch { notify("Lỗi xóa hàng loạt", "error") }
-                    }}
+                    onClick={() => setDeleteBulkOpen(true)}
                     className="flex items-center px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition"
                   >
                     <Trash2 size={14} className="mr-1.5" /> {"Xóa (" + selectedIds.length + ")"}
@@ -617,8 +711,18 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                             <div
                               className="flex items-center gap-1.5 cursor-pointer group/cell"
                               onClick={() => {
-                                setInlineAssignId(r.id)
-                                setInlineAssignEmpId(r.assignedTo ?? "")
+                                if (r.status && r.status !== "Chưa xử lý") {
+                                  notify("Khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!", "error")
+                                  return
+                                }
+                                setReassignWarnMsg(`Khách hàng "${r.businessName}" đã có người phụ trách. Bạn vẫn muốn chia lại chứ?`)
+                                setReassignAction({
+                                  onConfirm: () => {
+                                    setInlineAssignId(r.id)
+                                    setInlineAssignEmpId(r.assignedTo ?? "")
+                                  }
+                                })
+                                setReassignWarnOpen(true)
                               }}
                             >
                               <AvatarCircle name={r.assignedToName} size="sm" />
@@ -628,6 +732,10 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                           ) : (
                             <button
                               onClick={() => {
+                                if (r.status && r.status !== "Chưa xử lý") {
+                                  notify("Khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!", "error")
+                                  return
+                                }
                                 setInlineAssignId(r.id)
                                 setInlineAssignEmpId("")
                               }}
@@ -733,6 +841,52 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
         type="danger"
       />
 
+      <ConfirmModal
+        isOpen={reassignWarnOpen}
+        onClose={() => {
+          setReassignWarnOpen(false)
+          setReassignAction(null)
+        }}
+        onConfirm={() => {
+          setReassignWarnOpen(false)
+          reassignAction?.onConfirm()
+          setReassignAction(null)
+        }}
+        title="Cảnh báo chia lại data"
+        message={reassignWarnMsg}
+        confirmText="Xác nhận"
+        type="warning"
+      />
+
+      <ConfirmModal
+        isOpen={importConfirmOpen}
+        onClose={() => {
+          setImportConfirmOpen(false)
+          setImportFile(null)
+        }}
+        onConfirm={() => {
+          setImportConfirmOpen(false)
+          submitImport()
+        }}
+        title="Xác nhận import file"
+        message={importFile ? `Bạn có chắc chắn muốn import file "${importFile.name}"?` : ""}
+        confirmText="Xác nhận"
+        type="info"
+      />
+
+      <ConfirmModal
+        isOpen={deleteBulkOpen}
+        onClose={() => setDeleteBulkOpen(false)}
+        onConfirm={() => {
+          setDeleteBulkOpen(false)
+          handleDeleteBulk()
+        }}
+        title="Xác nhận xóa hàng loạt"
+        message={`Bạn chắc chắn muốn xoá ${selectedIds.length} mục đã chọn? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa"
+        type="danger"
+      />
+
       <Modal
         open={assignOpen}
         onClose={() => setAssignOpen(false)}
@@ -802,6 +956,69 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                   showSearchIcon
                 />
               </div>
+
+              {autoAssignDept && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-gray-500 uppercase">
+                      Nhân sự nhận data ({autoAssignSelectedEmpIds.length}/{deptEmployees.length})
+                    </label>
+                    {deptEmployees.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (autoAssignSelectedEmpIds.length === deptEmployees.length) {
+                            setAutoAssignSelectedEmpIds([])
+                          } else {
+                            setAutoAssignSelectedEmpIds(deptEmployees.map((e: any) => e.id))
+                          }
+                        }}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-700 transition"
+                      >
+                        {autoAssignSelectedEmpIds.length === deptEmployees.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                      </button>
+                    )}
+                  </div>
+
+                  {deptEmployees.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">Không có nhân viên hoạt động trong phòng ban này.</p>
+                  ) : (
+                    <div className="border border-gray-100 rounded-xl bg-gray-50/50 max-h-48 overflow-y-auto divide-y divide-gray-50 p-2 space-y-1">
+                      {deptEmployees.map((emp: any) => {
+                        const isChecked = autoAssignSelectedEmpIds.includes(emp.id)
+                        return (
+                          <div
+                            key={emp.id}
+                            onClick={() => {
+                              if (isChecked) {
+                                setAutoAssignSelectedEmpIds(p => p.filter(id => id !== emp.id))
+                              } else {
+                                setAutoAssignSelectedEmpIds(p => [...p, emp.id])
+                              }
+                            }}
+                            className="flex items-center gap-3 px-3 py-1.5 hover:bg-gray-100/50 rounded-lg cursor-pointer transition animate-in fade-in duration-100"
+                          >
+                            <span className="shrink-0 text-gray-400 hover:text-[#C62828] transition">
+                              {isChecked ? (
+                                <CheckSquare size={16} className="text-[#C62828]" />
+                              ) : (
+                                <Square size={16} />
+                              )}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <AvatarCircle name={emp.name} size="sm" />
+                              <div className="text-xs">
+                                <p className="font-bold text-gray-800">{emp.name}</p>
+                                <p className="text-[10px] text-gray-400 font-mono">{emp.id}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

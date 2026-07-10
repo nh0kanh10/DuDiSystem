@@ -425,7 +425,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       daysList.forEach(day => {
         const matched = attendance.find(r => r.employeeId === e.id && r.date === day)
         if (matched) {
-          const isInternRecord = matched.employeeStatus === "intern" || isInternContract(getContractTypeForDate(e, day))
+          const isInternRecord = isInternContract(getContractTypeForDate(e, day))
           if (isInternRecord) {
             addSessionToStats(matched.statusAm, map[e.id])
             addSessionToStats(matched.statusPm, map[e.id])
@@ -638,9 +638,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       }
 
       if (matched) {
-        const matchedIsIntern = matched.employeeStatus
-          ? matched.employeeStatus === "intern"
-          : isInternContract(getContractTypeForDate(emp, day))
+        // Always classify by contract on that date; attendance.employeeStatus can be stale.
+        const matchedIsIntern = isInternContract(getContractTypeForDate(emp, day))
         const hasActualPunch = matchedIsIntern
           ? [matched.checkInAm, matched.checkOutAm, matched.checkInPm, matched.checkOutPm].some(v => hasPunchValue(v))
           : [matched.checkIn, matched.checkOut].some(v => hasPunchValue(v))
@@ -1486,8 +1485,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                     <th className="px-6 py-3.5">Họ tên</th>
                     <th className="px-6 py-3.5">Đơn vị</th>
                     <th className="px-6 py-3.5">Số {statsUnit} đi trễ/về sớm</th>
-                    <th className="px-6 py-3.5">Nghỉ phép</th>
-                    <th className="px-6 py-3.5">Vắng mặt</th>
+                    <th className="px-6 py-3.5">Số {statsUnit} nghỉ phép</th>
+                    <th className="px-6 py-3.5">Số {statsUnit} vắng mặt</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">

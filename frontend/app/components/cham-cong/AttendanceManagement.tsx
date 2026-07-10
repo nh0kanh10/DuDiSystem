@@ -392,7 +392,6 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterType, setFilterType] = useState<"all" | "intern" | "staff">("all")
   const [records, setRecords] = useState<AttendanceRecord[]>([])
-  const [stats, setStats] = useState({ onTime: 0, late: 0, absent: 0, leave: 0, total: 0 })
   const [loading, setLoading] = useState(true)
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [showAdd, setShowAdd] = useState(false)
@@ -413,12 +412,8 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
         ...branchQuery(selectedBranch),
         ...(empId !== "all" ? { employeeId: empId } : {}),
       }
-      const [data, statsData] = await Promise.all([
-        api.attendance.list(queryParams),
-        api.attendance.stats(queryParams)
-      ])
+      const data = await api.attendance.list(queryParams)
       setRecords(data as AttendanceRecord[])
-      setStats(statsData)
     } catch {
       setToast({ msg: "Lỗi tải dữ liệu", type: "error" })
     } finally {
@@ -449,13 +444,6 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
     try {
       const updated = await api.attendance.update(id, data) as AttendanceRecord
       setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r))
-      const statsData = await api.attendance.stats({
-        startDate: selectedDate,
-        endDate: selectedDate,
-        employeeId: filterEmployee !== "all" ? filterEmployee : undefined,
-        ...branchQuery(selectedBranch),
-      })
-      setStats(statsData)
       setToast({ msg: "Cập nhật thành công", type: "success" })
     } catch (e: unknown) {
       setToast({ msg: e instanceof Error ? e.message : "Lỗi cập nhật", type: "error" })
@@ -493,6 +481,38 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
       && (filterType === "all"
         || (filterType === "intern" ? isInternRecord(r) : !isInternRecord(r)))
   }), [enrichedRecords, search, filterDept, filterStatus, filterType])
+
+  const stats = useMemo(() => {
+    const counts = { onTime: 0, late: 0, absent: 0, leave: 0 }
+    filtered.forEach(r => {
+      if (isInternRecord(r)) {
+        const am = r.statusAm || "absent"
+        if (am === "on-time") counts.onTime += 0.5
+        else if (am === "late" || am === "late_early" || am === "early") counts.late += 0.5
+        else if (am === "absent") counts.absent += 0.5
+        else if (am === "leave") counts.leave += 0.5
+
+        const pm = r.statusPm || "absent"
+        if (pm === "on-time") counts.onTime += 0.5
+        else if (pm === "late" || pm === "late_early" || pm === "early") counts.late += 0.5
+        else if (pm === "absent") counts.absent += 0.5
+        else if (pm === "leave") counts.leave += 0.5
+      } else {
+        const s = r.status || "absent"
+        if (s === "on-time") counts.onTime += 1
+        else if (s === "late" || s === "late_early" || s === "early") counts.late += 1
+        else if (s === "absent") counts.absent += 1
+        else if (s === "leave") counts.leave += 1
+      }
+    })
+    return {
+      onTime: Math.round(counts.onTime * 10) / 10,
+      late: Math.round(counts.late * 10) / 10,
+      absent: Math.round(counts.absent * 10) / 10,
+      leave: Math.round(counts.leave * 10) / 10,
+      total: filtered.length
+    }
+  }, [filtered])
 
   const departments = useMemo(
     () => Array.from(new Set(branchEmployees.map(e => e.department).filter(Boolean))),

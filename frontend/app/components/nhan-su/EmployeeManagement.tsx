@@ -5,7 +5,7 @@ import {
   Building2, Paperclip, Briefcase, ExternalLink, FileText, Image as ImageIcon,
   File, Link2, AlertCircle, CheckCircle2, UserPlus, UserMinus, ArrowRightLeft,
   TrendingUp, RefreshCw, ChevronLeft, ChevronRight, Maximize2,
-  User, Camera, ClipboardList, Upload, Calendar
+  User, Camera, ClipboardList, Upload, Calendar, Loader2
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import { Employee, EmpExtForm, WorkHistoryEntry, WorkHistoryType, Attachment, OrgNode } from "../../types"
@@ -449,11 +449,7 @@ function FilesTab({
                       isOpen: true,
                       title: "Xác nhận xóa hình ảnh",
                       message: "Bạn có chắc chắn muốn xóa hình ảnh này khỏi hồ sơ?",
-                      onConfirm: async () => {
-                        const key = extractKey(src);
-                        if (key) {
-                          try { await api.storage.delete(key); } catch (err) { console.error(err); }
-                        }
+                      onConfirm: () => {
                         onChangePhotos(photos.filter((_, j) => j !== i));
                       }
                     });
@@ -517,13 +513,7 @@ function FilesTab({
                           isOpen: true,
                           title: "Xác nhận xóa tài liệu",
                           message: `Bạn có chắc chắn muốn xóa tài liệu "${a.name}"?`,
-                          onConfirm: async () => {
-                            if (a.type === "file") {
-                              const key = extractKey(a.url);
-                              if (key) {
-                                try { await api.storage.delete(key); } catch (err) { console.error(err); }
-                              }
-                            }
+                          onConfirm: () => {
                             onChangeAttachments(attachments.filter(x => x.id !== a.id));
                           }
                         });
@@ -1072,12 +1062,13 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
   )
 }
 
-export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }: {
+export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, saving = false }: {
   editEmp: Employee | null
   employees: Employee[]
   orgNodes: OrgNode[]
   onClose: () => void
-  onSave: (form: EmpExtForm) => void
+  onSave: (form: EmpExtForm, deletedUrls?: string[]) => void
+  saving?: boolean
 }) {
   const [tab, setTab] = useState<EditTab>("personal")
   const branches = orgNodes.filter(n => n.type === "branch")
@@ -1087,7 +1078,6 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
   const initialAttachments = useRef(editEmp?.attachments ?? [])
 
   const handleClose = async () => {
-    // Tìm các ảnh/tài liệu mới được up lên nhưng chưa được lưu vào DB
     const newPhotos = form.photos.filter(p => !initialPhotos.current.includes(p))
     const newAttachments = form.attachments.filter(
       a => !initialAttachments.current.some(ia => ia.url === a.url)
@@ -1105,7 +1095,6 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
       }
     }
 
-    // Xóa các file rác này ngầm trên Cloudinary
     for (const p of newPhotos) {
       const key = extractKey(p)
       if (key) {
@@ -1268,7 +1257,15 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
       }
     }
 
-    onSave(form)
+    const deletedPhotos = initialPhotos.current.filter(p => !form.photos.includes(p))
+    const deletedAttachments = initialAttachments.current.filter(
+      ia => !form.attachments.some(a => a.url === ia.url)
+    )
+    const deletedUrls = [
+      ...deletedPhotos,
+      ...deletedAttachments.map(a => a.url)
+    ]
+    onSave(form, deletedUrls)
   }
 
   return createPortal(
@@ -1280,7 +1277,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
             <h3 className="text-white font-bold text-lg">{editEmp ? `Sửa hồ sơ — ${editEmp.name}` : "Thêm nhân viên mới"}</h3>
             <p className="text-white/60 text-xs mt-0.5">Mã NV (dự kiến): {editEmp ? editEmp.id : newId}</p>
           </div>
-          <button onClick={handleClose} className="text-white/70 hover:text-white transition-colors"><X size={20} /></button>
+          <button onClick={handleClose} disabled={saving} className="text-white/70 hover:text-white transition-colors disabled:opacity-50"><X size={20} /></button>
         </div>
 
         <div className="bg-white border-b border-gray-100 px-4 flex gap-0.5 flex-shrink-0 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
@@ -1313,11 +1310,14 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }:
           </p>
           <div className="flex gap-2">
             <button onClick={handleClose}
-              className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors">
+              disabled={saving}
+              className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
               Hủy
             </button>
             <button onClick={handleOnSaveClick}
-              className="px-6 py-2.5 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-sm shadow-[#C62828]/20">
+              disabled={saving}
+              className="px-6 py-2.5 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-sm shadow-[#C62828]/20 flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
+              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
               {editEmp ? "Lưu thay đổi" : "Thêm nhân viên"}
             </button>
           </div>
@@ -1348,10 +1348,12 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     defaultNote: string
     customNote: string
     pendingForm: EmpExtForm
+    deletedUrls?: string[]
   } | null>(null)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [deleteEmpId, setDeleteEmpId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const [profileUpdates, setProfileUpdates] = useState<any[]>([])
   const [previewReq, setPreviewReq] = useState<any | null>(null)
   const { showToast } = useToast()
@@ -1401,16 +1403,20 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
   }, [autoOpenUpdateReqId, profileUpdates])
 
   const handleRequestUpdate = async (empId: string, note?: string) => {
+    setSaving(true)
     try {
       const res = await api.profileUpdates.request(empId, note)
       setProfileUpdates(prev => [...prev, res])
       showToast("Đã gửi yêu cầu cập nhật hồ sơ thành công!", "success")
     } catch (e: any) {
       showToast(e.message, "error")
+    } finally {
+      setSaving(false)
     }
   }
 
   const handleApproveUpdate = async (id: string) => {
+    setSaving(true)
     try {
       await api.profileUpdates.approve(id)
       setProfileUpdates(prev => prev.map(p => p.id === id ? { ...p, status: "approved" } : p))
@@ -1421,10 +1427,13 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       showToast("Đã phê duyệt cập nhật hồ sơ thành công!", "success")
     } catch (e: any) {
       showToast(e.message, "error")
+    } finally {
+      setSaving(false)
     }
   }
 
   const handleRejectUpdate = async (id: string, reason: string) => {
+    setSaving(true)
     try {
       await api.profileUpdates.reject(id, reason)
       setProfileUpdates(prev => prev.map(p => p.id === id ? { ...p, status: "rework_requested", reworkReason: reason } : p))
@@ -1432,6 +1441,8 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       showToast("Đã yêu cầu nhân viên sửa đổi bổ sung hồ sơ!", "success")
     } catch (e: any) {
       showToast(e.message, "error")
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -1464,7 +1475,8 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     return matchQ && matchS && matchD && matchB
   }), [employees, search, filterStatus, filterDept, selectedBranch])
 
-  const saveEmployeeData = async (finalForm: EmpExtForm) => {
+  const saveEmployeeData = async (finalForm: EmpExtForm, deletedUrls: string[] = []) => {
+    setSaving(true)
     try {
       if (editEmp) {
         const updated = await api.employees.update(editEmp.id, finalForm) as Employee
@@ -1477,9 +1489,29 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       }
       setShowModal(false)
       setEditEmp(null)
+
+      const extractKey = (url: string) => {
+        try {
+          const parsed = new URL(url)
+          return parsed.searchParams.get("key") || ""
+        } catch {
+          if (url.includes("key=")) {
+            return decodeURIComponent(url.split("key=")[1].split("&")[0])
+          }
+          return ""
+        }
+      }
+      for (const url of deletedUrls) {
+        const key = extractKey(url)
+        if (key) {
+          try { await api.storage.delete(key) } catch (e) { console.error(e) }
+        }
+      }
     } catch (err) {
       console.error("Lỗi lưu nhân viên:", err)
       showToast(err instanceof Error ? err.message : "Không thể lưu nhân viên", "error")
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -1504,10 +1536,10 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     }
 
     setHistoryConfirm(null)
-    await saveEmployeeData(finalForm)
+    await saveEmployeeData(finalForm, historyConfirm.deletedUrls)
   }
 
-  const handleSave = async (form: EmpExtForm) => {
+  const handleSave = async (form: EmpExtForm, deletedUrls?: string[]) => {
     let finalForm = { ...form }
 
     if (editEmp) {
@@ -1540,7 +1572,8 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
           detectedType,
           defaultNote,
           customNote: defaultNote,
-          pendingForm: form
+          pendingForm: form,
+          deletedUrls
         })
         return
       }
@@ -1560,7 +1593,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       finalForm.workHistory = [joinEntry]
     }
 
-    await saveEmployeeData(finalForm)
+    await saveEmployeeData(finalForm, deletedUrls)
   }
 
   const handleDelete = async (id: string) => {
@@ -1569,6 +1602,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
 
   const confirmDelete = async () => {
     if (!deleteEmpId) return
+    setSaving(true)
     try {
       await api.employees.delete(deleteEmpId)
       setEmployees(prev => prev.filter(e => e.id !== deleteEmpId))
@@ -1576,6 +1610,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     } catch (e: any) {
       showToast(e.message || "Xóa nhân viên thất bại", "error")
     } finally {
+      setSaving(false)
       setDeleteEmpId(null)
     }
   }
@@ -1782,6 +1817,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
           orgNodes={orgNodes}
           onClose={() => { setShowModal(false); setEditEmp(null) }}
           onSave={handleSave}
+          saving={saving}
         />
       )}
 
@@ -1974,7 +2010,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                       Nhân viên: <span className="font-semibold">{previewReq.employeeId}</span> · Có <span className="font-semibold text-orange-600">{diffRows.length}</span> thay đổi
                     </p>
                   </div>
-                  <button onClick={() => { setPreviewReq(null); setPreviewMode("diff"); setPreviewFormTab("personal") }} className="text-gray-400 hover:text-gray-600 transition-colors">
+                  <button disabled={saving} onClick={() => { setPreviewReq(null); setPreviewMode("diff"); setPreviewFormTab("personal") }} className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50">
                     <X size={20} />
                   </button>
                 </div>
@@ -2101,6 +2137,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
 
                 <div className="p-4 border-t border-gray-100 bg-white flex justify-end gap-3">
                   <button
+                    disabled={saving}
                     onClick={() => {
                       setInputModal({
                         open: true,
@@ -2111,14 +2148,16 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                         }
                       })
                     }}
-                    className="px-6 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl text-sm transition-colors"
+                    className="px-6 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Yêu cầu sửa lại
                   </button>
                   <button
+                    disabled={saving}
                     onClick={() => handleApproveUpdate(previewReq.id)}
-                    className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl text-sm hover:opacity-90 transition-opacity shadow-sm"
+                    className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl text-sm hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : null}
                     Duyệt & Lưu hồ sơ
                   </button>
                 </div>

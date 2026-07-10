@@ -60,6 +60,7 @@ export function hasPageAccess(permissions: string[], page: string): boolean {
   if (permissions.includes("all")) return true
   if (page === "dashboard") return permissions.includes("dashboard")
   if (page === "staff-portal") return canOpenStaffPortal(permissions)
+  if (page === "kpi-stats" || page === "kpi-compare") return permissions.includes("kpi")
   return permissions.includes(page)
 }
 

@@ -646,6 +646,7 @@ export function listAttendance(filter) {
 
     let employees = empRepo.getAll()
     employees = employees.filter(e => !["0000000000", "1111111111", "2222222222"].includes(e.id))
+    employees = employees.filter(e => e.status === "active")
 
     if (filter.employeeId) {
       employees = employees.filter(e => e.id === filter.employeeId)
@@ -668,7 +669,7 @@ export function listAttendance(filter) {
           const compareDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
           compareDate.setHours(0, 0, 0, 0)
 
-          if (compareDate < today && !isWeekend) {
+          if (compareDate <= today && !isWeekend) {
             const isIntern = getContractTypeForDate(emp, dateStr) === "intern"
             const blank = {
               id: `TEMP_${emp.id}_${dateStr}`,
