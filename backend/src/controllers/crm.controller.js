@@ -105,7 +105,7 @@ export function importCsv(req, res) {
       if (phone) phoneSeen.add(phone)
 
       svc.createRecord({
-        id: customId ? `crm-${customId}` : undefined,
+        id: customId ? customId : undefined,
         businessName,
         address:      addrIdx !== -1 ? String(cols[addrIdx] ?? "").trim() : "",
         area:         areaIdx !== -1  ? String(cols[areaIdx] ?? "").trim() : "",

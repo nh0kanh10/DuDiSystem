@@ -74,8 +74,25 @@ export function getRecordById(id) {
 export function createRecord(body, createdBy) {
   const { businessName, address = "", area = "", phone = "", website = "", businessType = "", googleMapUrl = "", note = "", status = "Chưa xử lý" } = body
   if (!businessName?.trim()) throw new Error("Tên doanh nghiệp không được để trống")
+
+  let newId = body.id
+  if (newId) {
+    newId = String(newId).replace("crm-", "")
+  } else {
+    const records = repo.getAll()
+    let maxId = 0
+    for (const r of records) {
+      const idStr = String(r.id || "").replace("crm-", "")
+      const num = parseInt(idStr, 10)
+      if (!isNaN(num) && num > maxId) {
+        maxId = num
+      }
+    }
+    newId = String(maxId > 0 ? maxId + 1 : 1)
+  }
+
   return repo.create({
-    id: body.id || `crm-${uuidv4().slice(0, 8)}`,
+    id: newId,
     businessName: businessName.trim(),
     address, area, phone, website, businessType, googleMapUrl,
     status, assignedTo: null, assignedToName: null,
