@@ -3,35 +3,24 @@ import { Employee, OrgNode, Assignment, AttendanceRecord, LeaveRequest, TaskItem
 export const avatarImg = `https://ui-avatars.com/api/?name=T&background=C62828&color=fff&bold=true`
 
 export const INIT_EMPLOYEES: Employee[] = [
-  { id: "0000000001", name: "Trần Thị Bích Liên", email: "lien.tran@dudi.vn", phone: "0901 234 567", department: "Frontend", position: "Senior Developer", joinDate: "28/05/2026", status: "active", contractType: "staff" },
-  { id: "0000000002", name: "Nguyễn Văn Minh", email: "minh.nguyen@dudi.vn", phone: "0912 345 678", department: "Backend", position: "Lead Developer", joinDate: "12/03/2024", status: "active", contractType: "staff" },
-  { id: "0000000003", name: "Lê Thu Hương", email: "huong.le@dudi.vn", phone: "0923 456 789", department: "Design", position: "UI/UX Designer", joinDate: "15/08/2023", status: "active", contractType: "staff" },
-  { id: "0000000004", name: "Phạm Đức Thành", email: "thanh.pham@dudi.vn", phone: "0934 567 890", department: "PM", position: "Project Manager", joinDate: "28/01/2025", status: "active", contractType: "staff" },
-  { id: "0000000005", name: "Hoàng Thị Mai", email: "admin@dudi.vn", phone: "0945 678 901", department: "HR", position: "HR Manager", joinDate: "12/09/2024", status: "active", contractType: "staff" },
-  { id: "0000000006", name: "Võ Minh Tuấn", email: "tuan.vo@dudi.vn", phone: "0956 789 012", department: "Backend", position: "Developer", joinDate: "01/06/2025", status: "active", contractType: "intern" },
-  { id: "0000000007", name: "Đinh Thị Lan Anh", email: "lanh.dinh@dudi.vn", phone: "0967 890 123", department: "Frontend", position: "Developer", joinDate: "15/07/2025", status: "active", contractType: "intern" },
-  { id: "0000000008", name: "Bùi Văn Hùng", email: "hung.bui@dudi.vn", phone: "0978 901 234", department: "DevOps", position: "DevOps Engineer", joinDate: "20/11/2024", status: "inactive", contractType: "staff" },
+  { id: "0000000000", name: "Quản Trị Viên", email: "0000000000", phone: "0988 888 888", department: "IT", position: "System Administrator", joinDate: "01/01/2026", status: "active", contractType: "staff" },
+  { id: "1111111111", name: "Quản Trị Viên 2", email: "1111111111", phone: "0988 888 889", department: "IT", position: "System Administrator", joinDate: "01/01/2026", status: "active", contractType: "staff" },
+  { id: "2222222222", name: "Quản Trị Viên 3", email: "2222222222", phone: "0988 888 890", department: "IT", position: "System Administrator", joinDate: "01/01/2026", status: "active", contractType: "staff" }
 ]
 
 export const INIT_ORG_NODES: OrgNode[] = [
-  { id: "branch-hcm", name: "Chi nhánh Hồ Chí Minh", code: "HCM01", type: "branch", memberCount: 150, status: "active", managerId: "0000000005", managerTitle: "Giám đốc chi nhánh" },
-  { id: "branch-hn", name: "Chi nhánh Hà Nội", code: "HN01", type: "branch", memberCount: 100, status: "active", managerId: "0000000002", managerTitle: "Giám đốc chi nhánh HN" },
-  { id: "branch-dn", name: "Chi nhánh Đà Nẵng", code: "DN01", type: "branch", memberCount: 50, status: "active", managerId: "0000000003", managerTitle: "Giám đốc chi nhánh DN" },
-  { id: "dept-tech", name: "Phòng Công nghệ", code: "TECH01", type: "department", parentId: "branch-hcm", memberCount: 80, status: "active", managerId: "0000000002", managerTitle: "Trưởng phòng Công nghệ" },
+  { id: "branch-dudi", name: "DuDiSolfware 49", code: "DUDI-BR", type: "branch", memberCount: 150, status: "active", managerId: "0000000005", managerTitle: "Giám đốc chi nhánh" },
+  { id: "dept-tech", name: "Phòng Công nghệ", code: "TECH01", type: "department", parentId: "branch-dudi", memberCount: 80, status: "active", managerId: "0000000002", managerTitle: "Trưởng phòng Công nghệ" },
   { id: "sub-dev", name: "Bộ phận Phát triển phần mềm", code: "DEV01", type: "sub-department", parentId: "dept-tech", memberCount: 50, status: "active", managerId: "0000000004", managerTitle: "Trưởng bộ phận Dev" },
   { id: "pos-lead", name: "Lead Developer", code: "LDEV01", type: "position", parentId: "sub-dev", memberCount: 10, status: "active", managerId: "0000000002", managerTitle: "Lead Developer" },
   { id: "team-fe", name: "Nhóm Frontend", code: "FE01", type: "team", parentId: "pos-lead", memberCount: 15, status: "active", managerId: "0000000001", managerTitle: "Trưởng nhóm Frontend" },
-  { id: "dept-finance", name: "Phòng Tài chính", code: "FIN01", type: "department", parentId: "branch-hn", memberCount: 20, status: "active", managerId: "0000000005", managerTitle: "Trưởng phòng Tài chính" },
-  { id: "dept-sales", name: "Phòng Kinh doanh", code: "SALE01", type: "department", parentId: "branch-dn", memberCount: 35, status: "active", managerId: "0000000003", managerTitle: "Trưởng phòng Kinh doanh" },
-  { id: "dept-hr", name: "Phòng Nhân sự", code: "HR01", type: "department", parentId: "branch-hcm", memberCount: 15, status: "active", managerId: "0000000005", managerTitle: "Trưởng phòng Nhân sự" }
+  { id: "dept-finance", name: "Phòng Tài chính - Kế toán", code: "FIN01", type: "department", parentId: "branch-dudi", memberCount: 20, status: "active", managerId: "0000000005", managerTitle: "Trưởng phòng Tài chính" },
+  { id: "dept-sales", name: "Phòng Kinh doanh", code: "SALE01", type: "department", parentId: "branch-dudi", memberCount: 35, status: "active", managerId: "0000000003", managerTitle: "Trưởng phòng Kinh doanh" },
+  { id: "dept-hr", name: "Phòng HC NS", code: "HR01", type: "department", parentId: "branch-dudi", memberCount: 15, status: "active", managerId: "0000000005", managerTitle: "Trưởng phòng Nhân sự" }
 ]
 
 export const INIT_ASSIGNMENTS: Assignment[] = [
-  { id: "as-1", employeeId: "0000000001", nodeId: "team-fe", type: "permanent", startDate: "2026-05-28", status: "active" },
-  { id: "as-2", employeeId: "0000000002", nodeId: "dept-tech", type: "permanent", startDate: "2024-03-12", status: "active" },
-  { id: "as-3", employeeId: "0000000003", nodeId: "dept-sales", type: "permanent", startDate: "2023-08-15", status: "active" },
-  { id: "as-4", employeeId: "0000000004", nodeId: "sub-dev", type: "permanent", startDate: "2025-01-28", status: "active" },
-  { id: "as-5", employeeId: "0000000005", nodeId: "dept-hr", type: "permanent", startDate: "2024-09-12", status: "active" }
+  { id: "as-1", employeeId: "0000000000", nodeId: "branch-dudi", type: "permanent", startDate: "2026-01-01", status: "active" }
 ]
 
 export const ATTENDANCE: AttendanceRecord[] = [

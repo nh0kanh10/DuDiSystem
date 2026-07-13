@@ -28,12 +28,25 @@ function ensureConfig() {
   }
 }
 
+function removeAccents(str) {
+  return String(str)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+}
+
 function normalizeKey(key) {
   return String(key).replace(/\\/g, "/").replace(/^\/+/, "")
 }
 
 function publicIdFromKey(key) {
-  return `${CLOUDINARY_FOLDER}/${normalizeKey(key)}`
+  const norm = normalizeKey(key)
+  const unsigned = removeAccents(norm)
+  const sanitized = unsigned
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9.\-_/]/g, "")
+  return `${CLOUDINARY_FOLDER}/${sanitized}`
 }
 
 function downloadFormatFromKey(key) {
@@ -43,9 +56,11 @@ function downloadFormatFromKey(key) {
 }
 
 function uploadOptions(key) {
+  const ext = String(key).split(".").pop()?.toLowerCase()
+  const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)
   return {
-    resource_type: "raw",
-    type: "authenticated",
+    resource_type: isImage ? "image" : "raw",
+    type: "upload",
     public_id: publicIdFromKey(key),
     overwrite: true,
   }
@@ -68,31 +83,49 @@ export async function get(key) {
   ensureConfig()
   const publicId = publicIdFromKey(key)
   const format = downloadFormatFromKey(key)
-  try {
-    await cloudinary.api.resource(publicId, {
-      resource_type: "raw",
-      type: "authenticated",
+  const ext = String(key).split(".").pop()?.toLowerCase()
+  const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)
+
+  let url
+  if (isImage) {
+    url = cloudinary.url(publicId, {
+      format: format,
+      resource_type: "image",
+      secure: true
     })
-  } catch (err) {
-    if (err?.error?.http_code === 404) return null
-    throw err
+  } else {
+    url = cloudinary.url(publicId, {
+      resource_type: "raw",
+      secure: true
+    })
   }
-  const url = cloudinary.utils.private_download_url(publicId, format, {
-    resource_type: "raw",
-    type: "authenticated",
-  })
-  const res = await fetch(url)
-  if (!res.ok) return null
-  return Buffer.from(await res.arrayBuffer())
+  
+  let res = await fetch(url)
+  if (res.ok) {
+    return Buffer.from(await res.arrayBuffer())
+  }
+
+  const fallbackUrl = isImage
+    ? cloudinary.url(publicId, { resource_type: "raw", secure: true })
+    : cloudinary.url(publicId, { format: format, resource_type: "image", secure: true })
+
+  res = await fetch(fallbackUrl)
+  if (res.ok) {
+    return Buffer.from(await res.arrayBuffer())
+  }
+
+  return null
 }
 
 export async function remove(key) {
   ensureConfig()
   const publicId = publicIdFromKey(key)
+  const ext = String(key).split(".").pop()?.toLowerCase()
+  const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)
   try {
     await cloudinary.uploader.destroy(publicId, {
-      resource_type: "raw",
-      type: "authenticated",
+      resource_type: isImage ? "image" : "raw",
+      type: "upload",
       invalidate: true,
     })
   } catch (err) {

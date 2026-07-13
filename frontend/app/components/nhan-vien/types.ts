@@ -23,7 +23,7 @@ export interface Employee {
 
 function readStoredUser() {
     try {
-        const raw = localStorage.getItem("dudi_user")
+        const raw = localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user")
         return raw ? JSON.parse(raw) : null
     } catch { return null }
 }

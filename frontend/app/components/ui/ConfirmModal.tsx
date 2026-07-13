@@ -1,6 +1,7 @@
 import React from "react"
 import { createPortal } from "react-dom"
 import { X, AlertTriangle, HelpCircle, Info } from "lucide-react"
+import { overlayLayer } from "../../utils/overlayLayers"
 
 interface ConfirmModalProps {
   isOpen: boolean
@@ -62,7 +63,7 @@ export default function ConfirmModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm ${overlayLayer("confirm")} flex items-center justify-center p-4 animate-in fade-in duration-200`}>
       <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 p-6 relative animate-in zoom-in-95 duration-200">
         <button
           onClick={onClose}
@@ -80,7 +81,7 @@ export default function ConfirmModal({
             {title}
           </h3>
 
-          <p className="text-sm text-gray-600 px-2 leading-relaxed">
+          <p className="text-sm text-gray-600 px-2 leading-relaxed whitespace-pre-line text-left max-h-48 overflow-y-auto w-full">
             {message}
           </p>
 

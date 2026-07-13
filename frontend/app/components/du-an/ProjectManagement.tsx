@@ -108,50 +108,7 @@ const EMPTY_FORM = {
 }
 
 function defaultTestSessions(projectId: string): TestSession[] {
-  if (projectId !== "PRJ001") return []
-  const now = new Date().toISOString()
-  return [
-    {
-      id: "TS-PRJ001-1",
-      projectId,
-      version: "v2.0.0-beta",
-      testDate: "28/06/2026",
-      testerId: "NV006",
-      testerName: "Trần Văn Lực",
-      testType: "regression",
-      bugsFound: 14,
-      bugsPassed: 9,
-      bugsRejected: 2,
-      bugsReviewing: 3,
-      bugsBillable: 4,
-      confirmedById: "NV004",
-      confirmedByName: "Phạm Đức Thành",
-      confirmedAt: "29/06/2026",
-      handlingStatus: "in-progress",
-      createdAt: now,
-      updatedAt: now,
-    },
-    {
-      id: "TS-PRJ001-2",
-      projectId,
-      version: "v2.0.0-rc1",
-      testDate: "02/07/2026",
-      testerId: "NV002",
-      testerName: "Nguyễn Văn B",
-      testType: "uat",
-      bugsFound: 6,
-      bugsPassed: 4,
-      bugsRejected: 1,
-      bugsReviewing: 1,
-      bugsBillable: 2,
-      confirmedById: "NV001",
-      confirmedByName: "Admin",
-      confirmedAt: "03/07/2026",
-      handlingStatus: "pending",
-      createdAt: now,
-      updatedAt: now,
-    },
-  ]
+  return []
 }
 
 export function ProjectManagement({
@@ -212,6 +169,7 @@ export function ProjectManagement({
   const [teamMemberSearch, setTeamMemberSearch] = useState("")
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<Project | null>(null)
+  const [showReopenConfirm, setShowReopenConfirm] = useState(false)
   const [deleteGroup, setDeleteGroup] = useState<Group | null>(null)
 
   const [memberTab, setMemberTab] = useState<"member" | "group">("member")
@@ -371,9 +329,14 @@ export function ProjectManagement({
     }
   }
 
-  const handleReopenProject = async () => {
+  const handleReopenProject = () => {
     if (!detail) return
-    if (!window.confirm("Bạn có chắc chắn muốn mở lại dự án này?")) return
+    setShowReopenConfirm(true)
+  }
+
+  const handleConfirmReopen = async () => {
+    if (!detail) return
+    setShowReopenConfirm(false)
     try {
       await api.projects.update(detail.id, { status: "active" })
       await refreshProject(detail.id)
@@ -827,7 +790,7 @@ export function ProjectManagement({
                     {leader && (
                       <div className="flex items-center gap-2 py-2 border-t border-gray-50">
                         <Crown size={11} className="text-amber-500" />
-                        <AvatarCircle name={leader.name} photo={leader.photos?.[0]} />
+                        <AvatarCircle name={leader.name} photo={leader.avatar} />
                         <span className="text-xs font-bold text-gray-600">{leader.name}</span>
                         <span className="text-[10px] text-gray-400">· Trưởng nhóm</span>
                       </div>
@@ -836,7 +799,7 @@ export function ProjectManagement({
                       <div className="flex -space-x-1.5">
                         {g.memberIds.slice(0, 6).map(mid => {
                           const emp = empById(mid)
-                          return emp ? <AvatarCircle key={mid} name={emp.name} photo={emp.photos?.[0]} /> : null
+                          return emp ? <AvatarCircle key={mid} name={emp.name} photo={emp.avatar} /> : null
                         })}
                         {g.memberIds.length > 6 && (
                           <div className="w-7 h-7 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-gray-500">
@@ -988,13 +951,13 @@ export function ProjectManagement({
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      {manager && <AvatarCircle name={manager.name} photo={manager.photos?.[0]} />}
+                      {manager && <AvatarCircle name={manager.name} photo={manager.avatar} />}
                       <span className="text-[11px] text-gray-500 font-semibold">{p.managerName ?? manager?.name ?? "—"}</span>
                     </div>
                     <div className="flex -space-x-1.5">
                       {p.memberIds.slice(0, 3).map(mid => {
                         const emp = empById(mid)
-                        return emp ? <AvatarCircle key={mid} name={emp.name} photo={emp.photos?.[0]} /> : null
+                        return emp ? <AvatarCircle key={mid} name={emp.name} photo={emp.avatar} /> : null
                       })}
                       {p.memberIds.length > 3 && (
                         <div className="w-7 h-7 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-gray-500">
@@ -1071,7 +1034,6 @@ export function ProjectManagement({
                       { value: "planning",  label: "Lên kế hoạch" },
                       { value: "active",    label: "Đang thực hiện" },
                       { value: "on-hold",   label: "Tạm dừng" },
-                      { value: "completed", label: "Hoàn thành" },
                     ]}
                   />
                 </div>
@@ -1167,7 +1129,7 @@ export function ProjectManagement({
                       return (
                         <button key={e.id} type="button" onClick={() => toggleMember(e.id)}
                           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs transition-all group ${selected ? "bg-[#C62828]/6" : "hover:bg-gray-50"}`}>
-                          <AvatarCircle name={e.name} photo={e.photos?.[0]} size="md" />
+                          <AvatarCircle name={e.name} photo={e.avatar} size="md" />
                           <div className="flex-1 text-left min-w-0">
                             <div className="flex items-center gap-1.5 min-w-0">
                               <p className={`font-bold truncate ${selected ? "text-[#C62828]" : "text-gray-700"}`}>{e.name}</p>
@@ -1347,7 +1309,7 @@ export function ProjectManagement({
                         const m = empById(detail.managerId)
                         return m ? (
                           <div className="flex items-center gap-2.5">
-                            <AvatarCircle name={m.name} photo={m.photos?.[0]} size="md" />
+                            <AvatarCircle name={m.name} photo={m.avatar} size="md" />
                             <div>
                               <p className="text-sm font-bold text-gray-700">{m.name}</p>
                               <p className="text-[11px] text-gray-400">{m.position} · {m.department}</p>
@@ -1367,7 +1329,7 @@ export function ProjectManagement({
                           const emp = empById(mid)
                           return emp ? (
                             <div key={mid} className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2 border border-gray-100">
-                              <AvatarCircle name={emp.name} photo={emp.photos?.[0]} />
+                              <AvatarCircle name={emp.name} photo={emp.avatar} />
                               <div>
                                 <p className="text-xs font-bold text-gray-700 leading-none">{emp.name}</p>
                                 <p className="text-[10px] text-gray-400 mt-0.5">{emp.department}</p>
@@ -1602,7 +1564,7 @@ export function ProjectManagement({
                     return (
                       <button key={e.id} type="button" onClick={() => toggleTeamMember(e.id)}
                         className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs transition-all ${sel ? "bg-[#C62828]/6" : "hover:bg-gray-50"}`}>
-                        <AvatarCircle name={e.name} photo={e.photos?.[0]} />
+                        <AvatarCircle name={e.name} photo={e.avatar} />
                         <div className="flex-1 text-left min-w-0">
                           <div className="flex items-center gap-1.5">
                             <p className={`font-bold truncate ${sel ? "text-[#C62828]" : "text-gray-700"}`}>{e.name}</p>
@@ -1671,6 +1633,17 @@ export function ProjectManagement({
         confirmText="Xác nhận xóa"
         cancelText="Hủy"
         type="danger"
+      />
+
+      <ConfirmModal
+        isOpen={showReopenConfirm}
+        onClose={() => setShowReopenConfirm(false)}
+        onConfirm={handleConfirmReopen}
+        title="Mở lại dự án"
+        message="Bạn có chắc chắn muốn mở lại dự án này?"
+        confirmText="Xác nhận"
+        cancelText="Hủy"
+        type="warning"
       />
 
       <Modal

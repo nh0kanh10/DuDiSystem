@@ -43,11 +43,23 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     return `${day}/${month}/${year}`
   }
 
-  const [viewMode, setViewMode] = useState<"all" | "day" | "range">("day")
-  const [dateBasis, setDateBasis] = useState<"due" | "created" | "assigned">("due")
+  const [viewMode, setViewMode] = useState<"all" | "day" | "range" | "month">("month")
+  const [dateBasis, setDateBasis] = useState<"due" | "created" | "assigned">("created")
   const [selectedDate, setSelectedDate] = useState(getTodayVnStr())
   const [startDate, setStartDate] = useState(getTodayVnStr())
   const [endDate, setEndDate] = useState(getFutureVnStr(6))
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+
+  useEffect(() => {
+    if (viewMode === "month") {
+      const firstDay = `01/${String(selectedMonth).padStart(2, '0')}/${selectedYear}`
+      const lastDateObj = new Date(selectedYear, selectedMonth, 0)
+      const lastDay = `${String(lastDateObj.getDate()).padStart(2, '0')}/${String(selectedMonth).padStart(2, '0')}/${selectedYear}`
+      setStartDate(firstDay)
+      setEndDate(lastDay)
+    }
+  }, [viewMode, selectedMonth, selectedYear])
 
   const [showModal, setShowModal] = useState(false)
   const [editingTask, setEditingTask] = useState<any | null>(null)
@@ -61,6 +73,26 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   })
 
 
+
+  const getDatesInRange = (startStr: string, endStr: string) => {
+    const start = parseVnDate(startStr)
+    const end = parseVnDate(endStr)
+    if (!start || !end) return []
+    start.setHours(0, 0, 0, 0)
+    end.setHours(0, 0, 0, 0)
+    const dates: string[] = []
+    const current = new Date(start)
+    let limit = 0
+    while (current <= end && limit < 100) {
+      const day = String(current.getDate()).padStart(2, '0')
+      const month = String(current.getMonth() + 1).padStart(2, '0')
+      const year = current.getFullYear()
+      dates.push(`${day}/${month}/${year}`)
+      current.setDate(current.getDate() + 1)
+      limit++
+    }
+    return dates
+  }
 
   const parseVnDate = (s: string) => {
     if (!s) return null
@@ -188,6 +220,9 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     setSelectedStatus("all")
     if (viewMode === "day") {
       setSelectedDate(getTodayVnStr())
+    } else if (viewMode === "month") {
+      setSelectedMonth(new Date().getMonth() + 1)
+      setSelectedYear(new Date().getFullYear())
     } else {
       setStartDate(getTodayVnStr())
       setEndDate(getFutureVnStr(6))
@@ -203,6 +238,8 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
     setSelectedDate(getTodayVnStr())
     setStartDate(getTodayVnStr())
     setEndDate(getFutureVnStr(6))
+    setSelectedMonth(new Date().getMonth() + 1)
+    setSelectedYear(new Date().getFullYear())
     await loadData()
   }
 
@@ -254,12 +291,13 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
   }
 
   const renderTaskCells = (t: any, tIdx: number, allTasks: any[], empId: string, bgClass: string) => {
+    const isPlaceholder = t.isPlaceholder
     const isDone = t.status === "done"
     const isInProgress = t.status === "in-progress"
-    const dueDate = parseVnDate(t.dueDate)
+    const dueDate = !isPlaceholder && t.dueDate ? parseVnDate(t.dueDate) : null
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const isOverdue = !!dueDate && !isDone && dueDate.getTime() < today.getTime()
+    const isOverdue = !isPlaceholder && !!dueDate && !isDone && dueDate.getTime() < today.getTime()
     const isFirstOfGroup = tIdx === 0 || allTasks[tIdx - 1]._displayDate !== t._displayDate
     let dateGroupLength = 0
     if (isFirstOfGroup) {
@@ -284,76 +322,98 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
         )}
 
         <td className="px-5 py-3 border-r border-gray-100 align-middle">
-          <div
-            className={`h-[38px] px-3 flex items-center border rounded-xl text-xs font-bold w-full truncate transition-all ${
-              isOverdue ? "bg-red-50/60 hover:bg-red-50 border-red-200 text-red-800"
-              : isDone ? "bg-emerald-50/25 hover:bg-emerald-50/45 border-emerald-200 text-emerald-800"
-              : isInProgress ? "bg-orange-50/20 hover:bg-orange-50/40 border-orange-200 text-orange-850"
-              : "bg-gray-50/45 hover:bg-gray-50/80 border-gray-200 text-gray-700"
-            }`}
-            title={t.description ? `${t.title} — ${t.description}` : t.title}
-          >
-            <span className="truncate flex-1">
-              <span className="text-gray-800 font-bold">{t.title}</span>
-              {t.description && <span className="text-gray-400 font-normal ml-1.5">— {t.description}</span>}
-            </span>
-            <span className={`ml-2 shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
-              t.priority === "high" ? "bg-red-50 text-red-650 border border-red-100"
-              : t.priority === "medium" ? "bg-amber-50 text-amber-600 border border-amber-100"
-              : "bg-blue-50 text-blue-600 border border-blue-100"
-            }`}>
-              {t.priority === "high" ? "Cao" : t.priority === "medium" ? "Trung" : "Thấp"}
-            </span>
-          </div>
+          {isPlaceholder ? (
+            <div className="flex items-center gap-1.5 text-gray-450 font-semibold text-xs h-[38px] italic">
+              <Briefcase size={13} className="text-gray-300 shrink-0" />
+              Không có công việc
+            </div>
+          ) : (
+            <div
+              className={`h-[38px] px-3 flex items-center border rounded-xl text-xs font-bold w-full truncate transition-all ${
+                isOverdue ? "bg-red-50/60 hover:bg-red-50 border-red-200 text-red-800"
+                : isDone ? "bg-emerald-50/25 hover:bg-emerald-50/45 border-emerald-200 text-emerald-800"
+                : isInProgress ? "bg-orange-50/20 hover:bg-orange-50/40 border-orange-200 text-orange-850"
+                : "bg-gray-50/45 hover:bg-gray-50/80 border-gray-200 text-gray-700"
+              }`}
+              title={t.description ? `${t.title} — ${t.description}` : t.title}
+            >
+              <span className="truncate flex-1">
+                <span className="text-gray-800 font-bold">{t.title}</span>
+                {t.description && <span className="text-gray-400 font-normal ml-1.5">— {t.description}</span>}
+              </span>
+              <span className={`ml-2 shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
+                t.priority === "high" ? "bg-red-50 text-red-650 border border-red-100"
+                : t.priority === "medium" ? "bg-amber-50 text-amber-600 border border-amber-100"
+                : "bg-blue-50 text-blue-600 border border-blue-100"
+              }`}>
+                {t.priority === "high" ? "Cao" : t.priority === "medium" ? "Trung" : "Thấp"}
+              </span>
+            </div>
+          )}
         </td>
 
         <td className="px-5 py-3 border-r border-gray-100 align-middle text-left">
-          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-            isOverdue ? "bg-red-50 text-red-700 border-red-100"
-            : isDone ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-            : isInProgress ? "bg-orange-50 text-orange-600 border-orange-100"
-            : "bg-gray-150 text-gray-650 border-gray-200"
-          }`}>
-            {isOverdue ? "Quá hạn" : isDone ? "Đã xong" : isInProgress ? "Đang làm" : "Chưa làm"}
-          </span>
+          {isPlaceholder ? (
+            <span className="text-xs text-gray-300 font-bold h-[38px] flex items-center">—</span>
+          ) : (
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+              isOverdue ? "bg-red-50 text-red-700 border-red-100"
+              : isDone ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+              : isInProgress ? "bg-orange-50 text-orange-600 border-orange-100"
+              : "bg-gray-150 text-gray-650 border-gray-200"
+            }`}>
+              {isOverdue ? "Quá hạn" : isDone ? "Đã xong" : isInProgress ? "Đang làm" : "Chưa làm"}
+            </span>
+          )}
         </td>
 
         <td className="px-5 py-3 text-center align-middle">
-          <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
-            <button
-              onClick={() => handleOpenEdit(t)}
-              className="w-8 h-8 flex items-center justify-center border border-[#C62828] text-[#C62828] hover:bg-red-50 rounded-xl transition-all active:scale-95 cursor-pointer"
-              title="Sửa công việc"
-            >
-              <Edit2 size={13} />
-            </button>
-            <button
-              onClick={() => handleDeleteTask(t.id)}
-              className="w-8 h-8 flex items-center justify-center border border-[#C62828] text-[#C62828] hover:bg-red-50 rounded-xl transition-all active:scale-95 cursor-pointer"
-              title="Xóa công việc"
-            >
-              <Trash2 size={13} />
-            </button>
-            <button
-              onClick={() => handleOpenCreate(empId)}
-              className="w-8 h-8 flex items-center justify-center bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl transition-all active:scale-95 cursor-pointer"
-              title="Thêm công việc khác"
-            >
-              <Plus size={15} className="stroke-[3px]" />
-            </button>
-          </div>
+          {isPlaceholder ? (
+            <div className="h-[38px] flex items-center justify-center">
+              <button
+                onClick={() => handleOpenCreate(empId, t._displayDate)}
+                className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+              >
+                <Plus size={13} className="stroke-[3px]" /> Thêm
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+              <button
+                onClick={() => handleOpenEdit(t)}
+                className="w-8 h-8 flex items-center justify-center border border-[#C62828] text-[#C62828] hover:bg-red-50 rounded-xl transition-all active:scale-95 cursor-pointer"
+                title="Sửa công việc"
+              >
+                <Edit2 size={13} />
+              </button>
+              <button
+                onClick={() => handleDeleteTask(t.id)}
+                className="w-8 h-8 flex items-center justify-center border border-[#C62828] text-[#C62828] hover:bg-red-50 rounded-xl transition-all active:scale-95 cursor-pointer"
+                title="Xóa công việc"
+              >
+                <Trash2 size={13} />
+              </button>
+              <button
+                onClick={() => handleOpenCreate(empId, t._displayDate)}
+                className="w-8 h-8 flex items-center justify-center bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl transition-all active:scale-95 cursor-pointer"
+                title="Thêm công việc khác"
+              >
+                <Plus size={15} className="stroke-[3px]" />
+              </button>
+            </div>
+          )}
         </td>
       </>
     )
   }
 
-  const handleOpenCreate = (assigneeId: string) => {
+  const handleOpenCreate = (assigneeId: string, defaultDate?: string) => {
     setEditingTask(null)
     setForm({
       title: "",
       description: "",
       assigneeId: assigneeId,
-      dueDate: viewMode === "day" ? selectedDate : getTodayVnStr(),
+      dueDate: defaultDate || (viewMode === "day" ? selectedDate : getTodayVnStr()),
       priority: "medium",
       status: "todo"
     })
@@ -449,6 +509,14 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
               </div>
               <button
                 type="button"
+                onClick={() => setViewMode("month")}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Chuyển sang xem theo tháng"
+              >
+                Xem theo tháng
+              </button>
+              <button
+                type="button"
                 onClick={() => setViewMode("day")}
                 className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
                 title="Chuyển sang xem theo ngày cụ thể"
@@ -484,11 +552,67 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
               </button>
               <button
                 type="button"
+                onClick={() => setViewMode("month")}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Chuyển sang xem theo tháng"
+              >
+                Xem theo tháng
+              </button>
+              <button
+                type="button"
                 onClick={() => setViewMode("range")}
                 className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
                 title="Chuyển sang xem theo khoảng ngày"
               >
                 Xem khoảng ngày
+              </button>
+            </div>
+          ) : viewMode === "month" ? (
+            <div className="lg:col-span-8 flex items-end gap-2">
+              <div className="w-[140px] shrink-0">
+                <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Chọn tháng</label>
+                <CustomSelect
+                  value={String(selectedMonth)}
+                  onChange={val => setSelectedMonth(Number(val))}
+                  options={Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: `Tháng ${i + 1}` }))}
+                  heightClass="h-[42px]"
+                />
+              </div>
+              <div className="w-[120px] shrink-0">
+                <label className="text-xs font-black text-gray-400 mb-1.5 block uppercase tracking-wider">Chọn năm</label>
+                <CustomSelect
+                  value={String(selectedYear)}
+                  onChange={val => setSelectedYear(Number(val))}
+                  options={Array.from({ length: 5 }, (_, i) => {
+                    const y = new Date().getFullYear() - 2 + i
+                    return { value: String(y), label: String(y) }
+                  })}
+                  heightClass="h-[42px]"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleViewAllTasks}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Xem tất cả công việc"
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("day")}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Xem theo ngày cụ thể"
+              >
+                Xem theo ngày
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("range")}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Xem theo khoảng ngày"
+              >
+                Khoảng ngày
               </button>
             </div>
           ) : (
@@ -516,6 +640,14 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                 title="Xem tất cả công việc"
               >
                 All
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("month")}
+                className="h-[42px] px-3.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-650 hover:bg-gray-50 bg-white transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0"
+                title="Chuyển sang xem theo tháng"
+              >
+                Xem theo tháng
               </button>
               <button
                 type="button"
@@ -646,82 +778,135 @@ export function TaskManagement({ selectedBranch }: { selectedBranch: string }) {
                 </tr>
               ) : (
                 displayEmployees.flatMap((emp, index) => {
-                  const empTasks = tasks.filter(t => {
-                    if (t.assigneeId !== emp.id) return false
-                    const taskDate = getTaskDateByBasis(t)
-
-                    // Lọc trạng thái trước: "no-deadline" là case riêng.
-                    if (selectedStatus === "no-deadline") {
-                      if (t.dueDate) return false
-                      return viewMode === "all" ? true : matchesDateFilter(taskDate)
-                    }
-                    if (selectedStatus !== "all" && (t.status || "todo") !== selectedStatus) return false
-
-                    // "Tất cả trạng thái" thực sự là tất cả trạng thái, không tự loại "đã xong".
-                    return matchesDateFilter(taskDate)
-                  })
-                  
                   const empBgClass = index % 2 === 0 ? "bg-white" : "bg-gray-50/45"
-                  
-                  if (empTasks.length === 0) {
-                    return (
-                      <tr key={emp.id} className={`hover:bg-gray-100/50 transition-colors border-b-2 border-gray-200 ${empBgClass}`}>
-                        <td className="px-5 py-4 font-bold text-gray-400 border-r border-gray-100">{index + 1}</td>
-                        <td className="px-5 py-4 font-mono font-bold text-gray-700 border-r border-gray-100">{emp.id}</td>
-                        <td className="px-5 py-4 font-bold text-gray-800 border-r border-gray-100">{emp.name}</td>
-                        <td className="px-5 py-4 text-gray-500 font-bold text-xs border-r border-gray-100">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-gray-800 font-mono">{viewMode === "all" ? "Tất cả" : (viewMode === "day" ? selectedDate : startDate)}</span>
-                            {viewMode !== "all" && (
-                              <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(viewMode === "day" ? selectedDate : startDate)}</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 border-r border-gray-100">
-                          <div className="flex items-center gap-1.5 text-gray-400 font-medium text-xs h-[38px]">
-                            <Briefcase size={13} className="text-gray-300" />
-                            Không có công việc
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 border-r border-gray-100">
-                          <span className="text-xs text-gray-300 font-bold h-[38px] flex items-center">—</span>
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <div className="h-[38px] flex items-center justify-center">
-                            <button
-                              onClick={() => handleOpenCreate(emp.id)}
-                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
-                            >
-                              <Plus size={13} className="stroke-[3px]" /> Thêm
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
+                  const isSingleEmployeeFilter = selectedEmp !== "all" && viewMode !== "all"
+
+                  if (isSingleEmployeeFilter) {
+                    const activeDates = viewMode === "day" ? [selectedDate] : getDatesInRange(startDate, endDate)
+                    const baseEmpTasks = tasks.filter(t => {
+                      if (t.assigneeId !== emp.id) return false
+                      if (selectedStatus === "no-deadline") {
+                        return !t.dueDate
+                      }
+                      if (selectedStatus !== "all" && (t.status || "todo") !== selectedStatus) return false
+                      return true
+                    })
+
+                    const sortedTasks: any[] = []
+                    activeDates.forEach(date => {
+                      const tasksOnDate = baseEmpTasks.filter(t => getTaskDateByBasis(t) === date)
+                      if (tasksOnDate.length === 0) {
+                        sortedTasks.push({
+                          id: `placeholder-${date}`,
+                          title: "Không có công việc",
+                          description: "",
+                          assigneeId: emp.id,
+                          dueDate: date,
+                          status: "none",
+                          isPlaceholder: true,
+                          _displayDate: date
+                        })
+                      } else {
+                        tasksOnDate.forEach(t => {
+                          sortedTasks.push({
+                            ...t,
+                            _displayDate: date
+                          })
+                        })
+                      }
+                    })
+
+                    return sortedTasks.map((t, tIdx) => {
+                      const isLast = tIdx === sortedTasks.length - 1
+                      return (
+                        <tr 
+                          key={`${emp.id}-${t.id}`} 
+                          className={`hover:bg-gray-100/50 transition-colors ${isLast ? "border-b-2 border-gray-200" : ""} ${empBgClass}`}
+                        >
+                          {tIdx === 0 && (
+                            <>
+                              <td rowSpan={sortedTasks.length} className="px-5 py-4 font-bold text-gray-400 border-r border-gray-100 align-middle">{index + 1}</td>
+                              <td rowSpan={sortedTasks.length} className="px-5 py-4 font-mono font-bold text-gray-700 border-r border-gray-100 align-middle">{emp.id}</td>
+                              <td rowSpan={sortedTasks.length} className="px-5 py-4 font-bold text-gray-800 border-r border-gray-100 align-middle">{emp.name}</td>
+                            </>
+                          )}
+                          {renderTaskCells(t, tIdx, sortedTasks, emp.id, empBgClass)}
+                        </tr>
+                      )
+                    })
+                  } else {
+                    const empTasks = tasks.filter(t => {
+                      if (t.assigneeId !== emp.id) return false
+                      const taskDate = getTaskDateByBasis(t)
+
+                      if (selectedStatus === "no-deadline") {
+                        if (t.dueDate) return false
+                        return viewMode === "all" ? true : matchesDateFilter(taskDate)
+                      }
+                      if (selectedStatus !== "all" && (t.status || "todo") !== selectedStatus) return false
+                      return matchesDateFilter(taskDate)
+                    })
+
+                    if (empTasks.length === 0) {
+                      return (
+                        <tr key={emp.id} className={`hover:bg-gray-100/50 transition-colors border-b-2 border-gray-200 ${empBgClass}`}>
+                          <td className="px-5 py-4 font-bold text-gray-400 border-r border-gray-100">{index + 1}</td>
+                          <td className="px-5 py-4 font-mono font-bold text-gray-700 border-r border-gray-100">{emp.id}</td>
+                          <td className="px-5 py-4 font-bold text-gray-800 border-r border-gray-100">{emp.name}</td>
+                          <td className="px-5 py-4 text-gray-500 font-bold text-xs border-r border-gray-100">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-gray-800 font-mono">{viewMode === "all" ? "Tất cả" : (viewMode === "day" ? selectedDate : startDate)}</span>
+                              {viewMode !== "all" && (
+                                <span className="text-gray-400 text-[10px]">{getVnDayOfWeek(viewMode === "day" ? selectedDate : startDate)}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 border-r border-gray-100">
+                            <div className="flex items-center gap-1.5 text-gray-450 font-semibold text-xs h-[38px] italic">
+                              <Briefcase size={13} className="text-gray-300 shrink-0" />
+                              Không có công việc
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 border-r border-gray-100">
+                            <span className="text-xs text-gray-300 font-bold h-[38px] flex items-center">—</span>
+                          </td>
+                          <td className="px-5 py-4 text-center">
+                            <div className="h-[38px] flex items-center justify-center">
+                              <button
+                                onClick={() => handleOpenCreate(emp.id)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer"
+                              >
+                                <Plus size={13} className="stroke-[3px]" /> Thêm
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    }
+
+                    const sortedTasks = [...empTasks]
+                      .map(t => ({ ...t, _displayDate: getTaskDateByBasis(t) }))
+                      .sort((a, b) => compareVnDates(a._displayDate, b._displayDate))
+
+                    return sortedTasks.map((t, tIdx) => {
+                      const isLast = tIdx === sortedTasks.length - 1
+                      return (
+                        <tr 
+                          key={`${emp.id}-${t.id}`} 
+                          className={`hover:bg-gray-100/50 transition-colors ${isLast ? "border-b-2 border-gray-200" : ""} ${empBgClass}`}
+                        >
+                          {tIdx === 0 && (
+                            <>
+                              <td rowSpan={sortedTasks.length} className="px-5 py-4 font-bold text-gray-400 border-r border-gray-100 align-middle">{index + 1}</td>
+                              <td rowSpan={sortedTasks.length} className="px-5 py-4 font-mono font-bold text-gray-700 border-r border-gray-100 align-middle">{emp.id}</td>
+                              <td rowSpan={sortedTasks.length} className="px-5 py-4 font-bold text-gray-800 border-r border-gray-100 align-middle">{emp.name}</td>
+                            </>
+                          )}
+                          {renderTaskCells(t, tIdx, sortedTasks, emp.id, empBgClass)}
+                        </tr>
+                      )
+                    })
                   }
-
-                  const sortedTasks = [...empTasks]
-                    .map(t => ({ ...t, _displayDate: getTaskDateByBasis(t) }))
-                    .sort((a, b) => compareVnDates(a._displayDate, b._displayDate))
-
-                  return sortedTasks.map((t, tIdx) => {
-                    const isLast = tIdx === sortedTasks.length - 1
-                    return (
-                      <tr 
-                        key={`${emp.id}-${t.id}`} 
-                        className={`hover:bg-gray-100/50 transition-colors ${isLast ? "border-b-2 border-gray-200" : ""} ${empBgClass}`}
-                      >
-                        {tIdx === 0 && (
-                          <>
-                            <td rowSpan={sortedTasks.length} className="px-5 py-4 font-bold text-gray-400 border-r border-gray-100 align-middle">{index + 1}</td>
-                            <td rowSpan={sortedTasks.length} className="px-5 py-4 font-mono font-bold text-gray-700 border-r border-gray-100 align-middle">{emp.id}</td>
-                            <td rowSpan={sortedTasks.length} className="px-5 py-4 font-bold text-gray-800 border-r border-gray-100 align-middle">{emp.name}</td>
-                          </>
-                        )}
-                        {renderTaskCells(t, tIdx, sortedTasks, emp.id, empBgClass)}
-                      </tr>
-                    )
-                  })
                 })
               )}
             </tbody>

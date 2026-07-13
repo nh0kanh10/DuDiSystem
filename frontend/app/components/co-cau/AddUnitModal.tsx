@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { X, Building2, Clipboard, Settings, Briefcase, Users } from "lucide-react"
 import { OrgNode, OrgNodeType, Employee } from "../../types"
+import { CustomSelect } from "../ui/CustomSelect"
 
 interface AddUnitModalProps {
   isOpen: boolean
@@ -218,21 +219,17 @@ export default function AddUnitModal({
               {type !== "branch" && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1.5">Cấp cha trực thuộc *</label>
-                  <select
+                  <CustomSelect
                     value={selectedParentId}
-                    onChange={e => setSelectedParentId(e.target.value)}
+                    onChange={setSelectedParentId}
                     disabled={!!editNode || !!parentId}
-                    className={`w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] text-gray-800 ${
-                      (editNode || parentId) ? "bg-gray-50 text-gray-400 cursor-not-allowed" : ""
-                    }`}
-                  >
-                    <option value="">Chọn đơn vị cha</option>
-                    {parentOptions.map(p => (
-                      <option key={p.id} value={p.id}>
-                        [{p.code}] {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: "", label: "Chọn đơn vị cha" },
+                      ...parentOptions.map(p => ({ value: p.id, label: `[${p.code}] ${p.name}` }))
+                    ]}
+                    className="w-full"
+                    heightClass="h-[42px]"
+                  />
                 </div>
               )}
             </div>
@@ -242,18 +239,16 @@ export default function AddUnitModal({
             <div className="space-y-4 max-w-md mx-auto">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Người quản lý</label>
-                <select
+                <CustomSelect
                   value={managerId}
-                  onChange={e => setManagerId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] text-gray-800"
-                >
-                  <option value="">Chọn quản lý phụ trách</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} ({emp.position})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setManagerId}
+                  options={[
+                    { value: "", label: "Chọn quản lý phụ trách" },
+                    ...employees.map(emp => ({ value: emp.id, label: `${emp.name} (${emp.position})` }))
+                  ]}
+                  className="w-full"
+                  heightClass="h-[42px]"
+                />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Chức danh quản lý</label>
@@ -288,14 +283,16 @@ export default function AddUnitModal({
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">Trạng thái hoạt động</label>
-                <select
+                <CustomSelect
                   value={status}
-                  onChange={e => setStatus(e.target.value as "active" | "inactive")}
-                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] text-gray-800"
-                >
-                  <option value="active">Đang hoạt động</option>
-                  <option value="inactive">Ngừng hoạt động</option>
-                </select>
+                  onChange={val => setStatus(val as "active" | "inactive")}
+                  options={[
+                    { value: "active", label: "Đang hoạt động" },
+                    { value: "inactive", label: "Ngừng hoạt động" }
+                  ]}
+                  className="w-full"
+                  heightClass="h-[42px]"
+                />
               </div>
             </div>
           )}

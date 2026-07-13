@@ -1,7 +1,3 @@
-/**
- * Mã nhân viên: YYYYMMDD + 2 số thứ tự trong ngày (01, 02, ...)
- * VD: 2026070301, 2026070302
- */
 export function generateEmployeeId(takenIds = []) {
   const taken = new Set(takenIds.filter(Boolean))
   const d = new Date()

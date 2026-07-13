@@ -1,31 +1,9 @@
 [
   {
-    "id": "branch-hcm",
-    "name": "Chi nhánh TP.HCM",
-    "code": "HCM-BR",
+    "id": "branch-dudi",
+    "name": "DuDiSolfware 49",
+    "code": "DUDI-BR",
     "type": "branch",
-    "managerId": "NV009",
-    "managerTitle": "Giám đốc Chi nhánh",
-    "status": "active",
-    "createdDate": "01/01/2020"
-  },
-  {
-    "id": "branch-hn",
-    "name": "Chi nhánh Hà Nội",
-    "code": "HN-BR",
-    "type": "branch",
-    "managerId": "NV002",
-    "managerTitle": "Giám đốc Chi nhánh",
-    "status": "active",
-    "createdDate": "01/01/2020"
-  },
-  {
-    "id": "branch-dn",
-    "name": "Chi nhánh Đà Nẵng",
-    "code": "DN-BR",
-    "type": "branch",
-    "managerId": "NV003",
-    "managerTitle": "Giám đốc Chi nhánh",
     "status": "active",
     "createdDate": "01/01/2020"
   },
@@ -34,9 +12,7 @@
     "name": "Phòng Công nghệ",
     "code": "TECH-DEPT",
     "type": "department",
-    "managerId": "NV009",
-    "managerTitle": "Trưởng phòng",
-    "parentId": "branch-hcm",
+    "parentId": "branch-dudi",
     "status": "active",
     "createdDate": "01/01/2020"
   },
@@ -45,8 +21,6 @@
     "name": "Bộ phận Phát triển phần mềm",
     "code": "DEV-SUB",
     "type": "sub-department",
-    "managerId": "NV009",
-    "managerTitle": "Trưởng Phòng",
     "parentId": "dept-tech",
     "status": "active",
     "createdDate": "01/01/2020"
@@ -281,9 +255,7 @@
     "name": "Phòng Tài chính - Kế toán",
     "code": "FIN-DEPT",
     "type": "department",
-    "managerId": "NV009",
-    "managerTitle": "Trưởng phòng",
-    "parentId": "branch-hn",
+    "parentId": "branch-dudi",
     "status": "active",
     "createdDate": "01/01/2020"
   },
@@ -292,8 +264,6 @@
     "name": "Bộ phận Kế toán",
     "code": "ACC-SUB",
     "type": "sub-department",
-    "managerId": "NV009",
-    "managerTitle": "Kế toán trưởng",
     "parentId": "dept-finance",
     "status": "active",
     "createdDate": "01/01/2020"
@@ -384,9 +354,7 @@
     "name": "Phòng Kinh doanh",
     "code": "SAL-DEPT",
     "type": "department",
-    "managerId": "NV009",
-    "managerTitle": "Trưởng phòng",
-    "parentId": "branch-dn",
+    "parentId": "branch-dudi",
     "status": "active",
     "createdDate": "01/01/2020"
   },
@@ -395,8 +363,6 @@
     "name": "Bộ phận Sales",
     "code": "SAL-SUB",
     "type": "sub-department",
-    "managerId": "NV009",
-    "managerTitle": "Trưởng phòng",
     "parentId": "dept-sales",
     "status": "active",
     "createdDate": "01/01/2020"
@@ -496,7 +462,7 @@
     "name": "Phòng Marketing",
     "code": "MKT-DEPT",
     "type": "department",
-    "parentId": "branch-hcm",
+    "parentId": "branch-dudi",
     "status": "active",
     "createdDate": "01/01/2020"
   },
@@ -592,12 +558,10 @@
   },
   {
     "id": "dept-hr",
-    "name": "Phòng Nhân sự - Hành chính",
+    "name": "Phòng HC NS",
     "code": "HR-DEPT",
     "type": "department",
-    "managerId": "NV009",
-    "managerTitle": "Trưởng phòng",
-    "parentId": "branch-hcm",
+    "parentId": "branch-dudi",
     "status": "active",
     "createdDate": "01/01/2020"
   },
@@ -606,8 +570,6 @@
     "name": "Bộ phận Tuyển dụng",
     "code": "REC-SUB",
     "type": "sub-department",
-    "managerId": "NV009",
-    "managerTitle": "Trưởng phòng",
     "parentId": "dept-hr",
     "status": "active",
     "createdDate": "01/01/2020"
@@ -653,8 +615,6 @@
     "name": "Bộ phận C&B",
     "code": "CB-SUB",
     "type": "sub-department",
-    "managerId": "NV009",
-    "managerTitle": "Phó phòng",
     "parentId": "dept-hr",
     "status": "active",
     "createdDate": "01/01/2020"

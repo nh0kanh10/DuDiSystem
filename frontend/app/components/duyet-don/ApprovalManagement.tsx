@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react"
+import { useToast } from "@/app/hooks/useToast"
 import { createPortal } from "react-dom"
 import {
   Search, Check, X, Plus, FileText,
@@ -534,8 +535,7 @@ export default function ApprovalManagement({
     }
   }
   const [adminNote, setAdminNote] = useState("")
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [toastType, setToastType] = useState<"success" | "error">("success")
+  const { showToast } = useToast()
   const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1)
   const [weekFilter, setWeekFilter] = useState(() => `W${getISOWeek(new Date())}`)
@@ -639,10 +639,6 @@ export default function ApprovalManagement({
     return list
   }, [requests, weekFilter, employees, selectedBranch, orgNodes])
 
-  const showToast = (msg: string, type: "success" | "error" = "success") => {
-    setToastMessage(msg); setToastType(type)
-    setTimeout(() => setToastMessage(null), 2800)
-  }
   const addProcessing    = (id: string) => setProcessingIds(p => [...p, id])
   const removeProcessing = (id: string) => setProcessingIds(p => p.filter(x => x !== id))
 
@@ -931,14 +927,11 @@ export default function ApprovalManagement({
     if (!quickAddSlot) return
     if (!quickAddReason.trim()) { showToast("Vui lòng nhập lý do nghỉ!", "error"); return }
 
-    const toVnDate = (s: string) => {
-      const p = s.split("-")
-      return `${p[2]}/${p[1]}/${p[0]}`
-    }
-
     if (quickAddScope === "date_range") {
       if (!quickAddStartDate || !quickAddEndDate) { showToast("Vui lòng chọn đầy đủ khoảng thời gian!", "error"); return }
-      if (quickAddStartDate > quickAddEndDate) { showToast("Ngày kết thúc không thể trước ngày bắt đầu!", "error"); return }
+      const startD = parseVnDate(quickAddStartDate)
+      const endD = parseVnDate(quickAddEndDate)
+      if (startD > endD) { showToast("Ngày kết thúc không thể trước ngày bắt đầu!", "error"); return }
     } else if (!quickAddStartDate) {
       showToast("Vui lòng chọn ngày nghỉ!", "error"); return
     }
@@ -947,7 +940,6 @@ export default function ApprovalManagement({
     const intern = emp ? isInternEmployee(emp) : false
     const category = "leave"
     const leaveType = intern ? "personal" : "annual"
-    const startVn = toVnDate(quickAddStartDate)
 
     let payload: Record<string, unknown>
     if (quickAddScope === "half_session") {
@@ -956,7 +948,7 @@ export default function ApprovalManagement({
         category,
         leaveType,
         scope: "half_session",
-        startDate: startVn,
+        startDate: quickAddStartDate,
         session: quickAddSession,
         reason: quickAddReason,
       }
@@ -966,7 +958,7 @@ export default function ApprovalManagement({
         category,
         leaveType,
         scope: "full_day",
-        startDate: startVn,
+        startDate: quickAddStartDate,
         reason: quickAddReason,
       }
     } else {
@@ -975,8 +967,8 @@ export default function ApprovalManagement({
         category,
         leaveType,
         scope: "date_range",
-        startDate: startVn,
-        endDate: toVnDate(quickAddEndDate),
+        startDate: quickAddStartDate,
+        endDate: quickAddEndDate,
         reason: quickAddReason,
       }
     }
@@ -1057,20 +1049,21 @@ export default function ApprovalManagement({
     })
   }, [weeksInMonth, gridWeekFilter])
 
-  const isoFromDayInfo = (day: number) => {
+  // Trả về VN format (DD/MM/YYYY) để khớp với CustomDatePicker
+  const vnDateFromDayInfo = (day: number) => {
     const dayInfo = DAYS.find(d => d.day === day)
     if (!dayInfo || dayInfo.dateObj.getTime() === 0) return ""
     const d = dayInfo.dateObj
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
   }
 
   const handleOpenQuickAdd = (s: { empId: string; empName: string; day: number; session: "sang" | "chieu" }) => {
-    const iso = isoFromDayInfo(s.day)
+    const vnDate = vnDateFromDayInfo(s.day)
     setQuickAddSlot(s)
     setQuickAddSession(s.session)
     setQuickAddScope("half_session")
-    setQuickAddStartDate(iso)
-    setQuickAddEndDate(iso)
+    setQuickAddStartDate(vnDate)
+    setQuickAddEndDate(vnDate)
     setQuickAddReason("")
   }
 
@@ -1086,11 +1079,11 @@ export default function ApprovalManagement({
       return `${quickAddSlot.empName} · ${dayLabel} · Buổi ${quickAddSession === "sang" ? "sáng" : "chiều"}`
     }
     if (quickAddScope === "full_day") {
-      const d = quickAddStartDate ? quickAddStartDate.split("-").reverse().join("/") : dayLabel
-      return `${quickAddSlot.empName} · Cả ngày · ${d}`
+      // quickAddStartDate đã là VN format DD/MM/YYYY
+      return `${quickAddSlot.empName} · Cả ngày · ${quickAddStartDate || dayLabel}`
     }
-    const from = quickAddStartDate ? quickAddStartDate.split("-").reverse().join("/") : "?"
-    const to = quickAddEndDate ? quickAddEndDate.split("-").reverse().join("/") : "?"
+    const from = quickAddStartDate || "?"
+    const to = quickAddEndDate || "?"
     return `${quickAddSlot.empName} · ${from} → ${to} (các ngày làm việc)`
   }
 
@@ -1098,7 +1091,11 @@ export default function ApprovalManagement({
     if (!quickAddReason.trim()) { showToast("Vui lòng nhập lý do nghỉ!", "error"); return }
     if (quickAddScope === "date_range") {
       if (!quickAddStartDate || !quickAddEndDate) { showToast("Vui lòng chọn đầy đủ khoảng thời gian!", "error"); return }
-      if (quickAddStartDate > quickAddEndDate) { showToast("Ngày kết thúc không thể trước ngày bắt đầu!", "error"); return }
+      try {
+        const startD = parseVnDate(quickAddStartDate)
+        const endD = parseVnDate(quickAddEndDate)
+        if (startD > endD) { showToast("Ngày kết thúc không thể trước ngày bắt đầu!", "error"); return }
+      } catch { showToast("Ngày không hợp lệ!", "error"); return }
     } else if (!quickAddStartDate) {
       showToast("Vui lòng chọn ngày nghỉ!", "error"); return
     }
@@ -1127,22 +1124,48 @@ export default function ApprovalManagement({
   }, [employees, selectedBranch, orgNodes])
 
   const empRows = useMemo(() => {
-    const parseVnDate = (s?: string) => {
+    const parseLocalVnDate = (s?: string) => {
       if (!s) return 0
       const p = s.split("/")
       return p.length === 3 ? new Date(+p[2], +p[1] - 1, +p[0]).getTime() : 0
     }
+    const weekStart = DAYS[0]?.dateObj?.getTime() || 0
+    const weekEnd = DAYS[4]?.dateObj?.getTime() || 0
+
     return employees
       .filter(e => {
         const matchSearch = e.name.toLowerCase().includes(searchEmp.toLowerCase()) ||
           (e.department ?? "").toLowerCase().includes(searchEmp.toLowerCase())
         const matchDept = deptFilter === "all" || e.department === deptFilter
         const matchBranch = selectedBranch === "all" || isEmployeeInBranch(e.id, selectedBranch)
-        return matchSearch && matchDept && matchBranch
+        if (!(matchSearch && matchDept && matchBranch)) return false
+
+        // Chỉ hiện NV đang active; tạm nghỉ / nghỉ việc chỉ hiện khi tuần đang xem còn có đơn của họ
+        if (e.status !== "active") {
+          const hasLeaveInView = requests.some(r => {
+            if (r.employeeId !== e.id) return false
+            try {
+              return expandRequestToSlots(r).some(({ date }) => {
+                const t = date.getTime()
+                if (weekStart && weekEnd) return t >= weekStart && t <= weekEnd
+                return `W${getISOWeek(date)}` === gridWeekFilter
+              })
+            } catch {
+              return false
+            }
+          })
+          if (hasLeaveInView) return true
+          if (e.resignDate) {
+            const resignTs = parseLocalVnDate(e.resignDate)
+            if (resignTs && weekStart && resignTs < weekStart) return false
+          }
+          return false
+        }
+        return true
       })
-      .sort((a, b) => parseVnDate(a.joinDate) - parseVnDate(b.joinDate))
-      .map(e => ({ empId: e.id, empName: e.name, empCode: e.id, department: e.department ?? "", position: e.position ?? "", empPhoto: e.photos?.[0] }))
-  }, [employees, searchEmp, deptFilter, selectedBranch, orgNodes])
+      .sort((a, b) => String(a.id).localeCompare(String(b.id), "vi", { numeric: true }))
+      .map(e => ({ empId: e.id, empName: e.name, empCode: e.id, department: e.department ?? "", position: e.position ?? "", empPhoto: e.avatar }))
+  }, [employees, searchEmp, deptFilter, selectedBranch, orgNodes, requests, DAYS, gridWeekFilter])
 
   const slotsLookup = useMemo(() => {
     const map = new Map<string, TimeOffSlot>()
@@ -1253,17 +1276,6 @@ export default function ApprovalManagement({
 
   return (
     <div className="space-y-4 pb-24">
-      {toastMessage && createPortal(
-        <div className={`fixed bottom-6 right-6 px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 z-[9999] border backdrop-blur-sm animate-in slide-in-from-right duration-300
-          ${toastType === "success"
-            ? "bg-gray-900/95 text-white border-white/10"
-            : "bg-red-900/95 text-white border-red-500/20"}`}>
-          <div className={`w-2.5 h-2.5 rounded-full ${toastType === "success" ? "bg-emerald-400" : "bg-red-400"} animate-pulse`} />
-          <span className="text-sm font-semibold">{toastMessage}</span>
-        </div>,
-        document.body
-      )}
-
       <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
         <div className="flex items-center">
           <div className="flex gap-1.5 items-center mr-4 shrink-0">
@@ -1760,7 +1772,7 @@ export default function ApprovalManagement({
                   <tr key={req.id} className="hover:bg-gray-50/30 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        <AvatarCircle name={req.employeeName ?? req.employeeId} photo={employees.find(e => e.id === req.employeeId)?.photos?.[0]} size="sm" />
+                        <AvatarCircle name={req.employeeName ?? req.employeeId} photo={employees.find(e => e.id === req.employeeId)?.avatar} size="sm" />
                         <span className="font-bold text-gray-900 text-sm">{req.employeeName ?? "—"}</span>
                       </div>
                     </td>
@@ -1991,7 +2003,7 @@ export default function ApprovalManagement({
       )}
 
       {confirmAction && createPortal(
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setConfirmAction(null)}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[200] p-4" onClick={() => setConfirmAction(null)}>
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className={`px-6 pt-6 pb-4 flex gap-4 items-start`}>
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${confirmAction.variant === "approve" ? "bg-emerald-50" : "bg-red-50"}`}>
@@ -2104,7 +2116,7 @@ export default function ApprovalManagement({
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <div className="flex items-center gap-3">
-                  {emp && <AvatarCircle name={emp.empName} photo={empData?.photos?.[0]} size="md" />}
+                  {emp && <AvatarCircle name={emp.empName} photo={empData?.avatar} size="md" />}
                   <div>
                     <p className="font-black text-gray-800 text-sm">{emp?.empName ?? "—"}</p>
                     <p className="text-xs text-gray-400">{emp?.department} · <span className="font-mono">{emp?.empCode}</span></p>
@@ -2276,23 +2288,29 @@ export default function ApprovalManagement({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Từ ngày</label>
-                    <input type="date" value={quickAddStartDate} onChange={e => setQuickAddStartDate(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] transition-colors" />
+                    <CustomDatePicker
+                      value={quickAddStartDate}
+                      onChange={v => setQuickAddStartDate(v)}
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Đến ngày</label>
-                    <input type="date" value={quickAddEndDate} onChange={e => setQuickAddEndDate(e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] transition-colors" />
+                    <CustomDatePicker
+                      value={quickAddEndDate}
+                      onChange={v => setQuickAddEndDate(v)}
+                    />
                   </div>
                 </div>
               ) : (
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5">Ngày nghỉ</label>
-                  <input type="date" value={quickAddStartDate} onChange={e => {
-                    setQuickAddStartDate(e.target.value)
-                    setQuickAddEndDate(e.target.value)
-                  }}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828] transition-colors" />
+                  <CustomDatePicker
+                    value={quickAddStartDate}
+                    onChange={v => {
+                      setQuickAddStartDate(v)
+                      setQuickAddEndDate(v)
+                    }}
+                  />
                 </div>
               )}
 
@@ -2422,7 +2440,7 @@ export default function ApprovalManagement({
               ) : (
               <div className="bg-gray-50 rounded-2xl p-5 space-y-3.5 border border-gray-100">
                 <div className="flex items-start gap-3">
-                  <AvatarCircle name={selectedRequest.employeeName ?? selectedRequest.employeeId} photo={employees.find(e => e.id === selectedRequest.employeeId)?.photos?.[0]} size="md" />
+                  <AvatarCircle name={selectedRequest.employeeName ?? selectedRequest.employeeId} photo={employees.find(e => e.id === selectedRequest.employeeId)?.avatar} size="md" />
                   <div>
                     <p className="font-black text-gray-800 text-sm">{selectedRequest.employeeName ?? "—"}</p>
                     <p className="text-xs text-gray-400">{selectedRequest.department}</p>

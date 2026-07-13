@@ -5,7 +5,7 @@ import { authenticate } from "../middlewares/auth.js"
 import { decodeUploadFilename } from "../utils/uploadFilename.util.js"
 
 const router = Router()
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
+const upload = multer({ storage: multer.memoryStorage() })
 
 function getMimeType(key) {
   const ext = String(key).split(".").pop()?.toLowerCase()
@@ -65,6 +65,20 @@ router.get("/download", async (req, res, next) => {
     
     res.setHeader("Content-Type", getMimeType(key))
     res.send(buffer)
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post("/delete", authenticate, async (req, res, next) => {
+  try {
+    const { key } = req.body
+    if (!key) {
+      return res.status(400).json({ success: false, error: "Thiếu tham số key" })
+    }
+    const storage = getFileStorage()
+    await storage.remove(key)
+    res.json({ success: true, message: "Xóa file thành công" })
   } catch (err) {
     next(err)
   }

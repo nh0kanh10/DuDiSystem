@@ -181,10 +181,25 @@ export default function OrgDetailView({
   const activeAsgn = useMemo(() => assignments.filter(isActiveAssignment), [assignments])
 
   const officialEmps = useMemo(() => employees.filter(emp => {
-    const isUnder = emp.orgNodeId && descIds.includes(emp.orgNodeId)
-    const isTempOut = activeAsgn.some(a => a.employeeId === emp.id && a.type === "temporary")
+    const assignedNodeIds = [
+      emp.orgNodeId,
+      ...activeAsgn.filter(a => a.employeeId === emp.id).map(a => a.nodeId),
+    ].filter(Boolean) as string[]
+    const isUnder = assignedNodeIds.some(id => descIds.includes(id))
+    const isTempOut = activeAsgn.some(a =>
+      a.employeeId === emp.id && a.type === "temporary" && !descIds.includes(a.nodeId ?? "")
+    )
     return isUnder && !isTempOut
   }), [employees, descIds, activeAsgn])
+
+  /** Nhân sự gắn thẳng đơn vị hiện tại, chưa nằm dưới đơn vị con */
+  const directOnlyEmps = useMemo(() => employees.filter(emp => {
+    const assignedNodeIds = [
+      emp.orgNodeId,
+      ...activeAsgn.filter(a => a.employeeId === emp.id && a.type !== "temporary").map(a => a.nodeId),
+    ].filter(Boolean) as string[]
+    return assignedNodeIds.includes(node.id)
+  }), [employees, activeAsgn, node.id])
 
   const tempInEmps = useMemo(() => employees.filter(emp => {
     const a = activeAsgn.find(a => a.employeeId === emp.id && a.type === "temporary")
@@ -255,7 +270,13 @@ export default function OrgDetailView({
             const ct = THEME[child.type]
             const childMgr = employees.find(e => e.id === child.managerId)
             const childDescIds = collectDescendantIds(child.id, orgNodes)
-            const empCount = employees.filter(e => e.orgNodeId && childDescIds.includes(e.orgNodeId)).length
+            const empCount = employees.filter(e => {
+              const ids = [
+                e.orgNodeId,
+                ...assignments.filter(a => a.employeeId === e.id && a.status === "active").map(a => a.nodeId),
+              ].filter(Boolean) as string[]
+              return ids.some(id => childDescIds.includes(id))
+            }).length
             const subCount = orgNodes.filter(n => n.parentId === child.id).length
             return (
               <div key={child.id} onClick={() => onSelectNode(child.id)}
@@ -294,12 +315,25 @@ export default function OrgDetailView({
 
     if (node.type === "department") {
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-4">
+          {directOnlyEmps.length > 0 && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+              <span className="font-bold">{directOnlyEmps.length} nhân sự</span> đang gắn trực tiếp phòng ban, chưa phân về bộ phận.
+              {" "}Mở tab <span className="font-bold">Nhân sự</span> để xem danh sách, hoặc gán họ xuống bộ phận/vị trí tương ứng.
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {childNodes.map(child => {
             const ct = THEME[child.type]
             const childMgr = employees.find(e => e.id === child.managerId)
             const childDescIds = collectDescendantIds(child.id, orgNodes)
-            const empCount = employees.filter(e => e.orgNodeId && childDescIds.includes(e.orgNodeId)).length
+            const empCount = employees.filter(e => {
+              const ids = [
+                e.orgNodeId,
+                ...assignments.filter(a => a.employeeId === e.id && a.status === "active").map(a => a.nodeId),
+              ].filter(Boolean) as string[]
+              return ids.some(id => childDescIds.includes(id))
+            }).length
             const posCount = orgNodes.filter(n => n.parentId === child.id && n.type === "position").length
             return (
               <div key={child.id} onClick={() => onSelectNode(child.id)}
@@ -322,6 +356,7 @@ export default function OrgDetailView({
               </div>
             )
           })}
+          </div>
         </div>
       )
     }
@@ -420,17 +455,25 @@ export default function OrgDetailView({
   const EmpAvatar = ({ emp, size = "sm" }: { emp: Employee; size?: "sm" | "md" | "lg" }) => {
     const szMap = { sm: "w-7 h-7 rounded-lg text-[10px]", md: "w-10 h-10 rounded-xl text-xs", lg: "w-16 h-16 rounded-2xl text-xl" }
     const s = szMap[size]
-    return emp.photos?.[0]
-      ? <img src={emp.photos[0]} alt={emp.name} className={`${s} object-cover flex-shrink-0`} />
+    const avatarUrl = emp.avatar
+    return avatarUrl
+      ? <img src={avatarUrl} alt={emp.name} className={`${s} object-cover flex-shrink-0`} />
       : <div className={`${s} bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white font-bold flex-shrink-0`}>{initials(emp.name)}</div>
   }
 
   const renderPersonnel = () => (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <p className="font-bold text-gray-700 text-sm">
-          Nhân sự trực thuộc ({officialEmps.length})
-        </p>
+        <div>
+          <p className="font-bold text-gray-700 text-sm">
+            Nhân sự thuộc đơn vị ({officialEmps.length})
+          </p>
+          {directOnlyEmps.length > 0 && childNodes.length > 0 && (
+            <p className="text-[11px] text-amber-700 mt-1">
+              Trong đó {directOnlyEmps.length} người gắn trực tiếp đơn vị này, chưa phân về đơn vị con.
+            </p>
+          )}
+        </div>
         <button onClick={() => setIsAssignOpen(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
           <UserPlus size={12} /> Gán nhân sự
@@ -449,13 +492,16 @@ export default function OrgDetailView({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {officialEmps.map(emp => (
+              {[...officialEmps].sort((a, b) => String(a.id).localeCompare(String(b.id), "vi", { numeric: true })).map(emp => (
                 <tr key={emp.id} className="hover:bg-gray-50/60 transition-colors">
                   <td className="px-4 py-3 font-mono text-gray-400">{emp.id}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <EmpAvatar emp={emp} size="sm" />
                       <span className="font-semibold text-gray-700">{emp.name}</span>
+                      {emp.orgNodeId === node.id && childNodes.length > 0 && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">Trực tiếp</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-500">{emp.position}</td>
@@ -549,10 +595,14 @@ export default function OrgDetailView({
   const renderManager = () => (
     manager ? (
       <div className="flex items-start gap-5 p-1">
-        {manager.photos?.[0]
-          ? <img src={manager.photos[0]} alt={manager.name} className="w-20 h-20 rounded-2xl object-cover flex-shrink-0" />
-          : <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">{initials(manager.name)}</div>
-        }
+        {(() => {
+          const mAvatar = manager.avatar
+          return mAvatar ? (
+            <img src={mAvatar} alt={manager.name} className="w-20 h-20 rounded-2xl object-cover flex-shrink-0" />
+          ) : (
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white font-bold text-2xl flex-shrink-0">{initials(manager.name)}</div>
+          )
+        })()}
         <div>
           <div className="flex items-center gap-2.5 mb-1">
             <h4 className="font-black text-gray-800 text-lg">{manager.name}</h4>

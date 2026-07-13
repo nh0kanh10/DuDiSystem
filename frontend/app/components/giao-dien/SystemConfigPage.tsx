@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { Settings, Clock, ShieldAlert, Check, RefreshCw, Users, Layers, X, Edit, Lock, User, Save, Building } from "lucide-react"
 import { createPortal } from "react-dom"
+import { useToast } from "@/app/hooks/useToast"
 import { api } from "@/lib/api"
 
 import { CustomTimePicker } from "../ui/CustomTimePicker"
@@ -33,7 +34,7 @@ export function SystemConfigPage() {
   const [editPassword, setEditPassword] = useState("")
   const [editError, setEditError] = useState<string | null>(null)
   const [isSavingAdmin, setIsSavingAdmin] = useState(false)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const { showToast } = useToast()
 
   const loadAdminUsers = async () => {
     setIsLoadingAdmins(true)
@@ -71,11 +72,10 @@ export function SystemConfigPage() {
       await api.users.updateAdmin(editingAdmin.id, {
         newPassword: editPassword
       })
-      setToastMessage("Cập nhật mật khẩu tài khoản quản trị thành công!")
+      showToast("Cập nhật mật khẩu tài khoản quản trị thành công!")
       setEditingAdmin(null)
       loadAdminUsers()
       window.dispatchEvent(new CustomEvent("dudi_permissions_updated"))
-      setTimeout(() => setToastMessage(null), 3000)
     } catch (err: any) {
       setEditError(err.message || "Đã xảy ra lỗi khi cập nhật")
     } finally {
@@ -515,14 +515,6 @@ export function SystemConfigPage() {
             </div>
           </div>
         </>,
-        document.body
-      )}
-
-      {toastMessage && createPortal(
-        <div className="fixed bottom-6 right-6 z-[9999] bg-emerald-600 text-white px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 font-bold text-xs animate-in slide-in-from-bottom-5 duration-300">
-          <Check size={16} />
-          <span>{toastMessage}</span>
-        </div>,
         document.body
       )}
     </div>
