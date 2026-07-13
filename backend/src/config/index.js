@@ -4,7 +4,12 @@ import { fileURLToPath } from "url"
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const BACKEND_ROOT = path.resolve(__dirname, "../..")
 
-const DEFAULT_ORIGINS = ["http://localhost:5173", "http://localhost:3000"]
+const DEFAULT_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://dudicompany.vercel.app",
+  "https://dudisystem.vercel.app"
+]
 
 function parseCorsOrigins() {
   const fromEnv = process.env.CORS_ORIGIN

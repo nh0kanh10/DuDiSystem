@@ -33,10 +33,10 @@ export function refreshSession(decoded) {
 export async function login(loginKey, password) {
   let user = getByEmployeeId(loginKey)
   if (!user) user = getByEmail(loginKey)
-  if (!user) return { error: "Mã đăng nhập hoặc mật khẩu không đúng", status: 401 }
+  if (!user) return { error: "Không tìm thấy người dùng", status: 401 }
 
   const valid = await bcrypt.compare(password, user.password)
-  if (!valid) return { error: "Mã đăng nhập hoặc mật khẩu không đúng", status: 401 }
+  if (!valid) return { error: "Mật khẩu không đúng", status: 401 }
 
   if (user.status !== "active") {
     const errorMsg = user.lockReason ? `Tài khoản đã bị khóa do: ${user.lockReason}` : "Tài khoản đã bị vô hiệu hóa"
