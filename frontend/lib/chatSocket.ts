@@ -45,7 +45,6 @@ function createSocket(t: string) {
   return socket
 }
 
-/** Force disconnect regardless of refCount — call on logout or token identity change. */
 export function resetChatSocket() {
   refCount = 0
   destroySocket()

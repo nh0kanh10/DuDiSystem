@@ -217,15 +217,15 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#241416]">Không gian làm việc</h1>
-          <p className="text-sm text-[#7f5f63] mt-0.5">Xem và cập nhật tiến độ xử lý data được giao</p>
+          <h1 className="text-2xl font-extrabold text-[#241416] dark:text-[#FFE8EC]">Không gian làm việc</h1>
+          <p className="text-sm text-[#7f5f63] dark:text-white/40 mt-0.5">Xem và cập nhật tiến độ xử lý data được giao</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={handleExportExcel} className="flex items-center gap-1.5 px-3 py-2.5 bg-white border border-[#efd7da] text-xs font-bold text-[#7a1d22] rounded-xl hover:bg-[#fff1f2] transition active:scale-95 shadow-sm">
+          <button onClick={handleExportExcel} className="flex items-center gap-1.5 px-3 py-2.5 bg-white dark:bg-white/[0.03] border border-[#efd7da] dark:border-white/5 text-xs font-bold text-[#7a1d22] dark:text-[#FFE8EC] rounded-xl hover:bg-[#fff1f2] dark:hover:bg-white/10 transition active:scale-95 shadow-sm">
             <Download size={15} /> Xuất Excel
           </button>
-          <button onClick={refresh} className="p-2.5 bg-white border border-[#efd7da] rounded-xl hover:bg-[#fff1f2] transition active:scale-95 shadow-sm">
-            <RefreshCw size={16} className="text-[#7a1d22]" />
+          <button onClick={refresh} className="p-2.5 bg-white dark:bg-white/[0.03] border border-[#efd7da] dark:border-white/5 rounded-xl hover:bg-[#fff1f2] dark:hover:bg-white/10 transition active:scale-95 shadow-sm">
+            <RefreshCw size={16} className="text-[#7a1d22] dark:text-[#FFE8EC]" />
           </button>
         </div>
       </div>
@@ -233,42 +233,42 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-3xl p-5 border border-[#efd7da] shadow-sm flex items-center justify-between">
+          <div className="bg-white dark:bg-white/[0.03] backdrop-blur rounded-3xl p-5 border border-[#efd7da] dark:border-white/5 shadow-sm dark:shadow-inner flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black text-[#8b6b70] uppercase tracking-wider mb-1">Được giao</p>
-              <h4 className="text-2xl font-black text-[#241416]">{stats.totalAssigned}</h4>
+              <p className="text-[10px] font-black text-[#8b6b70] dark:text-white/40 uppercase tracking-wider mb-1">Được giao</p>
+              <h4 className="text-2xl font-black text-[#241416] dark:text-white">{stats.totalAssigned}</h4>
             </div>
-            <div className="w-11 h-11 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center flex-shrink-0">
               <Briefcase size={20} className="text-blue-400" />
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-5 border border-[#efd7da] shadow-sm flex items-center justify-between">
+          <div className="bg-white dark:bg-white/[0.03] backdrop-blur rounded-3xl p-5 border border-[#efd7da] dark:border-white/5 shadow-sm dark:shadow-inner flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black text-[#8b6b70] uppercase tracking-wider mb-1">Chưa xử lý</p>
-              <h4 className="text-2xl font-black text-[#241416]">{stats.untreatedCount}</h4>
+              <p className="text-[10px] font-black text-[#8b6b70] dark:text-white/40 uppercase tracking-wider mb-1">Chưa xử lý</p>
+              <h4 className="text-2xl font-black text-[#241416] dark:text-white">{stats.untreatedCount}</h4>
             </div>
-            <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
               <Clock size={20} className="text-slate-500" />
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-5 border border-[#efd7da] shadow-sm flex items-center justify-between">
+          <div className="bg-white dark:bg-white/[0.03] backdrop-blur rounded-3xl p-5 border border-[#efd7da] dark:border-white/5 shadow-sm dark:shadow-inner flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black text-[#8b6b70] uppercase tracking-wider mb-1">Đã gửi</p>
-              <h4 className="text-2xl font-black text-[#241416]">{stats.processingCount}</h4>
+              <p className="text-[10px] font-black text-[#8b6b70] dark:text-white/40 uppercase tracking-wider mb-1">Đã gửi</p>
+              <h4 className="text-2xl font-black text-[#241416] dark:text-white">{stats.processingCount}</h4>
             </div>
-            <div className="w-11 h-11 rounded-2xl bg-red-50 flex items-center justify-center flex-shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-red-50 dark:bg-red-500/10 flex items-center justify-center flex-shrink-0">
               <Activity size={20} className="text-[#E8231A]" />
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-5 border border-[#efd7da] shadow-sm flex items-center justify-between">
+          <div className="bg-white dark:bg-white/[0.03] backdrop-blur rounded-3xl p-5 border border-[#efd7da] dark:border-white/5 shadow-sm dark:shadow-inner flex items-center justify-between">
             <div>
-              <p className="text-[10px] font-black text-[#8b6b70] uppercase tracking-wider mb-1">Trả lời</p>
-              <h4 className="text-2xl font-black text-[#241416]">{stats.completedCount}</h4>
+              <p className="text-[10px] font-black text-[#8b6b70] dark:text-white/40 uppercase tracking-wider mb-1">Trả lời</p>
+              <h4 className="text-2xl font-black text-[#241416] dark:text-white">{stats.completedCount}</h4>
             </div>
-            <div className="w-11 h-11 rounded-2xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
               <CheckCircle size={20} className="text-emerald-500" />
             </div>
           </div>
@@ -277,17 +277,17 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
 
       {/* Progress detail */}
       {stats?.statusCounts && (
-        <div className="bg-white p-5 rounded-3xl border border-[#efd7da] shadow-sm">
-          <p className="text-xs font-black text-[#8b6b70] uppercase tracking-wider mb-4">Tiến độ chi tiết</p>
+        <div className="bg-white dark:bg-white/[0.03] backdrop-blur p-5 rounded-3xl border border-[#efd7da] dark:border-white/5 shadow-sm">
+          <p className="text-xs font-black text-[#8b6b70] dark:text-white/40 uppercase tracking-wider mb-4">Tiến độ chi tiết</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {Object.entries(stats.statusCounts as Record<string, number>).map(([s, count]) => {
               const pct = stats.totalAssigned > 0 ? +((count / stats.totalAssigned) * 100).toFixed(1) : 0
               return (
                 <div key={s}>
-                  <div className="flex justify-between text-xs font-semibold text-[#5f4246] mb-1.5">
+                  <div className="flex justify-between text-xs font-semibold text-[#5f4246] dark:text-gray-300 mb-1.5">
                     <span>{s}</span><span>{count} ({pct}%)</span>
                   </div>
-                  <div className="w-full bg-[#f3eeee] h-1.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-[#f3eeee] dark:bg-white/10 h-1.5 rounded-full overflow-hidden">
                     <div className={`h-full rounded-full ${s === "Chưa xử lý" ? "bg-slate-400" : s === "Chặn người lạ" ? "bg-amber-400" : s === "Đã gửi tin nhắn" ? "bg-blue-400" : s === "Không có Zalo" ? "bg-red-500" : "bg-emerald-500"}`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
@@ -298,11 +298,11 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
       )}
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-2xl border border-[#efd7da] shadow-sm flex flex-col sm:flex-row gap-3">
+      <div className="bg-white dark:bg-white/[0.03] backdrop-blur p-4 rounded-2xl border border-[#efd7da] dark:border-white/5 shadow-sm flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8b6b70]" />
           <input type="text" placeholder="Tìm tên doanh nghiệp, địa chỉ, SĐT..." value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-[#efd7da] rounded-xl bg-[#fffafa] text-sm text-[#241416] placeholder-[#9a7a7f] focus:outline-none focus:border-[#E8231A]/50 focus:ring-1 focus:ring-[#E8231A]/20 transition" />
+            className="w-full pl-10 pr-4 py-2.5 border border-[#efd7da] dark:border-white/10 rounded-xl bg-[#fffafa] dark:bg-white/[0.03] text-sm text-[#241416] dark:text-white placeholder-[#9a7a7f] dark:placeholder:text-white/30 focus:outline-none focus:border-[#E8231A]/50 focus:ring-1 focus:ring-[#E8231A]/20 transition" />
         </div>
         <CustomSelect
           value={statusFilter}
@@ -327,7 +327,7 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-3xl border border-[#efd7da] shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-white/[0.03] backdrop-blur rounded-3xl border border-[#efd7da] dark:border-white/5 shadow-sm overflow-hidden">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-[#7f5f63]">
             <Loader2 size={28} className="animate-spin text-[#E8231A] mb-3" />
@@ -342,28 +342,28 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
           <div className="overflow-x-auto">
             <table className="w-full min-w-[960px] text-left text-xs">
               <thead>
-                <tr className="bg-[#fff1f2] border-b border-[#efd7da]">
+                <tr className="bg-[#fff1f2] dark:bg-white/5 border-b border-[#efd7da] dark:border-white/5">
                   {["ID", "Tên doanh nghiệp","Loại hình","Địa chỉ","Khu vực","SĐT","Website","Maps","Trạng thái","Lead","Ghi chú"].map(h => (
-                    <th key={h} className="py-3 px-3 text-[10px] font-bold text-[#8b6b70] uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    <th key={h} className="py-3 px-3 text-[10px] font-bold text-[#8b6b70] dark:text-white/50 uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#f0dadd]">
+              <tbody className="divide-y divide-[#f0dadd] dark:divide-white/5">
                 {records.map(r => (
-                  <tr key={r.id} className="hover:bg-[#fffafa] transition">
-                    <td className="py-2.5 px-3 font-mono text-[10px] text-[#8b6b70] font-bold whitespace-nowrap">{(r.id || "").replace("crm-", "")}</td>
-                    <td className="py-2.5 px-3 font-bold text-[#241416] max-w-[160px] break-words">{r.businessName}</td>
-                    <td className="py-2.5 px-3"><span className="px-1.5 py-0.5 bg-[#fff1f2] text-[#7a1d22] rounded text-[10px] font-semibold border border-[#efd7da]">{r.businessType || "—"}</span></td>
-                    <td className="py-2.5 px-3 text-[#5f4246] max-w-[180px] break-words">{r.address}</td>
-                    <td className="py-2.5 px-3 text-[#6f565a]">{r.area}</td>
+                  <tr key={r.id} className="hover:bg-[#fffafa] dark:hover:bg-white/5 transition">
+                    <td className="py-2.5 px-3 font-mono text-[10px] text-[#8b6b70] dark:text-white/50 font-bold whitespace-nowrap">{(r.id || "").replace("crm-", "")}</td>
+                    <td className="py-2.5 px-3 font-bold text-[#241416] dark:text-white max-w-[160px] break-words">{r.businessName}</td>
+                    <td className="py-2.5 px-3"><span className="px-1.5 py-0.5 bg-[#fff1f2] dark:bg-white/5 text-[#7a1d22] dark:text-white rounded text-[10px] font-semibold border border-[#efd7da] dark:border-white/10">{r.businessType || "—"}</span></td>
+                    <td className="py-2.5 px-3 text-[#5f4246] dark:text-gray-200 max-w-[180px] break-words">{r.address}</td>
+                    <td className="py-2.5 px-3 text-[#6f565a] dark:text-gray-300">{r.area}</td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <div className="flex items-center gap-1">
-                        <a href={`tel:${r.phone}`} className="text-[#241416] font-bold hover:text-[#E8231A] flex items-center"><Phone size={11} className="mr-1 text-[#8b6b70]" />{r.phone}</a>
-                        <button onClick={() => navigator.clipboard.writeText(r.phone).then(() => notify("Đã copy SĐT!"))} className="p-0.5 text-[#8b6b70] hover:text-[#E8231A] rounded hover:bg-[#fff1f2] transition"><Copy size={11}/></button>
+                        <a href={`tel:${r.phone}`} className="text-[#241416] dark:text-[#FFE8EC] font-bold hover:text-[#E8231A] flex items-center"><Phone size={11} className="mr-1 text-[#8b6b70] dark:text-white/40" />{r.phone}</a>
+                        <button onClick={() => navigator.clipboard.writeText(r.phone).then(() => notify("Đã copy SĐT!"))} className="p-0.5 text-[#8b6b70] dark:text-white/40 hover:text-[#E8231A] rounded hover:bg-[#fff1f2] dark:hover:bg-white/5 transition"><Copy size={11}/></button>
                       </div>
                     </td>
-                    <td className="py-2.5 px-3 whitespace-nowrap">{r.website ? <a href={r.website} target="_blank" rel="noreferrer" className="inline-flex items-center text-[#E8231A] hover:text-[#B91C1C] font-semibold"><Globe size={11} className="mr-1" />Web</a> : <span className="text-[#b59da1] italic">—</span>}</td>
-                    <td className="py-2.5 px-3 whitespace-nowrap">{r.googleMapUrl ? <a href={r.googleMapUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-[#E8231A] hover:text-[#B91C1C] font-semibold"><MapPin size={11} className="mr-1" />Maps</a> : <span className="text-[#b59da1] italic">—</span>}</td>
+                    <td className="py-2.5 px-3 whitespace-nowrap">{r.website ? <a href={r.website} target="_blank" rel="noreferrer" className="inline-flex items-center text-[#E8231A] hover:text-[#B91C1C] font-semibold"><Globe size={11} className="mr-1" />Web</a> : <span className="text-[#b59da1] italic dark:text-white/30">—</span>}</td>
+                    <td className="py-2.5 px-3 whitespace-nowrap">{r.googleMapUrl ? <a href={r.googleMapUrl} target="_blank" rel="noreferrer" className="inline-flex items-center text-[#E8231A] hover:text-[#B91C1C] font-semibold"><MapPin size={11} className="mr-1" />Maps</a> : <span className="text-[#b59da1] italic dark:text-white/30">—</span>}</td>
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <CustomSelect
                         value={r.status ?? "Chưa xử lý"}
@@ -393,9 +393,9 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
                         ? <input autoFocus type="text" value={tempNote} onChange={e => setTempNote(e.target.value)}
                             onBlur={() => handleSaveNote(r.id)}
                             onKeyDown={e => { if (e.key === "Enter") handleSaveNote(r.id); if (e.key === "Escape") setEditingNoteId(null) }}
-                            className="w-full min-w-[90px] px-1.5 py-0.5 bg-white text-[#241416] border border-[#efd7da] rounded text-xs focus:outline-none focus:border-[#E8231A]/50" />
-                        : <div onClick={() => { setEditingNoteId(r.id); setTempNote(r.note ?? "") }} className="cursor-pointer hover:bg-[#fff1f2] px-1 py-0.5 rounded min-h-[18px] min-w-[80px] max-w-[140px] break-words text-[#6f565a] font-medium">
-                            {r.note || <span className="text-[#b59da1] italic text-[10px]">Thêm ghi chú...</span>}
+                            className="w-full min-w-[90px] px-1.5 py-0.5 bg-white dark:bg-[#1C1C21] text-[#241416] dark:text-white border border-[#efd7da] dark:border-white/10 rounded text-xs focus:outline-none focus:border-[#E8231A]/50" />
+                        : <div onClick={() => { setEditingNoteId(r.id); setTempNote(r.note ?? "") }} className="cursor-pointer hover:bg-[#fff1f2] dark:hover:bg-white/5 px-1 py-0.5 rounded min-h-[18px] min-w-[80px] max-w-[140px] break-words text-[#6f565a] dark:text-gray-300 font-medium">
+                            {r.note || <span className="text-[#b59da1] italic text-[10px] dark:text-white/30">Thêm ghi chú...</span>}
                           </div>}
                     </td>
                   </tr>
@@ -405,8 +405,8 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
           </div>
         )}
         {!loading && records.length > 0 && (
-          <div className="px-6 py-3 border-t border-[#efd7da] bg-[#fffafa] flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#8b6b70]">Hiển thị <strong className="text-[#241416]">{records.length}</strong> / {total} data được giao</span>
+          <div className="px-6 py-3 border-t border-[#efd7da] dark:border-white/5 bg-[#fffafa] dark:bg-white/5 flex items-center justify-between">
+            <span className="text-xs font-semibold text-[#8b6b70] dark:text-white/40">Hiển thị <strong className="text-[#241416] dark:text-white">{records.length}</strong> / {total} data được giao</span>
             {total > records.length && <button onClick={() => setPageSize("all")} className="text-xs font-bold text-[#E8231A] hover:underline">Xem tất cả {total} →</button>}
           </div>
         )}

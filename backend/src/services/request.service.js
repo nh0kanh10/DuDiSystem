@@ -164,11 +164,11 @@ export function getRequest(id) {
   return withEmployee(req)
 }
 
-export function createRequest(data) {
+export function createRequest(data, options = {}) {
   const emp = empRepo.getById(data.employeeId)
   if (!emp) return { error: "Không tìm thấy nhân viên", status: 400 }
 
-  const err = validateCreateData(data)
+  const err = validateCreateData(data, { skipPastDate: options.isAdmin === true })
   if (err) return { error: err, status: 400 }
 
   const normalized = normalizeCreateData(data)

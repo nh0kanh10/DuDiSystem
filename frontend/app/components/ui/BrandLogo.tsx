@@ -32,7 +32,7 @@ export function BrandLogo({
     <div className={`flex items-center gap-3 ${className}`}>
       <img
         src={logoSrc}
-        alt="DUDI Software"
+        alt="DUDI Company"
         width={size}
         height={size}
         className={`flex-shrink-0 ${imageClassName}`}
@@ -41,7 +41,7 @@ export function BrandLogo({
       {withText && !collapsed && (
         <div>
           <div className={titleClass}>DUDI</div>
-          <div className={subtitleClass}>software</div>
+          <div className={subtitleClass}>company</div>
         </div>
       )}
     </div>

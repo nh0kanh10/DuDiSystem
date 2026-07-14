@@ -246,8 +246,8 @@ export function createLeaveForm(emp: Pick<Employee, "contractType">): LeaveFormS
   }
 }
 
-export function validateLeaveForm(form: LeaveFormState): string | null {
-  const isBackdatingAllowed = form.leaveType === "sick"
+export function validateLeaveForm(form: LeaveFormState, isAdmin: boolean = false): string | null {
+  const isBackdatingAllowed = form.leaveType === "sick" || isAdmin
 
   if (!form.reason.trim()) return "Vui lòng nhập lý do"
 

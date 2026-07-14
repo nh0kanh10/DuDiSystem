@@ -4,6 +4,41 @@ import * as readRepo from "../repositories/chatReadState.repository.js"
 import * as presenceRepo from "../repositories/chatPresence.repository.js"
 import * as empRepo from "../repositories/employee.repository.js"
 import { isAdminUser } from "../utils/access.js"
+import crypto from "crypto"
+
+const ALGORITHM = "aes-256-cbc"
+const ENCRYPTION_KEY = process.env.CHAT_ENCRYPTION_KEY || "dudi_system_chat_secret_key_32b"
+const IV_LENGTH = 16
+
+function encryptText(text) {
+  if (!text) return ""
+  try {
+    const iv = crypto.randomBytes(IV_LENGTH)
+    const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY), iv)
+    let encrypted = cipher.update(text, "utf8")
+    encrypted = Buffer.concat([encrypted, cipher.final()])
+    return iv.toString("hex") + ":" + encrypted.toString("hex")
+  } catch (err) {
+    console.error("Encryption error:", err)
+    return text
+  }
+}
+
+function decryptText(text) {
+  if (!text) return ""
+  try {
+    const textParts = text.split(":")
+    if (textParts.length < 2) return text
+    const iv = Buffer.from(textParts.shift(), "hex")
+    const encryptedText = Buffer.from(textParts.join(":"), "hex")
+    const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY), iv)
+    let decrypted = decipher.update(encryptedText)
+    decrypted = Buffer.concat([decrypted, decipher.final()])
+    return decrypted.toString("utf8")
+  } catch (err) {
+    return text
+  }
+}
 
 export const MAX_MESSAGE_LENGTH = 2000
 export const ONLINE_THRESHOLD_MS = 60_000
@@ -151,7 +186,7 @@ function enrichConversation(conversation, user) {
     id: conversation.id,
     peerId,
     peer: peerSummary(peer, isOnline(presence)),
-    lastMessage: conversation.lastMessage ?? "",
+    lastMessage: decryptText(conversation.lastMessage ?? ""),
     lastMessageAt: conversation.lastMessageAt ?? null,
     lastSenderId: conversation.lastSenderId ?? null,
     unreadCount,
@@ -232,7 +267,7 @@ function formatMessage(message, myId) {
     conversationId: message.conversationId,
     senderId: message.senderId,
     from: message.senderId === myId ? "me" : "them",
-    body: message.body,
+    body: decryptText(message.body),
     type: message.type ?? "text",
     createdAt: message.createdAt,
   }
@@ -259,18 +294,19 @@ export function sendMessage(user, peerId, body) {
 
   const conversation = getOrCreateConversation(user.employeeId, peerId)
   const now = new Date().toISOString()
+  const encryptedText = encryptText(text)
 
   const message = msgRepo.create({
     id: nextId("MSG"),
     conversationId: conversation.id,
     senderId: user.employeeId,
-    body: text,
+    body: encryptedText,
     type: "text",
     createdAt: now,
   })
 
   convRepo.update(conversation.id, {
-    lastMessage: text,
+    lastMessage: encryptedText,
     lastMessageAt: now,
     lastSenderId: user.employeeId,
     updatedAt: now,
@@ -279,7 +315,7 @@ export function sendMessage(user, peerId, body) {
   return {
     conversationId: conversation.id,
     message: formatMessage(message, user.employeeId),
-    rawMessage: message,
+    rawMessage: { ...message, body: text },
     peerId,
   }
 }
@@ -356,7 +392,7 @@ export function getRoster(user, query = "", options = {}) {
       photos: emp.photos ?? [],
       online: isOnline(presenceMap.get(emp.id)),
       unread,
-      lastMessage: conv?.lastMessage ?? "",
+      lastMessage: decryptText(conv?.lastMessage ?? ""),
       lastMessageAt: conv?.lastMessageAt ?? null,
       conversationId: conv?.id ?? null,
     }

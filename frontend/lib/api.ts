@@ -341,8 +341,8 @@ export const api = {
   },
 
   notifications: {
-    list: (params?: { read?: string }) =>
-      req<unknown[]>("GET", `/notifications${qs(params)}`),
+    list: (params?: { read?: string; view?: string; recipientId?: string }) =>
+      req<unknown[]>("GET", `/notifications${qs(params as any)}`),
     create: (data: unknown) => req<unknown>("POST", "/notifications", data),
     markRead: (id: string) => req<unknown>("PATCH", `/notifications/${id}/read`),
     markAllRead: () => req<unknown>("PATCH", "/notifications/read-all"),

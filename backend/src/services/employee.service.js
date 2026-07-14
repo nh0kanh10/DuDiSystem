@@ -80,8 +80,9 @@ export async function createEmployee(data) {
   }
 
   const takenIds = collectTakenEmployeeIds(repo, userRepo)
+  const totalEmployeesCount = repo.getAll().length
   let fields = {
-    id: generateEmployeeId(takenIds),
+    id: generateEmployeeId(takenIds, totalEmployeesCount),
     name: data.name || "",
     email: data.email || "",
     phone: data.phone || "",

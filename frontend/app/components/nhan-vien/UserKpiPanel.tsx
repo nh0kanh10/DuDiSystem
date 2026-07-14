@@ -569,13 +569,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
       {/* Sub navigation bar */}
       <div className="flex justify-start mb-6">
-        <div className="flex gap-1 rounded-xl p-1 bg-[#fff0f1] border border-[#efd7da]">
+        <div className="flex gap-1 rounded-xl p-1 bg-[#fff0f1] dark:bg-white/5 border border-[#efd7da] dark:border-white/10">
           <button
             onClick={() => setActiveSubTab("overview")}
             className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeSubTab === "overview"
-                ? "bg-white text-[#E8231A] shadow-sm"
-                : "text-[#8b6b70] hover:text-[#C62828]"
+                ? "bg-white dark:bg-white/10 text-[#E8231A] dark:text-[#FFE8EC] shadow-sm"
+                : "text-[#8b6b70] dark:text-white/40 hover:text-[#C62828] dark:hover:text-white"
             }`}
           >
             Tổng quan
@@ -584,8 +584,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
             onClick={() => setActiveSubTab("history")}
             className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeSubTab === "history"
-                ? "bg-white text-[#E8231A] shadow-sm"
-                : "text-[#8b6b70] hover:text-[#C62828]"
+                ? "bg-white dark:bg-white/10 text-[#E8231A] dark:text-[#FFE8EC] shadow-sm"
+                : "text-[#8b6b70] dark:text-white/40 hover:text-[#C62828] dark:hover:text-white"
             }`}
           >
             Lịch sử KPI
@@ -600,8 +600,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
           {/* Header block inside Dashboard tab */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h2 className="text-xl font-extrabold text-gray-800">Tổng quan</h2>
-              <p className="text-[10px] text-gray-400 font-bold mt-0.5">KPI cá nhân của bạn</p>
+              <h2 className="text-xl font-extrabold text-gray-800 dark:text-[#FFE8EC]">Tổng quan</h2>
+              <p className="text-[10px] text-gray-400 dark:text-white/40 font-bold mt-0.5">KPI cá nhân của bạn</p>
             </div>
 
             <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
@@ -612,7 +612,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                 Nhập KPI
               </button>
 
-              <div className="relative flex-1 sm:flex-none justify-center flex items-center gap-2 text-xs font-bold text-gray-500 bg-white border border-gray-200 px-3 py-1.5 rounded-xl shadow-xs">
+              <div className="relative flex-1 sm:flex-none justify-center flex items-center gap-2 text-xs font-bold text-gray-500 dark:text-gray-300 bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-white/10 px-3 py-1.5 rounded-xl shadow-xs">
                 <span>CHỌN THÁNG:</span>
                 <UserCustomMonthPicker value={selectedMonth} onChange={setSelectedMonth} />
               </div>
@@ -622,13 +622,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
           {/* Quick Metrics Widget Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {/* Card 1: KPI hôm nay */}
-            <div className="bg-white p-4 border border-[#efd7da] rounded-2xl shadow-xs flex flex-col justify-between h-[110px] relative overflow-hidden">
+            <div className="bg-white dark:bg-white/[0.03] backdrop-blur p-4 border border-[#efd7da] dark:border-white/5 rounded-2xl shadow-xs flex flex-col justify-between h-[110px] relative overflow-hidden">
               <div>
                 <div className="flex justify-between items-start">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">KPI hôm nay</p>
+                  <p className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase tracking-wider">KPI hôm nay</p>
                   <Calendar className="text-[#C62828] opacity-60" size={16} />
                 </div>
-                <h3 className="text-2xl font-black text-gray-800 mt-1">{todayKpiPoints}</h3>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-1">{todayKpiPoints}</h3>
               </div>
               <div className="mt-2 text-[9px] font-bold">
                 {todayKpiDelta.diff >= 0 ? (
@@ -644,13 +644,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
             </div>
 
             {/* Card 2: Doanh thu tuần */}
-            <div className="bg-white p-4 border border-[#efd7da] rounded-2xl shadow-xs flex flex-col justify-between h-[110px] relative overflow-hidden">
+            <div className="bg-white dark:bg-white/[0.03] backdrop-blur p-4 border border-[#efd7da] dark:border-white/5 rounded-2xl shadow-xs flex flex-col justify-between h-[110px] relative overflow-hidden">
               <div>
                 <div className="flex justify-between items-start">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Doanh thu tuần</p>
+                  <p className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase tracking-wider">Doanh thu tuần</p>
                   <DollarSign className="text-green-600 opacity-60" size={16} />
                 </div>
-                <h3 className="text-2xl font-black text-gray-800 mt-1">
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-1">
                   {currentWeekRevenue.toLocaleString("vi-VN")}
                 </h3>
               </div>
@@ -668,13 +668,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
             </div>
 
             {/* Card 3: Doanh thu tháng */}
-            <div className="bg-white p-4 border border-[#efd7da] rounded-2xl shadow-xs flex flex-col justify-between h-[110px] relative overflow-hidden">
+            <div className="bg-white dark:bg-white/[0.03] backdrop-blur p-4 border border-[#efd7da] dark:border-white/5 rounded-2xl shadow-xs flex flex-col justify-between h-[110px] relative overflow-hidden">
               <div>
                 <div className="flex justify-between items-start">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Doanh thu tháng</p>
+                  <p className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase tracking-wider">Doanh thu tháng</p>
                   <DollarSign className="text-blue-600 opacity-60" size={16} />
                 </div>
-                <h3 className="text-2xl font-black text-gray-800 mt-1">
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-1">
                   {currentMonthTotals.revenue.toLocaleString("vi-VN")}
                 </h3>
               </div>
@@ -692,13 +692,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
             </div>
 
             {/* Card 4: Chốt Deal tháng */}
-            <div className="bg-white p-4 border border-[#efd7da] rounded-2xl shadow-xs flex flex-col justify-between h-[110px] relative overflow-hidden">
+            <div className="bg-white dark:bg-white/[0.03] backdrop-blur p-4 border border-[#efd7da] dark:border-white/5 rounded-2xl shadow-xs flex flex-col justify-between h-[110px] relative overflow-hidden">
               <div>
                 <div className="flex justify-between items-start">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Chốt Deal tháng</p>
+                  <p className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase tracking-wider">Chốt Deal tháng</p>
                   <Target className="text-orange-500 opacity-60" size={16} />
                 </div>
-                <h3 className="text-2xl font-black text-gray-800 mt-1">{currentMonthTotals.deal}</h3>
+                <h3 className="text-2xl font-black text-gray-800 dark:text-white mt-1">{currentMonthTotals.deal}</h3>
               </div>
               <div className="mt-2 text-[9px] font-bold">
                 {monthDealDelta.diff >= 0 ? (
@@ -715,9 +715,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
           </div>
 
           {/* Tiến độ KPI tháng */}
-          <div className="bg-white p-5 border border-[#efd7da] rounded-2xl shadow-xs space-y-4">
+          <div className="bg-white dark:bg-white/[0.03] backdrop-blur p-5 border border-[#efd7da] dark:border-white/5 rounded-2xl shadow-xs space-y-4">
             <div>
-              <h4 className="font-extrabold text-gray-800 text-sm">
+              <h4 className="font-extrabold text-gray-800 dark:text-[#FFE8EC] text-sm">
                 Tiến độ KPI tháng {selectedMonth ? `${selectedMonth.substring(5)}/${selectedMonth.substring(0, 4)}` : "--/----"}
               </h4>
             </div>
@@ -743,9 +743,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   return (
                     <div key={key} className="space-y-1.5">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-bold text-gray-700">{label}</span>
+                        <span className="font-bold text-gray-700 dark:text-gray-300">{label}</span>
                         <div className="flex items-center gap-3">
-                          <span className="font-bold text-gray-700 font-mono">
+                          <span className="font-bold text-gray-700 dark:text-white font-mono">
                             {isRevenue
                               ? `${currentVal.toLocaleString()}đ / ${targetVal.toLocaleString()}đ (${pct}%)`
                               : `${currentVal} / ${targetVal} (${pct}%)`
@@ -757,7 +757,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                           </span>
                         </div>
                       </div>
-                      <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                      <div className="w-full bg-gray-100 dark:bg-white/10 h-2.5 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
@@ -767,8 +767,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
           </div>
 
           {/* Biểu đồ KPI 30 ngày */}
-          <div className="bg-white p-5 border border-[#efd7da] rounded-2xl shadow-xs space-y-4">
-            <h4 className="font-extrabold text-gray-800 text-sm">Biểu đồ KPI 30 ngày</h4>
+          <div className="bg-white dark:bg-white/[0.03] backdrop-blur p-5 border border-[#efd7da] dark:border-white/5 rounded-2xl shadow-xs space-y-4">
+            <h4 className="font-extrabold text-gray-800 dark:text-[#FFE8EC] text-sm">Biểu đồ KPI 30 ngày</h4>
             <div className="h-60 w-full text-xs">
               {lineChartData.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-gray-400">Không có dữ liệu báo cáo trong tháng</div>
@@ -788,9 +788,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
             </div>
           </div>
 
-          {/* So sánh với tháng trước */}
-          <div className="bg-white p-5 border border-[#efd7da] rounded-2xl shadow-xs space-y-4">
-            <h4 className="font-extrabold text-gray-800 text-sm">So sánh với tháng trước</h4>
+          <div className="bg-white dark:bg-white/[0.03] backdrop-blur p-5 border border-[#efd7da] dark:border-white/5 rounded-2xl shadow-xs space-y-4">
+            <h4 className="font-extrabold text-gray-800 dark:text-[#FFE8EC] text-sm">So sánh với tháng trước</h4>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
               {Object.entries(KPI_METRIC_LABELS).map(([metricKey, label]) => {
@@ -800,9 +799,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                 const pct = prevVal > 0 ? Math.round((diff / prevVal) * 100) : (currVal > 0 ? 100 : 0);
 
                 return (
-                  <div key={metricKey} className="p-3 border border-gray-100 rounded-xl bg-gray-50/20 text-center flex flex-col justify-between h-[100px]">
-                    <span className="text-[10px] text-gray-400 font-bold block truncate" title={label}>{label}</span>
-                    <p className="text-sm font-black text-gray-800 font-mono mt-2">
+                  <div key={metricKey} className="p-3 border border-gray-100 dark:border-white/5 rounded-xl bg-gray-50/20 dark:bg-white/[0.02] text-center flex flex-col justify-between h-[100px]">
+                    <span className="text-[10px] text-gray-400 dark:text-white/40 font-bold block truncate" title={label}>{label}</span>
+                    <p className="text-sm font-black text-gray-800 dark:text-[#FFE8EC] font-mono mt-2">
                       {formatCompareValue(metricKey as keyof KpiMetrics, currVal)}
                     </p>
                     <div className="mt-1 flex items-center justify-center">
@@ -829,40 +828,40 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
       {activeSubTab === "history" && (
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-extrabold text-gray-800">Lịch sử KPI</h2>
-            <p className="text-[10px] text-gray-400 font-bold mt-0.5">Xem lại KPI đã nhập</p>
+            <h2 className="text-xl font-extrabold text-gray-800 dark:text-[#FFE8EC]">Lịch sử KPI</h2>
+            <p className="text-[10px] text-gray-400 dark:text-white/40 font-bold mt-0.5">Xem lại KPI đã nhập</p>
           </div>
 
-          <div className="bg-white border border-[#efd7da] rounded-2xl shadow-xs overflow-hidden">
+          <div className="bg-white dark:bg-white/[0.03] border border-[#efd7da] dark:border-white/5 rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 text-xs">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-white/5 text-xs">
+                <thead className="bg-gray-50 dark:bg-white/5">
                   <tr>
-                    <th scope="col" className="sticky left-0 bg-gray-50 z-10 px-4 py-3 text-left font-bold text-gray-500 uppercase tracking-wider border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">NGÀY</th>
-                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider">IB ZALO</th>
-                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider">IB FB</th>
-                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider">COMMENT</th>
-                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider">BÀI ĐĂNG</th>
-                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider">KHÁCH REP</th>
-                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider">FOLLOW-UP</th>
-                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider">BÁO GIÁ</th>
-                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider">CHỐT DEAL</th>
-                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider">DOANH THU</th>
-                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 uppercase tracking-wider">HÀNH ĐỘNG</th>
+                    <th scope="col" className="sticky left-0 bg-gray-50 dark:bg-[#1D1D23] z-10 px-4 py-3 text-left font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider border-r border-gray-100 dark:border-white/5 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">NGÀY</th>
+                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">IB ZALO</th>
+                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">IB FB</th>
+                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">COMMENT</th>
+                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">BÀI ĐĂNG</th>
+                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">KHÁCH REP</th>
+                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">FOLLOW-UP</th>
+                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">BÁO GIÁ</th>
+                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">CHỐT DEAL</th>
+                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">DOANH THU</th>
+                    <th scope="col" className="px-4 py-3 text-center font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">HÀNH ĐỘNG</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-100 font-medium text-gray-700">
+                <tbody className="bg-white dark:bg-transparent divide-y divide-gray-100 dark:divide-white/5 font-medium text-gray-700 dark:text-gray-300">
                   {userAllEntries.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="px-4 py-8 text-center text-gray-400 font-semibold">
+                      <td colSpan={11} className="px-4 py-8 text-center text-gray-400 font-semibold dark:text-white/30">
                         Chưa có nhật ký nào được báo cáo
                       </td>
                     </tr>
                   ) : (
                     paginatedEntries.map((log) => {
                       return (
-                        <tr key={log.id} className="group hover:bg-gray-50/50 transition-colors">
-                          <td className="sticky left-0 bg-white group-hover:bg-gray-50/80 transition-colors z-10 px-4 py-4 whitespace-nowrap text-left font-semibold text-gray-800 border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                        <tr key={log.id} className="group hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors">
+                          <td className="sticky left-0 bg-white dark:bg-[#1D1D23] group-hover:bg-gray-50/80 dark:group-hover:bg-white/5 transition-colors z-10 px-4 py-4 whitespace-nowrap text-left font-semibold text-gray-800 dark:text-[#FFE8EC] border-r border-gray-100 dark:border-white/5 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
                             <div className="flex items-center gap-1">
                               <Calendar size={14} className="text-gray-400" />
                               <span>{formatKpiDate(log.date)}</span>
@@ -882,7 +881,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                           <td className="px-4 py-4 whitespace-nowrap text-center">
                             <button
                               onClick={() => setSelectedEntryForDetail(log)}
-                              className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100 cursor-pointer inline-flex items-center justify-center"
+                              className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer inline-flex items-center justify-center"
                               title="Chi tiết"
                             >
                               <Eye size={16} />
@@ -898,7 +897,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
             {/* Pagination controls inside the same card */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-xs sm:text-[13px] font-semibold text-gray-500 bg-white">
+              <div className="flex items-center justify-between border-t border-gray-100 dark:border-white/5 px-4 py-3 text-xs sm:text-[13px] font-semibold text-gray-500 dark:text-white/40 bg-white dark:bg-white/[0.03]">
                 <div>
                   Trang {currentPage} / {totalPages} ({totalItems} bản ghi)
                 </div>
@@ -906,10 +905,10 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <button
                     onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className={`w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center transition-colors ${
+                    className={`w-8 h-8 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 flex items-center justify-center transition-colors ${
                       currentPage === 1
                         ? "opacity-50 cursor-not-allowed text-gray-300"
-                        : "hover:bg-gray-50 hover:text-gray-700 cursor-pointer text-gray-600"
+                        : "hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-[#FFE8EC] cursor-pointer text-gray-600 dark:text-gray-350"
                     }`}
                   >
                     <ChevronLeft size={16} />
@@ -917,10 +916,10 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <button
                     onClick={() => setHistoryPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className={`w-8 h-8 rounded-lg border border-gray-200 bg-white flex items-center justify-center transition-colors ${
+                    className={`w-8 h-8 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 flex items-center justify-center transition-colors ${
                       currentPage === totalPages
                         ? "opacity-50 cursor-not-allowed text-gray-300"
-                        : "hover:bg-gray-50 hover:text-gray-700 cursor-pointer text-gray-600"
+                        : "hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-[#FFE8EC] cursor-pointer text-gray-600 dark:text-gray-350"
                     }`}
                   >
                     <ChevronRight size={16} />

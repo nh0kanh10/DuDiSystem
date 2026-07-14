@@ -32,6 +32,7 @@ interface Props {
   cartSlots?: LeaveSessionSlot[]
   onPick: (pick: WeekPick) => void
   variant?: "default" | "portal"
+  isAdmin?: boolean
 }
 
 export default function LeaveWeekGrid({
@@ -39,6 +40,7 @@ export default function LeaveWeekGrid({
   cartSlots = [],
   onPick,
   variant = "default",
+  isAdmin = false,
 }: Props) {
   const portal = variant === "portal"
   const [weekOffset, setWeekOffset] = useState(0)
@@ -169,7 +171,7 @@ export default function LeaveWeekGrid({
                 const bothCart = sangCart && chieuCart
                 const anyOcc = sangOcc || chieuOcc
                 const bothOcc = sangOcc && chieuOcc
-                const locked = isPast || bothOcc || anyOcc || sangCart || chieuCart
+                const locked = (isPast && !isAdmin) || bothOcc || anyOcc || sangCart || chieuCart
                 const fdCls = bothCart
                   ? cellBase({ locked: false, past: false, inCart: true })
                   : bothOcc
@@ -178,7 +180,7 @@ export default function LeaveWeekGrid({
                       ? portal
                         ? "bg-amber-50/80 dark:bg-amber-900/20 border-amber-200 text-amber-700 cursor-not-allowed opacity-80"
                         : "bg-amber-50 border-amber-200 text-amber-700 cursor-not-allowed opacity-80"
-                      : cellBase({ locked: isPast, past: isPast, inCart: false })
+                      : cellBase({ locked: isPast && !isAdmin, past: isPast && !isAdmin, inCart: false })
 
                 return (
                   <td key={i} colSpan={2} className={`p-1 border-r ${portal ? "border-[#efd7da] dark:border-white/10" : "border-gray-200"}`}>
@@ -211,12 +213,12 @@ export default function LeaveWeekGrid({
                     ? (portal
                       ? "bg-amber-50/80 dark:bg-amber-900/30 border-amber-300/50 text-amber-700 cursor-not-allowed opacity-80"
                       : "bg-amber-50 border-amber-300 text-amber-700 cursor-not-allowed opacity-80")
-                    : cellBase({ locked: false, past: isPast, inCart: isCart })
+                    : cellBase({ locked: false, past: isPast && !isAdmin, inCart: isCart })
                   return (
                     <td key={session} className={`p-1 border-r ${borderRight ? (portal ? "border-[#efd7da] dark:border-white/10" : "border-gray-200") : (portal ? "border-[#efd7da]/50 dark:border-white/5" : "border-gray-100")}`}>
                       <button
                         type="button"
-                        disabled={isPast || isOcc || isCart}
+                        disabled={(isPast && !isAdmin) || isOcc || isCart}
                         onClick={() => onPick({ kind: "half_session", date: dateStr, session })}
                         className={`w-full min-h-[64px] rounded-xl border flex flex-col items-center justify-center gap-1 transition-all text-xs font-bold ${cls}`}
                       >

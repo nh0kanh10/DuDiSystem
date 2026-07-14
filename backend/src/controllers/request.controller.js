@@ -1,6 +1,6 @@
 import * as svc from "../services/request.service.js"
 import { ok, created, notFound, fail } from "../utils/response.js"
-import { canManageRequests, enforceBranchQuery, assertEmployeeInScope } from "../utils/access.js"
+import { canManageRequests, enforceBranchQuery, assertEmployeeInScope, isAdminUser } from "../utils/access.js"
 
 export function list(req, res) {
   let filter = { ...req.query }
@@ -34,7 +34,7 @@ export function create(req, res) {
     const denied = assertEmployeeInScope(req.user, body.employeeId)
     if (denied) return fail(res, denied.error, denied.status)
   }
-  const result = svc.createRequest(body)
+  const result = svc.createRequest(body, { isAdmin: isAdminUser(req.user) })
   if (result?.error) return fail(res, result.error, result.status)
   created(res, result)
 }

@@ -11,11 +11,10 @@ function sumCosts(items = []) {
   return items.reduce((s, i) => s + (Number(i.amount) || 0), 0)
 }
 
-/** Chuyển số thành chữ — placeholder đơn giản, có thể thay bằng thư viện sau */
 function amountInWords(amount) {
   const n = Number(amount) || 0
   if (n === 0) return "không đồng"
-  return `${formatVnd(n)} đồng` // TODO: doc-tien-bang-chu khi cần chuẩn pháp lý
+  return `${formatVnd(n)} đồng` 
 }
 
 function phasesFromQuote(quote = {}) {

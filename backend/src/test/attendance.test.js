@@ -8,22 +8,19 @@ import {
 } from "../services/attendance.service.js"
 
 test("Attendance Service - calculateStaffAttendanceStatus", () => {
-  // Test case 1: Staff check-in on-time today (not a past date)
-  const resultOnTimeToday = calculateStaffAttendanceStatus("08:55", "--", { employeeStart: "09:00" }, "2026-07-03")
+  const todayStr = new Date().toISOString().split("T")[0]
+  const resultOnTimeToday = calculateStaffAttendanceStatus("08:55", "--", { employeeStart: "09:00" }, todayStr)
   assert.strictEqual(resultOnTimeToday.status, "on-time")
   assert.strictEqual(resultOnTimeToday.note, "Chưa check-out")
 
-  // Test case 2: Staff check-in late today (not a past date)
-  const resultLateToday = calculateStaffAttendanceStatus("09:05", "--", { employeeStart: "09:00" }, "2026-07-03")
+  const resultLateToday = calculateStaffAttendanceStatus("09:05", "--", { employeeStart: "09:00" }, todayStr)
   assert.strictEqual(resultLateToday.status, "late")
   assert.strictEqual(resultLateToday.note, "Đi trễ 5p, chưa check-out")
 
-  // Test case 3: Staff check-in on-time in the past (past date)
   const resultOnTimePast = calculateStaffAttendanceStatus("08:55", "--", { employeeStart: "09:00" }, "2026-06-30")
   assert.strictEqual(resultOnTimePast.status, "on-time")
   assert.strictEqual(resultOnTimePast.note, "Quên check-out")
 
-  // Test case 4: Staff check-in late in the past (past date)
   const resultLatePast = calculateStaffAttendanceStatus("09:05", "--", { employeeStart: "09:00" }, "2026-06-30")
   assert.strictEqual(resultLatePast.status, "late")
   assert.strictEqual(resultLatePast.note, "Đi trễ 5p, quên check-out")

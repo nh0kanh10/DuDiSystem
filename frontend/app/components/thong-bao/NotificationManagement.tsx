@@ -3,7 +3,7 @@ import { createPortal } from "react-dom"
 import {
   Bell, Plus, Search, Edit2, Trash2, RefreshCw,
   Settings, Info, AlertTriangle, Calendar, Zap,
-  CheckCircle2, Clock, XCircle, Eye,
+  CheckCircle2, Clock, XCircle, Eye, Users, User,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import { Announcement, AnnouncementType, AnnouncementPriority, AnnouncementStatus } from "../../types"
@@ -29,6 +29,12 @@ const PRIORITY_CFG: Record<AnnouncementPriority, { label: string; full: string; 
   high:   { label: "Cao",      full: "Cao",        cls: "bg-red-50 text-red-600 border-red-200" },
   medium: { label: "Trung bình", full: "Trung bình", cls: "bg-amber-50 text-amber-600 border-amber-200" },
   low:    { label: "Thấp",     full: "Thấp",       cls: "bg-gray-100 text-gray-500 border-gray-200" },
+}
+
+const INBOX_TYPE_CFG: Record<string, { label: string; icon: React.ElementType; cls: string }> = {
+  system: { label: "Hệ thống", icon: Settings, cls: "bg-blue-50 text-blue-600" },
+  hr:     { label: "Nhân sự",  icon: Users,    cls: "bg-purple-50 text-purple-600" },
+  leave:  { label: "Nghỉ phép",icon: Calendar, cls: "bg-amber-50 text-amber-600" },
 }
 
 const EMPTY_FORM = {
@@ -80,6 +86,14 @@ export function NotificationManagement() {
   const [stats, setStats]     = useState({ total: 0, active: 0, scheduled: 0, expired: 0 })
   const [employees, setEmployees] = useState<any[]>([])
 
+  const [activeTab, setActiveTab] = useState<"announcements" | "sent_inbox">("announcements")
+  const [sentInboxes, setSentInboxes] = useState<any[]>([])
+  const [loadingSent, setLoadingSent] = useState(false)
+  const [searchInbox, setSearchInbox] = useState("")
+  const [filterInboxType, setFilterInboxType] = useState("all")
+  const [filterInboxTarget, setFilterInboxTarget] = useState("all")
+  const [deleteInboxConfirm, setDeleteInboxConfirm] = useState<any | null>(null)
+
   const [search, setSearch]             = useState("")
   const [filterType, setFilterType]     = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -119,10 +133,13 @@ export function NotificationManagement() {
   })
 
   useEffect(() => {
-    loadAll()
-    const timer = setInterval(() => { loadAll() }, 30000)
-    return () => clearInterval(timer)
-  }, [])
+    if (activeTab === "announcements") {
+      loadAll()
+    } else {
+      loadSentInboxes()
+    }
+  }, [activeTab])
+
   useEffect(() => {
     api.employees.list({ status: "active" } as any)
       .then((rows: any) => setEmployees(Array.isArray(rows) ? rows : []))
@@ -143,11 +160,52 @@ export function NotificationManagement() {
     }
   }
 
+  async function loadSentInboxes() {
+    setLoadingSent(true)
+    try {
+      const data = await api.notifications.list({ view: "sent" })
+      setSentInboxes(Array.isArray(data) ? data : [])
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoadingSent(false)
+    }
+  }
+
+  async function handleDeleteInbox(id: string) {
+    try {
+      await api.notifications.delete(id)
+      setSentInboxes(prev => prev.filter(x => x.id !== id))
+      setDeleteInboxConfirm(null)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   const filtered = items.filter(a => {
     if (filterType !== "all" && a.type !== filterType) return false
     if (filterStatus !== "all" && a.status !== filterStatus) return false
     if (search && !a.title.toLowerCase().includes(search.toLowerCase()) &&
         !a.content.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
+  const filteredInboxes = sentInboxes.filter(n => {
+    if (filterInboxType !== "all" && n.type !== filterInboxType) return false
+    if (filterInboxTarget === "all_staff" && n.recipientId !== null) return false
+    if (filterInboxTarget === "one_staff" && n.recipientId === null) return false
+
+    if (searchInbox) {
+      const s = searchInbox.toLowerCase()
+      const titleMatch = (n.title || "").toLowerCase().includes(s)
+      const messageMatch = (n.message || "").toLowerCase().includes(s)
+      let empMatch = false
+      if (n.recipientId) {
+        const emp = employees.find(e => e.id === n.recipientId)
+        empMatch = n.recipientId.toLowerCase().includes(s) || (emp && emp.name.toLowerCase().includes(s))
+      }
+      if (!titleMatch && !messageMatch && !empMatch) return false
+    }
     return true
   })
 
@@ -222,6 +280,7 @@ export function NotificationManagement() {
       await api.notifications.create(payload)
       setShowInboxForm(false)
       setInboxForm({ title: "", type: "system", message: "", targetMode: "all", recipientId: "" })
+      loadSentInboxes()
     } finally {
       setSendingInbox(false)
     }
@@ -242,7 +301,7 @@ export function NotificationManagement() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={loadAll}
+          <button onClick={() => activeTab === "announcements" ? loadAll() : loadSentInboxes()}
             className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
             <RefreshCw size={14} />Làm mới
           </button>
@@ -261,49 +320,75 @@ export function NotificationManagement() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={CheckCircle2} value={stats.active}    label="Đang hiển thị" highlight />
-        <StatCard icon={Clock}        value={stats.scheduled} label="Đã lên lịch" />
-        <StatCard icon={Bell}         value={stats.total}     label="Tổng số" />
-        <StatCard icon={XCircle}      value={stats.expired}   label="Đã hết hạn" />
+      {/* Tab Navigation */}
+      <div className="flex gap-2 border-b border-black/[0.05] pb-px">
+        <button
+          onClick={() => setActiveTab("announcements")}
+          className={`pb-2.5 px-4 text-xs font-black border-b-2 transition-all cursor-pointer ${
+            activeTab === "announcements"
+              ? "border-[#C62828] text-[#C62828]"
+              : "border-transparent text-gray-400 hover:text-gray-600"
+          }`}
+        >
+          Thông báo hệ thống (Announcements)
+        </button>
+        <button
+          onClick={() => setActiveTab("sent_inbox")}
+          className={`pb-2.5 px-4 text-xs font-black border-b-2 transition-all cursor-pointer ${
+            activeTab === "sent_inbox"
+              ? "border-[#C62828] text-[#C62828]"
+              : "border-transparent text-gray-400 hover:text-gray-600"
+          }`}
+        >
+          Thông báo Inbox Staff đã gửi
+        </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-black/[0.05] p-4 flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Tìm tiêu đề, nội dung..."
-            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 transition-all" />
-        </div>
-        <CustomSelect value={filterType} onChange={setFilterType} className="w-44"
-          options={[
-            { value: "all",     label: "Tất cả loại" },
-            { value: "info",    label: "Thông tin" },
-            { value: "warning", label: "Cảnh báo" },
-            { value: "event",   label: "Sự kiện" },
-            { value: "urgent",  label: "Khẩn cấp" },
-          ]} />
-        <CustomSelect value={filterStatus} onChange={setFilterStatus} className="w-48"
-          options={[
-            { value: "all",       label: "Tất cả trạng thái" },
-            { value: "active",    label: "Đang hiển thị" },
-            { value: "scheduled", label: "Đã lên lịch" },
-            { value: "expired",   label: "Đã hết hạn" },
-          ]} />
-        <span className="text-xs text-gray-400 font-bold ml-auto">{filtered.length} thông báo</span>
-      </div>
+      {activeTab === "announcements" ? (
+        <>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard icon={CheckCircle2} value={stats.active}    label="Đang hiển thị" highlight />
+            <StatCard icon={Clock}        value={stats.scheduled} label="Đã lên lịch" />
+            <StatCard icon={Bell}         value={stats.total}     label="Tổng số" />
+            <StatCard icon={XCircle}      value={stats.expired}   label="Đã hết hạn" />
+          </div>
 
-      {loading ? (
-        <div className="bg-white rounded-2xl border border-black/[0.05] p-16 text-center">
-          <div className="w-8 h-8 rounded-full border-2 border-[#C62828]/30 border-t-[#C62828] animate-spin mx-auto" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-black/[0.05] p-16 text-center">
-          <Bell size={36} className="mx-auto text-gray-200 mb-3" />
-          <p className="text-sm font-bold text-gray-400">Chưa có thông báo nào</p>
-          <p className="text-xs text-gray-300 mt-1">Nhấn «Tạo thông báo» để bắt đầu</p>
-        </div>
-      ) : (
+          <div className="bg-white rounded-2xl border border-black/[0.05] p-4 flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Tìm tiêu đề, nội dung..."
+                className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 transition-all" />
+            </div>
+            <CustomSelect value={filterType} onChange={setFilterType} className="w-44"
+              options={[
+                { value: "all",     label: "Tất cả loại" },
+                { value: "info",    label: "Thông tin" },
+                { value: "warning", label: "Cảnh báo" },
+                { value: "event",   label: "Sự kiện" },
+                { value: "urgent",  label: "Khẩn cấp" },
+              ]} />
+            <CustomSelect value={filterStatus} onChange={setFilterStatus} className="w-48"
+              options={[
+                { value: "all",       label: "Tất cả trạng thái" },
+                { value: "active",    label: "Đang hiển thị" },
+                { value: "scheduled", label: "Đã lên lịch" },
+                { value: "expired",   label: "Đã hết hạn" },
+              ]} />
+            <span className="text-xs text-gray-400 font-bold ml-auto">{filtered.length} thông báo</span>
+          </div>
+
+          {loading ? (
+            <div className="bg-white rounded-2xl border border-black/[0.05] p-16 text-center">
+              <div className="w-8 h-8 rounded-full border-2 border-[#C62828]/30 border-t-[#C62828] animate-spin mx-auto" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-black/[0.05] p-16 text-center">
+              <Bell size={36} className="mx-auto text-gray-200 mb-3" />
+              <p className="text-sm font-bold text-gray-400">Chưa có thông báo nào</p>
+              <p className="text-xs text-gray-300 mt-1">Nhấn «Tạo thông báo» để bắt đầu</p>
+            </div>
+          ) : (
         <div className="space-y-3">
           {filtered.map(a => {
             const tcfg = TYPE_CFG[a.type]
@@ -355,6 +440,100 @@ export function NotificationManagement() {
             )
           })}
         </div>
+      )}
+      </>
+      ) : (
+        <>
+          {/* Tab 2: Sent Inbox Staff */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <StatCard icon={Bell} value={sentInboxes.length} label="Tổng thông báo inbox đã gửi" highlight />
+            <StatCard icon={Users} value={sentInboxes.filter(x => !x.recipientId).length} label="Gửi tới toàn bộ nhân viên" />
+            <StatCard icon={User} value={sentInboxes.filter(x => x.recipientId).length} label="Gửi tới nhân viên cụ thể" />
+          </div>
+
+          {/* Filters Sent Inbox */}
+          <div className="bg-white rounded-2xl border border-black/[0.05] p-4 flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input value={searchInbox} onChange={e => setSearchInbox(e.target.value)}
+                placeholder="Tìm tiêu đề, nội dung, mã/tên staff..."
+                className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 transition-all" />
+            </div>
+            <CustomSelect value={filterInboxType} onChange={setFilterInboxType} className="w-44"
+              options={[
+                { value: "all",     label: "Tất cả loại" },
+                { value: "system",  label: "Hệ thống" },
+                { value: "hr",      label: "Nhân sự" },
+                { value: "leave",   label: "Nghỉ phép" },
+              ]} />
+            <CustomSelect value={filterInboxTarget} onChange={setFilterInboxTarget} className="w-48"
+              options={[
+                { value: "all",       label: "Tất cả đối tượng" },
+                { value: "all_staff", label: "Toàn bộ nhân viên" },
+                { value: "one_staff", label: "Nhân viên cụ thể" },
+              ]} />
+            <span className="text-xs text-gray-400 font-bold ml-auto">{filteredInboxes.length} thông báo</span>
+          </div>
+
+          {/* List Sent Inbox */}
+          {loadingSent ? (
+            <div className="bg-white rounded-2xl border border-black/[0.05] p-16 text-center">
+              <div className="w-8 h-8 rounded-full border-2 border-[#C62828]/30 border-t-[#C62828] animate-spin mx-auto" />
+            </div>
+          ) : filteredInboxes.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-black/[0.05] p-16 text-center">
+              <Bell size={36} className="mx-auto text-gray-200 mb-3" />
+              <p className="text-sm font-bold text-gray-400">Chưa có thông báo inbox nào được gửi</p>
+              <p className="text-xs text-gray-300 mt-1">Nhấn «Gửi inbox staff» để bắt đầu gửi thông báo</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredInboxes.map(n => {
+                const itype = INBOX_TYPE_CFG[n.type] || { label: "Hệ thống", icon: Settings, cls: "bg-blue-50 text-blue-600" }
+                const Icon = itype.icon
+                const emp = employees.find(e => e.id === n.recipientId)
+                const recipientText = n.recipientId ? `${emp?.name || n.recipientId} (${n.recipientId})` : "Toàn bộ nhân viên"
+                
+                return (
+                  <div key={n.id} className="bg-white rounded-2xl border border-black/[0.05] border-l-4 border-l-red-400 px-5 py-4 hover:shadow-md transition-all group flex items-start justify-between gap-4">
+                    <div className="flex gap-3 flex-1 min-w-0">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${itype.cls}`}>
+                        <Icon size={16} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-black text-gray-800 text-sm truncate">{n.title || "Không có tiêu đề"}</p>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${itype.cls}`}>
+                            {itype.label}
+                          </span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${n.recipientId ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-[#fff1f2] text-[#7a1d22] border-[#efd7da]"}`}>
+                            Gửi tới: {recipientText}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2 leading-relaxed whitespace-pre-wrap">{n.message}</p>
+                        <div className="flex items-center gap-4 mt-2 text-[11px] text-gray-400">
+                          <span className="flex items-center gap-1">
+                            <Clock size={10} />
+                            Thời gian gửi: {n.time || "—"}
+                          </span>
+                          {n.recipientId && (
+                            <span className={`font-bold text-[10px] ${n.read ? "text-emerald-600" : "text-amber-500"}`}>
+                              {n.read ? "✓ Đã đọc" : "○ Chưa đọc"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button onClick={() => setDeleteInboxConfirm(n)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 mt-0.5">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </>
       )}
 
       <Modal open={showForm} onClose={() => setShowForm(false)}
@@ -624,6 +803,32 @@ export function NotificationManagement() {
               </button>
               <button onClick={() => handleDelete(deleteConfirm)}
                 className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-bold transition-colors">
+                Xóa
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {deleteInboxConfirm && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDeleteInboxConfirm(null)}>
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={20} className="text-red-500" />
+            </div>
+            <h3 className="text-base font-black text-gray-800 text-center">Thu hồi thông báo inbox?</h3>
+            <p className="text-sm text-gray-500 text-center mt-1 mb-5 px-4">
+              Thông báo «{deleteInboxConfirm.title || "Không có tiêu đề"}» sẽ bị xóa khỏi inbox của nhân viên và không thể khôi phục.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteInboxConfirm(null)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors">
+                Hủy
+              </button>
+              <button onClick={() => handleDeleteInbox(deleteInboxConfirm.id)}
+                className="flex-1 py-2.5 bg-[#C62828] hover:bg-[#b71c1c] text-white rounded-xl text-sm font-bold transition-colors">
                 Xóa
               </button>
             </div>

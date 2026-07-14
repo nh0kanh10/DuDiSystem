@@ -9,7 +9,7 @@ export const INIT_EMPLOYEES: Employee[] = [
 ]
 
 export const INIT_ORG_NODES: OrgNode[] = [
-  { id: "branch-dudi", name: "DuDiSolfware 49", code: "DUDI-BR", type: "branch", memberCount: 150, status: "active", managerId: "0000000005", managerTitle: "Giám đốc chi nhánh" },
+  { id: "branch-dudi", name: "DuDi Company 49", code: "DUDI-BR", type: "branch", memberCount: 150, status: "active", managerId: "0000000005", managerTitle: "Giám đốc chi nhánh" },
   { id: "dept-tech", name: "Phòng Công nghệ", code: "TECH01", type: "department", parentId: "branch-dudi", memberCount: 80, status: "active", managerId: "0000000002", managerTitle: "Trưởng phòng Công nghệ" },
   { id: "sub-dev", name: "Bộ phận Phát triển phần mềm", code: "DEV01", type: "sub-department", parentId: "dept-tech", memberCount: 50, status: "active", managerId: "0000000004", managerTitle: "Trưởng bộ phận Dev" },
   { id: "pos-lead", name: "Lead Developer", code: "LDEV01", type: "position", parentId: "sub-dev", memberCount: 10, status: "active", managerId: "0000000002", managerTitle: "Lead Developer" },

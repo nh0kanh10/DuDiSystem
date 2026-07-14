@@ -1,4 +1,4 @@
-export function generateEmployeeId(takenIds = []) {
+export function generateEmployeeId(takenIds = [], totalEmployeesCount = 0) {
   const taken = new Set(takenIds.filter(Boolean))
   const d = new Date()
   const prefix = [
@@ -7,17 +7,11 @@ export function generateEmployeeId(takenIds = []) {
     String(d.getDate()).padStart(2, "0"),
   ].join("")
 
-  let maxSeq = 0
-  for (const id of taken) {
-    if (typeof id !== "string" || !id.startsWith(prefix)) continue
-    const tail = id.slice(prefix.length)
-    const m = tail.match(/^(\d{2})/)
-    if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10))
-  }
-
-  for (let seq = maxSeq + 1; seq <= 99; seq++) {
+  let seq = totalEmployeesCount
+  while (seq <= 99) {
     const candidate = `${prefix}${String(seq).padStart(2, "0")}`
     if (!taken.has(candidate)) return candidate
+    seq++
   }
 
   throw new Error("Đã đạt giới hạn 99 mã nhân viên trong ngày")

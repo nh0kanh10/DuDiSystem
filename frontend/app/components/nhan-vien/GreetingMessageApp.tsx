@@ -203,7 +203,7 @@ export function Background({ dark }: { dark: boolean }) {
 }
 
 /* ─── Ticker data ────────────────────────────────────────── */
-const TICKER_TEXT = "Welcome to DUDI SOFTWARE TECHNOLOGY CO., LTD";
+const TICKER_TEXT = "Welcome to DUDI COMPANY";
 
 /* ─── Block definitions ──────────────────────────────────── */
 interface Block {

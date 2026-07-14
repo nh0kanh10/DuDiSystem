@@ -1682,7 +1682,15 @@ export default function UserPortalApp({
 }) {
   const { showToast } = useToast();
   const [activePage, setActivePage] = useState<BubbleId | null>(null);
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(() => {
+    const savedTheme = localStorage.getItem("dudi_theme_mode");
+    if (savedTheme === "dark") return true;
+    if (savedTheme === "light") return false;
+    if (typeof document !== "undefined") {
+      return document.documentElement.classList.contains("dark");
+    }
+    return false;
+  });
   const [employee, setEmployee] = useState<Employee | null>(null);
   const { unread: notifUnread } = useNotifications();
   const [adminReqCount, setAdminReqCount] = useState(0);
@@ -1693,13 +1701,18 @@ export default function UserPortalApp({
   });
   const canUseKpi = hasStaffModule(modules, "user-kpi");
 
-  // Load theme từ localStorage
+  // Đồng bộ class dark lên document.documentElement
   useEffect(() => {
-    const savedTheme = localStorage.getItem("dudi_theme_mode");
-    if (savedTheme === "light") {
-      setDark(false);
+    if (dark) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
     }
-  }, []);
+    return () => {
+      // Dọn dẹp class dark khi component bị unmount
+      document.documentElement.classList.remove("dark");
+    };
+  }, [dark]);
 
   const handleToggleDark = () => {
     const newDark = !dark;
@@ -1853,11 +1866,13 @@ export default function UserPortalApp({
 
 
   return (
-    <div style={{ width: "100%", height: embed ? "100%" : "100vh", overflow: "hidden", position: embed ? "absolute" : "relative", inset: embed ? 0 : undefined }}>
+    <div 
+      className={dark ? "dark" : ""}
+      style={{ width: "100%", height: embed ? "100%" : "100vh", overflow: "hidden", position: embed ? "absolute" : "relative", inset: embed ? 0 : undefined }}
+    >
 
 
 
-      {/* Fallback nếu GreetingMessageApp lỗi */}
       {!employee ? (
         <div style={{
           display: "flex",

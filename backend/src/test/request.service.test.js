@@ -18,14 +18,14 @@ test("request.service - admin update pending half_session", () => {
   })
 
   const updated = updateRequest(created.id, {
-    startDate: "11/07/2026",
+    startDate: "13/07/2026",
     session: "chieu",
     reason: "Khám bệnh (đổi chiều)",
   }, { adminEdit: true })
 
   assert.ok(updated)
   assert.strictEqual(updated.error, undefined)
-  assert.strictEqual(updated.startDate, "11/07/2026")
+  assert.strictEqual(updated.startDate, "13/07/2026")
   assert.strictEqual(updated.session, "chieu")
   assert.strictEqual(updated.reason, "Khám bệnh (đổi chiều)")
 

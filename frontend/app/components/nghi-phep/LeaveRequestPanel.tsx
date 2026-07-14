@@ -51,6 +51,15 @@ const portalInputClass = "w-full px-4 py-3 rounded-xl text-base focus:outline-no
 
 export default function LeaveRequestPanel({ employee, variant = "default" }: Props) {
   const portal = variant === "portal"
+  const isAdmin = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user")
+      const u = raw ? JSON.parse(raw) : null
+      return u?.roleId === "role-admin" || u?.roleId === "role-super-admin"
+    } catch {
+      return false
+    }
+  }, [])
   const [tab, setTab] = useState<"register" | "history">("register")
   const [historyFilter, setHistoryFilter] = useState<"active" | "all">("active")
   const [form, setForm] = useState<LeaveFormState>(() => createLeaveForm(employee))
@@ -238,7 +247,7 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
       return
     }
 
-    const err = validateLeaveForm(form)
+    const err = validateLeaveForm(form, isAdmin)
     if (err) {
       setFormError(err)
       return
@@ -444,6 +453,7 @@ export default function LeaveRequestPanel({ employee, variant = "default" }: Pro
                       cartSlots={cartSlots}
                       onPick={handleWeekPick}
                       variant={portal ? "portal" : "default"}
+                      isAdmin={isAdmin}
                     />
 
                     {draftPick && (

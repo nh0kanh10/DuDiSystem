@@ -44,6 +44,30 @@ function InfoField({
 export default function UserProfile({ emp, onEdit, onClose }: { emp: Employee; onEdit?: () => void; onClose?: () => void }) {
     const safeStr = (v: any) => v || "---";
 
+    const history = emp.workHistory ?? [];
+    const mergedHistory = history.length > 0
+        ? history
+        : [
+            emp.joinDate
+                ? {
+                    id: 1,
+                    type: "join",
+                    date: emp.joinDate,
+                    title: emp.position || "Nhận việc",
+                    snapshot: [emp.department, emp.contractType].filter(Boolean).join(" · "),
+                }
+                : null,
+            emp.status === "inactive" && emp.resignDate
+                ? {
+                    id: 2,
+                    type: "resign",
+                    date: emp.resignDate,
+                    title: "Nghỉ việc",
+                    snapshot: emp.department || emp.position || "",
+                }
+                : null,
+        ].filter(Boolean) as any[];
+
     return (
         <div className="w-full max-w-5xl relative mx-auto">
             <div
@@ -96,7 +120,7 @@ export default function UserProfile({ emp, onEdit, onClose }: { emp: Employee; o
 
                         <div className="relative z-10 mb-5">
                             <div
-                                className="w-28 h-28 rounded-2xl flex items-center justify-center overflow-hidden"
+                                className="w-36 h-36 rounded-2xl flex items-center justify-center overflow-hidden"
                                 style={{
                                     background: "rgba(255,255,255,0.15)",
                                     border: "2px solid rgba(255,255,255,0.25)",
@@ -106,9 +130,9 @@ export default function UserProfile({ emp, onEdit, onClose }: { emp: Employee; o
                                 {emp.avatar ? (
                                     <img src={emp.avatar} alt={emp.name} className="w-full h-full object-cover" />
                                 ) : emp.name ? (
-                                    <span className="text-5xl font-bold text-white opacity-90">{emp.name.split(" ").pop()?.charAt(0)}</span>
+                                    <span className="text-6xl font-bold text-white opacity-90">{emp.name.split(" ").pop()?.charAt(0)}</span>
                                 ) : (
-                                    <User size={52} strokeWidth={1.5} className="text-white opacity-80" />
+                                    <User size={64} strokeWidth={1.5} className="text-white opacity-80" />
                                 )}
                             </div>
                             <div
@@ -280,6 +304,52 @@ export default function UserProfile({ emp, onEdit, onClose }: { emp: Employee; o
                                         icon={MapPin}
                                     />
                                 </div>
+                            </div>
+
+                            <div className="mt-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-[10px] font-bold tracking-[0.18em] uppercase" style={{ color: "#dc2626" }}>
+                                        Lịch sử làm việc
+                                    </span>
+                                    <div className="flex-1 h-px bg-red-100" />
+                                </div>
+                                {mergedHistory.length === 0 ? (
+                                    <p className="text-[13px] text-gray-500 font-medium">Chưa có dữ liệu lịch sử</p>
+                                ) : (
+                                    <div className="flex flex-col gap-4">
+                                        {mergedHistory.map((entry: any, idx: number) => (
+                                            <div key={entry.id || idx} className="flex items-start gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50/50">
+                                                <div className="shrink-0 mt-1">
+                                                    <div
+                                                        className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg"
+                                                        style={{
+                                                            background: idx === 0 ? "rgba(220,38,38,0.1)" : "rgba(107,114,128,0.1)",
+                                                            color: idx === 0 ? "#dc2626" : "#6b7280"
+                                                        }}
+                                                    >
+                                                        {idx + 1}
+                                                    </div>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <h4 className="text-sm font-bold text-gray-900 truncate">
+                                                            {entry.title}
+                                                        </h4>
+                                                        <span className="shrink-0 text-[11px] font-bold text-gray-400 bg-white px-2 py-1 rounded-md border border-gray-200">
+                                                            {entry.date}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[13px] text-gray-500 mt-1">
+                                                        {[
+                                                            entry.snapshot,
+                                                            entry.toDate ? `Đến: ${entry.toDate}` : null,
+                                                        ].filter(Boolean).join(" · ")}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

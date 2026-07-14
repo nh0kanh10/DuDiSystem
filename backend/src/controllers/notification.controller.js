@@ -6,8 +6,16 @@ export function list(req, res) {
   const filter = {}
   if (req.query.read === "true") filter.read = true
   if (req.query.read === "false") filter.read = false
-  const recipientId = req.user?.employeeId || req.user?.id || null
-  if (recipientId) filter.recipientId = recipientId
+  
+  const isNotificationAdmin = isAdminUser(req.user) || 
+    (req.user?.permissions && (req.user.permissions.includes("all") || req.user.permissions.includes("thong-bao")))
+
+  if (req.query.view === "sent" && isNotificationAdmin) {
+    if (req.query.recipientId) filter.recipientId = req.query.recipientId
+  } else {
+    const recipientId = req.user?.employeeId || req.user?.id || null
+    if (recipientId) filter.recipientId = recipientId
+  }
   ok(res, svc.listNotifications(filter))
 }
 
