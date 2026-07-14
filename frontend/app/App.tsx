@@ -17,7 +17,6 @@ import IPManagement from "./components/IPManagement"
 import AccountManagement from "./components/account/AccountManagement"
 import StatisticsPage from "./components/thong-ke/StatisticsPage"
 
-// Imported Vietnamese subfolders / modular components
 import { LoginPage } from "./components/xac-thuc/LoginPage"
 import { BrandLogo } from "./components/ui/BrandLogo"
 import { AdminDashboard } from "./components/tong-quan/AdminDashboard"
@@ -32,21 +31,20 @@ import { CrmAdminPage } from "./components/crm/CrmAdminPage"
 import { CrmStaffPage } from "./components/crm/CrmStaffPage"
 import { LeadManagement } from "./components/lead/LeadManagement"
 import { PublicRequirementForm } from "./components/lead/PublicRequirementForm"
+import { KpiManagementAdmin } from "./components/kpi/KpiManagementAdmin"
+import { clearKpiMockData } from "./components/kpi/kpiMockData"
 
-// Imported user portal components
 import UserAttendance from "./components/nhan-vien/UserAttendance"
 import UserTimeOff from "./components/nhan-vien/UserTimeOff"
 import { UserDirectory } from "./components/nhan-vien/UserDirectory"
 import { UserChat } from "./components/nhan-vien/UserChat"
 import { UserWorkflow } from "./components/nhan-vien/UserWorkflow"
 import UserSettings from "./components/nhan-vien/UserSettings"
-import { KpiManagementAdmin } from "./components/kpi/KpiManagementAdmin";
-import { clearKpiMockData } from "./components/kpi/kpiMockData";
 
 import { Role, Page, Employee, OrgNode, Assignment, RoleDefinition } from "./types"
 import { INIT_EMPLOYEES, INIT_ORG_NODES, NOTIFICATIONS, INIT_ASSIGNMENTS } from "./constants"
 import { findBranchForNode, initials } from "./utils"
-import { api } from "@/lib/api"
+import { api, writeStoredAuthUser } from "@/lib/api"
 import { connectChatSocket, releaseChatSocket, resetChatSocket, chatHeartbeat, getChatSocketStatus } from "@/lib/chatSocket"
 import { useNotificationBadge } from "./hooks/useNotifications"
 import { touchSession, resetSessionTouchClock } from "@/lib/session"
@@ -131,13 +129,13 @@ function AppContent() {
       return "dashboard"
     }
     const validPages: Page[] = [
-        "dashboard", "nhan-su", "cham-cong", "thong-ke",
-        "duyet-don", "thong-bao", "cong-viec", "du-an", "lead",
-        "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
-        "crm", "staff-portal", "kpi", "kpi-stats", "kpi-compare",
-        "user-profile", "user-attendance", "user-timeoff", "user-directory",
-        "user-chat", "user-workflow", "user-settings", "user-crm"
-      ]
+      "dashboard", "nhan-su", "cham-cong", "thong-ke",
+      "duyet-don", "thong-bao", "cong-viec", "du-an", "lead",
+      "tai-khoan", "phan-quyen", "ip", "tien-ich", "co-cau",
+      "crm", "staff-portal", "kpi", "kpi-stats", "kpi-compare",
+      "user-profile", "user-attendance", "user-timeoff", "user-directory",
+      "user-chat", "user-workflow", "user-settings", "user-crm"
+    ]
     const firstSegment = rawPath.split("/")[0]
     if (validPages.includes(firstSegment as Page)) {
       return firstSegment as Page
@@ -147,6 +145,11 @@ function AppContent() {
 
   const setActivePage = (page: Page) => navigate("/" + page)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [isMobileAdmin, setIsMobileAdmin] = useState(() => {
+    if (typeof window === "undefined") return false
+    return window.innerWidth < 1024
+  })
   const [rolesList, setRolesList] = useState<RoleDefinition[]>([])
   const [isPageLoading, setIsPageLoading] = useState(false)
   const [effectivePermissions, setEffectivePermissions] = useState<string[]>(() => {
@@ -167,11 +170,25 @@ function AppContent() {
       localStorage.setItem("dudi_kpi_mock_cleared_v2", "1")
     }
   }, [])
+
   useEffect(() => {
     setIsPageLoading(true)
     const t = setTimeout(() => setIsPageLoading(false), 300)
     return () => clearTimeout(t)
   }, [activePage])
+
+  useEffect(() => {
+    const onResize = () => setIsMobileAdmin(window.innerWidth < 1024)
+    onResize()
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
+
+  useEffect(() => {
+    if (!isMobileAdmin) {
+      setMobileSidebarOpen(false)
+    }
+  }, [isMobileAdmin])
 
   const activeRolePermissions = useMemo(() => {
     let list: string[] = []
@@ -183,7 +200,7 @@ function AppContent() {
     if (list.length > 0 && !list.includes("kpi")) {
       list.push("kpi")
     }
-    return list as Page[]
+    return list
   }, [effectivePermissions, rolesList, role])
 
   const roleName = useMemo(() => {
@@ -215,205 +232,205 @@ function AppContent() {
       const target = hasPageAccess(activeRolePermissions, "dashboard") ? "/dashboard" : "/staff-portal"
       navigate(target)
     }
-    }, [isLoggedIn, location.pathname, navigate, activeRolePermissions])
+  }, [isLoggedIn, location.pathname, navigate, activeRolePermissions])
 
-    useEffect(() => {
-      const handleUnauthorized = () => {
-        handleLogout()
-        setSessionAlertMsg("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
-      }
-      window.addEventListener("dudi_unauthorized", handleUnauthorized)
-      return () => {
-        window.removeEventListener("dudi_unauthorized", handleUnauthorized)
-      }
-    }, [])
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      handleLogout()
+      setSessionAlertMsg("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+    }
+    window.addEventListener("dudi_unauthorized", handleUnauthorized)
+    return () => {
+      window.removeEventListener("dudi_unauthorized", handleUnauthorized)
+    }
+  }, [])
 
-    const lastActivityRef = useRef<number>(Date.now())
+  const lastActivityRef = useRef<number>(Date.now())
 
-    useEffect(() => {
-      if (!isLoggedIn) return
+  useEffect(() => {
+    if (!isLoggedIn) return
 
-      const SESSION_MS = sessionTimeout * 60 * 1000
-      let idleTimeoutId: ReturnType<typeof setTimeout> | undefined
+    const SESSION_MS = sessionTimeout * 60 * 1000
+    let idleTimeoutId: ReturnType<typeof setTimeout> | undefined
 
-      const scheduleIdleCheck = () => {
-        if (idleTimeoutId) clearTimeout(idleTimeoutId)
-        const remaining = SESSION_MS - (Date.now() - lastActivityRef.current)
-        idleTimeoutId = setTimeout(() => {
-          const idleDuration = Date.now() - lastActivityRef.current
-          if (idleDuration >= SESSION_MS) {
-            handleLogout()
-            setSessionAlertMsg(
-              `Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`
-            )
-          } else {
-            scheduleIdleCheck()
-          }
-        }, Math.max(remaining, 1000))
-      }
+    const scheduleIdleCheck = () => {
+      if (idleTimeoutId) clearTimeout(idleTimeoutId)
+      const remaining = SESSION_MS - (Date.now() - lastActivityRef.current)
+      idleTimeoutId = setTimeout(() => {
+        const idleDuration = Date.now() - lastActivityRef.current
+        if (idleDuration >= SESSION_MS) {
+          handleLogout()
+          setSessionAlertMsg(
+            `Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`
+          )
+        } else {
+          scheduleIdleCheck()
+        }
+      }, Math.max(remaining, 1000))
+    }
 
-      const onActivity = () => {
-        lastActivityRef.current = Date.now()
-        touchSession()
-        scheduleIdleCheck()
-      }
-
-      const events = ["mousedown", "keydown", "scroll", "touchstart", "click"] as const
-
+    const onActivity = () => {
       lastActivityRef.current = Date.now()
       touchSession()
       scheduleIdleCheck()
-
-      events.forEach(event => {
-        window.addEventListener(event, onActivity, { capture: true, passive: true })
-      })
-
-      return () => {
-        if (idleTimeoutId) clearTimeout(idleTimeoutId)
-        events.forEach(event => {
-          window.removeEventListener(event, onActivity, { capture: true })
-        })
-      }
-    }, [isLoggedIn, sessionTimeout])
-
-    const [employees, setEmployees] = useState<Employee[]>(INIT_EMPLOYEES)
-    const [orgNodes, setOrgNodes] = useState<OrgNode[]>(INIT_ORG_NODES)
-    const [assignments, setAssignments] = useState<Assignment[]>(INIT_ASSIGNMENTS)
-    const [requests, setRequests] = useState<any[]>([])
-
-    const pendingRequestsCount = useMemo(() => {
-      const currentWeekVal = `W${getISOWeek(new Date())}`
-      return requests.filter(r => {
-        if (r.status !== "pending") return false
-        try {
-          const dates = getDateRange(r.startDate, r.endDate)
-          return dates.some(d => `W${getISOWeek(d)}` === currentWeekVal)
-        } catch {
-          return false
-        }
-      }).length
-    }, [requests])
-    const [loginError, setLoginError] = useState<string | null>(null)
-    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
-    const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
-    const {
-      unread: unreadNotifs,
-      latest: notifPreview,
-      reload: reloadNotificationsCount,
-      setLatest: setNotifPreview,
-      setUnread: setUnreadNotifCount,
-    } = useNotificationBadge(isLoggedIn)
-    const [profileUpdates, setProfileUpdates] = useState<any[]>([])
-    const [autoOpenUpdateReqId, setAutoOpenUpdateReqId] = useState<string | null>(null)
-
-    const reloadProfileUpdates = () => {
-      if (isLoggedIn) {
-        api.profileUpdates.list().then(d => {
-          if (d && Array.isArray(d)) setProfileUpdates(d as any[])
-        }).catch(err => console.error("Lỗi tải profile updates:", err))
-      }
     }
 
-    const [selectedBranch, setSelectedBranch] = useState(() => {
-      const saved = localStorage.getItem("dudi_user")
-      if (saved) {
-        try {
-          const u = JSON.parse(saved)
-          return u.branchId || "all"
-        } catch {
-          return "all"
-        }
-      }
-      return "all"
+    const events = ["mousedown", "keydown", "scroll", "touchstart", "click"] as const
+
+    lastActivityRef.current = Date.now()
+    touchSession()
+    scheduleIdleCheck()
+
+    events.forEach(event => {
+      window.addEventListener(event, onActivity, { capture: true, passive: true })
     })
 
-    const branches = orgNodes.filter(n => n.type === "branch")
+    return () => {
+      if (idleTimeoutId) clearTimeout(idleTimeoutId)
+      events.forEach(event => {
+        window.removeEventListener(event, onActivity, { capture: true })
+      })
+    }
+  }, [isLoggedIn, sessionTimeout])
 
-    const fetchRequests = () => {
-      if (isLoggedIn) {
+  const [employees, setEmployees] = useState<Employee[]>(INIT_EMPLOYEES)
+  const [orgNodes, setOrgNodes] = useState<OrgNode[]>(INIT_ORG_NODES)
+  const [assignments, setAssignments] = useState<Assignment[]>(INIT_ASSIGNMENTS)
+  const [requests, setRequests] = useState<any[]>([])
+
+  const pendingRequestsCount = useMemo(() => {
+    const currentWeekVal = `W${getISOWeek(new Date())}`
+    return requests.filter(r => {
+      if (r.status !== "pending") return false
+      try {
+        const dates = getDateRange(r.startDate, r.endDate)
+        return dates.some(d => `W${getISOWeek(d)}` === currentWeekVal)
+      } catch {
+        return false
+      }
+    }).length
+  }, [requests])
+  const [loginError, setLoginError] = useState<string | null>(null)
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [globalAddEmpOpen, setGlobalAddEmpOpen] = useState(false)
+  const {
+    unread: unreadNotifs,
+    latest: notifPreview,
+    reload: reloadNotificationsCount,
+    setLatest: setNotifPreview,
+    setUnread: setUnreadNotifCount,
+  } = useNotificationBadge(isLoggedIn)
+  const [profileUpdates, setProfileUpdates] = useState<any[]>([])
+  const [autoOpenUpdateReqId, setAutoOpenUpdateReqId] = useState<string | null>(null)
+
+  const reloadProfileUpdates = () => {
+    if (isLoggedIn) {
+      api.profileUpdates.list().then(d => {
+        if (d && Array.isArray(d)) setProfileUpdates(d as any[])
+      }).catch(err => console.error("Lỗi tải profile updates:", err))
+    }
+  }
+
+  const [selectedBranch, setSelectedBranch] = useState(() => {
+    const saved = localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user")
+    if (saved) {
+      try {
+        const u = JSON.parse(saved)
+        return u.branchId || "all"
+      } catch {
+        return "all"
+      }
+    }
+    return "all"
+  })
+
+  const branches = orgNodes.filter(n => n.type === "branch")
+
+  const fetchRequests = () => {
+    if (isLoggedIn) {
+      api.requests.list().then(d => {
+        if (d && Array.isArray(d)) setRequests(d as any[])
+      }).catch(err => console.error("Lỗi tải requests:", err))
+    }
+  }
+
+  const reloadPermissionsAndRoles = () => {
+    api.roles.list().then(d => {
+      if (d && Array.isArray(d)) setRolesList(d as RoleDefinition[])
+    }).catch(err => console.error("Lỗi tải roles:", err))
+
+    api.auth.me().then(user => {
+      if (user) {
+        writeStoredAuthUser(user)
+        setRole(user.roleId || "role-admin")
+        setLoggedEmail(user.employeeId || user.email || "")
+        if (Array.isArray((user as any).effectivePermissions)) {
+          setEffectivePermissions((user as any).effectivePermissions)
+        }
+      }
+    }).catch(err => console.error("Lỗi tải thông tin tài khoản:", err))
+  }
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      reloadPermissionsAndRoles()
+
+      api.systemConfig.get().then(res => {
+        if (res && res.sessionTimeoutMinutes) {
+          setSessionTimeout(Number(res.sessionTimeoutMinutes))
+        }
+      }).catch(err => console.error("Lỗi tải cấu hình session:", err))
+
+      Promise.all([
+        api.employees.list().then(d => {
+          if (d && Array.isArray(d)) setEmployees(d as Employee[])
+        }),
+        api.orgNodes.list().then(d => {
+          if (d && Array.isArray(d)) setOrgNodes(d as OrgNode[])
+        }),
+        api.assignments.list().then(d => {
+          if (d && Array.isArray(d)) setAssignments(d as Assignment[])
+        }).catch(() => { }),
         api.requests.list().then(d => {
           if (d && Array.isArray(d)) setRequests(d as any[])
-        }).catch(err => console.error("Lỗi tải requests:", err))
+        }).catch(() => { }),
+        api.profileUpdates.list().then(d => {
+          if (d && Array.isArray(d)) setProfileUpdates(d as any[])
+        }).catch(() => { })
+      ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
+    }
+  }, [isLoggedIn])
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      resetChatSocket()
+      return
+    }
+    connectChatSocket()
+    const heartbeat = setInterval(() => {
+      if (getChatSocketStatus() === "connected") {
+        chatHeartbeat()
+      } else {
+        api.staffChat.heartbeat().catch(() => { })
       }
+    }, 25_000)
+    return () => {
+      clearInterval(heartbeat)
+      releaseChatSocket()
     }
+  }, [isLoggedIn])
 
-    const reloadPermissionsAndRoles = () => {
-      api.roles.list().then(d => {
-        if (d && Array.isArray(d)) setRolesList(d as RoleDefinition[])
-      }).catch(err => console.error("Lỗi tải roles:", err))
-
-      api.auth.me().then(user => {
-        if (user) {
-          localStorage.setItem("dudi_user", JSON.stringify(user))
-          setRole(user.roleId || "role-admin")
-          setLoggedEmail(user.employeeId || user.email || "")
-          if (Array.isArray((user as any).effectivePermissions)) {
-            setEffectivePermissions((user as any).effectivePermissions)
-          }
-        }
-      }).catch(err => console.error("Lỗi tải thông tin tài khoản:", err))
-    }
-
-    useEffect(() => {
+  useEffect(() => {
+    const handleUpdate = () => {
       if (isLoggedIn) {
         reloadPermissionsAndRoles()
-
-        api.systemConfig.get().then(res => {
-          if (res && res.sessionTimeoutMinutes) {
-            setSessionTimeout(Number(res.sessionTimeoutMinutes))
-          }
-        }).catch(err => console.error("Lỗi tải cấu hình session:", err))
-
-        Promise.all([
-          api.employees.list().then(d => {
-            if (d && Array.isArray(d)) setEmployees(d as Employee[])
-          }),
-          api.orgNodes.list().then(d => {
-            if (d && Array.isArray(d)) setOrgNodes(d as OrgNode[])
-          }),
-          api.assignments.list().then(d => {
-            if (d && Array.isArray(d)) setAssignments(d as Assignment[])
-          }),
-          api.requests.list().then(d => {
-            if (d && Array.isArray(d)) setRequests(d as any[])
-          }),
-          api.profileUpdates.list().then(d => {
-            if (d && Array.isArray(d)) setProfileUpdates(d as any[])
-          }).catch(() => {})
-        ]).catch(err => console.error("Lỗi tải dữ liệu ban đầu:", err))
       }
-    }, [isLoggedIn])
+    }
+    window.addEventListener("dudi_permissions_updated", handleUpdate)
+    return () => window.removeEventListener("dudi_permissions_updated", handleUpdate)
+  }, [isLoggedIn])
 
-    useEffect(() => {
-      if (!isLoggedIn) {
-        resetChatSocket()
-        return
-      }
-      connectChatSocket()
-      const heartbeat = setInterval(() => {
-        if (getChatSocketStatus() === "connected") {
-          chatHeartbeat()
-        } else {
-          api.staffChat.heartbeat().catch(() => {})
-        }
-      }, 25_000)
-      return () => {
-        clearInterval(heartbeat)
-        releaseChatSocket()
-      }
-    }, [isLoggedIn])
-
-    useEffect(() => {
-      const handleUpdate = () => {
-        if (isLoggedIn) {
-          reloadPermissionsAndRoles()
-        }
-      }
-      window.addEventListener("dudi_permissions_updated", handleUpdate)
-      return () => window.removeEventListener("dudi_permissions_updated", handleUpdate)
-    }, [isLoggedIn])
-
-    useEffect(() => {
+  useEffect(() => {
     if (isLoggedIn && role === "role-manager" && orgNodes.length > 0) {
       const emp = employees.find(e =>
         (e.email || "").toLowerCase() === (loggedEmail || "").toLowerCase() ||
@@ -434,10 +451,10 @@ function AppContent() {
       if (res && res.token) {
         const storage = rememberMe ? localStorage : sessionStorage
         const otherStorage = rememberMe ? sessionStorage : localStorage
-        
+
         storage.setItem("dudi_token", res.token)
         storage.setItem("dudi_user", JSON.stringify(res.user))
-        
+
         otherStorage.removeItem("dudi_token")
         otherStorage.removeItem("dudi_user")
 
@@ -448,6 +465,7 @@ function AppContent() {
           localStorage.removeItem("dudi_saved_id")
           localStorage.removeItem("dudi_saved_pass")
         }
+
         const user = res.user as any
         const r = user.roleId as Role
         setRole(r)
@@ -498,7 +516,7 @@ function AppContent() {
         <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
       )}
       <LoginPage
-        onLogin={(id: string, pass: string, remember: boolean) => { handleLogin(id, pass, remember) }}
+        onLogin={(id, pass, remember) => handleLogin(id, pass, remember)}
         loginError={loginError}
         isLoading={loginLoading}
       />
@@ -511,7 +529,7 @@ function AppContent() {
         {sessionAlertMsg && (
           <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
         )}
-        <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} />
+        <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} onOpenLead={(id) => navigate(`/lead/${id}`)} />
       </>
     )
   }
@@ -522,8 +540,8 @@ function AppContent() {
   )
   let profileUser: { name?: string; email?: string; employeeId?: string; position?: string; department?: string } = {}
   try {
-    profileUser = JSON.parse(localStorage.getItem("dudi_user") || "{}")
-  } catch { /* ignore */ }
+    profileUser = JSON.parse(localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user") || "{}")
+  } catch { }
   const isAdminRole = role === "role-admin" || role === "role-super-admin"
   const currentEmp: Employee = matchedEmp || {
     id: loggedEmail || profileUser.employeeId || "—",
@@ -547,10 +565,10 @@ function AppContent() {
 
   const renderPage = () => {
     if (!hasPageAccess(activeRolePermissions, activePage)) {
-      return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
+      return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} onOpenLead={(id) => navigate(`/lead/${id}`)} /> : <AdminDashboard onNavigate={setActivePage} />
     }
     switch (activePage) {
-      case "dashboard": return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
+      case "dashboard": return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} onOpenLead={(id) => navigate(`/lead/${id}`)} /> : <AdminDashboard onNavigate={setActivePage} />
       case "nhan-su": return (
         <EmployeeManagement
           employees={employees}
@@ -605,17 +623,12 @@ function AppContent() {
       case "kpi":
       case "kpi-stats":
       case "kpi-compare": {
-        const view = activePage === "kpi" ? "overview" : (activePage === "kpi-stats" ? "stats" : "compare");
-        return (
-          <KpiManagementAdmin
-            employees={employees}
-            activeTab={view}
-          />
-        );
+        const view = activePage === "kpi" ? "overview" : (activePage === "kpi-stats" ? "stats" : "compare")
+        return <KpiManagementAdmin employees={employees} activeTab={view} />
       }
       case "staff-portal": return (
-        <div className="w-full h-[calc(100vh-2.5rem)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-black">
-          <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} embed={true} />
+        <div className="w-full h-[calc(100vh-2.5rem)] min-h-[500px] rounded-2xl overflow-hidden shadow-lg border border-black/5 relative bg-[#FFF8F4] isolate">
+          <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} embed={true} onOpenLead={(id) => navigate(`/lead/${id}`)} />
         </div>
       )
       case "user-profile": return (
@@ -633,21 +646,21 @@ function AppContent() {
       case "user-crm": return (
         <CrmStaffPage onOpenLead={(id) => navigate(`/lead/${id}`)} />
       )
-        case "lead": {
-          const leadId = location.pathname.match(/^\/lead\/([^/]+)/)?.[1]
-          return (
-            <LeadManagement
-              currentUserId={currentEmp.id}
-              employees={employees}
-              leadId={leadId}
-              selectedBranch={selectedBranch}
-              onNavigateToLead={(id) => navigate(id ? `/lead/${id}` : "/lead")}
-              onNavigateToProject={(id) => navigate(id ? `/du-an/${id}` : "/du-an")}
-            />
-          )
-        }
-        default: return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} /> : <AdminDashboard onNavigate={setActivePage} />
+      case "lead": {
+        const leadId = location.pathname.match(/^\/lead\/([^/]+)/)?.[1]
+        return (
+          <LeadManagement
+            currentUserId={currentEmp.id}
+            employees={employees}
+            leadId={leadId}
+            selectedBranch={selectedBranch}
+            onNavigateToLead={(id) => navigate(id ? `/lead/${id}` : "/lead")}
+            onNavigateToProject={(id) => navigate(id ? `/du-an/${id}` : "/du-an")}
+          />
+        )
       }
+      default: return isStaffRole ? <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} onOpenLead={(id) => navigate(`/lead/${id}`)} /> : <AdminDashboard onNavigate={setActivePage} />
+    }
   }
 
 
@@ -655,17 +668,25 @@ function AppContent() {
 
   return (
     <Routes>
-      {/* Route dành cho khách hàng điền form */}
       <Route path="/form/:leadId" element={<PublicRequirementForm />} />
-      {/* Route dành cho admin */}
       <Route path="*" element={
         <>
           {sessionAlertMsg && (
             <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
           )}
           <div className="flex h-screen bg-[#F5F1EF] overflow-hidden" onClick={() => { }}>
-            <UserAwareSidebar active={activePage} onNavigate={setActivePage}
-              collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(p => !p)}
+            {isMobileAdmin && mobileSidebarOpen && (
+              <div
+                className="fixed inset-0 bg-black/45 z-30 lg:hidden"
+                onClick={() => setMobileSidebarOpen(false)}
+              />
+            )}
+            <UserAwareSidebar active={activePage} onNavigate={(p) => {
+              setActivePage(p)
+              if (isMobileAdmin) setMobileSidebarOpen(false)
+            }}
+              collapsed={isMobileAdmin ? false : sidebarCollapsed}
+              onToggle={() => isMobileAdmin ? setMobileSidebarOpen(p => !p) : setSidebarCollapsed(p => !p)}
               role={role} roleName={roleName} modules={activeRolePermissions} onLogout={handleLogout}
               pendingRequestsCount={pendingRequestsCount}
               currentUser={currentUserInfo}
@@ -685,9 +706,28 @@ function AppContent() {
               employees={employees}
               orgNodes={orgNodes}
               onSelectUpdateReq={setAutoOpenUpdateReqId}
+              mobile={isMobileAdmin}
+              mobileOpen={mobileSidebarOpen}
             />
             <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-              <main className="flex-1 overflow-y-auto p-5 relative"
+              {isMobileAdmin && (
+                <div className="lg:hidden px-3 pt-3 pb-1">
+                  <div className="rounded-2xl bg-white/90 backdrop-blur-md border border-black/5 shadow-sm px-3 py-2.5 flex items-center gap-3">
+                    <button
+                      onClick={() => setMobileSidebarOpen(true)}
+                      className="p-2 rounded-xl hover:bg-gray-100 text-gray-700 transition-colors"
+                      title="Mở menu"
+                    >
+                      <Menu size={18} />
+                    </button>
+                    <BrandLogo size={28} withText className="min-w-0 flex-1" />
+                    <div className="text-[11px] font-bold text-gray-500 truncate">
+                      {roleName}
+                    </div>
+                  </div>
+                </div>
+              )}
+              <main className={`flex-1 overflow-y-auto relative ${isMobileAdmin ? "px-3 pb-3 pt-2" : "p-5"}`}
                 style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
                 {isPageLoading && (
                   <div className="absolute top-0 left-0 right-0 h-0.5 z-[100] overflow-hidden pointer-events-none">
@@ -777,13 +817,7 @@ function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate
     if (!collapsed || !open || !btnRef.current) return
     const update = () => {
       const rect = btnRef.current!.getBoundingClientRect()
-      const itemCount = React.Children.count(children)
-      const flyoutHeight = 36 + (itemCount * 36) + 16
-      let top = rect.top
-      if (top + flyoutHeight > window.innerHeight) {
-        top = Math.max(8, window.innerHeight - flyoutHeight - 8)
-      }
-      setFlyoutPos({ top, left: rect.right + 8 })
+      setFlyoutPos({ top: rect.top, left: rect.right + 8 })
     }
     update()
     window.addEventListener("scroll", update, true)
@@ -792,7 +826,7 @@ function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate
       window.removeEventListener("scroll", update, true)
       window.removeEventListener("resize", update)
     }
-  }, [collapsed, open, children])
+  }, [collapsed, open])
 
   const handleClick = () => {
     if (collapsed) {
@@ -826,7 +860,7 @@ function GroupNav({ gKey, icon: Icon, label, pages, children, active, onNavigate
         <>
           <div className="fixed inset-0 z-[90]" onClick={() => onToggle(gKey)} />
           <div
-            className="fixed w-56 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl py-1.5 z-[100] flex flex-col max-h-[90vh] overflow-y-auto"
+            className="fixed w-56 bg-white/95 backdrop-blur-md rounded-2xl border border-gray-100 shadow-xl py-1.5 z-[100] flex flex-col"
             style={{ top: flyoutPos.top, left: flyoutPos.left }}
           >
             <div className="px-4 py-2 text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">
@@ -883,6 +917,7 @@ function UserAwareSidebar({
   currentUser, unread = 0, notifPreview = [], onMarkAllRead, onReloadNotifCount,
   selectedBranch = "all", onBranchChange, branches = [],
   profileUpdates = [], onReloadProfileUpdates, employees = [], orgNodes = [], onSelectUpdateReq,
+  mobile = false, mobileOpen = false,
 }: {
   active: Page
   onNavigate: (p: Page) => void
@@ -906,6 +941,8 @@ function UserAwareSidebar({
   employees?: Employee[]
   orgNodes?: OrgNode[]
   onSelectUpdateReq?: (id: string | null) => void
+  mobile?: boolean
+  mobileOpen?: boolean
 }) {
   const [expanded, setExpanded] = useState<string[]>([])
   const [showBranchDrop, setShowBranchDrop] = useState(false)
@@ -1019,7 +1056,10 @@ function UserAwareSidebar({
   ) : null
 
   return (
-    <aside className={`${collapsed ? "w-16" : "w-60"} bg-[#160606] flex flex-col transition-all duration-300 flex-shrink-0 overflow-visible relative z-40`}>
+    <aside className={`${mobile
+      ? `fixed inset-y-0 left-0 w-72 max-w-[86vw] shadow-2xl transform transition-transform duration-300 z-40 ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`
+      : `${collapsed ? "w-16" : "w-60"} transition-all duration-300 flex-shrink-0 relative z-40`
+      } bg-[#160606] flex flex-col overflow-visible`}>
       <div className={`p-3 border-b border-white/5 flex ${collapsed ? "flex-col items-center gap-2" : "items-center gap-2"}`}>
         <button
           onClick={onToggle}
@@ -1037,7 +1077,6 @@ function UserAwareSidebar({
         />
       </div>
 
-      {/* Chi nhánh + Thông báo */}
       <div className={`px-2 pt-2 pb-1 space-y-1 border-b border-white/5 ${collapsed ? "flex flex-col items-center" : ""}`}>
         {isAdmin && onBranchChange && (
           <div className="relative w-full">
@@ -1085,7 +1124,6 @@ function UserAwareSidebar({
 
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 space-y-0.5 py-2" style={{ scrollbarWidth: "none" }}>
         {hasAccess("dashboard") && <NavItem page="dashboard" icon={LayoutDashboard} label="Dashboard" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         <NavItem page="staff-portal" icon={Fingerprint} label="Cổng nhân viên" active={active} onNavigate={onNavigate} collapsed={collapsed} />
@@ -1121,13 +1159,10 @@ function UserAwareSidebar({
           </GroupNav>
         )}
 
-        {hasAccess("thong-ke") && <NavItem page="thong-ke" icon={BarChart3} label="Báo cáo thống kê" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Quản lý thông báo" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("lead") && <NavItem page="lead" icon={User} label="Cơ hội" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("kpi") && (
           <GroupNav
             gKey="kpi"
@@ -1142,6 +1177,8 @@ function UserAwareSidebar({
             <SubItem page="kpi-compare" label="So sánh" active={active} onNavigate={onNavigate} />
           </GroupNav>
         )}
+        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
+        {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
 
       <div className="p-2 border-t border-white/5">
@@ -1208,7 +1245,6 @@ function UserAwareSidebar({
   )
 }
 
-// ─── SESSION ALERT MODAL (thay thế browser alert()) ───
 function SessionAlertModal({ message, onClose }: { message: string; onClose: () => void }) {
   return (
     <div
@@ -1219,10 +1255,7 @@ function SessionAlertModal({ message, onClose }: { message: string; onClose: () 
         className="bg-white rounded-2xl shadow-2xl w-[340px] overflow-hidden"
         style={{ animation: "sessionModalIn 0.22s cubic-bezier(.34,1.56,.64,1) both" }}
       >
-        {/* Gradient header strip */}
         <div className="h-1.5 w-full bg-gradient-to-r from-[#C62828] to-[#E64A19]" />
-
-        {/* Icon + message */}
         <div className="flex flex-col items-center gap-3 px-7 pt-7 pb-5">
           <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
@@ -1236,7 +1269,6 @@ function SessionAlertModal({ message, onClose }: { message: string; onClose: () 
           </p>
         </div>
 
-        {/* Action button */}
         <div className="px-7 pb-6 flex justify-center">
           <button
             id="session-alert-ok"

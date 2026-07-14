@@ -125,18 +125,7 @@ export function LeadManagement({
       showToast("Tên công ty không được để trống khi chọn loại khách hàng là Công ty", "error")
       return
     }
-    if (form.contactPhone.trim()) {
-      const cleanPhone = form.contactPhone.trim()
-      const phoneRegex = /^[0-9]+$/
-      if (!phoneRegex.test(cleanPhone)) {
-        showToast("Số điện thoại chỉ được chứa các chữ số", "error")
-        return
-      }
-      if (cleanPhone.length < 9 || cleanPhone.length > 11) {
-        showToast("Số điện thoại phải từ 9 đến 11 chữ số", "error")
-        return
-      }
-    }
+
     if (form.contactEmail.trim()) {
       const cleanEmail = form.contactEmail.trim()
       const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/

@@ -1080,9 +1080,19 @@ export function ProjectDocVaultTab({
     }
   }, [autoOpenCategory])
 
-  const clientItems = vaultItems.filter(i => i.audience === "client" && Object.keys(CLIENT_CATEGORIES).includes(i.category))
-  const handoverItems = vaultItems.filter(i => Object.keys(HANDOVER_CATEGORIES).includes(i.category))
-  const internalItems = vaultItems.filter(i => i.audience === "internal" && Object.keys(INTERNAL_CATEGORIES).includes(i.category))
+  const normalizedVaultItems = vaultItems.map((i: ProjectVaultItem) => {
+    const isClient = Object.keys(CLIENT_CATEGORIES).includes(i.category)
+    const isHandover = Object.keys(HANDOVER_CATEGORIES).includes(i.category)
+    const isInternal = Object.keys(INTERNAL_CATEGORIES).includes(i.category)
+    if (!isClient && !isHandover && !isInternal) {
+      return { ...i, audience: "internal", category: "other" } as ProjectVaultItem
+    }
+    return i
+  })
+
+  const clientItems = normalizedVaultItems.filter(i => Object.keys(CLIENT_CATEGORIES).includes(i.category))
+  const handoverItems = normalizedVaultItems.filter(i => Object.keys(HANDOVER_CATEGORIES).includes(i.category))
+  const internalItems = normalizedVaultItems.filter(i => Object.keys(INTERNAL_CATEGORIES).includes(i.category))
 
   function groupByCategory(items: ProjectVaultItem[], catMap: Record<string, any>) {
     return Object.entries(catMap)
@@ -1148,7 +1158,7 @@ export function ProjectDocVaultTab({
     if (!form.name.trim() || saving) return
     const legacy = vaultMetaToLegacy({ category: form.category, meta: form.meta })
     const isClientCategory = (cat: ProjectVaultCategory) =>
-      ["quotation", "requirement", "contract", "client-file", "client-handover", "client-account"].includes(cat)
+      ["quotation", "requirement", "contract", "client-file", "client-handover", "client-account", "tech-doc"].includes(cat)
 
     const payload = {
       audience: isClientCategory(form.category) ? "client" : ("internal" as ProjectVaultAudience),

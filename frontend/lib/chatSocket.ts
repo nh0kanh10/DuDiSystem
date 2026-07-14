@@ -28,6 +28,7 @@ function createSocket(t: string) {
     path: "/socket.io",
     auth: { token: t },
     transports: ["websocket", "polling"],
+    withCredentials: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
@@ -35,7 +36,6 @@ function createSocket(t: string) {
   })
 
   socket.on("connect_error", () => {
-    /* fallback REST polling handles offline */
   })
 
   socket.on("connect", () => {

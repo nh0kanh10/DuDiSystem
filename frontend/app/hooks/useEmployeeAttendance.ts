@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { api, detectPublicIP } from "@/lib/api"
+import { api, detectPublicIP, readStoredAuthUser, writeStoredAuthUser } from "@/lib/api"
 import type { AttendanceRecord } from "../types"
 import {
   getPunchLabel,
   getTodayStatusText,
   hasPunchTime,
-  isInternStatus,
+  isInternContractType,
 } from "../components/cham-cong/attendanceModel"
 
 function pad(n: number) {
@@ -23,12 +23,7 @@ export function formatTimeNow() {
 }
 
 function readStoredUser() {
-  try {
-    const raw = localStorage.getItem("dudi_user")
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+  return readStoredAuthUser()
 }
 
 export {
@@ -90,12 +85,13 @@ export function useEmployeeAttendance() {
       let profile = readStoredUser()
       try {
         profile = await api.auth.me()
-        localStorage.setItem("dudi_user", JSON.stringify(profile))
+        writeStoredAuthUser(profile)
       } catch {
       }
       const empId = profile?.employeeId as string
       if (!empId) throw new Error("Không tìm thấy mã nhân viên trên tài khoản")
-      const intern = isInternStatus(profile?.employeeStatus)
+      // Phân loại TT/CT theo loại hợp đồng — không dùng employeeStatus (đang làm/nghỉ việc)
+      const intern = isInternContractType(profile?.contractType as string | undefined)
       setEmployeeId(empId)
       setEmployeeName((profile?.name as string) || empId)
       setIsIntern(intern)
@@ -167,7 +163,7 @@ export function useEmployeeAttendance() {
           ip: publicIP,
           message: msg,
         })
-        setError(null)
+        setError(msg)
       } else {
         setError(msg)
       }

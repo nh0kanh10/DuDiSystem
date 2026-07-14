@@ -90,6 +90,8 @@ async function start() {
   try {
     await connectDB()
     await loadCache()
+    
+
 
     const httpServer = http.createServer(app)
     initChatSocket(httpServer)

@@ -9,7 +9,7 @@ function normSearch(s = "") {
 
 export function getAll(filter = {}) {
   let rows = findAll(COL)
-  if (filter.branchId) rows = rows.filter(e => e.branchId === filter.branchId)
+  if (filter.branchId && filter.branchId !== "all") rows = rows.filter(e => e.branchId === filter.branchId)
   if (filter.status) rows = rows.filter(e => e.status === filter.status)
   if (filter.department) rows = rows.filter(e => e.department === filter.department)
   if (filter.q) {

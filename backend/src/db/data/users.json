@@ -1,79 +1,5 @@
 [
   {
-    "id": "U001",
-    "employeeId": "NV001",
-    "email": "NV001",
-    "password": "$2a$10$bFlWDZ7oJv7ftHEo655TWusfOlhXTfxotkKWS3wjQKcekdr0yKnOi",
-    "roleId": "role-user",
-    "status": "active",
-    "permissions": null
-  },
-  {
-    "id": "U002",
-    "employeeId": "NV002",
-    "email": "NV002",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "roleId": "role-manager",
-    "status": "active",
-    "permissions": null
-  },
-  {
-    "id": "U003",
-    "employeeId": "NV003",
-    "email": "NV003",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "roleId": "role-user",
-    "status": "active"
-  },
-  {
-    "id": "U004",
-    "employeeId": "NV004",
-    "email": "NV004",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "roleId": "role-user",
-    "status": "active"
-  },
-  {
-    "id": "U005",
-    "employeeId": "NV005",
-    "email": "NV005",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "roleId": "role-admin",
-    "status": "active"
-  },
-  {
-    "id": "U006",
-    "employeeId": "NV006",
-    "email": "NV006",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "roleId": "role-user",
-    "status": "active"
-  },
-  {
-    "id": "U007",
-    "employeeId": "NV007",
-    "email": "NV007",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "roleId": "role-user",
-    "status": "active"
-  },
-  {
-    "id": "U008",
-    "employeeId": "NV008",
-    "email": "NV008",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "roleId": "role-user",
-    "status": "active"
-  },
-  {
-    "id": "U009",
-    "employeeId": "NV009",
-    "email": "NV009",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "roleId": "role-manager",
-    "status": "active"
-  },
-  {
     "id": "U010",
     "employeeId": "0000000000",
     "email": "0000000000",
@@ -83,43 +9,291 @@
     "permissions": null
   },
   {
-    "id": "U011",
-    "employeeId": "NV011",
-    "email": "NV011",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "id": "2025081606",
+    "employeeId": "2025081606",
+    "email": "nv2025081606@dudi.vn",
+    "password": "$2a$10$jRnIZYas2f2C8F.BLMS6VOZfT5Yv5AH9pkuzLISR69sCw/R9sIs7i",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025081607",
+    "employeeId": "2025081607",
+    "email": "trinhtuandan1601@gmail.com",
+    "password": "$2a$10$yg4JVhaW20eUCWbrx3L6C.qte/TTdsUW2pCNcvvPKT4RVjYQpnXiK",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025081608",
+    "employeeId": "2025081608",
+    "email": "longvo1903@gmail.com",
+    "password": "$2a$10$trIEwNxd2hfUduUNkIlPW.VzG9slldAbj8ZMe9gs9OpPsnYbF6gHa",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025081611",
+    "employeeId": "2025081611",
+    "email": "nqhung394.work@gmail.com",
+    "password": "$2a$10$7GWzNZcPTv78q0M.Y/nkIO6jOq8rbzxInX7FaGB.yfJQFSL6MjLrW",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025081612",
+    "employeeId": "2025081612",
+    "email": "baokie2004@gmail.com",
+    "password": "$2a$10$TlDEVXpnV4CyQnEvR0X3y.Sj4na7fbDMIkj.5BFGXCUA9c9W5q/8y",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025081613",
+    "employeeId": "2025081613",
+    "email": "anb962719@gmail.com",
+    "password": "$2a$10$Amsf3gTEHOJOVYXG9agwKua1tDxWLfuRzU4zrZoejVW0JkHwWFW1e",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025081614",
+    "employeeId": "2025081614",
+    "email": "nguyenphuongcongviec@gmail.com",
+    "password": "$2a$10$OyX7gituKBmnd4YbJh3hG.Fb4ZD1ut1/XweFrOeh/e3u84WjeKdoi",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025081615",
+    "employeeId": "2025081615",
+    "email": "ngothithuynga736@gmail.com",
+    "password": "$2a$10$5cg8dW5hsXZnnbEt8p0aQu2svJFFGgsj..UyiIM..OhfrGSN6BSzq",
+    "roleId": "role-manager",
+    "status": "inactive"
+  },
+  {
+    "id": "2025081632",
+    "employeeId": "2025081632",
+    "email": "vobathanhnhan@gmail.com",
+    "password": "$2a$10$IWAfwSBYHrjJx0wbAIbXeefHPRtob2UhDwePherPYcKVbuNgCj8nG",
+    "roleId": "role-admin",
+    "status": "inactive"
+  },
+  {
+    "id": "2025090304",
+    "employeeId": "2025090304",
+    "email": "trivinh147@gmail.com",
+    "password": "$2a$10$oQLESzb4bmStc2bKMRgoRu9o8EAY9FSdHvtvd2E0S.IrK8A/wzfPu",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025091515",
+    "employeeId": "2025091515",
+    "email": "duonghung17122004@gmail.com",
+    "password": "$2a$10$xBDn9Qi5WLMbEQ854nZtEeK8kSaMskyeXAqGaHvRWyWaGW7AL/nMq",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025091516",
+    "employeeId": "2025091516",
+    "email": "le4465520@gmail.com",
+    "password": "$2a$10$V6xRhvhq282SUKiuDglOV.c4h3WFgFA.W1RvjoGBrkq7VDPq101JO",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025100101",
+    "employeeId": "2025100101",
+    "email": "nguyengiathinh2@gmail.com",
+    "password": "$2a$10$.jbqW1qO6hgMgWgE3LXc3elWnQZp.Tyg8ypK/RfODT7d0Q3TwdeTu",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025100601",
+    "employeeId": "2025100601",
+    "email": "trungtin0972@gmail.com",
+    "password": "$2a$10$7w2I/ZkWUNBYaXRUJoZlwuXNN77l4TNP2YyExLuD8MynD59vI3FkK",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025103001",
+    "employeeId": "2025103001",
+    "email": "nv2025103001@dudi.vn",
+    "password": "$2a$10$hYPc/7tuB2BnUJENE4lOzOQA0Rra9KzUnofRlHVvgmi1jQXYQgGxq",
+    "roleId": "role-manager",
+    "status": "inactive"
+  },
+  {
+    "id": "2025112301",
+    "employeeId": "2025112301",
+    "email": "tungnnx.cybersec@gmail.com",
+    "password": "$2a$10$0dkjCdq68sQfPFghPuzDnunMWt59zj5zT7rj/g7ZLZ6JEDSfT.aRS",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025112401",
+    "employeeId": "2025112401",
+    "email": "huyhoangzx08@gmail.com",
+    "password": "$2a$10$xxlMx8vNqmzH0DGCc7cTNO3EeelL8xYdVNpahtAb/hAD/ud2A4U.S",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025121502",
+    "employeeId": "2025121502",
+    "email": "nguyentathientruc.lk@gmail.com",
+    "password": "$2a$10$mWzqA9zkZr8yZTlDzukBa.XTlC2IaiskhD.lIJ/hu/2iqxTyjjbGi",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2025122410",
+    "employeeId": "2025122410",
+    "email": "linhtrangvo4@gmail.com",
+    "password": "$2a$10$/HQ/n1uJkoIMNOVwmGCkxeeLKbK6SOJ1Jtm65IRqz5SNFwO87kwbK",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2026031603",
+    "employeeId": "2026031603",
+    "email": "ththu23092004@gmail.com",
+    "password": "$2a$10$QXdEvja6jxScJyleBaCleeEwEqUDK18Ck1TZjCUrXSW4wPmcjMQYm",
     "roleId": "role-user",
     "status": "active"
   },
   {
-    "id": "U012",
-    "employeeId": "NV012",
-    "email": "NV012",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "id": "2026031802",
+    "employeeId": "2026031802",
+    "email": "hientrancong0827@gmail.com",
+    "password": "$2a$10$O/l/6xmeo59I5TuXxOXkXuiwNzE4lBaAyv6cx/YdRp5L59vOwkDry",
     "roleId": "role-manager",
     "status": "active"
   },
   {
-    "id": "U013",
-    "employeeId": "NV013",
-    "email": "NV013",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
+    "id": "2026031903",
+    "employeeId": "2026031903",
+    "email": "luandangnhap@gmail.com",
+    "password": "$2a$10$PvniDw4eRAhXjLLemOynOuYVb4J3OPLcjcGSUMCqtnb3ZMRudJUaO",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2026032404",
+    "employeeId": "2026032404",
+    "email": "quybi190804@gmail.com",
+    "password": "$2a$10$JmlLXTzEwVCAN5wDpGZaYOiTbDFQFCC4iqN6BMBsSSVSB6nOMfdYC",
     "roleId": "role-user",
     "status": "active"
   },
   {
-    "id": "U014",
-    "employeeId": "1111111111",
-    "email": "1111111111",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "roleId": "role-super-admin",
+    "id": "2026032603",
+    "employeeId": "2026032603",
+    "email": "ngocquynh2004.mis@gmail.com",
+    "password": "$2a$10$y6K7YP9HayplXjW4WM4sw.NQOAIH4/KF5iLf7j8pH8xLSPsabkmwS",
+    "roleId": "role-user",
     "status": "active"
   },
   {
-    "id": "U015",
-    "employeeId": "2222222222",
-    "email": "2222222222",
-    "password": "$2a$10$AQgC2.Xokn2FiR64/C8cV.HKmrRAnCvAQ.VBYyCD.ePOXlICadxwu",
-    "roleId": "role-super-admin",
+    "id": "2026033003",
+    "employeeId": "2026033003",
+    "email": "dngockhue2707@gmail.com",
+    "password": "$2a$10$la0YaZSDZdWHDwxxKwcZf.dboShQYrq6Yu9Vvb3sBTTZVTWvw3MMK",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "2026033008",
+    "employeeId": "2026033008",
+    "email": "1150070045@sv.hcmunre.edu.vn",
+    "password": "$2a$10$KIOw2LADQRQAxFjO4Zuoa.dRvvCsbIaKvGdD7UnpS5EYBQOVa7hoy",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "2026040604",
+    "employeeId": "2026040604",
+    "email": "mainguyentruongduy2468@gmail.com",
+    "password": "$2a$10$a1pIM3AzQgB78vpoVKX8DurFrLGHB.yK6EKUgqfW9MA6jcWjOp5sm",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "2026040904",
+    "employeeId": "2026040904",
+    "email": "tonguyentienvu2004@gmail.com",
+    "password": "$2a$10$UiK6ArTgiQqwWJeSAJJjZ.99YzGg3AwQXDwFdGPwKY4NfHGQWVtbK",
+    "roleId": "role-user",
+    "status": "inactive"
+  },
+  {
+    "id": "2026041302",
+    "employeeId": "2026041302",
+    "email": "nguyenntttb01430@gmail.com",
+    "password": "$2a$10$0PgAFX22VPJLAvosq/ReG.ggSA8sW38fjR/i9cGlwtaVRzzvE38zS",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "2026042205",
+    "employeeId": "2026042205",
+    "email": "ntspro01@gmail.com",
+    "password": "$2a$10$qn6TwVZitoxI6qfngDxQE.DCVuPFCHfa.6GyApEw1AmRencxJoEVy",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "2026052831",
+    "employeeId": "2026052831",
+    "email": "tranbichlien935@gmail.com",
+    "password": "$2a$10$WuG2RXOGOqA7aLTR7gUbFu2DL18FcigxkwMtj7lmoyoqJjcXrvSi.",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "2026052832",
+    "employeeId": "2026052832",
+    "email": "phthicamtien030325@gmail.com",
+    "password": "$2a$10$munAiJlsM/iB3nbygbadBOE47Tuz5s4JmUN9jhb2ywV16VnpelH2.",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "2026060133",
+    "employeeId": "2026060133",
+    "email": "buitringuyen1999@gmail.com",
+    "password": "$2a$10$ioNBRvCXqL8PL/686AQf7OYNuO9pS6DwaFJdthm0CnlnTuYlhgj2q",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "2026061034",
+    "employeeId": "2026061034",
+    "email": "vandiem2004@gmail.com",
+    "password": "$2a$10$wVdWmPXRaSXppocfmiOg/.HIY/Pu4ifRqLZ8MohakFLECxtNkIHQq",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "2026061535",
+    "employeeId": "2026061535",
+    "email": "phamquanghien648@gmail.com",
+    "password": "$2a$10$LIQXpYVprAA4k5d8nwo27uUAFFWuHIcoj21f/4T1epahGrrm6JhBy",
+    "roleId": "role-user",
+    "status": "active"
+  },
+  {
+    "id": "2026061536",
+    "employeeId": "2026061536",
+    "email": "dangpham1010da@gmail.com",
+    "password": "$2a$10$ZI0psQtkYKdK0MPEZ8O4R.uUF45eXcnA0E1Hqyr1ZiP3ABO7qNqEi",
+    "roleId": "role-user",
     "status": "active"
   }
 ]

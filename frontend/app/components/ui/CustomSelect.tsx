@@ -190,7 +190,7 @@ export function CustomSelect({
           {portal ? (
             menuRect ? createPortal(
               <div
-                className="fixed z-[60]"
+                className="fixed z-[10010]"
                 style={{ top: menuRect.top, left: menuRect.left, width: menuRect.width }}
               >
                 {menuContent}

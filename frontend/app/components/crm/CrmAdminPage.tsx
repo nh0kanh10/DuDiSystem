@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { api } from "@/lib/api"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 import ConfirmModal from "../ui/ConfirmModal"
 import { useToast } from "@/app/hooks/useToast"
+import { CustomSelect } from "../ui/CustomSelect"
 import { CrmLeadCell } from "./CrmLeadCell"
+import { getChatSocket } from "@/lib/chatSocket"
 import { StatCard } from "../ui/StatCard"
 import { CustomCombobox } from "../ui/CustomCombobox"
 import { AvatarCircle } from "../ui/AvatarCircle"
@@ -53,6 +55,9 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [dashboardPeriod, setDashboardPeriod] = useState<"all" | "today" | "week" | "month">("all")
+  const [expandedEmpId, setExpandedEmpId] = useState<string | null>(null)
+  const [expandedStatusMap, setExpandedStatusMap] = useState<Record<string, string | null>>({})
   const [employees, setEmployees] = useState<any[]>([])
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
@@ -73,6 +78,13 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
   const [autoAssignDept, setAutoAssignDept] = useState("")
   const [autoAssignSpecificEmp, setAutoAssignSpecificEmp] = useState("")
   const [autoAssignQuantity, setAutoAssignQuantity] = useState("")
+  const [autoAssignSelectedEmpIds, setAutoAssignSelectedEmpIds] = useState<string[]>([])
+  const [reassignWarnOpen, setReassignWarnOpen] = useState(false)
+  const [reassignWarnMsg, setReassignWarnMsg] = useState("")
+  const [reassignAction, setReassignAction] = useState<{ onConfirm: () => void } | null>(null)
+  const [importConfirmOpen, setImportConfirmOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [deleteBulkOpen, setDeleteBulkOpen] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [tempNote, setTempNote] = useState("")
@@ -118,7 +130,7 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
 
   const fetchStats = async () => {
     setStatsLoading(true)
-    try { setStats(await api.crm.adminDashboard({ branchId: selectedBranch })) } catch { } finally { setStatsLoading(false) }
+    try { setStats(await api.crm.adminDashboard({ branchId: selectedBranch, period: dashboardPeriod })) } catch { } finally { setStatsLoading(false) }
   }
 
   const fetchRecords = async () => {
@@ -136,14 +148,55 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
   }
 
   const refresh = () => { fetchStats(); fetchRecords(); fetchEmployees() }
-  useEffect(() => { refresh() }, [statusFilter, assignedFilter, search, pageSize, selectedBranch])
+  useEffect(() => { refresh() }, [statusFilter, assignedFilter, search, pageSize, selectedBranch, dashboardPeriod])
 
-  const phoneReg = /^(\+84|0)(\s*\d){9,11}$/
+  const refreshRef = React.useRef(refresh)
+  useEffect(() => {
+    refreshRef.current = refresh
+  }, [refresh])
+
+  useEffect(() => {
+    let boundSocket: any = null
+
+    const handleCrmChanged = () => {
+      refreshRef.current()
+    }
+
+    const tryBind = () => {
+      const socket = getChatSocket()
+      if (socket) {
+        if (boundSocket && boundSocket !== socket) {
+          boundSocket.off("crm:changed", handleCrmChanged)
+        }
+        boundSocket = socket
+        socket.on("crm:changed", handleCrmChanged)
+      }
+    }
+
+    tryBind()
+    window.addEventListener("dudi:chat-socket-connect", tryBind)
+
+    return () => {
+      if (boundSocket) {
+        boundSocket.off("crm:changed", handleCrmChanged)
+      }
+      window.removeEventListener("dudi:chat-socket-connect", tryBind)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!autoAssignOpen) {
+      setAutoAssignDept("")
+      setAutoAssignSelectedEmpIds([])
+      setAutoAssignSpecificEmp("")
+      setAutoAssignQuantity("")
+    }
+  }, [autoAssignOpen])
+
   const validate = () => {
     const errs: any = {}
     if (!form.businessName.trim()) errs.businessName = "Không được để trống"
     if (!form.phone.trim()) errs.phone = "Không được để trống"
-    else if (!phoneReg.test(form.phone.trim())) errs.phone = "SĐT không hợp lệ"
     setFormErrors(errs)
     return !Object.keys(errs).length
   }
@@ -161,9 +214,14 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
     if (!selectedEmpId) return
     if (selectedIds.length > 0) {
       const selectedRecords = records.filter(r => selectedIds.includes(r.id))
-      const alreadyAssigned = selectedRecords.filter(r => r.assignedTo)
-      if (alreadyAssigned.length > 0) {
-        notify(`Có ${alreadyAssigned.length} khách đã có người phụ trách. Vui lòng huỷ tích!`, "error")
+      const cannotReassign = selectedRecords.filter(r => r.status && r.status !== "Chưa xử lý")
+      if (cannotReassign.length > 0) {
+        notify(`Có ${cannotReassign.length} khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!`, "error")
+        return
+      }
+    } else if (current) {
+      if (current.status && current.status !== "Chưa xử lý") {
+        notify("Khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!", "error")
         return
       }
     }
@@ -176,19 +234,34 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
 
   const handleDelete = async () => {
     if (!current) return
-    try { await api.crm.deleteData(current.id); notify("Đã xóa!"); refresh() }
-    catch { notify("Không thể xóa", "error") }
+    try {
+      await api.crm.deleteData(current.id)
+      notify("Đã xóa!")
+      refresh()
+    } catch (err: any) {
+      notify(err.message || "Không thể xóa", "error")
+    }
+  }
+
+  const handleDeleteBulk = async () => {
+    try {
+      await api.crm.deleteBulk(selectedIds)
+      notify("Đã xóa " + selectedIds.length + " mục")
+      setSelectedIds([])
+      refresh()
+    } catch (err: any) {
+      notify(err.message || "Lỗi xóa hàng loạt", "error")
+    }
   }
 
   const submitAutoAssign = async () => {
     if (autoAssignTab === "department") {
       if (!autoAssignDept) { notify("Vui lòng chọn phòng ban", "error"); return }
-      const active = activeEmployees.filter((e: any) => e.department === autoAssignDept)
-      if (!active.length) { notify(`Không có nhân viên hoạt động ở phòng ban này`, "error"); return }
+      if (!autoAssignSelectedEmpIds.length) { notify("Vui lòng chọn ít nhất một nhân viên để chia data", "error"); return }
       
       setAutoAssignLoading(true)
       try {
-        const r = await api.crm.autoAssign(active.map((e: any) => e.id))
+        const r = await api.crm.autoAssign(autoAssignSelectedEmpIds)
         notify("Đã chia tự động " + (r?.assignedCount ?? 0) + " data cho phòng ban!")
         setAutoAssignOpen(false); refresh()
       } catch (err: any) { notify(err.message || "Lỗi chia tự động", "error") }
@@ -208,20 +281,23 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
     }
   }
 
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; 
     if (!file) return
-    if (!window.confirm(`Bạn có chắc chắn muốn import file "${file.name}"?`)) {
-      e.target.value = ""
-      return
-    }
+    setImportFile(file)
+    setImportConfirmOpen(true)
+    e.target.value = ""
+  }
+
+  const submitImport = async () => {
+    if (!importFile) return
     setImportLoading(true)
     try {
-      const r = await api.crm.importCsv(file)
+      const r = await api.crm.importCsv(importFile)
       notify("Import " + (r?.successCount ?? 0) + " dòng thành công!")
       refresh()
     } catch { notify("Lỗi import file", "error") }
-    finally { setImportLoading(false); e.target.value = "" }
+    finally { setImportLoading(false); setImportFile(null) }
   }
 
   const handleExport = () => {
@@ -240,6 +316,13 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
 
   const handleInlineAssignConfirm = async () => {
     if (!inlineAssignId) return
+    const target = records.find(r => r.id === inlineAssignId)
+    if (target && target.status && target.status !== "Chưa xử lý") {
+      notify("Khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!", "error")
+      setInlineAssignId(null)
+      setInlineAssignEmpId("")
+      return
+    }
     setInlineAssignLoading(true)
     try {
       if (inlineAssignEmpId === "") {
@@ -262,13 +345,71 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
     setFormErrors({})
     setFormOpen(true)
   }
-  const openAssign = (r?: any) => { if (r) setCurrent(r); else setCurrent(null); setSelectedEmpId(""); setAssignOpen(true) }
+  const openAssign = (r?: any) => {
+    if (r) {
+      if (r.status && r.status !== "Chưa xử lý") {
+        notify("Khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!", "error")
+        return
+      }
+      if (r.assignedTo) {
+        setReassignWarnMsg(`Khách hàng "${r.businessName}" đã có người phụ trách. Bạn vẫn muốn chia lại chứ?`)
+        setReassignAction({
+          onConfirm: () => {
+            setCurrent(r)
+            setSelectedEmpId("")
+            setAssignOpen(true)
+          }
+        })
+        setReassignWarnOpen(true)
+        return
+      }
+      setCurrent(r)
+    } else {
+      if (selectedIds.length > 0) {
+        const selectedRecords = records.filter(rec => selectedIds.includes(rec.id))
+        const cannotReassign = selectedRecords.filter(rec => rec.status && rec.status !== "Chưa xử lý")
+        if (cannotReassign.length > 0) {
+          notify(`Có ${cannotReassign.length} khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!`, "error")
+          return
+        }
+        const alreadyAssigned = selectedRecords.filter(rec => rec.assignedTo)
+        if (alreadyAssigned.length > 0) {
+          setReassignWarnMsg(`Có ${alreadyAssigned.length} khách đã có người phụ trách. Bạn vẫn muốn chia lại chứ?`)
+          setReassignAction({
+            onConfirm: () => {
+              setCurrent(null)
+              setSelectedEmpId("")
+              setAssignOpen(true)
+            }
+          })
+          setReassignWarnOpen(true)
+          return
+        }
+      }
+      setCurrent(null)
+    }
+    setSelectedEmpId("")
+    setAssignOpen(true)
+  }
   const toggleAll = () => setSelectedIds(p => p.length === records.length ? [] : records.map(r => r.id))
   const toggleOne = (id: string) => setSelectedIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id])
 
-  const activeEmployees = employees.filter(
-    (e: any) => e.status === "active" && (selectedBranch === "all" || e.branchId === selectedBranch)
+  const activeEmployees = useMemo(
+    () => employees.filter(
+      (e: any) => e.status === "active" && (selectedBranch === "all" || e.branchId === selectedBranch)
+    ),
+    [employees, selectedBranch]
   )
+
+  const deptEmployees = useMemo(() => {
+    if (!autoAssignDept) return []
+    return activeEmployees.filter((e: any) => e.department === autoAssignDept)
+  }, [activeEmployees, autoAssignDept])
+
+  useEffect(() => {
+    setAutoAssignSelectedEmpIds(deptEmployees.map((e: any) => e.id))
+  }, [deptEmployees])
+
   const allEmployeesInBranch = employees.filter(
     (e: any) => selectedBranch === "all" || e.branchId === selectedBranch
   )
@@ -334,6 +475,24 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
         </button>
       </div>
 
+      {stats && (
+        <div className="bg-amber-50/50 border border-amber-200/60 rounded-xl p-3 text-xs font-bold text-amber-800 flex items-center justify-between gap-2 shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${(stats.unassignedData ?? 0) > 0 ? "bg-amber-500" : "bg-emerald-500"}`}></span>
+            <span>Còn {stats.unassignedData ?? 0} data chưa chia</span>
+          </div>
+          {tab !== "data" && (
+            <button
+              onClick={() => setTab("data")}
+              className="text-[10px] uppercase tracking-wider text-amber-700 hover:text-amber-900 underline cursor-pointer"
+            >
+              Xem ngay
+            </button>
+          )}
+        </div>
+      )}
+
+
       {tab === "dashboard" && (
         <div className="space-y-5">
           {statsLoading ? (
@@ -342,66 +501,272 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
             </div>
           ) : stats && (
             <div>
+              {/* Period Filter Selector */}
+              <div className="flex bg-gray-100/80 p-1 rounded-2xl border border-gray-200/50 mb-5 max-w-xs">
+                {[
+                  { value: "all", label: "Tất cả" },
+                  { value: "today", label: "Hôm nay" },
+                  { value: "week", label: "Tuần này" },
+                  { value: "month", label: "Tháng này" }
+                ].map(p => (
+                  <button
+                    key={p.value}
+                    onClick={() => setDashboardPeriod(p.value as any)}
+                    className={`flex-1 py-1.5 text-xs font-black rounded-xl transition-all cursor-pointer ${
+                      dashboardPeriod === p.value
+                        ? "bg-[#C62828] text-white shadow-xs"
+                        : "text-gray-500 hover:text-[#C62828]"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-5">
                 <StatCard title="Tổng data" value={stats.totalData} icon={Database} iconBg="bg-slate-100" iconColor="text-slate-500" />
                 <StatCard title="Đã chia" value={stats.assignedData} icon={UserCheck} iconBg="bg-blue-50" iconColor="text-blue-500" />
                 <StatCard title="Chưa chia" value={stats.unassignedData} icon={UserMinus} iconBg="bg-amber-50" iconColor="text-amber-500" />
-                <StatCard title="Đã gửi" value={stats.totalData - (stats.statusCounts?.["Chưa xử lý"] ?? 0)} icon={Send} iconBg="bg-purple-50" iconColor="text-purple-500" />
-                <StatCard title="Trả lời" value={stats.statusCounts?.["Trả lời"] ?? 0} icon={MessageSquare} iconBg="bg-emerald-50" iconColor="text-emerald-500" />
+                <StatCard title={dashboardPeriod !== "all" ? "Đã gửi (Kỳ)" : "Đã gửi"} value={dashboardPeriod !== "all" ? (stats.statusCounts?.["Đã gửi tin nhắn"] ?? 0) : (stats.totalData - (stats.statusCounts?.["Chưa xử lý"] ?? 0))} icon={Send} iconBg="bg-purple-50" iconColor="text-purple-500" />
+                <StatCard title={dashboardPeriod !== "all" ? "Trả lời (Kỳ)" : "Trả lời"} value={stats.statusCounts?.["Trả lời"] ?? 0} icon={MessageSquare} iconBg="bg-emerald-50" iconColor="text-emerald-500" />
               </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="space-y-5">
                 <div className="bg-white p-5 rounded-3xl border border-black/5 shadow-xs space-y-4">
                   <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Trạng thái xử lý</p>
-                  {STATUSES_VN_DISPLAY.map(s => {
-                    const count = stats.statusCounts?.[s] ?? 0
-                    const pct = stats.totalData > 0 ? +((count / stats.totalData) * 100).toFixed(1) : 0
-                    return (
-                      <div key={s}>
-                        <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
-                          <span>{s}</span><span>{count} ({pct}%)</span>
+                  {(() => {
+                    const totalForPct = dashboardPeriod === "all"
+                      ? stats.totalData
+                      : (stats.statusCounts?.["Chặn người lạ"] ?? 0) +
+                        (stats.statusCounts?.["Đã gửi tin nhắn"] ?? 0) +
+                        (stats.statusCounts?.["Không có Zalo"] ?? 0) +
+                        (stats.statusCounts?.["Trả lời"] ?? 0)
+                    
+                    const displayStatuses = dashboardPeriod === "all"
+                      ? STATUSES_VN_DISPLAY
+                      : STATUSES_VN_DISPLAY.filter(s => s !== "Chưa xử lý")
+
+                    return displayStatuses.map(s => {
+                      const count = stats.statusCounts?.[s] ?? 0
+                      const pct = totalForPct > 0 ? +((count / totalForPct) * 100).toFixed(1) : 0
+                      return (
+                        <div key={s}>
+                          <div className="flex justify-between text-xs font-semibold text-gray-700 mb-1">
+                            <span>{s}</span><span>{count} ({pct}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                            <div
+                              className={s === "Chưa xử lý" ? "h-full rounded-full bg-slate-300" : s === "Chặn người lạ" ? "h-full rounded-full bg-amber-400" : s === "Đã gửi tin nhắn" ? "h-full rounded-full bg-blue-400" : s === "Không có Zalo" ? "h-full rounded-full bg-red-500" : "h-full rounded-full bg-emerald-500"}
+                              style={{ width: pct + "%" }}
+                            />
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                          <div
-                            className={s === "Chưa xử lý" ? "h-full rounded-full bg-slate-300" : s === "Chặn người lạ" ? "h-full rounded-full bg-amber-400" : s === "Đã gửi tin nhắn" ? "h-full rounded-full bg-blue-400" : s === "Không có Zalo" ? "h-full rounded-full bg-red-500" : "h-full rounded-full bg-emerald-500"}
-                            style={{ width: pct + "%" }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })
+                  })()}
                 </div>
-                <div className="bg-white p-5 rounded-3xl border border-black/5 shadow-xs space-y-4">
-                  <p className="text-xs font-black text-gray-400 uppercase tracking-wider">Tiến độ nhân viên</p>
+
+                <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-xs space-y-4">
+                  <div className="border-b border-gray-100 pb-3">
+                    <p className="text-xs font-black text-gray-600 uppercase tracking-wider">Tiến độ nhân viên</p>
+                    <p className="text-xs text-gray-500 font-semibold mt-0.5">Bấm vào từng nhân viên để xem chi tiết trạng thái và danh sách khách hàng</p>
+                  </div>
                   {!stats.employeeProgress?.length ? (
                     <div className="flex flex-col items-center justify-center py-8 text-gray-400">
                       <Users size={32} className="mb-2 stroke-1" />
                       <p className="text-sm">Chưa có dữ liệu</p>
                     </div>
                   ) : (
-                    <div className="space-y-4 max-h-64 overflow-y-auto pr-1">
-                      {stats.employeeProgress.map((emp: any) => {
-                        const cPct = emp.totalAssigned > 0 ? +((emp.completedCount / emp.totalAssigned) * 100).toFixed(0) : 0
-                        const pPct = emp.totalAssigned > 0 ? +((emp.processingCount / emp.totalAssigned) * 100).toFixed(0) : 0
-                        return (
-                          <div key={emp.employeeId} className="pb-3 border-b border-gray-50 last:border-0 last:pb-0">
-                            <div className="flex justify-between items-center mb-1.5">
-                              <div>
-                                <p className="text-sm font-bold text-gray-800">{emp.employeeName}</p>
-                                <p className="text-xs text-gray-400">{"Được giao: " + emp.totalAssigned}</p>
-                              </div>
-                              <div className="flex gap-1.5">
-                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-600 text-white">{"Trả lời: " + emp.completedCount}</span>
-                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">{"Gửi: " + emp.processingCount}</span>
-                              </div>
-                            </div>
-                            <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden flex">
-                              <div className="bg-emerald-500 h-full transition-all" style={{ width: cPct + "%" }} />
-                              <div className="bg-blue-400 h-full transition-all" style={{ width: pPct + "%" }} />
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                    <>
+                      <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                        <table className="w-full min-w-[640px] text-sm border-collapse">
+                          <thead>
+                            <tr className="bg-gray-50 text-gray-600">
+                              <th className="border border-gray-200 px-4 py-2.5 text-left text-xs font-bold whitespace-nowrap">Nhân viên</th>
+                              <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Tổng</th>
+                              <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Đã gửi</th>
+                              <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Chặn</th>
+                              {!stats.employeeProgress.some((e: any) => e.isTimeBound) && (
+                                <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Chưa xử lý</th>
+                              )}
+                              <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Trả lời</th>
+                              <th className="border border-gray-200 px-3 py-2.5 text-center text-xs font-bold whitespace-nowrap">Ko Zalo</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stats.employeeProgress.map((emp: any) => {
+                              const isExpanded = expandedEmpId === emp.employeeId
+                              const showUntreated = !emp.isTimeBound
+                              const colSpan = showUntreated ? 7 : 6
+
+                              return (
+                                <React.Fragment key={emp.employeeId}>
+                                  <tr
+                                    onClick={() => {
+                                      setExpandedEmpId(isExpanded ? null : emp.employeeId)
+                                      setExpandedStatusMap(prev => ({ ...prev, [emp.employeeId]: null }))
+                                    }}
+                                    className={`cursor-pointer transition-colors ${isExpanded ? "bg-red-50/60" : "hover:bg-gray-50/80"}`}
+                                  >
+                                    <td className="border border-gray-200 px-4 py-2.5 text-left font-semibold text-gray-900 whitespace-nowrap">
+                                      {emp.employeeName}
+                                      <span className="block text-[10px] font-mono text-gray-400 mt-0.5">{emp.employeeId}</span>
+                                    </td>
+                                    <td className="border border-gray-200 px-3 py-2.5 text-center font-bold text-gray-900 tabular-nums">{emp.totalAssigned}</td>
+                                    <td className="border border-gray-200 px-3 py-2.5 text-center font-semibold text-blue-700 tabular-nums">{emp.processingCount || ""}</td>
+                                    <td className="border border-gray-200 px-3 py-2.5 text-center font-semibold text-amber-700 tabular-nums">{emp.blockedCount || ""}</td>
+                                    {showUntreated && (
+                                      <td className="border border-gray-200 px-3 py-2.5 text-center font-semibold text-gray-500 tabular-nums">{emp.untreatedCount || ""}</td>
+                                    )}
+                                    <td className="border border-gray-200 px-3 py-2.5 text-center font-semibold text-emerald-700 tabular-nums">{emp.completedCount || ""}</td>
+                                    <td className="border border-gray-200 px-3 py-2.5 text-center font-semibold text-red-600 tabular-nums">{emp.noZaloCount || ""}</td>
+                                  </tr>
+                                  {isExpanded && (
+                                    <tr>
+                                      <td colSpan={colSpan} className="border border-gray-200 bg-gray-50/50 p-4">
+                                        <div className="space-y-3">
+                                          <p className="text-xs font-black text-gray-500 uppercase tracking-wider">Chọn trạng thái để xem danh sách khách:</p>
+                                          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                            {STATUSES_VN_DISPLAY.filter(status => !emp.isTimeBound || status !== "Chưa xử lý").map(status => {
+                                              const list = emp.details?.[status] ?? []
+                                              const count = list.length
+                                              const isSelected = expandedStatusMap[emp.employeeId] === status
+
+                                              return (
+                                                <button
+                                                  key={status}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    if (count === 0) return
+                                                    setExpandedStatusMap(prev => ({
+                                                      ...prev,
+                                                      [emp.employeeId]: isSelected ? null : status
+                                                    }))
+                                                  }}
+                                                  disabled={count === 0}
+                                                  className={`p-2.5 rounded-xl border text-left transition ${
+                                                    count === 0
+                                                      ? "bg-gray-50/70 border-gray-100 opacity-50 cursor-not-allowed text-gray-400"
+                                                      : isSelected
+                                                        ? "bg-red-50 border-[#C62828] text-[#C62828] ring-1 ring-[#C62828]/30 shadow-xs"
+                                                        : "bg-white border-gray-200 hover:border-gray-400 hover:bg-gray-50 text-gray-700 cursor-pointer"
+                                                  }`}
+                                                >
+                                                  <div className={`text-[10px] font-black uppercase tracking-wide ${count === 0 ? "text-gray-400" : isSelected ? "text-[#C62828]" : "text-gray-600"}`}>
+                                                    {status}
+                                                  </div>
+                                                  <div className={`text-xs font-black mt-0.5 ${count === 0 ? "text-gray-400" : isSelected ? "text-[#C62828]" : "text-gray-900"}`}>
+                                                    {count} khách
+                                                  </div>
+                                                </button>
+                                              )
+                                            })}
+                                          </div>
+
+                                          {(() => {
+                                            const activeStatus = expandedStatusMap[emp.employeeId]
+                                            if (!activeStatus) return null
+                                            const list = emp.details?.[activeStatus] ?? []
+                                            if (list.length === 0) return null
+
+                                            return (
+                                              <div className="mt-3 bg-white rounded-2xl p-4 border border-gray-200 space-y-3">
+                                                <div className="flex justify-between items-center pb-2 border-b border-gray-200">
+                                                  <span className="text-xs font-black text-gray-800 uppercase tracking-wider">
+                                                    Danh sách khách — {activeStatus} ({list.length})
+                                                  </span>
+                                                </div>
+                                                <div className="max-h-60 overflow-y-auto overflow-x-hidden">
+                                                  <table className="w-full text-xs text-left">
+                                                    <thead>
+                                                      <tr className="text-gray-600 font-extrabold border-b border-gray-200 text-[11px] uppercase tracking-wider">
+                                                        <th className="py-2.5 px-3">Doanh nghiệp / Khách</th>
+                                                        <th className="py-2.5 px-3">SĐT</th>
+                                                        <th className="py-2.5 px-3">Thời gian cập nhật</th>
+                                                      </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-200 text-gray-700 font-medium">
+                                                      {list.map((item: any) => {
+                                                        const dateObj = new Date(item.updatedAt)
+                                                        let timeStr = "--:--"
+                                                        let dateStr = ""
+                                                        if (!isNaN(dateObj.getTime())) {
+                                                          const hours = String(dateObj.getHours()).padStart(2, "0")
+                                                          const minutes = String(dateObj.getMinutes()).padStart(2, "0")
+                                                          const day = String(dateObj.getDate()).padStart(2, "0")
+                                                          const month = String(dateObj.getMonth() + 1).padStart(2, "0")
+                                                          const year = dateObj.getFullYear()
+                                                          timeStr = `${hours}:${minutes}`
+                                                          dateStr = `${day}/${month}/${year}`
+                                                        }
+                                                        return (
+                                                          <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="py-2.5 px-3 font-bold text-gray-900">{item.businessName || "Không có tên"}</td>
+                                                            <td className="py-2.5 px-3 font-mono text-gray-800">
+                                                              {item.phone ? (
+                                                                <div className="flex items-center gap-1.5">
+                                                                  <span>{item.phone}</span>
+                                                                  <button
+                                                                    onClick={(e) => {
+                                                                      e.stopPropagation()
+                                                                      navigator.clipboard.writeText(item.phone)
+                                                                      notify("Đã sao chép số điện thoại!")
+                                                                    }}
+                                                                    className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-gray-600 cursor-pointer"
+                                                                    title="Sao chép SĐT"
+                                                                  >
+                                                                    <Copy size={11} />
+                                                                  </button>
+                                                                </div>
+                                                              ) : "--"}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 font-mono whitespace-nowrap">
+                                                              <span className="font-extrabold text-gray-900">{timeStr}</span>
+                                                              <span className="text-gray-400 mx-2">|</span>
+                                                              <span className="text-gray-700">{dateStr}</span>
+                                                            </td>
+                                                          </tr>
+                                                        )
+                                                      })}
+                                                    </tbody>
+                                                  </table>
+                                                </div>
+                                              </div>
+                                            )
+                                          })()}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
+                              )
+                            })}
+                            <tr className="bg-gray-50 font-bold text-gray-800">
+                              <td className="border border-gray-200 px-4 py-2.5 text-left text-xs uppercase tracking-wide">Tổng cộng</td>
+                              <td className="border border-gray-200 px-3 py-2.5 text-center tabular-nums">
+                                {stats.employeeProgress.reduce((s: number, e: any) => s + e.totalAssigned, 0)}
+                              </td>
+                              <td className="border border-gray-200 px-3 py-2.5 text-center text-blue-700 tabular-nums">
+                                {stats.employeeProgress.reduce((s: number, e: any) => s + (e.processingCount || 0), 0) || ""}
+                              </td>
+                              <td className="border border-gray-200 px-3 py-2.5 text-center text-amber-700 tabular-nums">
+                                {stats.employeeProgress.reduce((s: number, e: any) => s + (e.blockedCount || 0), 0) || ""}
+                              </td>
+                              {!stats.employeeProgress.some((e: any) => e.isTimeBound) && (
+                                <td className="border border-gray-200 px-3 py-2.5 text-center text-gray-500 tabular-nums">
+                                  {stats.employeeProgress.reduce((s: number, e: any) => s + (e.untreatedCount || 0), 0) || ""}
+                                </td>
+                              )}
+                              <td className="border border-gray-200 px-3 py-2.5 text-center text-emerald-700 tabular-nums">
+                                {stats.employeeProgress.reduce((s: number, e: any) => s + (e.completedCount || 0), 0) || ""}
+                              </td>
+                              <td className="border border-gray-200 px-3 py-2.5 text-center text-red-600 tabular-nums">
+                                {stats.employeeProgress.reduce((s: number, e: any) => s + (e.noZaloCount || 0), 0) || ""}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -433,15 +798,7 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                     <UserPlus size={14} className="mr-1.5" /> {"Chia (" + selectedIds.length + ")"}
                   </button>
                   <button
-                    onClick={async () => {
-                      if (!window.confirm(`Bạn có chắc chắn muốn xoá ${selectedIds.length} mục đã chọn? Hành động này không thể hoàn tác.`)) return
-                      try {
-                        await api.crm.deleteBulk(selectedIds)
-                        notify("Đã xóa " + selectedIds.length + " mục")
-                        setSelectedIds([])
-                        refresh()
-                      } catch { notify("Lỗi xóa hàng loạt", "error") }
-                    }}
+                    onClick={() => setDeleteBulkOpen(true)}
                     className="flex items-center px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition"
                   >
                     <Trash2 size={14} className="mr-1.5" /> {"Xóa (" + selectedIds.length + ")"}
@@ -481,6 +838,8 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
               </button>
             </div>
           </div>
+
+
 
           {showFilters && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-4 rounded-2xl border border-gray-200">
@@ -537,7 +896,7 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                             : <Square size={15} className="text-gray-400" />}
                         </button>
                       </th>
-                      {["Tên doanh nghiệp", "Loại hình", "Địa chỉ", "Khu vực", "SĐT", "Website", "Maps", "Trạng thái", "Nhân viên", "Lead", "Ghi chú", ""].map(h => (
+                      {["ID", "Tên doanh nghiệp", "Loại hình", "Địa chỉ", "Khu vực", "SĐT", "Website", "Maps", "Trạng thái", "Nhân viên", "Lead", "Ghi chú", ""].map(h => (
                         <th key={h} className="py-3 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -552,6 +911,7 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                               : <Square size={15} className="text-gray-400" />}
                           </button>
                         </td>
+                        <td className="py-2 px-2 font-mono text-[10px] text-gray-400 font-bold whitespace-nowrap">{(r.id || "").replace("crm-", "")}</td>
                         <td className="py-2 px-2 font-bold text-gray-800 max-w-[160px] break-words">{r.businessName}</td>
                         <td className="py-2 px-2">
                           <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-semibold border border-gray-200">
@@ -617,17 +977,31 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                             <div
                               className="flex items-center gap-1.5 cursor-pointer group/cell"
                               onClick={() => {
-                                setInlineAssignId(r.id)
-                                setInlineAssignEmpId(r.assignedTo ?? "")
+                                if (r.status && r.status !== "Chưa xử lý") {
+                                  notify("Khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!", "error")
+                                  return
+                                }
+                                setReassignWarnMsg(`Khách hàng "${r.businessName}" đã có người phụ trách. Bạn vẫn muốn chia lại chứ?`)
+                                setReassignAction({
+                                  onConfirm: () => {
+                                    setInlineAssignId(r.id)
+                                    setInlineAssignEmpId(r.assignedTo ?? "")
+                                  }
+                                })
+                                setReassignWarnOpen(true)
                               }}
                             >
-                              <AvatarCircle name={r.assignedToName} size="sm" />
+                              <AvatarCircle name={r.assignedToName} avatar={employees.find(e => e.id === r.assignedTo)?.avatar} size="sm" />
                               <span className="text-xs font-semibold text-gray-700">{r.assignedToName}</span>
                               <Edit3 size={11} className="text-gray-300 opacity-0 group-hover/cell:opacity-100 transition ml-0.5" />
                             </div>
                           ) : (
                             <button
                               onClick={() => {
+                                if (r.status && r.status !== "Chưa xử lý") {
+                                  notify("Khách đã có trạng thái khác ngoài 'Chưa xử lý'. Không thể chia lại!", "error")
+                                  return
+                                }
                                 setInlineAssignId(r.id)
                                 setInlineAssignEmpId("")
                               }}
@@ -733,6 +1107,52 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
         type="danger"
       />
 
+      <ConfirmModal
+        isOpen={reassignWarnOpen}
+        onClose={() => {
+          setReassignWarnOpen(false)
+          setReassignAction(null)
+        }}
+        onConfirm={() => {
+          setReassignWarnOpen(false)
+          reassignAction?.onConfirm()
+          setReassignAction(null)
+        }}
+        title="Cảnh báo chia lại data"
+        message={reassignWarnMsg}
+        confirmText="Xác nhận"
+        type="warning"
+      />
+
+      <ConfirmModal
+        isOpen={importConfirmOpen}
+        onClose={() => {
+          setImportConfirmOpen(false)
+          setImportFile(null)
+        }}
+        onConfirm={() => {
+          setImportConfirmOpen(false)
+          submitImport()
+        }}
+        title="Xác nhận import file"
+        message={importFile ? `Bạn có chắc chắn muốn import file "${importFile.name}"?` : ""}
+        confirmText="Xác nhận"
+        type="info"
+      />
+
+      <ConfirmModal
+        isOpen={deleteBulkOpen}
+        onClose={() => setDeleteBulkOpen(false)}
+        onConfirm={() => {
+          setDeleteBulkOpen(false)
+          handleDeleteBulk()
+        }}
+        title="Xác nhận xóa hàng loạt"
+        message={`Bạn chắc chắn muốn xoá ${selectedIds.length} mục đã chọn? Hành động này không thể hoàn tác.`}
+        confirmText="Xóa"
+        type="danger"
+      />
+
       <Modal
         open={assignOpen}
         onClose={() => setAssignOpen(false)}
@@ -802,6 +1222,69 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                   showSearchIcon
                 />
               </div>
+
+              {autoAssignDept && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-gray-500 uppercase">
+                      Nhân sự nhận data ({autoAssignSelectedEmpIds.length}/{deptEmployees.length})
+                    </label>
+                    {deptEmployees.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (autoAssignSelectedEmpIds.length === deptEmployees.length) {
+                            setAutoAssignSelectedEmpIds([])
+                          } else {
+                            setAutoAssignSelectedEmpIds(deptEmployees.map((e: any) => e.id))
+                          }
+                        }}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-700 transition"
+                      >
+                        {autoAssignSelectedEmpIds.length === deptEmployees.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                      </button>
+                    )}
+                  </div>
+
+                  {deptEmployees.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">Không có nhân viên hoạt động trong phòng ban này.</p>
+                  ) : (
+                    <div className="border border-gray-100 rounded-xl bg-gray-50/50 max-h-48 overflow-y-auto divide-y divide-gray-50 p-2 space-y-1">
+                      {deptEmployees.map((emp: any) => {
+                        const isChecked = autoAssignSelectedEmpIds.includes(emp.id)
+                        return (
+                          <div
+                            key={emp.id}
+                            onClick={() => {
+                              if (isChecked) {
+                                setAutoAssignSelectedEmpIds(p => p.filter(id => id !== emp.id))
+                              } else {
+                                setAutoAssignSelectedEmpIds(p => [...p, emp.id])
+                              }
+                            }}
+                            className="flex items-center gap-3 px-3 py-1.5 hover:bg-gray-100/50 rounded-lg cursor-pointer transition animate-in fade-in duration-100"
+                          >
+                            <span className="shrink-0 text-gray-400 hover:text-[#C62828] transition">
+                              {isChecked ? (
+                                <CheckSquare size={16} className="text-[#C62828]" />
+                              ) : (
+                                <Square size={16} />
+                              )}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <AvatarCircle name={emp.name} avatar={emp.avatar} size="sm" />
+                              <div className="text-xs">
+                                <p className="font-bold text-gray-800">{emp.name}</p>
+                                <p className="text-[10px] text-gray-400 font-mono">{emp.id}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -924,13 +1407,13 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Trạng thái</label>
-              <select
+              <CustomSelect
                 value={form.status}
-                onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-200 rounded-xl bg-gray-50 text-sm focus:outline-none"
-              >
-                {STATUSES_VN_DISPLAY.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+                onChange={val => setForm(f => ({ ...f, status: val }))}
+                options={STATUSES_VN_DISPLAY.map(s => ({ value: s, label: s }))}
+                className="w-full"
+                heightClass="h-[42px]"
+              />
             </div>
           </div>
           <div>

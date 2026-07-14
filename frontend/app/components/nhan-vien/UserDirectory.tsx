@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react"
-import { createPortal } from "react-dom"
+import { NestedOverlay } from "../ui/NestedOverlay"
 import { Search, Loader2, RefreshCw } from "lucide-react"
 import { Employee } from "../../types"
 import { AvatarCircle } from "../ui/AvatarCircle"
@@ -51,27 +51,35 @@ export function UserDirectory() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {list.map(emp => (
-          <div key={emp.id} onClick={() => setSelectedEmp(emp)} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-start gap-4 cursor-pointer hover:shadow-md transition-all active:scale-95 group">
-            <div className="group-hover:scale-105 transition-transform"><AvatarCircle name={emp.name} /></div>
+        {list.map(emp => {
+          const isInactive = emp.status === "inactive"
+          const isSuspended = emp.status === "suspended"
+          const dimmed = isInactive || isSuspended
+          return (
+          <div key={emp.id} onClick={() => setSelectedEmp(emp)} className={`bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-start gap-4 cursor-pointer hover:shadow-md transition-all active:scale-95 group ${dimmed ? "opacity-60" : ""}`}>
+            <div className="group-hover:scale-105 transition-transform"><AvatarCircle name={emp.name} avatar={emp.avatar} /></div>
             <div className="min-w-0">
-              <p className="font-bold text-gray-800 text-sm truncate">{emp.name}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-bold text-gray-800 text-sm truncate">{emp.name}</p>
+                {isInactive && <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-600">Đã nghỉ</span>}
+                {isSuspended && <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Tạm nghỉ</span>}
+              </div>
               <p className="text-xs text-gray-500 my-0.5">{emp.position} · {emp.department}</p>
               <span className="text-[#C62828] text-xs font-semibold block truncate opacity-70">{emp.email}</span>
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
-      {selectedEmp && createPortal(
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center z-[100] p-4 overflow-y-auto" onClick={(e) => { if (e.target === e.currentTarget) setSelectedEmp(null) }}>
-          <div className="relative w-full max-w-5xl animate-in zoom-in duration-200">
+      {selectedEmp && (
+        <NestedOverlay onClose={() => setSelectedEmp(null)} className="bg-black/40 backdrop-blur-[2px] overflow-y-auto">
+          <div className="relative w-full max-w-5xl animate-in zoom-in duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="rounded-2xl pb-2">
               <UserProfile emp={selectedEmp} onClose={() => setSelectedEmp(null)} />
             </div>
           </div>
-        </div>,
-        document.body
+        </NestedOverlay>
       )}
     </div>
   )

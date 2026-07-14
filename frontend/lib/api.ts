@@ -184,7 +184,7 @@ export const api = {
     create: (data: any) => req<any>("POST", "/users", data),
     update: (id: string, data: any) => req<any>("PATCH", `/users/${id}`, data),
     updateAdmin: (id: string, data: any) => req<any>("PATCH", `/users/admin/${id}`, data),
-    toggleStatus: (id: string) => req<any>("POST", `/users/${id}/toggle-status`),
+    toggleStatus: (id: string, data?: { reason?: string }) => req<any>("POST", `/users/${id}/toggle-status`, data),
     resetPassword: (id: string) => req<any>("POST", `/users/${id}/reset-password`),
     delete: (id: string) => req<any>("DELETE", `/users/${id}`),
   },
@@ -877,4 +877,24 @@ export function clearToken() {
 
 export function hasToken() {
   return !!localStorage.getItem("dudi_token") || !!sessionStorage.getItem("dudi_token")
+}
+
+/** Storage đang giữ phiên đăng nhập (remember → localStorage, không thì sessionStorage). */
+export function getAuthStorage(): Storage {
+  if (localStorage.getItem("dudi_token")) return localStorage
+  if (sessionStorage.getItem("dudi_token")) return sessionStorage
+  return localStorage
+}
+
+export function readStoredAuthUser<T = Record<string, unknown>>(): T | null {
+  try {
+    const raw = localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user")
+    return raw ? (JSON.parse(raw) as T) : null
+  } catch {
+    return null
+  }
+}
+
+export function writeStoredAuthUser(user: unknown) {
+  getAuthStorage().setItem("dudi_user", JSON.stringify(user))
 }

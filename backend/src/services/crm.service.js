@@ -1,9 +1,11 @@
 import * as repo from "../repositories/crm.repository.js"
 import * as empRepo from "../repositories/employee.repository.js"
 import * as customerRepo from "../repositories/customer.repository.js"
+import * as crmActivityLogRepo from "../repositories/crmActivityLog.repository.js"
 import * as leadSvc from "./lead.service.js"
 import * as customerSvc from "./customer.service.js"
 import { v4 as uuidv4 } from "uuid"
+import { emitCrmChanged } from "../socket/chat.socket.js"
 
 export const CRM_STATUSES = [
   "Chưa xử lý", "Chặn người lạ", "Đã gửi tin nhắn", "Không có Zalo", "Trả lời"
@@ -22,6 +24,14 @@ function resolveAssignee(employeeId) {
   if (!emp) throw new Error(`Không tìm thấy nhân viên: ${employeeId}`)
   if (emp.status !== "active") throw new Error(`Nhân viên ${emp.name} (${employeeId}) không còn hoạt động`)
   return { assignedTo: emp.id, assignedToName: emp.name }
+}
+
+function notifyChange(action, details = {}) {
+  try {
+    emitCrmChanged(action, details)
+  } catch (err) {
+    console.error("Failed to emit crm changed socket event:", err)
+  }
 }
 
 export function listRecords({ status, assignedTo, area, department, search, branchId, page = 0, size = 20 } = {}) {
@@ -74,14 +84,33 @@ export function getRecordById(id) {
 export function createRecord(body, createdBy) {
   const { businessName, address = "", area = "", phone = "", website = "", businessType = "", googleMapUrl = "", note = "", status = "Chưa xử lý" } = body
   if (!businessName?.trim()) throw new Error("Tên doanh nghiệp không được để trống")
-  return repo.create({
-    id: body.id || `crm-${uuidv4().slice(0, 8)}`,
+
+  let newId = body.id
+  if (newId) {
+    newId = String(newId).replace("crm-", "")
+  } else {
+    const records = repo.getAll()
+    let maxId = 0
+    for (const r of records) {
+      const idStr = String(r.id || "").replace("crm-", "")
+      const num = parseInt(idStr, 10)
+      if (!isNaN(num) && num > maxId) {
+        maxId = num
+      }
+    }
+    newId = String(maxId > 0 ? maxId + 1 : 1)
+  }
+
+  const created = repo.create({
+    id: newId,
     businessName: businessName.trim(),
     address, area, phone, website, businessType, googleMapUrl,
     status, assignedTo: null, assignedToName: null,
     createdBy, note,
     createdAt: now(), updatedAt: now()
   })
+  notifyChange("created", { id: newId })
+  return created
 }
 
 export function updateRecord(id, body) {
@@ -90,18 +119,45 @@ export function updateRecord(id, body) {
   ;["businessName", "address", "area", "phone", "website", "businessType", "googleMapUrl", "status", "note"]
     .forEach(k => { if (body[k] !== undefined) patch[k] = body[k] })
   patch.updatedAt = now()
-  return repo.update(id, patch)
+  const updated = repo.update(id, patch)
+  notifyChange("updated", { id })
+  return updated
 }
 
 export function deleteRecord(id) {
-  if (!repo.getById(id)) throw new Error("Không tìm thấy dữ liệu")
-  return repo.remove(id)
+  const record = repo.getById(id)
+  if (!record) throw new Error("Không tìm thấy dữ liệu")
+  const { leads } = listLeadsForCrmRecord(id)
+  if (leads.length > 0) {
+    const codes = leads.map(l => l.code).join(", ")
+    throw new Error(`Không thể xóa khách "${record.businessName}" vì đã được tạo cơ hội (Lead: ${codes}). Vui lòng xóa cơ hội trước!`)
+  }
+  const removed = repo.remove(id)
+  notifyChange("deleted", { id })
+  return removed
 }
 
 export function deleteRecordsBulk(ids) {
   if (!Array.isArray(ids) || ids.length === 0) throw new Error("Danh sách ID không hợp lệ")
+  
+  const cannotDelete = []
+  ids.forEach(id => {
+    const record = repo.getById(id)
+    if (record) {
+      const { leads } = listLeadsForCrmRecord(id)
+      if (leads.length > 0) {
+        cannotDelete.push(`"${record.businessName}" (Lead: ${leads.map(l => l.code).join(", ")})`)
+      }
+    }
+  })
+
+  if (cannotDelete.length > 0) {
+    throw new Error(`Không thể xóa các dữ liệu CRM sau vì đã được tạo cơ hội:\n${cannotDelete.map(s => `- ${s}`).join("\n")}\nVui lòng xóa cơ hội trước!`)
+  }
+
   let count = 0
   ids.forEach(id => { if (repo.remove(id)) count++ })
+  notifyChange("deleted_bulk", { ids })
   return { deletedCount: count }
 }
 
@@ -114,7 +170,9 @@ export function updateNote(id, note, currentUser) {
     err.status = 403
     throw err
   }
-  return repo.update(id, { note, updatedAt: now() })
+  const updated = repo.update(id, { note, updatedAt: now() })
+  notifyChange("updated", { id })
+  return updated
 }
 
 export function updateStatusByEmployee(id, status, currentUser) {
@@ -126,16 +184,46 @@ export function updateStatusByEmployee(id, status, currentUser) {
     throw err
   }
   if (!CRM_STATUSES.includes(status)) throw new Error("Trạng thái không hợp lệ")
-  return repo.update(id, { status, updatedAt: now() })
+
+  const oldStatus = record.status
+  const newStatus = status
+  const updated = repo.update(id, { status, updatedAt: now() })
+
+  if (oldStatus !== newStatus) {
+    const logId = "act-" + Math.random().toString(36).substring(2, 9) + "-" + Date.now()
+    const vnDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
+
+    const emp = empRepo.getById(currentUser.employeeId)
+    const employeeName = emp ? emp.name : (currentUser.name || currentUser.username || "Nhân viên")
+
+    crmActivityLogRepo.create({
+      id: logId,
+      dataId: id,
+      businessName: record.businessName || record.name || "",
+      employeeId: currentUser.employeeId,
+      employeeName,
+      fromStatus: oldStatus,
+      toStatus: newStatus,
+      date: vnDateStr,
+      createdAt: new Date().toISOString()
+    })
+  }
+
+  notifyChange("status_updated", { id, employeeId: currentUser.employeeId, status })
+  return updated
 }
 
 export function assignOne(dataId, employeeId) {
   if (!repo.getById(dataId)) throw new Error("Không tìm thấy dữ liệu")
+  let updated
   if (!employeeId || employeeId === "unassigned") {
-    return repo.update(dataId, { assignedTo: null, assignedToName: null, updatedAt: now() })
+    updated = repo.update(dataId, { assignedTo: null, assignedToName: null, updatedAt: now() })
+  } else {
+    const { assignedTo, assignedToName } = resolveAssignee(employeeId)
+    updated = repo.update(dataId, { assignedTo, assignedToName, updatedAt: now() })
   }
-  const { assignedTo, assignedToName } = resolveAssignee(employeeId)
-  return repo.update(dataId, { assignedTo, assignedToName, updatedAt: now() })
+  notifyChange("assigned", { id: dataId, employeeId })
+  return updated
 }
 
 export function assignBulk(dataIds, employeeId) {
@@ -153,6 +241,7 @@ export function assignBulk(dataIds, employeeId) {
       count++
     }
   })
+  notifyChange("bulk_assigned", { ids: dataIds, employeeId })
   return { assignedCount: count }
 }
 
@@ -160,6 +249,7 @@ export function reassign(fromEmployeeId, toEmployeeId) {
   const { assignedTo, assignedToName } = resolveAssignee(toEmployeeId)
   const records = repo.getAll().filter(r => r.assignedTo === fromEmployeeId)
   records.forEach(r => repo.update(r.id, { assignedTo, assignedToName, updatedAt: now() }))
+  notifyChange("reassigned", { fromEmployeeId, toEmployeeId })
   return { movedCount: records.length }
 }
 
@@ -195,6 +285,8 @@ export function autoAssign(employeeIds) {
     target.newAssigned++;
   })
 
+  notifyChange("auto_assigned", { employeeIds })
+
   return {
     totalUnassigned: unassigned.length,
     assignedCount: unassigned.length,
@@ -216,6 +308,8 @@ export function assignSpecific(employeeId, quantity) {
     repo.update(record.id, { assignedTo: emp.id, assignedToName: emp.name, updatedAt: now() })
   })
 
+  notifyChange("assigned_specific", { employeeId, quantity })
+
   return {
     assignedCount: unassigned.length,
     employeeId: emp.id,
@@ -223,7 +317,33 @@ export function assignSpecific(employeeId, quantity) {
   }
 }
 
-export function getAdminDashboard({ branchId } = {}) {
+function getPeriodDates(period) {
+  const tzOptions = { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }
+  const formatter = new Intl.DateTimeFormat('en-CA', tzOptions)
+  const todayStr = formatter.format(new Date())
+
+  if (period === "today") {
+    return { start: todayStr, end: todayStr }
+  }
+
+  const [y, m, d] = todayStr.split("-").map(Number)
+  const vnDate = new Date(y, m - 1, d)
+
+  if (period === "week") {
+    const day = vnDate.getDay()
+    const diff = vnDate.getDate() - day + (day === 0 ? -6 : 1)
+    const monday = new Date(vnDate.getFullYear(), vnDate.getMonth(), diff)
+    const startStr = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`
+    return { start: startStr, end: todayStr }
+  }
+  if (period === "month") {
+    const startStr = `${y}-${String(m).padStart(2, "0")}-01`
+    return { start: startStr, end: todayStr }
+  }
+  return null
+}
+
+export function getAdminDashboard({ branchId, period = "all" } = {}) {
   let all = repo.getAll()
   if (branchId?.trim() && branchId !== "all") {
     const branchStaffs = empRepo.getAll({ branchId })
@@ -235,37 +355,127 @@ export function getAdminDashboard({ branchId } = {}) {
   CRM_STATUSES.forEach(s => { statusBreakdown[s] = 0 })
   all.forEach(r => { if (statusBreakdown[r.status] !== undefined) statusBreakdown[r.status]++ })
 
-  const empMap = {}
-  all.filter(r => r.assignedTo).forEach(r => {
-    if (!empMap[r.assignedTo]) {
-      empMap[r.assignedTo] = { employeeId: r.assignedTo, employeeName: r.assignedToName, total: 0, converted: 0 }
-    }
-    empMap[r.assignedTo].total++
-    if (["Trả lời"].includes(r.status)) empMap[r.assignedTo].converted++
-  })
+  let employeeProgress = []
+  let dashboardStatusCounts = statusBreakdown
 
-  const employeeStats = Object.values(empMap).sort((a, b) => b.total - a.total)
-  const employeeProgress = employeeStats.map(emp => ({
-    employeeId: emp.employeeId,
-    employeeName: emp.employeeName,
-    // Frontend expects: totalAssigned / completedCount / processingCount
-    totalAssigned: emp.total,
-    completedCount: emp.converted,
-    processingCount: Math.max(emp.total - emp.converted, 0),
-  }))
+  if (period !== "all") {
+    const dates = getPeriodDates(period)
+    if (dates) {
+      const logs = crmActivityLogRepo.getAll().filter(log => log.date >= dates.start && log.date <= dates.end)
+      let filteredLogs = logs
+      if (branchId?.trim() && branchId !== "all") {
+        const branchStaffs = empRepo.getAll({ branchId })
+        const staffIds = branchStaffs.map(e => e.id)
+        filteredLogs = logs.filter(log => staffIds.includes(log.employeeId))
+      }
+
+      const keyMap = {}
+      filteredLogs.forEach(log => {
+        const key = `${log.employeeId}_${log.dataId}`
+        if (!keyMap[key] || log.createdAt > keyMap[key].createdAt) {
+          keyMap[key] = log
+        }
+      })
+
+      const periodStatusCounts = {}
+      CRM_STATUSES.forEach(s => { periodStatusCounts[s] = 0 })
+      Object.values(keyMap).forEach(log => {
+        if (periodStatusCounts[log.toStatus] !== undefined) {
+          periodStatusCounts[log.toStatus]++
+        }
+      })
+      dashboardStatusCounts = periodStatusCounts
+
+      const empMap = {}
+      Object.values(keyMap).forEach(log => {
+        if (!empMap[log.employeeId]) {
+          empMap[log.employeeId] = {
+            employeeId: log.employeeId,
+            employeeName: log.employeeName,
+            totalProcessed: 0,
+            statusCounts: {},
+            details: {}
+          }
+          CRM_STATUSES.forEach(s => {
+            empMap[log.employeeId].statusCounts[s] = 0
+            empMap[log.employeeId].details[s] = []
+          })
+        }
+        empMap[log.employeeId].totalProcessed++
+        if (empMap[log.employeeId].statusCounts[log.toStatus] !== undefined) {
+          empMap[log.employeeId].statusCounts[log.toStatus]++
+        }
+        const record = repo.getById(log.dataId)
+        empMap[log.employeeId].details[log.toStatus].push({
+          id: log.dataId,
+          businessName: log.businessName,
+          phone: record ? (record.phone || "") : "",
+          status: log.toStatus,
+          updatedAt: log.createdAt
+        })
+      })
+
+      employeeProgress = Object.values(empMap).map(emp => ({
+        employeeId: emp.employeeId,
+        employeeName: emp.employeeName,
+        totalAssigned: emp.totalProcessed,
+        completedCount: emp.statusCounts["Trả lời"] ?? 0,
+        processingCount: emp.statusCounts["Đã gửi tin nhắn"] ?? 0,
+        blockedCount: emp.statusCounts["Chặn người lạ"] ?? 0,
+        noZaloCount: emp.statusCounts["Không có Zalo"] ?? 0,
+        isTimeBound: true,
+        details: emp.details,
+      })).sort((a, b) => b.totalAssigned - a.totalAssigned)
+    }
+  } else {
+    const empMap = {}
+    all.filter(r => r.assignedTo).forEach(r => {
+      if (!empMap[r.assignedTo]) {
+        empMap[r.assignedTo] = {
+          employeeId: r.assignedTo,
+          employeeName: r.assignedToName,
+          total: 0,
+          converted: 0,
+          statusCounts: {},
+          details: {}
+        }
+        CRM_STATUSES.forEach(s => {
+          empMap[r.assignedTo].statusCounts[s] = 0
+          empMap[r.assignedTo].details[s] = []
+        })
+      }
+      empMap[r.assignedTo].total++
+      if (["Trả lời"].includes(r.status)) empMap[r.assignedTo].converted++
+      empMap[r.assignedTo].statusCounts[r.status]++
+      empMap[r.assignedTo].details[r.status].push({
+        id: r.id,
+        businessName: r.businessName || r.name || "",
+        phone: r.phone || "",
+        status: r.status,
+        updatedAt: r.updatedAt
+      })
+    })
+
+    const employeeStats = Object.values(empMap).sort((a, b) => b.total - a.total)
+    employeeProgress = employeeStats.map(emp => ({
+      employeeId: emp.employeeId,
+      employeeName: emp.employeeName,
+      totalAssigned: emp.total,
+      completedCount: emp.statusCounts["Trả lời"] ?? 0,
+      processingCount: emp.statusCounts["Đã gửi tin nhắn"] ?? 0,
+      blockedCount: emp.statusCounts["Chặn người lạ"] ?? 0,
+      noZaloCount: emp.statusCounts["Không có Zalo"] ?? 0,
+      untreatedCount: emp.statusCounts["Chưa xử lý"] ?? 0,
+      isTimeBound: false,
+      details: emp.details,
+    }))
+  }
 
   return {
     totalData: all.length,
-    // Old keys (kept for backward compatibility)
-    assigned,
-    unassigned: all.length - assigned,
-    statusBreakdown,
-    employeeStats,
-
-    // Client contract (CrmAdminPage)
     assignedData: assigned,
     unassignedData: all.length - assigned,
-    statusCounts: statusBreakdown,
+    statusCounts: dashboardStatusCounts,
     employeeProgress,
   }
 }
@@ -278,15 +488,12 @@ export function getEmployeeDashboard(employeeId) {
   const totalAssigned = myRecords.length
   const untreatedCount = statusBreakdown["Chưa xử lý"] ?? 0
   const completedCount = statusBreakdown["Trả lời"] ?? 0
-  // "Đã gửi" here means: processed but not replied yet.
   const processingCount = Math.max(totalAssigned - untreatedCount - completedCount, 0)
 
   return {
-    // Old keys (kept for backward compatibility)
     total: totalAssigned,
     statusBreakdown,
 
-    // Client contract (CrmStaffPage)
     totalAssigned,
     untreatedCount,
     processingCount,

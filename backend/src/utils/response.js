@@ -22,6 +22,11 @@ export function conflict(res, message) {
   return fail(res, message, 409)
 }
 
-export function serverError(res, message = "Lỗi server nội bộ") {
-  return fail(res, message, 500)
+export function serverError(res, err) {
+  return res.status(500).json({
+    success: false,
+    message: "Lỗi server nội bộ",
+    error: err?.message,
+    stack: err?.stack
+  })
 }

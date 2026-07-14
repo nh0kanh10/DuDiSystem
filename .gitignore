@@ -1,6 +1,16 @@
 # Legacy CRM prototype (not part of DuDiSystem — ignore)
 DuDi_CRM/
 
+# Excel and DB files
+*.xlsx
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!tsconfig.node.json
+!vercel.json
+!render.yaml
+
 # Markdown files
 *.md
 
@@ -142,5 +152,3 @@ scratch/
 _template_unzip/
 *.docx
 
-# Vite configuration temporary compilation timestamps
-vite.config.ts.timestamp-*

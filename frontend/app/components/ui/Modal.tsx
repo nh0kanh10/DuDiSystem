@@ -1,6 +1,7 @@
 import React from "react"
 import { createPortal } from "react-dom"
 import { X } from "lucide-react"
+import { overlayLayer } from "../../utils/overlayLayers"
 
 interface ModalProps {
   open: boolean
@@ -12,6 +13,8 @@ interface ModalProps {
   footer?: React.ReactNode
   bodyClassName?: string
   noFooter?: boolean
+  /** Override z-index class khi cần nested modal (mặc định: z-[10000]) */
+  zIndexClass?: string
 }
 
 const WIDTH = {
@@ -24,11 +27,12 @@ const WIDTH = {
   "6xl": "max-w-6xl",
 }
 
-export function Modal({ open, onClose, title, icon: Icon, width = "xl", children, footer, bodyClassName = "", noFooter = false }: ModalProps) {
+export function Modal({ open, onClose, title, icon: Icon, width = "xl", children, footer, bodyClassName = "", noFooter = false, zIndexClass }: ModalProps) {
   if (!open) return null
+  const zClass = zIndexClass ?? overlayLayer("modal")
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className={`fixed inset-0 ${zClass} flex items-center justify-center p-4`}
       onClick={onClose}
     >
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />

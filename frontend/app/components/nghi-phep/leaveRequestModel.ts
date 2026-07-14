@@ -4,7 +4,8 @@ import { isInternEmployee } from "../cham-cong/attendanceModel"
 export type LeaveScope = "full_day" | "date_range" | "half_session" | "multi_session"
 export type LeaveSession = "sang" | "chieu"
 export type LeaveCategory = "leave" | "timeoff"
-export type LeaveType = "annual" | "sick" | "personal" | "unpaid" | "timeoff"
+export type LeaveType = "annual" | "unpaid" | "sick" | "special" | "comp"
+export type LeaveSubType = "none" | "sick_cert" | "sick_nocert" | "marriage_self" | "marriage_child" | "maternity" | "paternity" | "bereavement"
 export type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled"
 
 export interface LeaveSessionSlot {
@@ -19,6 +20,7 @@ export interface LeaveRequestRecord {
   department?: string
   category: LeaveCategory
   leaveType: LeaveType
+  leaveSubType?: LeaveSubType
   scope: LeaveScope
   startDate: string
   endDate?: string
@@ -33,7 +35,7 @@ export const LEAVE_SCOPE = {
   full_day: { label: "Cả ngày", short: "Cả ngày" },
   date_range: { label: "Nhiều ngày", short: "Nhiều ngày" },
   half_session: { label: "Một buổi", short: "Một buổi" },
-  multi_session: { label: "Chọn lưới buổi", short: "Nhiều buổi" },
+  multi_session: { label: "Xin nghỉ theo tuần", short: "Theo tuần" },
 } as const
 
 export const LEAVE_SESSION = {
@@ -42,12 +44,23 @@ export const LEAVE_SESSION = {
 } as const
 
 export const LEAVE_TYPE = {
-  annual: { label: "Nghỉ phép năm", category: "leave" as const },
-  sick: { label: "Nghỉ ốm", category: "leave" as const },
-  personal: { label: "Việc cá nhân", category: "leave" as const },
-  unpaid: { label: "Nghỉ không lương", category: "leave" as const },
-  timeoff: { label: "Time off bù tăng ca", category: "timeoff" as const },
+  annual: { label: "Nghỉ phép năm (Annual Leave)", category: "leave" as const },
+  unpaid: { label: "Nghỉ không lương (Unpaid)", category: "leave" as const },
+  sick: { label: "Nghỉ ốm đau/BHXH (Sick)", category: "leave" as const },
+  special: { label: "Nghỉ chế độ (Special)", category: "leave" as const },
+  comp: { label: "Nghỉ bù (Compensatory)", category: "leave" as const },
 } as const
+
+export const LEAVE_SUB_TYPE: Record<LeaveSubType, { label: string, maxDays?: number, requireAttachment?: boolean }> = {
+  none: { label: "Không" },
+  sick_cert: { label: "Ốm có giấy xác nhận (Hưởng BHXH)", requireAttachment: true },
+  sick_nocert: { label: "Ốm tự nghỉ (Không giấy)" },
+  marriage_self: { label: "Kết hôn bản thân (3 ngày)", maxDays: 3 },
+  marriage_child: { label: "Con kết hôn (1 ngày)", maxDays: 1 },
+  maternity: { label: "Khám thai", requireAttachment: true },
+  paternity: { label: "Vợ sinh" },
+  bereavement: { label: "Tang gia" },
+}
 
 export const LEAVE_STATUS = {
   pending: { label: "Chờ duyệt", bg: "bg-amber-100", color: "text-amber-700" },
@@ -183,16 +196,11 @@ export function getScopeSessionLabel(req: LeaveRequestRecord): string {
 }
 
 export function scopesForEmployee(emp: Pick<Employee, "contractType">): LeaveScope[] {
-  if (isInternEmployee(emp)) {
-    return ["half_session", "full_day", "multi_session"]
-  }
-  return ["full_day", "date_range", "half_session"]
+  return ["half_session", "full_day", "multi_session"]
 }
 
 export function leaveTypesForEmployee(emp: Pick<Employee, "contractType">, category: LeaveCategory): LeaveType[] {
-  if (category === "timeoff") return ["timeoff"]
-  if (isInternEmployee(emp)) return ["personal", "sick", "unpaid"]
-  return ["annual", "sick", "personal", "unpaid"]
+  return ["annual", "unpaid", "sick", "special", "comp"]
 }
 
 export function isDateInPast(dateStr: string): boolean {
@@ -206,50 +214,89 @@ export function isDateInPast(dateStr: string): boolean {
 export interface LeaveFormState {
   category: LeaveCategory
   leaveType: LeaveType
+  leaveSubType: LeaveSubType
   scope: LeaveScope
   startDate: string
   endDate: string
   session: LeaveSession
   sessions: LeaveSessionSlot[]
   reason: string
+  handoverPerson?: string
+  attachment?: File | null
 }
 
 export function createLeaveForm(emp: Pick<Employee, "contractType">): LeaveFormState {
-  const intern = isInternEmployee(emp)
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = formatVnDate(tomorrow)
+
   return {
     category: "leave",
-    leaveType: intern ? "personal" : "annual",
-    scope: intern ? "multi_session" : "full_day",
-    startDate: "",
-    endDate: "",
+    leaveType: "annual",
+    leaveSubType: "none",
+    scope: "full_day",
+    startDate: tomorrowStr,
+    endDate: tomorrowStr,
     session: "sang",
     sessions: [],
     reason: "",
+    handoverPerson: "",
+    attachment: null,
   }
 }
 
 export function validateLeaveForm(form: LeaveFormState): string | null {
+  const isBackdatingAllowed = form.leaveType === "sick"
+
   if (!form.reason.trim()) return "Vui lòng nhập lý do"
+
+  const subTypeInfo = LEAVE_SUB_TYPE[form.leaveSubType]
+  if (subTypeInfo?.requireAttachment && !form.attachment) {
+    return "Vui lòng tải lên tệp đính kèm (Giấy khám bệnh/chứng từ)"
+  }
+
+  // Quota checking for special limit
+  const requestedDays = countLeaveDaysForm(form)
+  if (subTypeInfo?.maxDays && requestedDays > subTypeInfo.maxDays) {
+    return `Loại nghỉ này chỉ được tối đa ${subTypeInfo.maxDays} ngày (${subTypeInfo.maxDays * 2} buổi)`
+  }
+
+  // Phép năm quota mock check
+  if (form.leaveType === "annual" && requestedDays > 12) {
+    return "Số ngày nghỉ vượt quá số phép năm còn lại (12 ngày)"
+  }
+
   switch (form.scope) {
     case "full_day":
       if (!form.startDate) return "Vui lòng chọn ngày nghỉ"
-      if (isDateInPast(form.startDate)) return "Không thể đăng ký ngày đã qua"
+      if (!isBackdatingAllowed && isDateInPast(form.startDate)) return "Chỉ nghỉ ốm mới được chọn ngày trong quá khứ"
       break
     case "date_range":
       if (!form.startDate || !form.endDate) return "Vui lòng chọn đủ ngày bắt đầu và kết thúc"
       if (parseVnDate(form.endDate) < parseVnDate(form.startDate)) return "Ngày kết thúc phải sau ngày bắt đầu"
-      if (isDateInPast(form.startDate)) return "Không thể đăng ký ngày đã qua"
+      if (!isBackdatingAllowed && isDateInPast(form.startDate)) return "Chỉ nghỉ ốm mới được chọn ngày trong quá khứ"
       break
     case "half_session":
       if (!form.startDate) return "Vui lòng chọn ngày nghỉ"
-      if (isDateInPast(form.startDate)) return "Không thể đăng ký ngày đã qua"
+      if (!isBackdatingAllowed && isDateInPast(form.startDate)) return "Chỉ nghỉ ốm mới được chọn ngày trong quá khứ"
       break
     case "multi_session":
       if (form.sessions.length === 0) return "Vui lòng chọn ít nhất một buổi nghỉ"
-      if (form.sessions.some(s => isDateInPast(s.date))) return "Không thể chọn buổi đã qua"
+      if (!isBackdatingAllowed && form.sessions.some(s => isDateInPast(s.date))) return "Chỉ nghỉ ốm mới được chọn buổi trong quá khứ"
       break
   }
   return null
+}
+
+export function countLeaveDaysForm(form: LeaveFormState): number {
+  switch (form.scope) {
+    case "full_day": return 1;
+    case "date_range": return form.startDate && form.endDate ? getWeekdayDateRange(form.startDate, form.endDate).length : 0;
+    case "half_session": return 0.5;
+    case "multi_session": return form.sessions.length * 0.5;
+    default: return 0;
+  }
 }
 
 export function buildCreatePayload(employeeId: string, form: LeaveFormState) {

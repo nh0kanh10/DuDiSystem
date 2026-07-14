@@ -14,7 +14,7 @@ export function useLeaveRequests(employeeId?: string) {
       setLoading(false)
       return
     }
-    if (loadingRef.current) return 
+    if (loadingRef.current) return
     loadingRef.current = true
     setLoading(true)
     setError(null)

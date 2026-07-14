@@ -162,43 +162,6 @@ export function LoginPage({ onLogin, loginError, isLoading }: {
               )}
             </button>
           </div>
-
-          <div className="mt-5 p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs text-gray-500 space-y-3">
-            <p className="font-semibold text-gray-700 text-sm">Đăng nhập nhanh:</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => quickLogin("0000000000", "123456")}
-                className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 transition-colors cursor-pointer text-violet-700"
-              >
-                <div className="font-bold mb-0.5">Quản trị viên</div>
-                <div className="font-mono text-[10px] opacity-75">0000000000 · CN HCM</div>
-              </button>
-              <button
-                onClick={() => quickLogin("NV009", "123456")}
-                className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors cursor-pointer text-amber-700"
-              >
-                <div className="font-bold mb-0.5">Nhân · Giám đốc CN</div>
-                <div className="font-mono text-[10px] opacity-75">NV009 · CN HCM</div>
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => quickLogin("NV001", "0901234567")}
-                className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer text-emerald-700"
-              >
-                <div className="font-bold mb-0.5">Bích Liên</div>
-                <div className="font-mono text-[10px] opacity-75">NV001 · Nhân viên</div>
-              </button>
-              <button
-                onClick={() => quickLogin("NV012", "123456")}
-                className="w-full flex flex-col items-center justify-center p-3 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 transition-colors cursor-pointer text-sky-700"
-              >
-                <div className="font-bold mb-0.5">Thị Hà</div>
-                <div className="font-mono text-[10px] opacity-75">NV012 · CN Hà Nội</div>
-              </button>
-            </div>
-            <p className="text-gray-400 text-[10px] text-center pt-1">Hệ thống tự phân quyền dựa vào tài khoản đăng nhập.</p>
-          </div>
         </div>
       </div>
 
@@ -214,6 +177,7 @@ export function LoginPage({ onLogin, loginError, isLoading }: {
                 onClick={() => setShowForgotModal(false)}
                 className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500"
               >
+                <Lock size={18} className="hidden" /> {/* Placeholder just in case */}
                 <span className="text-xl leading-none">&times;</span>
               </button>
             </div>

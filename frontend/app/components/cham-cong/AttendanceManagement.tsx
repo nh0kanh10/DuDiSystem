@@ -28,6 +28,7 @@ import {
 } from "./attendanceModel"
 import { CustomSelect } from "../ui/CustomSelect"
 import { CustomTimePicker } from "../ui/CustomTimePicker"
+import StatisticsPage from "../thong-ke/StatisticsPage"
 
 const STATUS_MAP = {
   "on-time": { label: "Đúng giờ",  bg: "bg-green-100",  text: "text-green-700",  dot: "bg-green-500"  },
@@ -163,8 +164,8 @@ function InternSessionBadges({ record }: { record: AttendanceRecord }) {
 function SkeletonRow() {
   return (
     <tr className="animate-pulse">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <td key={i} className="py-3.5 px-4"><div className="h-3.5 bg-gray-100 rounded-full" style={{ width: `${60 + i * 8}%` }} /></td>
+      {Array.from({ length: 11 }).map((_, i) => (
+        <td key={i} className="py-3.5 px-4"><div className="h-3.5 bg-gray-100 rounded-full" style={{ width: `${60 + (i % 5) * 8}%` }} /></td>
       ))}
     </tr>
   )
@@ -392,7 +393,6 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterType, setFilterType] = useState<"all" | "intern" | "staff">("all")
   const [records, setRecords] = useState<AttendanceRecord[]>([])
-  const [stats, setStats] = useState({ onTime: 0, late: 0, absent: 0, leave: 0, total: 0 })
   const [loading, setLoading] = useState(true)
   const [editRecord, setEditRecord] = useState<AttendanceRecord | null>(null)
   const [showAdd, setShowAdd] = useState(false)
@@ -402,7 +402,7 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
     if (t) showToast(t.msg, t.type)
   }, [showToast])
 
-  useEffect(() => { api.employees.list().then(d => setEmployees(d as any[])) }, [])
+  useEffect(() => { api.employees.list().then(d => setEmployees((d as any[]).filter(e => e.status === "active"))) }, [])
 
   const loadData = useCallback(async (start: string, end: string, empId: string) => {
     setLoading(true)
@@ -413,12 +413,8 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
         ...branchQuery(selectedBranch),
         ...(empId !== "all" ? { employeeId: empId } : {}),
       }
-      const [data, statsData] = await Promise.all([
-        api.attendance.list(queryParams),
-        api.attendance.stats(queryParams)
-      ])
+      const data = await api.attendance.list(queryParams)
       setRecords(data as AttendanceRecord[])
-      setStats(statsData)
     } catch {
       setToast({ msg: "Lỗi tải dữ liệu", type: "error" })
     } finally {
@@ -449,13 +445,6 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
     try {
       const updated = await api.attendance.update(id, data) as AttendanceRecord
       setRecords(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r))
-      const statsData = await api.attendance.stats({
-        startDate: selectedDate,
-        endDate: selectedDate,
-        employeeId: filterEmployee !== "all" ? filterEmployee : undefined,
-        ...branchQuery(selectedBranch),
-      })
-      setStats(statsData)
       setToast({ msg: "Cập nhật thành công", type: "success" })
     } catch (e: unknown) {
       setToast({ msg: e instanceof Error ? e.message : "Lỗi cập nhật", type: "error" })
@@ -493,6 +482,24 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
       && (filterType === "all"
         || (filterType === "intern" ? isInternRecord(r) : !isInternRecord(r)))
   }), [enrichedRecords, search, filterDept, filterStatus, filterType])
+
+  const stats = useMemo(() => {
+    const counts = { onTime: 0, late: 0, absent: 0, leave: 0 }
+    filtered.forEach(r => {
+      const s = r.status || "absent"
+      if (s === "on-time") counts.onTime += 1
+      else if (s === "late" || s === "late_early" || s === "early") counts.late += 1
+      else if (s === "absent") counts.absent += 1
+      else if (s === "leave") counts.leave += 1
+    })
+    return {
+      onTime: counts.onTime,
+      late: counts.late,
+      absent: counts.absent,
+      leave: counts.leave,
+      total: filtered.length
+    }
+  }, [filtered])
 
   const departments = useMemo(
     () => Array.from(new Set(branchEmployees.map(e => e.department).filter(Boolean))),
@@ -610,7 +617,7 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
           <table className="w-full text-sm text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/80 text-gray-400 font-semibold text-xs border-b border-gray-100">
-                {["Mã NV", "Họ và tên", "Phòng ban", "Loại", "Check-in", "Check-out", "Tổng giờ", "Trạng thái", "Ghi chú", ""].map(h => (
+                {["#", "Mã NV", "Họ và tên", "Phòng ban", "Loại", "Check-in", "Check-out", "Tổng giờ", "Trạng thái", "Ghi chú", ""].map(h => (
                   <th key={h} className="py-3 px-4 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -621,7 +628,7 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
                 : filtered.length === 0
                   ? (
                     <tr>
-                      <td colSpan={10} className="py-16 text-center">
+                      <td colSpan={11} className="py-16 text-center">
                         <div className="flex flex-col items-center gap-2 text-gray-400">
                           <FileText size={32} className="opacity-30" />
                           <p className="text-sm font-medium">Không có bản ghi chấm công</p>
@@ -630,10 +637,11 @@ function DailyTab({ selectedBranch }: { selectedBranch: string }) {
                       </td>
                     </tr>
                   )
-                  : filtered.map(r => {
+                  : filtered.map((r, idx) => {
                     const kind = employeeKindMeta(r.employeeStatus)
                     return (
                     <tr key={r.id} className="hover:bg-gray-50/40 transition-colors group">
+                      <td className="py-3 px-4 text-xs font-semibold text-gray-400">{idx + 1}</td>
                       <td className="py-3 px-4 font-mono text-xs text-gray-500">{r.employeeId}</td>
                       <td className="py-3 px-4 font-bold text-gray-800 whitespace-nowrap">{r.employeeName}</td>
                       <td className="py-3 px-4 text-gray-500 text-xs">{r.department}</td>
@@ -725,7 +733,7 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
           api.employees.list(),
           api.attendance.list(branchQuery(selectedBranch)),
         ])
-        setAllEmployees(empData as Employee[])
+        setAllEmployees((empData as Employee[]).filter(e => e.status === "active"))
         const monthStr = String(month).padStart(2, "0")
         const branchEmpIds = new Set(
           (empData as Employee[]).filter(e => inBranch(e, selectedBranch)).map(e => e.id),
@@ -886,8 +894,8 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
                             <div className="text-[11px] text-gray-400 font-mono">{emp.id}</div>
                             {emp.department && <div className="text-[10px] text-gray-400 mt-1 truncate max-w-[120px]">{emp.department}</div>}
                           </div>
-                          <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black ${emp.contractType === "intern" ? "bg-purple-100 text-purple-700" : "bg-blue-50 text-blue-700"}`}>
-                            {emp.contractType === "intern" ? "TT" : "CT"}
+                          <span className={`shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black ${isInternEmployee(emp) ? "bg-purple-100 text-purple-700" : "bg-blue-50 text-blue-700"}`}>
+                            {isInternEmployee(emp) ? "TT" : "CT"}
                           </span>
                         </div>
                       </td>
@@ -934,7 +942,7 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
                           )
                         }
 
-                        const isCellIntern = rec.employeeStatus === "intern"
+                        const isCellIntern = isInternEmployee(emp)
                         const cellRows: MonthTimeRow[] = isCellIntern ? [
                           { id: "am-in", session: "am", kind: "in", label: "S·Vào", labelClass: "" },
                           { id: "am-out", session: "am", kind: "out", label: "S·Ra", labelClass: "" },
@@ -1007,7 +1015,7 @@ function MonthlyTab({ selectedBranch }: { selectedBranch: string }) {
 
                       <td className={`sticky right-0 z-10 border-b border-l border-gray-100 py-3 px-3 text-center shadow-[-4px_0_8px_-2px_rgba(0,0,0,0.06)] group-hover:bg-red-50/40 align-middle ${stickyBg}`}>
                         <div className="text-sm font-bold text-emerald-700 tabular-nums">{present}</div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">{emp.contractType === "intern" ? "buổi/ngày" : "ngày công"}</div>
+                        <div className="text-[10px] text-gray-400 mt-0.5">{isInternEmployee(emp) ? "buổi/ngày" : "ngày công"}</div>
                         <div className="flex flex-col items-center gap-0.5 mt-2">
                           {late > 0 && <span className="text-[10px] font-semibold text-orange-600">{late} trễ</span>}
                           {absent > 0 && <span className="text-[10px] font-semibold text-red-500">{absent} vắng</span>}
@@ -1276,7 +1284,27 @@ export function AttendanceManagement({ selectedBranch = "all" }: { selectedBranc
 
       {tab === "daily"   && <DailyTab selectedBranch={selectedBranch} />}
       {tab === "monthly" && <MonthlyTab selectedBranch={selectedBranch} />}
-      {tab === "stats"   && <StatsTab selectedBranch={selectedBranch} />}
+      {tab === "stats"   && (() => {
+        let user: any = null
+        try {
+          user = JSON.parse(localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user") || "{}")
+        } catch {}
+        const loggedEmail = user?.employeeId || user?.email || ""
+        const role = user?.roleId || "user"
+        const permissions = user?.effectivePermissions || []
+        const statsPermissions = permissions.includes("cham-cong") && !permissions.includes("thong-ke")
+          ? [...permissions, "thong-ke"]
+          : permissions
+        return (
+          <StatisticsPage
+            selectedBranch={selectedBranch}
+            currentUserEmail={loggedEmail}
+            currentUserRole={role}
+            modules={statsPermissions}
+            hideHeader={true}
+          />
+        )
+      })()}
     </div>
   )
 }

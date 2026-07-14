@@ -108,6 +108,7 @@ export async function createEmployee(data) {
     homeDistrict: data.homeDistrict || "",
     homeWard: data.homeWard || "",
     homeStreet: data.homeStreet || "",
+    avatar: data.avatar || "",
     photos: Array.isArray(data.photos) ? data.photos : [],
     attachments: Array.isArray(data.attachments) ? data.attachments : [],
     workHistory: Array.isArray(data.workHistory) ? data.workHistory : [],
@@ -229,9 +230,29 @@ export function updateEmployee(id, patch) {
     safe.contractHistory = updatedHistory
   }
 
-  return repo.update(id, safe)
+  const updatedEmp = repo.update(id, safe)
+
+  if (patch.status !== undefined) {
+    const user = userRepo.getByEmployeeId(id)
+    if (user) {
+      const newUserStatus = patch.status === "inactive" ? "locked" : "active"
+      const updatePayload = { status: newUserStatus }
+      if (newUserStatus === "locked") {
+        updatePayload.lockReason = "Bạn đã nghỉ việc, hệ thống tự động khóa. Nếu sai lầm vui lòng liên hệ admin"
+      } else {
+        updatePayload.lockReason = null
+      }
+      userRepo.update(user.id, updatePayload)
+    }
+  }
+
+  return updatedEmp
 }
 
 export function deleteEmployee(id) {
+  const user = userRepo.getByEmployeeId(id)
+  if (user) {
+    userRepo.remove(user.id)
+  }
   return repo.remove(id)
 }
