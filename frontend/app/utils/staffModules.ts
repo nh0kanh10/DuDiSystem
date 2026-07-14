@@ -7,7 +7,6 @@ export const STAFF_PORTAL_MODULES = [
   "user-workflow",
   "user-settings",
   "user-crm",
-  "user-kpi",
   "crm-employee-data",
   "cong-viec",
   "thong-bao",
@@ -60,8 +59,7 @@ export function hasPageAccess(permissions: string[], page: string): boolean {
   if (permissions.includes("all")) return true
   if (page === "dashboard") return permissions.includes("dashboard")
   if (page === "staff-portal") return canOpenStaffPortal(permissions)
-  if (page === "kpi-stats" || page === "kpi-compare") return permissions.includes("kpi")
-  if (page === "thong-ke") return permissions.includes("thong-ke") || permissions.includes("cham-cong")
+  if (page.startsWith("kpi")) return permissions.includes("kpi")
   return permissions.includes(page)
 }
 
@@ -74,24 +72,4 @@ export const LIVE_STAFF_BUBBLES = new Set([
   "notifications",
   "settings",
   "crm",
-  "kpi",
 ])
-
-export const STAFF_BLOCK_MODULES: Record<string, string> = {
-  employee: "user-profile",
-  checkin: "user-attendance",
-  leave: "user-timeoff",
-  directory: "user-directory",
-  tasks: "cong-viec",
-  notifications: "thong-bao",
-  settings: "user-settings",
-  crm: "user-crm",
-  kpi: "user-kpi",
-}
-
-export function canShowStaffBlock(permissions: string[], blockId: string): boolean {
-  const moduleKey = STAFF_BLOCK_MODULES[blockId]
-  if (!moduleKey) return true
-  if (permissions.length === 0) return false
-  return hasStaffModule(permissions, moduleKey)
-}

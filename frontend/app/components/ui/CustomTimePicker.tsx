@@ -169,7 +169,7 @@ export function CustomTimePicker({ value, onChange, disabled = false, className 
       {isOpen && !disabled && createPortal(
         <div 
           id="time-picker-portal-container"
-          className="fixed bg-white border border-gray-150 rounded-2xl shadow-xl z-[10010] p-3 grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-150"
+          className="fixed bg-white border border-gray-150 rounded-2xl shadow-xl z-[9999] p-3 grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-150"
           style={{ 
             top: dropdownPos.top, 
             left: dropdownPos.left, 

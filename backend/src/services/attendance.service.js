@@ -15,12 +15,6 @@ function parseVnDate(str) {
   return new Date(y, m - 1, d)
 }
 
-function isInternContractType(contractType) {
-  if (!contractType) return false
-  const t = String(contractType).trim().toLowerCase()
-  return t === "intern" || t === "thực tập" || t.startsWith("thực tập") || t === "thuc tap"
-}
-
 function getContractTypeForDate(emp, dateStr) {
   if (!emp) return "staff"
   if (!emp.contractHistory || emp.contractHistory.length === 0) {
@@ -368,8 +362,17 @@ function isoToRequestDate(isoStr) {
 function withEmployee(record) {
   const emp = empRepo.getById(record.employeeId)
   const sysConfig = getSystemConfig()
-
-  const isIntern = isInternContractType(getContractTypeForDate(emp, record.date))
+  
+  let isIntern = false
+  if (record.contractType) {
+    isIntern = record.contractType === "intern"
+  } else if (record.checkInAm !== undefined || record.checkInPm !== undefined || record.statusAm !== undefined || record.statusPm !== undefined) {
+    isIntern = true
+  } else if (record.checkIn !== undefined || record.checkOut !== undefined) {
+    isIntern = false
+  } else {
+    isIntern = getContractTypeForDate(emp, record.date) === "intern"
+  }
 
   const checkIn = record.checkIn ?? "--"
   const checkOut = record.checkOut ?? "--"
@@ -535,13 +538,7 @@ function withEmployee(record) {
   }
 }
 
-export function listAttendance(rawFilter) {
-  const filter = { ...rawFilter }
-  if (filter.date) {
-    if (!filter.startDate) filter.startDate = filter.date
-    if (!filter.endDate) filter.endDate = filter.date
-  }
-
+export function listAttendance(filter) {
   let records = repo.getAll()
   records = records.filter(r => !["0000000000", "1111111111", "2222222222"].includes(r.employeeId))
 
@@ -602,7 +599,7 @@ export function listAttendance(rawFilter) {
         const exists = recordKeys.has(`${leave.employeeId}_${dateStr}`)
         if (!exists) {
           const emp = empRepo.getById(leave.employeeId)
-          const isIntern = isInternContractType(getContractTypeForDate(emp, dateStr))
+          const isIntern = getContractTypeForDate(emp, dateStr) === "intern"
           const blank = {
             id: `TEMP_${leave.employeeId}_${dateStr}`,
             employeeId: leave.employeeId,
@@ -649,7 +646,6 @@ export function listAttendance(rawFilter) {
 
     let employees = empRepo.getAll()
     employees = employees.filter(e => !["0000000000", "1111111111", "2222222222"].includes(e.id))
-    employees = employees.filter(e => e.status === "active")
 
     if (filter.employeeId) {
       employees = employees.filter(e => e.id === filter.employeeId)
@@ -672,8 +668,8 @@ export function listAttendance(rawFilter) {
           const compareDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2])
           compareDate.setHours(0, 0, 0, 0)
 
-          if (compareDate <= today && !isWeekend) {
-            const isIntern = isInternContractType(getContractTypeForDate(emp, dateStr))
+          if (compareDate < today && !isWeekend) {
+            const isIntern = getContractTypeForDate(emp, dateStr) === "intern"
             const blank = {
               id: `TEMP_${emp.id}_${dateStr}`,
               employeeId: emp.id,
@@ -720,25 +716,6 @@ export function listAttendance(rawFilter) {
       return emp?.department === filter.department
     })
   }
-
-  records.sort((a, b) => {
-    if (a.date !== b.date) {
-      return b.date.localeCompare(a.date)
-    }
-    const parseTime = (t) => {
-      if (!t || t === "--") return 0
-      return parseToSeconds(t)
-    }
-    const getLatestCheckIn = (r) => {
-      if (r.checkInAm !== undefined || r.checkInPm !== undefined) {
-        const am = parseTime(r.checkInAm)
-        const pm = parseTime(r.checkInPm)
-        return Math.max(am, pm)
-      }
-      return parseTime(r.checkIn)
-    }
-    return getLatestCheckIn(b) - getLatestCheckIn(a)
-  })
 
   return records.map(withEmployee)
 }
@@ -806,7 +783,7 @@ export function createAttendance(data) {
   if (existing) return { error: "Đã có bản ghi chấm công cho nhân viên này hôm nay", status: 409 }
 
   const emp = empRepo.getById(data.employeeId)
-  const isIntern = isInternContractType(getContractTypeForDate(emp, data.date))
+  const isIntern = getContractTypeForDate(emp, data.date) === "intern"
   const sysConfig = getSystemConfig()
   const noonBoundary = sysConfig.noonBoundary || "14:00"
 
@@ -885,7 +862,7 @@ export function updateAttendance(id, patch) {
   }
 
   const emp = employeeId ? empRepo.getById(employeeId) : null
-  const isIntern = isInternContractType(getContractTypeForDate(emp, dateStr))
+  const isIntern = getContractTypeForDate(emp, dateStr) === "intern"
   const sysConfig = getSystemConfig()
 
   if (id.startsWith("TEMP_")) {

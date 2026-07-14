@@ -30,8 +30,7 @@ export function updateUser(req, res, next) {
 
 export function toggleUserStatus(req, res, next) {
   try {
-    const { reason } = req.body
-    const user = service.toggleStatus(req.params.id, reason)
+    const user = service.toggleStatus(req.params.id)
     res.json({ success: true, data: user })
   } catch (err) {
     res.status(400).json({ success: false, error: err.message })

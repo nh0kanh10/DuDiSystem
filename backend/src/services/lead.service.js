@@ -57,6 +57,13 @@ const SEED_LEADS = [
 let seeded = false
 
 function ensureSeed() {
+  if (seeded || repo.count() > 0) {
+    seeded = true
+    return
+  }
+  for (const lead of SEED_LEADS) {
+    repo.create({ ...lead })
+  }
   seeded = true
 }
 
@@ -149,28 +156,9 @@ export function createLead(body = {}) {
     throw new Error("Mã số thuế chỉ được chứa số và dấu gạch ngang")
   }
 
-  let leadCode = body.code
-  if (!leadCode) {
-    if (body.sourceCrmId) {
-      const crmIdNum = body.sourceCrmId.replace("crm-", "")
-      const existingLeads = repo.getAll().filter(l => l.sourceCrmId === body.sourceCrmId)
-      const nextSeq = existingLeads.length + 1
-
-      const d = new Date()
-      const day = String(d.getDate()).padStart(2, "0")
-      const month = String(d.getMonth() + 1).padStart(2, "0")
-      const yr = String(d.getFullYear()).slice(-2)
-      const dateStr = `${day}${month}${yr}`
-
-      leadCode = `${crmIdNum}-${nextSeq}-${dateStr}`
-    } else {
-      leadCode = nextCode()
-    }
-  }
-
   const lead = {
     id,
-    code: leadCode,
+    code: body.code || nextCode(),
     name,
     customerId: body.customerId || "",
     status: body.status || "new",

@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react"
 import { createPortal } from "react-dom"
-import * as XLSX from "xlsx"
 import { Download, Plus, Search, Edit2, Trash2, ChevronRight, ChevronDown, Circle, User, Ban, CheckCircle, ClipboardList, UserPlus, Briefcase } from "lucide-react"
 import { OrgNode, OrgNodeType, Employee, Assignment } from "../../types"
 import OrgTreeView from "./OrgTreeView"
@@ -575,34 +574,21 @@ export default function OrgStructure({
   }
 
   const handleExport = () => {
-    const typeLabelsExport: Record<string, string> = {
-      branch: "Chi nhánh",
-      department: "Phòng ban",
-      "sub-department": "Bộ phận",
-      position: "Vị trí",
-      team: "Nhóm",
-    }
-    const statusLabelsExport: Record<string, string> = {
-      active: "Hoạt động",
-      inactive: "Ngừng",
-    }
-    const rows = nodesToRender.map(n => {
-      const mgr = employees.find(e => e.id === n.managerId)
-      return {
-        ID: n.id,
-        "Tên đơn vị": n.name,
-        "Mã đơn vị": n.code,
-        "Phân cấp": typeLabelsExport[n.type] || n.type,
-        "Trưởng phòng": mgr ? mgr.name : "",
-        "Chức danh": n.managerTitle || "",
-        "Số nhân sự": n.memberCount,
-        "Trạng thái": statusLabelsExport[n.status] || n.status,
-      }
-    })
-    const ws = XLSX.utils.json_to_sheet(rows)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, "Cơ cấu tổ chức")
-    XLSX.writeFile(wb, "co-cau-to-chuc.xlsx")
+    const headers = "ID,Tên đơn vị,Mã đơn vị,Phân cấp,Quản lý,Chức danh,Số nhân sự,Trạng thái\n"
+    const rows = nodesToRender
+      .map(n => {
+        const mgr = employees.find(e => e.id === n.managerId)
+        return `${n.id},"${n.name}",${n.code},${n.type},"${mgr ? mgr.name : ""}","${n.managerTitle}",${n.memberCount},${n.status}`
+      })
+      .join("\n")
+    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.setAttribute("download", "co-cau-to-chuc.csv")
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const filteredNodes = useMemo<RowItem[]>(() => {
@@ -679,22 +665,34 @@ export default function OrgStructure({
         </div>
       </div>
 
-      <div className="flex bg-gray-100 rounded-xl p-1 shadow-inner border border-gray-200 w-fit">
+      <div className="flex bg-white rounded-2xl p-1 border border-gray-200 w-fit gap-1">
         <button
           onClick={() => { setSelectedNodeId(null); setViewMode("diagram") }}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "diagram" && !selectedNodeId ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+          className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            viewMode === "diagram" && !selectedNodeId
+              ? "bg-[#C62828] text-white shadow-sm"
+              : "text-[#8b6b70] hover:text-[#C62828]"
+          }`}
         >
           Sơ đồ
         </button>
         <button
           onClick={() => { setSelectedNodeId(null); setViewMode("list") }}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "list" && !selectedNodeId ? "bg-white text-gray-800 shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+          className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            viewMode === "list" && !selectedNodeId
+              ? "bg-[#C62828] text-white shadow-sm"
+              : "text-[#8b6b70] hover:text-[#C62828]"
+          }`}
         >
           Danh sách
         </button>
         <button
           onClick={() => { setSelectedNodeId(null); setViewMode("catalog") }}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${viewMode === "catalog" ? "bg-white text-[#C62828] shadow-sm" : "text-gray-400 hover:text-gray-700"}`}
+          className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+            viewMode === "catalog"
+              ? "bg-[#C62828] text-white shadow-sm"
+              : "text-[#8b6b70] hover:text-[#C62828]"
+          }`}
         >
           <Briefcase size={11} />Chức danh
         </button>
@@ -828,7 +826,7 @@ export default function OrgStructure({
                       <th className="px-6 py-3.5 text-left font-semibold">Tên đơn vị / Nhân sự</th>
                       <th className="px-6 py-3.5 text-left font-semibold">Phân cấp</th>
                       <th className="px-6 py-3.5 text-left font-semibold">Mã đơn vị / NV</th>
-                      <th className="px-6 py-3.5 text-left font-semibold">Trưởng phòng</th>
+                      <th className="px-6 py-3.5 text-left font-semibold">Người phụ trách</th>
                       <th className="px-6 py-3.5 text-left font-semibold">Chức danh</th>
                       <th className="px-6 py-3.5 text-left font-semibold">Nhân sự</th>
                       <th className="px-6 py-3.5 text-left font-semibold">Trạng thái</th>

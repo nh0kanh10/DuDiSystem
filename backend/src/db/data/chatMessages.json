@@ -1,1 +1,42 @@
-[]
+[
+  {
+    "id": "MSG001",
+    "conversationId": "CONV001",
+    "senderId": "NV002",
+    "body": "Chào anh, em vừa tạo PR sửa lỗi chấm công rồi ạ",
+    "type": "text",
+    "createdAt": "2026-07-03T09:30:00+07:00"
+  },
+  {
+    "id": "MSG002",
+    "conversationId": "CONV001",
+    "senderId": "NV001",
+    "body": "Ok để anh xem qua",
+    "type": "text",
+    "createdAt": "2026-07-03T09:35:00+07:00"
+  },
+  {
+    "id": "MSG003",
+    "conversationId": "CONV001",
+    "senderId": "NV002",
+    "body": "Anh check giúp em PR mới nhé",
+    "type": "text",
+    "createdAt": "2026-07-03T09:41:00+07:00"
+  },
+  {
+    "id": "MSG004",
+    "conversationId": "CONV002",
+    "senderId": "NV009",
+    "body": "Anh duyệt phiếu chi giúp em",
+    "type": "text",
+    "createdAt": "2026-07-03T10:02:00+07:00"
+  },
+  {
+    "id": "MSG005",
+    "conversationId": "CONV003",
+    "senderId": "NV003",
+    "body": "Deal khách A xong chưa?",
+    "type": "text",
+    "createdAt": "2026-07-03T08:58:00+07:00"
+  }
+]

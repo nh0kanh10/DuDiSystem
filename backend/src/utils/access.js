@@ -8,13 +8,13 @@ const MANAGER_ROLES = new Set(["role-admin", "role-super-admin", "role-manager"]
 
 const STAFF_MODULE_SET = new Set([
   "user-profile", "user-attendance", "user-timeoff", "user-directory",
-  "user-chat", "user-workflow", "user-settings", "user-crm", "user-kpi", "crm-employee-data",
+  "user-chat", "user-workflow", "user-settings", "user-crm", "crm-employee-data",
   "cong-viec", "thong-bao",
 ])
 
 const ADMIN_MODULE_SET = new Set([
   "nhan-su", "co-cau", "cham-cong", "duyet-don",
-  "tai-khoan", "phan-quyen", "ip", "thong-ke", "kpi", "du-an", "tien-ich", "crm",
+  "tai-khoan", "phan-quyen", "ip", "thong-ke", "du-an", "tien-ich", "crm",
 ])
 
 export function isAdminUser(user) {
@@ -68,14 +68,9 @@ export function resolveClientPermissions(user) {
     if (hasStaff && !perms.includes("staff-portal")) {
       perms = [...perms, "staff-portal"]
     }
-  } else {
-    if (!perms.includes("staff-portal")) {
-      const hasStaff = perms.some(p => STAFF_MODULE_SET.has(p))
-      if (hasStaff) perms = [...perms, "staff-portal"]
-    }
-    if (perms.includes("cham-cong") && !perms.includes("thong-ke")) {
-      perms = [...perms, "thong-ke"]
-    }
+  } else if (!perms.includes("staff-portal")) {
+    const hasStaff = perms.some(p => STAFF_MODULE_SET.has(p))
+    if (hasStaff) perms = [...perms, "staff-portal"]
   }
 
   return perms
@@ -135,6 +130,7 @@ export function assertOwnEmployee(user, employeeId) {
   return null
 }
 
+/** Data scope from role assignment + role definition */
 export function getUserScope(user) {
   if (!user?.id) return { type: "self", branchId: null }
 

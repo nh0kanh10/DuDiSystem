@@ -128,23 +128,10 @@ export function updateUser(id, patch) {
     const roleObj = roleRepo.getById(roleId)
     const scopeType = roleObj?.scopeType || "self"
     const primary = raRepo.getPrimary(id)
-    const resolvedScopeId = scopeType === "branch"
-      ? (patch.scopeId !== undefined
-        ? patch.scopeId
-        : (primary?.scopeId || resolveScopeFromEmployee(updated.employeeId) || null))
-      : null
     if (primary) {
       raRepo.update(primary.id, {
         scopeType,
-        scopeId: resolvedScopeId
-      })
-    } else {
-      raRepo.create({
-        id: `ra-${Date.now()}`,
-        userId: id,
-        scopeType,
-        scopeId: resolvedScopeId,
-        isPrimary: true
+        scopeId: scopeType === "branch" ? (patch.scopeId !== undefined ? patch.scopeId : primary.scopeId) : null
       })
     }
   }
@@ -153,20 +140,14 @@ export function updateUser(id, patch) {
   return safeUser
 }
 
-export function toggleStatus(id, reason) {
+export function toggleStatus(id) {
   const user = repo.getById(id)
   if (!user) throw new Error("Không tìm thấy tài khoản")
   if (["0000000000", "1111111111", "2222222222"].includes(user.email)) {
     throw new Error("Không thể thao tác tài khoản Quản trị viên")
   }
   const newStatus = user.status === "active" ? "locked" : "active"
-  const updateData = { status: newStatus }
-  if (newStatus === "locked") {
-    updateData.lockReason = reason || "Không có lý do cụ thể"
-  } else {
-    updateData.lockReason = null
-  }
-  const updated = repo.update(id, updateData)
+  const updated = repo.update(id, { status: newStatus })
   const { password: _, ...safeUser } = updated
   return safeUser
 }
@@ -220,10 +201,7 @@ export function enrichUserProfile(user) {
     name: emp?.name ?? "—",
     department: emp?.department ?? "—",
     position: emp?.position ?? "—",
-    // employment status (active/inactive/suspended) — NOT staff/intern
     employeeStatus: emp?.status ?? "active",
-    // contract kind for chấm công / thống kê (staff | intern)
-    contractType: emp?.contractType ?? "staff",
     branchId,
     branchName,
     assignments,

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   CalendarDays, BarChart3, Plus, FileText, ChevronLeft, ChevronRight, Eye, RefreshCw, X, Check, ClipboardList, HelpCircle,
   Calendar, DollarSign, Target, ArrowUpRight, ArrowDownRight
@@ -7,7 +8,6 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import { Employee } from "../../types";
-import { NestedOverlay } from "../ui/NestedOverlay";
 import { useToast } from "../../hooks/useToast";
 import {
   getStoredKpiEntries, getStoredKpiTargets, saveStoredKpiEntries,
@@ -933,8 +933,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
       )}
 
       {/* Entry Daily Form Modal */}
-      {isInputModalOpen && (
-        <NestedOverlay>
+      {isInputModalOpen && createPortal(
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col" style={{ animation: "sessionModalIn 0.2s ease", maxHeight: "90vh" }} onClick={(e) => e.stopPropagation()}>
             <div className="h-1.5 bg-gradient-to-r from-[#E8231A] to-[#FF8800]" />
             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
@@ -1381,12 +1381,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
               </div>
             </form>
           </div>
-        </NestedOverlay>
+        </div>,
+        document.body
       )}
 
       {/* Entry Detail Modal Component */}
-      {selectedEntryForDetail && (
-        <NestedOverlay onClose={() => setSelectedEntryForDetail(null)}>
+      {selectedEntryForDetail && createPortal(
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setSelectedEntryForDetail(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]" style={{ animation: "sessionModalIn 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
             
             {/* Title */}
@@ -1456,7 +1457,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
               </button>
             </div>
           </div>
-        </NestedOverlay>
+        </div>,
+        document.body
       )}
     </div>
   );

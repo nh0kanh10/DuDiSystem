@@ -4,7 +4,30 @@
     "ip": "192.168.1.1",
     "description": "Văn phòng chính - Wifi TP.HCM",
     "status": "active",
-    "orgNodeId": "branch-dudi",
+    "orgNodeId": "branch-hcm",
     "createdAt": "2026-07-01T00:00:00.000Z"
+  },
+  {
+    "id": "ip-2",
+    "ip": "10.0.0.1",
+    "description": "Văn phòng Tech - Wired",
+    "status": "active",
+    "orgNodeId": "branch-hcm",
+    "createdAt": "2026-07-01T00:00:00.000Z"
+  },
+  {
+    "id": "ip-3",
+    "ip": "192.168.2.1",
+    "description": "Văn phòng Hà Nội - Wifi",
+    "status": "active",
+    "orgNodeId": "branch-hn",
+    "createdAt": "2026-07-01T00:00:00.000Z"
+  },
+  {
+    "id": "ip-1782877231703",
+    "ip": "171.250.97.245",
+    "description": "IP tự động",
+    "status": "active",
+    "createdAt": "2026-07-01T03:40:31.703Z"
   }
 ]

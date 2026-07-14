@@ -18,7 +18,6 @@ interface CustomComboboxProps {
   heightClass?: string
   showSearchIcon?: boolean
   portal?: boolean
-  disabled?: boolean
 }
 
 export function CustomCombobox({
@@ -30,7 +29,6 @@ export function CustomCombobox({
   heightClass = "h-[34px]",
   showSearchIcon = false,
   portal = true,
-  disabled = false,
 }: CustomComboboxProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [inputValue, setInputValue] = useState("")
@@ -129,7 +127,6 @@ export function CustomCombobox({
   const hasWidth = className.split(" ").some(c => c.startsWith("w-") || c.startsWith("flex-1"))
 
   const openMenu = () => {
-    if (disabled) return
     setIsOpen(true)
     if (portal) {
       const nextRect = calcMenuRect()
@@ -143,7 +140,7 @@ export function CustomCombobox({
   const menuContent = (
     <div
       ref={menuRef}
-      className="bg-white border border-gray-200 rounded-xl shadow-lg z-[10010] max-h-60 overflow-y-auto py-1 divide-y divide-gray-50 animate-in fade-in duration-100"
+      className="bg-white border border-gray-200 rounded-xl shadow-lg z-[60] max-h-60 overflow-y-auto py-1 divide-y divide-gray-50 animate-in fade-in duration-100"
     >
       {filteredOptions.length === 0 ? (
         <div className="px-4 py-2.5 text-xs text-gray-400 text-center font-bold">Không tìm thấy kết quả</div>
@@ -169,7 +166,7 @@ export function CustomCombobox({
   )
 
   return (
-    <div ref={containerRef} className={`relative ${hasWidth ? "" : "w-full"} ${className} ${disabled ? "opacity-60 cursor-not-allowed pointer-events-none" : ""}`}>
+    <div ref={containerRef} className={`relative ${hasWidth ? "" : "w-full"} ${className}`}>
       <div ref={triggerRef} className="relative w-full flex items-center">
         {showSearchIcon && (
           <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -177,9 +174,7 @@ export function CustomCombobox({
         <input
           type="text"
           value={inputValue}
-          disabled={disabled}
           onChange={e => {
-            if (disabled) return
             setInputValue(e.target.value)
             openMenu()
           }}
@@ -188,7 +183,7 @@ export function CustomCombobox({
           className={`w-full ${showSearchIcon ? "pl-9" : "pl-3"} pr-10 py-2 border border-gray-200 rounded-xl text-xs text-gray-700 bg-white font-bold focus:outline-none focus:border-[#C62828]/40 ${heightClass}`}
         />
         <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          {inputValue && !disabled && (
+          {inputValue && (
             <button
               type="button"
               onClick={() => {
@@ -208,7 +203,7 @@ export function CustomCombobox({
         portal ? (
           menuRect ? createPortal(
             <div
-              className="fixed z-[10010]"
+              className="fixed z-[60]"
               style={{ top: menuRect.top, left: menuRect.left, width: menuRect.width }}
             >
               {menuContent}

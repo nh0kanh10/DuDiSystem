@@ -70,8 +70,7 @@ function resolveUserBranchId(user) {
 }
 
 function getChatBranchFilter(user) {
-  if (isAdminUser(user)) return null
-  return resolveUserBranchId(user)
+  return null
 }
 
 function rosterFilterForUser(user) {
@@ -82,13 +81,6 @@ function rosterFilterForUser(user) {
 }
 
 function assertChatPeerInScope(user, peerId) {
-  if (isAdminUser(user)) return null
-  const myBranch = resolveUserBranchId(user)
-  if (!myBranch) return null
-  const peer = empRepo.getById(peerId)
-  if (peer && peer.branchId && peer.branchId !== myBranch) {
-    return { error: "Chỉ được nhắn tin với nhân viên cùng chi nhánh", status: 403 }
-  }
   return null
 }
 
@@ -376,7 +368,7 @@ export function getRoster(user, query = "", options = {}) {
     return tb - ta
   })
 
-  return { items, onlineCount, total: items.length, scope, rosterScope: getChatBranchFilter(user) ? "branch" : "company" }
+  return { items, onlineCount, total: items.length, scope, rosterScope: "company" }
 }
 
 export function heartbeat(user) {
@@ -426,6 +418,6 @@ export function getOnlineStatus(user) {
     onlineIds: onlineEmployees.map(e => e.id),
     presence: onlineMap,
     onlineEmployees,
-    rosterScope: getChatBranchFilter(user) ? "branch" : "company",
+    rosterScope: "company",
   }
 }

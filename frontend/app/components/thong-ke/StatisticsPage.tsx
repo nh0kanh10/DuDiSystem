@@ -8,7 +8,6 @@ import { Modal } from "../ui/Modal"
 import { CustomDatePicker } from "../ui/CustomDatePicker"
 import { removeVietnameseTones } from "../../utils"
 import { ATT_STATUS_STYLE, formatCheckTime } from "../cham-cong/attendanceDisplay"
-import { isInternContractType } from "../cham-cong/attendanceModel"
 
 const getDayOfWeekVN = (dateStr: string) => {
   const [y, m, d] = dateStr.split("-").map(Number)
@@ -60,7 +59,7 @@ interface Employee {
   department: string
   position: string
   joinDate: string
-  status: "active" | "inactive" | "suspended"
+  status: "active" | "inactive" | "intern"
   contractType: string
   contractHistory?: { contractType: string; startDate: string; endDate?: string }[]
   branchId?: string
@@ -71,7 +70,6 @@ interface AttendanceRecord {
   id: string
   employeeId: string
   employeeStatus?: "staff" | "intern"
-  contractType?: string
   checkIn: string
   checkOut: string
   checkInAm?: string
@@ -89,7 +87,7 @@ interface AttendanceRecord {
   department?: string
 }
 
-const isInternContract = isInternContractType
+const isInternContract = (contractType?: string) => contractType === "intern" || contractType === "Thực tập"
 const WORKED_STATUSES = new Set(["on-time", "late", "early", "late_early"])
 const hasPunchValue = (val?: string) => !!val && val !== "--" && val !== "-"
 
@@ -152,7 +150,7 @@ function addSessionToStats(
   }
 }
 
-export default function StatisticsPage({ selectedBranch = "all", currentUserEmail = "", currentUserRole = "user", modules = [] as string[], hideHeader = false }: { selectedBranch?: string; currentUserEmail?: string; currentUserRole?: string; modules?: string[]; hideHeader?: boolean }) {
+export default function StatisticsPage({ selectedBranch = "all", currentUserEmail = "", currentUserRole = "user", modules = [] as string[] }: { selectedBranch?: string; currentUserEmail?: string; currentUserRole?: string; modules?: string[] }) {
   const canSelectEmployee = modules.includes("all") || modules.includes("thong-ke")
   const now = useMemo(() => new Date(), [])
   const currentYearStr = useMemo(() => String(now.getFullYear()), [now])
@@ -208,10 +206,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           api.attendance.list(),
           api.systemConfig.get().catch(() => null)
         ])
-        const filteredEmps = (empData as Employee[] || []).filter(e => 
-          !["0000000000", "1111111111", "2222222222"].includes(e.id) &&
-          e.status === "active"
-        )
+        const filteredEmps = (empData as Employee[] || []).filter(e => !["0000000000", "1111111111", "2222222222"].includes(e.id))
         setEmployees(filteredEmps)
         setAttendance(attData as AttendanceRecord[])
         if (configData) {
@@ -256,7 +251,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
   const detailSuggestionsList = useMemo(() => {
     const baseList = employees.filter(e => {
-      const isIntern = isInternContract(e.contractType)
+      const isIntern = e.contractType === "intern" || e.contractType === "Thực tập"
       let matchesType = true
       if (activeTab === "official") {
         matchesType = !isIntern
@@ -428,10 +423,10 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       map[e.id] = { late: 0, leave: 0, absent: 0, total: 0, onTime: 0 }
 
       daysList.forEach(day => {
-        const dayIsIntern = isInternContract(getContractTypeForDate(e, day))
         const matched = attendance.find(r => r.employeeId === e.id && r.date === day)
         if (matched) {
-          if (dayIsIntern) {
+          const isInternRecord = matched.employeeStatus === "intern" || isInternContract(getContractTypeForDate(e, day))
+          if (isInternRecord) {
             addSessionToStats(matched.statusAm, map[e.id])
             addSessionToStats(matched.statusPm, map[e.id])
           } else if (matched.status === "late" || matched.status === "late_early" || matched.status === "early") {
@@ -446,7 +441,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
             map[e.id].total += 1
           }
         } else {
-          map[e.id].absent += dayIsIntern ? 2 : 1
+          const isInternEmp = isInternContract(getContractTypeForDate(e, day))
+          map[e.id].absent += isInternEmp ? 2 : 1
         }
       })
     })
@@ -460,10 +456,9 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       if (!matchesBranch) return false
       const matchesDept = personalDept === "all" || e.department === personalDept
       if (!matchesDept) return false
-      const isIntern = isInternContract(e.contractType)
-      if (activeTab === "official") return !isIntern
-      if (activeTab === "intern") return isIntern
-      return true
+      const isIntern = e.contractType === "intern" || e.contractType === "Thực tập"
+      const matchesType = activeTab === "official" ? !isIntern : isIntern
+      return matchesType
     })
   }, [employees, selectedBranch, personalDept, activeTab])
 
@@ -492,7 +487,7 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
   const filteredEmployeesList = useMemo(() => {
     const res = employees.filter(e => {
-      const isIntern = isInternContract(e.contractType)
+      const isIntern = e.contractType === "intern" || e.contractType === "Thực tập"
       let matchesType = true
       if (activeTab === "official") {
         matchesType = !isIntern
@@ -643,8 +638,9 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
       }
 
       if (matched) {
-        // Always classify by contract on that date; attendance.employeeStatus can be stale.
-        const matchedIsIntern = isInternContract(getContractTypeForDate(emp, day))
+        const matchedIsIntern = matched.employeeStatus
+          ? matched.employeeStatus === "intern"
+          : isInternContract(getContractTypeForDate(emp, day))
         const hasActualPunch = matchedIsIntern
           ? [matched.checkInAm, matched.checkOutAm, matched.checkInPm, matched.checkOutPm].some(v => hasPunchValue(v))
           : [matched.checkIn, matched.checkOut].some(v => hasPunchValue(v))
@@ -827,31 +823,28 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
 
   return (
     <div className="space-y-6">
-      {!hideHeader && (
-        <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
-          <div className="flex items-center">
-            <div className="flex gap-1.5 items-center mr-4 shrink-0">
-              <span className="w-2.5 h-2.5 rounded-full bg-white/30 animate-pulse"></span>
-              <span className="w-2.5 h-2.5 rounded-full bg-white/60 animate-pulse delay-75"></span>
-              <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150"></span>
-            </div>
-            <div>
-              <h2 className="text-xl font-black tracking-tight text-white">Thống kê chấm công</h2>
-              <p className="text-xs text-white/80 mt-1">Báo cáo trực quan hiệu suất làm việc và vi phạm kỷ luật</p>
-            </div>
+      <div className="bg-[#C62828] bg-[radial-gradient(rgba(255,255,255,0.15)_1px,transparent_1px)] [background-size:8px_8px] p-5 rounded-2xl text-white flex items-center justify-between flex-wrap gap-4 shadow-md">
+        <div className="flex items-center">
+          <div className="flex gap-1.5 items-center mr-4 shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-white/30 animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white/60 animate-pulse delay-75"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse delay-150"></span>
           </div>
-          {(activeTab !== "personal" || personalStats) && (
-            <button onClick={handleExport} disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50 cursor-pointer">
-              {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-              {exporting ? "Đang xuất..." : "Xuất báo cáo"}
-            </button>
-          )}
+          <div>
+            <h2 className="text-xl font-black tracking-tight text-white">Thống kê chấm công</h2>
+            <p className="text-xs text-white/80 mt-1">Báo cáo trực quan hiệu suất làm việc và vi phạm kỷ luật</p>
+          </div>
         </div>
-      )}
+        {(activeTab !== "personal" || personalStats) && (
+          <button onClick={handleExport} disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50 cursor-pointer">
+            {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
+            {exporting ? "Đang xuất..." : "Xuất báo cáo"}
+          </button>
+        )}
+      </div>
 
       <div className="bg-[#FAF9F9] rounded-3xl p-4 border border-black/5 shadow-xs flex flex-wrap items-end gap-4">
-
         <div className="flex flex-col gap-1.5 min-w-[130px] flex-1 lg:flex-none">
           <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Loại bộ lọc</span>
           <CustomSelect
@@ -988,33 +981,28 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
           </div>
         )}
 
-        <div className="flex items-center gap-2 ml-auto self-end w-full lg:w-auto justify-end flex-wrap">
-          <button
-            onClick={() => {
-              setFilterType("month")
-              setSelectedYear(currentYearStr)
-              setSelectedMonth(currentMonthStr)
-              setSelectedWeekId("w1")
-              setPersonalDept("all")
-              setSearchQuery("")
-            }}
-            className="px-3 py-2 bg-white text-gray-500 hover:text-[#C62828] hover:bg-red-50 hover:border-red-100 rounded-xl text-xs font-bold border border-gray-200 transition-all shadow-2xs h-[34px] flex items-center gap-1.5 cursor-pointer"
-            title="Đặt lại bộ lọc"
-          >
-            <RefreshCw size={13} />
-            <span>Bỏ lọc</span>
-          </button>
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold border border-gray-150 shadow-2xs h-[34px] whitespace-nowrap">
-            <Calendar size={13} className="text-gray-400" />
-            {dateRangeText}
-          </div>
-          {hideHeader && (activeTab !== "personal" || personalStats) && (
-            <button onClick={handleExport} disabled={exporting}
-              className="flex items-center gap-2 px-4 py-2 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-xs font-bold transition-colors shadow-sm disabled:opacity-50 cursor-pointer h-[34px] whitespace-nowrap">
-              {exporting ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-              {exporting ? "Đang xuất..." : "Xuất báo cáo"}
+        <div className="flex flex-col gap-1.5 ml-auto self-end w-full lg:w-auto">
+          <div className="flex items-center gap-2 justify-center lg:justify-start">
+            <button
+              onClick={() => {
+                setFilterType("month")
+                setSelectedYear(currentYearStr)
+                setSelectedMonth(currentMonthStr)
+                setSelectedWeekId("w1")
+                setPersonalDept("all")
+                setSearchQuery("")
+              }}
+              className="px-3 py-2 bg-white text-gray-500 hover:text-[#C62828] hover:bg-red-50 hover:border-red-100 rounded-xl text-xs font-bold border border-gray-200 transition-all shadow-2xs h-[34px] flex items-center gap-1.5"
+              title="Đặt lại bộ lọc"
+            >
+              <RefreshCw size={13} />
+              <span className="hidden sm:inline">Bỏ lọc</span>
             </button>
-          )}
+            <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-xs font-bold border border-gray-150 shadow-2xs h-[34px]">
+              <Calendar size={13} className="text-gray-400" />
+              {dateRangeText}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1498,8 +1486,8 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                     <th className="px-6 py-3.5">Họ tên</th>
                     <th className="px-6 py-3.5">Đơn vị</th>
                     <th className="px-6 py-3.5">Số {statsUnit} đi trễ/về sớm</th>
-                    <th className="px-6 py-3.5">Số {statsUnit} nghỉ phép</th>
-                    <th className="px-6 py-3.5">Số {statsUnit} vắng mặt</th>
+                    <th className="px-6 py-3.5">Nghỉ phép</th>
+                    <th className="px-6 py-3.5">Vắng mặt</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -1647,11 +1635,11 @@ export default function StatisticsPage({ selectedBranch = "all", currentUserEmai
                         <td className="px-4 py-3 text-black font-semibold">{item.name}</td>
                         <td className="px-4 py-3 text-xs font-medium text-black">{item.department}</td>
                         <td className="px-4 py-3 text-xs">
-                          <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${isInternContract(item.contractType)
-                            ? "bg-orange-50 text-orange-700 border border-orange-100"
-                            : "bg-blue-50 text-blue-700 border border-blue-100"
+                          <span className={`px-2 py-0.5 rounded-md font-bold text-[10px] ${item.contractType === "staff" || item.contractType === "Chính thức"
+                            ? "bg-blue-50 text-blue-700 border border-blue-100"
+                            : "bg-orange-50 text-orange-700 border border-orange-100"
                             }`}>
-                            {isInternContract(item.contractType) ? "Thực tập" : "Chính thức"}
+                            {item.contractType === "staff" || item.contractType === "Chính thức" ? "Chính thức" : "Thực tập"}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right">
@@ -1753,9 +1741,7 @@ function ViolationTab({ employees, attendance, selectedBranch, selectedDepartmen
     const contractAtDate = emp ? getContractTypeForDate(emp, a.date) : undefined
     const isInternByDate = isInternContract(contractAtDate)
 
-    const isIntern = emp
-      ? isInternByDate
-      : (a.employeeStatus === "intern" || isInternContract(a.contractType))
+    const isIntern = isInternByDate || a.employeeStatus === "intern" || a.contractType === "intern"
     if (!isIntern) {
       return [{
         employeeId: a.employeeId,

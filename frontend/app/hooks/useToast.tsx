@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { CheckCircle2, AlertCircle } from "lucide-react"
-import { overlayLayer } from "../utils/overlayLayers"
 
 type ToastType = "success" | "error"
 
@@ -27,7 +26,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {toast && typeof document !== "undefined" && createPortal(
         <div
-          className={`fixed bottom-6 right-6 ${overlayLayer("toast")} flex items-center gap-3 px-6 py-3 rounded-xl shadow-lg border transition-all duration-300 ${
+          className={`fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-6 py-3 rounded-xl shadow-lg border transition-all duration-300 ${
             toast.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-800"
               : "bg-red-50 border-red-200 text-red-800"

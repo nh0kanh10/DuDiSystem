@@ -1,12 +1,11 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { overlayLayer } from "../../utils/overlayLayers"
 import {
   Plus, Search, Edit2, Trash2, X, Download, MoreHorizontal, Eye, Users,
   Building2, Paperclip, Briefcase, ExternalLink, FileText, Image as ImageIcon,
   File, Link2, AlertCircle, CheckCircle2, UserPlus, UserMinus, ArrowRightLeft,
   TrendingUp, RefreshCw, ChevronLeft, ChevronRight, Maximize2,
-  User, Camera, ClipboardList, Upload, Calendar, Loader2, Copy
+  User, Camera, ClipboardList, Upload, Calendar
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import { Employee, EmpExtForm, WorkHistoryEntry, WorkHistoryType, Attachment, OrgNode } from "../../types"
@@ -297,12 +296,8 @@ function FilesTab({
       const newAttachments = [...attachments]
 
       for (const pf of pendingFiles) {
-        const safeName = pf.name
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/\s+/g, "-")
-          .replace(/[^a-zA-Z0-9.\-_]/g, "");
-        const result = await api.storage.upload(pf.file, safeName)
+        // Upload with the new filename directly through the API
+        const result = await api.storage.upload(pf.file, pf.name)
         
         const isImg = pf.file.type.startsWith("image/")
         if (isImg) {
@@ -454,7 +449,11 @@ function FilesTab({
                       isOpen: true,
                       title: "Xác nhận xóa hình ảnh",
                       message: "Bạn có chắc chắn muốn xóa hình ảnh này khỏi hồ sơ?",
-                      onConfirm: () => {
+                      onConfirm: async () => {
+                        const key = extractKey(src);
+                        if (key) {
+                          try { await api.storage.delete(key); } catch (err) { console.error(err); }
+                        }
                         onChangePhotos(photos.filter((_, j) => j !== i));
                       }
                     });
@@ -518,7 +517,13 @@ function FilesTab({
                           isOpen: true,
                           title: "Xác nhận xóa tài liệu",
                           message: `Bạn có chắc chắn muốn xóa tài liệu "${a.name}"?`,
-                          onConfirm: () => {
+                          onConfirm: async () => {
+                            if (a.type === "file") {
+                              const key = extractKey(a.url);
+                              if (key) {
+                                try { await api.storage.delete(key); } catch (err) { console.error(err); }
+                              }
+                            }
                             onChangeAttachments(attachments.filter(x => x.id !== a.id));
                           }
                         });
@@ -555,7 +560,6 @@ function FilesTab({
         icon={Eye}
         width="5xl"
         bodyClassName="p-4 flex flex-col h-[75vh]"
-        zIndexClass="z-[10005]"
         footer={
           <button
             onClick={() => setPreviewKey((k) => k + 1)}
@@ -619,16 +623,13 @@ function WorkHistoryTab({ history, onChange, orgNodes, readonly = false }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1.5">Loại sự kiện</label>
-              <CustomSelect
-                value={entry.type || "join"}
-                onChange={val => setEntry(p => ({ ...p, type: val as WorkHistoryType }))}
-                options={(Object.entries(WH_CONFIG) as [WorkHistoryType, typeof WH_CONFIG[WorkHistoryType]][]).map(([k, v]) => ({
-                  value: k,
-                  label: v.label
-                }))}
-                className="w-full"
-                heightClass="h-[42px]"
-              />
+              <select value={entry.type}
+                onChange={e => setEntry(p => ({ ...p, type: e.target.value as WorkHistoryType }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none bg-white text-gray-700">
+                {(Object.entries(WH_CONFIG) as [WorkHistoryType, typeof WH_CONFIG[WorkHistoryType]][]).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1.5">Ngày</label>
@@ -639,29 +640,21 @@ function WorkHistoryTab({ history, onChange, orgNodes, readonly = false }: {
               <>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1.5">Chức vụ</label>
-                  <CustomSelect
-                    value={entry.title || ""}
-                    onChange={val => setEntry(p => ({ ...p, title: val }))}
-                    options={[
-                      { value: "", label: "Chọn chức vụ" },
-                      ...orgNodes.filter(n => n.type === "position").map(p => ({ value: p.name, label: p.name }))
-                    ]}
-                    className="w-full"
-                    heightClass="h-[42px]"
-                  />
+                  <select value={entry.title || ""} onChange={e => setEntry(p => ({ ...p, title: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none bg-white text-gray-700">
+                    <option value="">Chọn chức vụ</option>
+                    {orgNodes.filter(n => n.type === "position").map(p => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1.5">Đơn vị</label>
-                  <CustomSelect
-                    value={entry.orgNodeId || ""}
-                    onChange={val => setEntry(p => ({ ...p, orgNodeId: val }))}
-                    options={[
-                      { value: "", label: "Chọn đơn vị" },
-                      ...orgNodes.map(n => ({ value: n.id, label: n.name }))
-                    ]}
-                    className="w-full"
-                    heightClass="h-[42px]"
-                  />
+                  <select value={entry.orgNodeId || ""} onChange={e => setEntry(p => ({ ...p, orgNodeId: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none bg-white text-gray-700">
+                    <option value="">Chọn đơn vị</option>
+                    {orgNodes.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+                  </select>
                 </div>
               </>
             )}
@@ -746,151 +739,31 @@ function WorkHistoryTab({ history, onChange, orgNodes, readonly = false }: {
   )
 }
 
-function PersonalTab({ form, sf, inp, sel, lbl, readonly = false, onHasErrors }: {
+function PersonalTab({ form, sf, inp, sel, lbl, readonly = false }: {
   form: EmpExtForm
   sf: (k: keyof EmpExtForm, v: any) => void
   inp: string; sel: string; lbl: string
   readonly?: boolean
-  onHasErrors?: (hasErrors: boolean) => void
 }) {
-  const { showToast } = useToast()
-  const [avatarUploading, setAvatarUploading] = React.useState(false)
-  const avatarInputRef = React.useRef<HTMLInputElement>(null)
-
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setAvatarUploading(true)
-    try {
-      const safeName = file.name
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/[^a-zA-Z0-9.\-_]/g, "");
-      const res = await api.storage.upload(file, safeName)
-      sf("avatar", res.url)
-      showToast("Tải ảnh đại diện thành công!", "success")
-    } catch (err: any) {
-      showToast(err.message || "Tải ảnh đại diện thất bại", "error")
-    } finally {
-      setAvatarUploading(false)
-      e.target.value = ""
-    }
-  }
-
-  const handleRemoveAvatar = () => {
-    sf("avatar", "")
-  }
-
   const sectionLabel = "text-[10px] font-bold text-[#C62828] uppercase tracking-[0.15em] mb-3"
-  const [dateErrors, setDateErrors] = React.useState<{ dob?: string; cccdDate?: string }>({})
-
-  React.useEffect(() => {
-    const hasErr = !!(dateErrors.dob || dateErrors.cccdDate)
-    onHasErrors?.(hasErr)
-  }, [dateErrors, onHasErrors])
-
-  const isFuture = (val: string): boolean => {
-    if (!val) return false
-    const parts = val.split("/").map(Number)
-    if (parts.length !== 3 || parts.some(isNaN)) return false
-    const d = new Date(parts[2], parts[1] - 1, parts[0])
-    const today = new Date(); today.setHours(23, 59, 59, 999)
-    return d > today
-  }
-
-  const handleDateChange = (val: string, fieldKey: "dob" | "cccdDate", label: string) => {
-    sf(fieldKey, val)
-    if (!val) {
-      setDateErrors(prev => ({ ...prev, [fieldKey]: undefined }))
-      return
-    }
-    if (isFuture(val)) {
-      setDateErrors(prev => ({ ...prev, [fieldKey]: `${label} không thể là ngày trong tương lai` }))
-    } else {
-      setDateErrors(prev => ({ ...prev, [fieldKey]: undefined }))
-    }
-  }
-
-  const inpError = inp.replace("border-gray-200", "border-red-400").replace("focus:border-[#C62828]/50", "focus:border-red-500").replace("focus:ring-[#C62828]/10", "focus:ring-red-100")
 
   return (
     <div className="space-y-6">
-      {/* Avatar Section */}
-      <div className="flex flex-col items-center justify-center py-4 border-b border-gray-100 pb-6">
-        <div className="relative group">
-          <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-gray-100 shadow-md bg-gray-50 flex items-center justify-center relative">
-            {avatarUploading ? (
-              <Loader2 className="w-8 h-8 text-[#C62828] animate-spin" />
-            ) : form.avatar ? (
-              <img src={form.avatar} alt="Avatar" className="w-full h-full object-cover" />
-            ) : (
-              <User className="w-10 h-10 text-gray-300" />
-            )}
-
-            {!readonly && !avatarUploading && (
-              <div 
-                onClick={() => avatarInputRef.current?.click()}
-                className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-all duration-200 rounded-full"
-              >
-                <Camera className="w-6 h-6 text-white" />
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {!readonly && (
-          <div className="flex gap-2 mt-3.5">
-            <button
-              type="button"
-              onClick={() => avatarInputRef.current?.click()}
-              disabled={avatarUploading}
-              className="px-3.5 py-1.5 bg-[#C62828] text-white hover:bg-[#B71C1C] rounded-xl text-xs font-bold transition-all active:scale-95 shadow-sm shadow-[#C62828]/10 disabled:opacity-50"
-            >
-              Tải ảnh lên
-            </button>
-            {form.avatar && (
-              <button
-                type="button"
-                onClick={handleRemoveAvatar}
-                disabled={avatarUploading}
-                className="px-3.5 py-1.5 border border-gray-200 text-gray-500 hover:bg-gray-50 rounded-xl text-xs font-bold transition-all active:scale-95"
-              >
-                Gỡ bỏ
-              </button>
-            )}
-          </div>
-        )}
-        
-        <input 
-          ref={avatarInputRef}
-          type="file" 
-          accept="image/*" 
-          onChange={handleAvatarChange}
-          className="hidden" 
-        />
-        <p className="text-[10px] text-gray-400 mt-2 font-medium">Hỗ trợ định dạng JPG, PNG. Tối đa 5MB.</p>
-      </div>
-
       <div>
         <p className={sectionLabel}>Định danh cá nhân</p>
         <div className="grid grid-cols-2 gap-3">
           <div><label className={lbl}>Họ và tên *</label><input autoComplete="new-password" disabled={readonly} value={form.name} onChange={e => !readonly && sf("name", e.target.value)} placeholder="Nguyễn Văn A" className={inp} /></div>
-          <div>
-            <label className={lbl}>Ngày sinh</label>
-            <DateInput
-              disabled={readonly}
-              value={form.dob}
-              onChange={val => { if (!readonly) handleDateChange(val, "dob", "Ngày sinh") }}
-              className={dateErrors.dob ? inpError : inp}
-            />
-            {dateErrors.dob && (
-              <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                <AlertCircle size={12} className="flex-shrink-0" />
-                {dateErrors.dob}
-              </p>
-            )}
-          </div>
+          <div><label className={lbl}>Ngày sinh</label><DateInput disabled={readonly} value={form.dob} onChange={val => {
+            if (!readonly) {
+              if (val) {
+                const parts = val.split("/").map(Number)
+                const d = new Date(parts[2], parts[1] - 1, parts[0])
+                const today = new Date(); today.setHours(0, 0, 0, 0)
+                if (d > today) return
+              }
+              sf("dob", val)
+            }
+          }} className={inp} /></div>
           <div><label className={lbl}>Giới tính</label>
             <CustomSelect
               disabled={readonly}
@@ -914,21 +787,17 @@ function PersonalTab({ form, sf, inp, sel, lbl, readonly = false, onHasErrors }:
         <p className={sectionLabel}>CCCD / CMND</p>
         <div className="grid grid-cols-2 gap-3">
           <div><label className={lbl}>Số CCCD</label><input disabled={readonly} value={form.cccd} onChange={e => !readonly && sf("cccd", e.target.value)} placeholder="012345678901" className={inp} /></div>
-          <div>
-            <label className={lbl}>Ngày cấp</label>
-            <DateInput
-              disabled={readonly}
-              value={form.cccdDate}
-              onChange={val => { if (!readonly) handleDateChange(val, "cccdDate", "Ngày cấp CCCD") }}
-              className={dateErrors.cccdDate ? inpError : inp}
-            />
-            {dateErrors.cccdDate && (
-              <p className="mt-1 text-xs text-red-500 flex items-center gap-1">
-                <AlertCircle size={12} className="flex-shrink-0" />
-                {dateErrors.cccdDate}
-              </p>
-            )}
-          </div>
+          <div><label className={lbl}>Ngày cấp</label><DateInput disabled={readonly} value={form.cccdDate} onChange={val => {
+            if (!readonly) {
+              if (val) {
+                const parts = val.split("/").map(Number)
+                const d = new Date(parts[2], parts[1] - 1, parts[0])
+                const today = new Date(); today.setHours(0, 0, 0, 0)
+                if (d > today) return
+              }
+              sf("cccdDate", val)
+            }
+          }} className={inp} /></div>
           <div className="col-span-2"><label className={lbl}>Nơi cấp</label><input disabled={readonly} value={form.cccdPlace} onChange={e => !readonly && sf("cccdPlace", e.target.value)} placeholder="Cục CSQLHC về TTXH..." className={inp} /></div>
         </div>
       </div>
@@ -1203,24 +1072,22 @@ function WorkTab({ form, sf, inp, sel, lbl, orgNodes, branches, readonly = false
   )
 }
 
-export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, saving = false }: {
+export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave }: {
   editEmp: Employee | null
   employees: Employee[]
   orgNodes: OrgNode[]
   onClose: () => void
-  onSave: (form: EmpExtForm, deletedUrls?: string[]) => void
-  saving?: boolean
+  onSave: (form: EmpExtForm) => void
 }) {
   const [tab, setTab] = useState<EditTab>("personal")
-  const [personalHasErrors, setPersonalHasErrors] = useState(false)
   const branches = orgNodes.filter(n => n.type === "branch")
   const { showToast } = useToast()
 
   const initialPhotos = useRef(editEmp?.photos ?? [])
   const initialAttachments = useRef(editEmp?.attachments ?? [])
-  const initialAvatar = useRef(editEmp?.avatar ?? "")
 
   const handleClose = async () => {
+    // Tìm các ảnh/tài liệu mới được up lên nhưng chưa được lưu vào DB
     const newPhotos = form.photos.filter(p => !initialPhotos.current.includes(p))
     const newAttachments = form.attachments.filter(
       a => !initialAttachments.current.some(ia => ia.url === a.url)
@@ -1238,13 +1105,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, s
       }
     }
 
-    if (form.avatar && form.avatar !== initialAvatar.current) {
-      const key = extractKey(form.avatar)
-      if (key) {
-        try { await api.storage.delete(key) } catch (e) { console.error(e) }
-      }
-    }
-
+    // Xóa các file rác này ngầm trên Cloudinary
     for (const p of newPhotos) {
       const key = extractKey(p)
       if (key) {
@@ -1272,7 +1133,6 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, s
     dob: "", gender: "Nam",
     curProvince: "", curDistrict: "", curWard: "", curStreet: "",
     homeProvince: "", homeDistrict: "", homeWard: "", homeStreet: "",
-    avatar: "",
     photos: [], attachments: [], workHistory: [],
     internEndDate: "", university: "", notes: "", resignDate: "",
   })
@@ -1330,12 +1190,6 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, s
   )
 
   const handleOnSaveClick = () => {
-    if (personalHasErrors) {
-      showToast("Vui lòng sửa các ngày không hợp lệ trước khi lưu", "error")
-      setTab("personal")
-      return
-    }
-
     const name = (form.name || "").trim()
     if (!name) {
       showToast("Họ tên không được để trống", "error")
@@ -1414,22 +1268,11 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, s
       }
     }
 
-    const deletedPhotos = initialPhotos.current.filter(p => !form.photos.includes(p))
-    const deletedAttachments = initialAttachments.current.filter(
-      ia => !form.attachments.some(a => a.url === ia.url)
-    )
-    const deletedUrls = [
-      ...deletedPhotos,
-      ...deletedAttachments.map(a => a.url)
-    ]
-    if (initialAvatar.current && form.avatar !== initialAvatar.current) {
-      deletedUrls.push(initialAvatar.current)
-    }
-    onSave(form, deletedUrls)
+    onSave(form)
   }
 
   return createPortal(
-    <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center ${overlayLayer("nestedModal")} p-3`}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-3">
       <div className="bg-[#F5F1EF] rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[95vh]">
 
         <div className="bg-gradient-to-r from-[#C62828] to-[#E64A19] px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
@@ -1437,7 +1280,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, s
             <h3 className="text-white font-bold text-lg">{editEmp ? `Sửa hồ sơ — ${editEmp.name}` : "Thêm nhân viên mới"}</h3>
             <p className="text-white/60 text-xs mt-0.5">Mã NV (dự kiến): {editEmp ? editEmp.id : newId}</p>
           </div>
-          <button onClick={handleClose} disabled={saving} className="text-white/70 hover:text-white transition-colors disabled:opacity-50"><X size={20} /></button>
+          <button onClick={handleClose} className="text-white/70 hover:text-white transition-colors"><X size={20} /></button>
         </div>
 
         <div className="bg-white border-b border-gray-100 px-4 flex gap-0.5 flex-shrink-0 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
@@ -1455,7 +1298,7 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, s
         </div>
 
         <div className="overflow-y-auto flex-1 p-5" style={{ scrollbarWidth: "thin", scrollbarColor: "#e5e7eb transparent" }}>
-          {tab === "personal" && <PersonalTab form={form} sf={sf} inp={inp} sel={sel} lbl={lbl} onHasErrors={setPersonalHasErrors} />}
+          {tab === "personal" && <PersonalTab form={form} sf={sf} inp={inp} sel={sel} lbl={lbl} />}
           {tab === "work" && <WorkTab form={form} sf={sf} inp={inp} sel={sel} lbl={lbl} orgNodes={orgNodes} branches={branches} />}
           {tab === "files" && <FilesTab photos={form.photos} onChangePhotos={p => sf("photos", p)} attachments={form.attachments} onChangeAttachments={a => sf("attachments", a)} />}
           {tab === "history" && <WorkHistoryTab history={form.workHistory} onChange={h => sf("workHistory", h)} orgNodes={orgNodes} />}
@@ -1470,15 +1313,11 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, s
           </p>
           <div className="flex gap-2">
             <button onClick={handleClose}
-              disabled={saving}
-              className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+              className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors">
               Hủy
             </button>
             <button onClick={handleOnSaveClick}
-              disabled={saving || personalHasErrors}
-              title={personalHasErrors ? "Vui lòng sửa ngày không hợp lệ trước khi lưu" : undefined}
-              className="px-6 py-2.5 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-sm shadow-[#C62828]/20 flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+              className="px-6 py-2.5 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-sm shadow-[#C62828]/20">
               {editEmp ? "Lưu thay đổi" : "Thêm nhân viên"}
             </button>
           </div>
@@ -1509,12 +1348,10 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     defaultNote: string
     customNote: string
     pendingForm: EmpExtForm
-    deletedUrls?: string[]
   } | null>(null)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null)
   const [deleteEmpId, setDeleteEmpId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
   const [profileUpdates, setProfileUpdates] = useState<any[]>([])
   const [previewReq, setPreviewReq] = useState<any | null>(null)
   const { showToast } = useToast()
@@ -1564,20 +1401,16 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
   }, [autoOpenUpdateReqId, profileUpdates])
 
   const handleRequestUpdate = async (empId: string, note?: string) => {
-    setSaving(true)
     try {
       const res = await api.profileUpdates.request(empId, note)
       setProfileUpdates(prev => [...prev, res])
       showToast("Đã gửi yêu cầu cập nhật hồ sơ thành công!", "success")
     } catch (e: any) {
       showToast(e.message, "error")
-    } finally {
-      setSaving(false)
     }
   }
 
   const handleApproveUpdate = async (id: string) => {
-    setSaving(true)
     try {
       await api.profileUpdates.approve(id)
       setProfileUpdates(prev => prev.map(p => p.id === id ? { ...p, status: "approved" } : p))
@@ -1588,13 +1421,10 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       showToast("Đã phê duyệt cập nhật hồ sơ thành công!", "success")
     } catch (e: any) {
       showToast(e.message, "error")
-    } finally {
-      setSaving(false)
     }
   }
 
   const handleRejectUpdate = async (id: string, reason: string) => {
-    setSaving(true)
     try {
       await api.profileUpdates.reject(id, reason)
       setProfileUpdates(prev => prev.map(p => p.id === id ? { ...p, status: "rework_requested", reworkReason: reason } : p))
@@ -1602,8 +1432,6 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       showToast("Đã yêu cầu nhân viên sửa đổi bổ sung hồ sơ!", "success")
     } catch (e: any) {
       showToast(e.message, "error")
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -1620,27 +1448,23 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     return orgNodes.filter(n => n.type === "department" && (selectedBranch === "all" || n.parentId === selectedBranch))
   }, [orgNodes, selectedBranch])
 
-  const filtered = useMemo(() => {
-    const list = employees.filter(e => {
-      if (["0000000000", "1111111111", "2222222222"].includes(e.id)) return false
-      const q = removeVietnameseTones(search.toLowerCase())
-      const nameStr = removeVietnameseTones(e.name.toLowerCase())
-      const idStr = e.id.toLowerCase()
-      const emailStr = e.email.toLowerCase()
-      const phoneStr = e.phone.toLowerCase()
-      const matchQ = !q || nameStr.includes(q) || idStr.includes(q) || emailStr.includes(q) || phoneStr.includes(q)
-      const matchS = filterStatus === "all"
-        || e.status === filterStatus
-        || (filterStatus === "intern" && e.contractType === "intern")
-      const matchD = filterDept === "all" || e.department === filterDept
-      const matchB = selectedBranch === "all" || (e as any).branchId === selectedBranch
-      return matchQ && matchS && matchD && matchB
-    })
-    return list.sort((a, b) => String(a.id).localeCompare(String(b.id), "vi", { numeric: true }))
-  }, [employees, search, filterStatus, filterDept, selectedBranch])
+  const filtered = useMemo(() => employees.filter(e => {
+    if (["0000000000", "1111111111", "2222222222"].includes(e.id)) return false
+    const q = removeVietnameseTones(search.toLowerCase())
+    const nameStr = removeVietnameseTones(e.name.toLowerCase())
+    const idStr = e.id.toLowerCase()
+    const emailStr = e.email.toLowerCase()
+    const phoneStr = e.phone.toLowerCase()
+    const matchQ = !q || nameStr.includes(q) || idStr.includes(q) || emailStr.includes(q) || phoneStr.includes(q)
+    const matchS = filterStatus === "all"
+      || e.status === filterStatus
+      || (filterStatus === "intern" && e.contractType === "intern")
+    const matchD = filterDept === "all" || e.department === filterDept
+    const matchB = selectedBranch === "all" || (e as any).branchId === selectedBranch
+    return matchQ && matchS && matchD && matchB
+  }), [employees, search, filterStatus, filterDept, selectedBranch])
 
-  const saveEmployeeData = async (finalForm: EmpExtForm, deletedUrls: string[] = []) => {
-    setSaving(true)
+  const saveEmployeeData = async (finalForm: EmpExtForm) => {
     try {
       if (editEmp) {
         const updated = await api.employees.update(editEmp.id, finalForm) as Employee
@@ -1653,29 +1477,9 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       }
       setShowModal(false)
       setEditEmp(null)
-
-      const extractKey = (url: string) => {
-        try {
-          const parsed = new URL(url)
-          return parsed.searchParams.get("key") || ""
-        } catch {
-          if (url.includes("key=")) {
-            return decodeURIComponent(url.split("key=")[1].split("&")[0])
-          }
-          return ""
-        }
-      }
-      for (const url of deletedUrls) {
-        const key = extractKey(url)
-        if (key) {
-          try { await api.storage.delete(key) } catch (e) { console.error(e) }
-        }
-      }
     } catch (err) {
       console.error("Lỗi lưu nhân viên:", err)
       showToast(err instanceof Error ? err.message : "Không thể lưu nhân viên", "error")
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -1700,10 +1504,10 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     }
 
     setHistoryConfirm(null)
-    await saveEmployeeData(finalForm, historyConfirm.deletedUrls)
+    await saveEmployeeData(finalForm)
   }
 
-  const handleSave = async (form: EmpExtForm, deletedUrls?: string[]) => {
+  const handleSave = async (form: EmpExtForm) => {
     let finalForm = { ...form }
 
     if (editEmp) {
@@ -1736,8 +1540,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
           detectedType,
           defaultNote,
           customNote: defaultNote,
-          pendingForm: form,
-          deletedUrls
+          pendingForm: form
         })
         return
       }
@@ -1757,7 +1560,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       finalForm.workHistory = [joinEntry]
     }
 
-    await saveEmployeeData(finalForm, deletedUrls)
+    await saveEmployeeData(finalForm)
   }
 
   const handleDelete = async (id: string) => {
@@ -1766,7 +1569,6 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
 
   const confirmDelete = async () => {
     if (!deleteEmpId) return
-    setSaving(true)
     try {
       await api.employees.delete(deleteEmpId)
       setEmployees(prev => prev.filter(e => e.id !== deleteEmpId))
@@ -1774,7 +1576,6 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
     } catch (e: any) {
       showToast(e.message || "Xóa nhân viên thất bại", "error")
     } finally {
-      setSaving(false)
       setDeleteEmpId(null)
     }
   }
@@ -1891,7 +1692,6 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
               <tr className="bg-gray-50/80 text-gray-400 text-xs border-b border-gray-100">
                 <th className="px-4 py-3.5 text-left font-semibold w-10">#</th>
                 <th className="px-4 py-3.5 text-left font-semibold">Nhân viên</th>
-                <th className="px-4 py-3.5 text-left font-semibold">Số điện thoại</th>
                 <th className="px-4 py-3.5 text-left font-semibold">Chi nhánh</th>
                 <th className="px-4 py-3.5 text-left font-semibold">Phòng ban · Chức vụ</th>
                 <th className="px-4 py-3.5 text-left font-semibold">Hợp đồng</th>
@@ -1902,7 +1702,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.map((emp, idx) => {
-                const avatar = (emp as any).avatar || (emp as any).photos?.[0]
+                const avatar = (emp as any).photos?.[0]
                 const branchName = branches.find(b => b.id === (emp as any).branchId)?.name || ""
                 const isBottomRow = idx >= filtered.length - 2 && filtered.length >= 2
                 return (
@@ -1924,25 +1724,6 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                           <p className="text-xs text-gray-400 font-mono">{emp.id} · {emp.email}</p>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      {emp.phone ? (
-                        <div className="flex items-center gap-1.5 group/phone">
-                          <span className="text-sm font-mono text-gray-600 whitespace-nowrap">{emp.phone}</span>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(emp.phone)
-                              showToast("Đã sao chép số điện thoại!", "success")
-                            }}
-                            className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-[#C62828] transition-colors cursor-pointer opacity-0 group-hover/phone:opacity-100 focus:opacity-100"
-                            title="Sao chép số điện thoại"
-                          >
-                            <Copy size={13} />
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-gray-300 text-xs">—</span>
-                      )}
                     </td>
                     <td className="px-4 py-4">
                       {branchName && <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-lg font-medium whitespace-nowrap">{branchName}</span>}
@@ -2001,99 +1782,87 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
           orgNodes={orgNodes}
           onClose={() => { setShowModal(false); setEditEmp(null) }}
           onSave={handleSave}
-          saving={saving}
         />
       )}
 
       {historyConfirm && createPortal(
-        <div className={`fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center ${overlayLayer("confirm")} p-3 animate-in fade-in duration-200`}>
-          <div className="bg-[#F5F1EF] rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
-            <div className="bg-gradient-to-r from-[#C62828] to-[#E64A19] px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-                  <ClipboardList size={16} className="text-white" />
-                </div>
-                <div>
-                  <h3 className="text-white font-bold text-lg">Ghi nhận lịch sử công tác</h3>
-                  <p className="text-white/80 text-xs mt-0.5">Hệ thống phát hiện thông tin thay đổi</p>
-                </div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[150] p-4 animate-in fade-in duration-200">
+          <div className="bg-[#F5F1EF] rounded-3xl w-full max-w-md shadow-2xl p-6 border border-black/5 animate-in zoom-in-95 duration-100">
+            <div className="flex items-center gap-3 text-[#C62828] mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+                <ClipboardList size={20} />
               </div>
-              <button onClick={() => setHistoryConfirm(null)} className="text-white/70 hover:text-white transition-colors">
-                <X size={20} />
+              <div>
+                <h4 className="font-bold text-gray-800 text-sm">Ghi nhận lịch sử công tác?</h4>
+                <p className="text-[11px] text-gray-400">Hệ thống phát hiện thông tin thay đổi</p>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-4 space-y-2">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Loại thay đổi</p>
+              {historyConfirm.detectedType === "transfer" || historyConfirm.detectedType === "promotion" ? (
+                <div className="flex gap-6 pt-1">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-gray-700">
+                    <input
+                      type="radio"
+                      name="detectedType"
+                      value="transfer"
+                      checked={historyConfirm.detectedType === "transfer"}
+                      onChange={() => setHistoryConfirm(prev => prev ? { ...prev, detectedType: "transfer" } : null)}
+                      className="text-[#C62828] focus:ring-[#C62828]"
+                    />
+                    Thuyên chuyển
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-bold text-gray-700">
+                    <input
+                      type="radio"
+                      name="detectedType"
+                      value="promotion"
+                      checked={historyConfirm.detectedType === "promotion"}
+                      onChange={() => setHistoryConfirm(prev => prev ? { ...prev, detectedType: "promotion" } : null)}
+                      className="text-[#C62828] focus:ring-[#C62828]"
+                    />
+                    Thăng chức
+                  </label>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-800 font-extrabold">
+                  {historyConfirm.detectedType === "resign" && "Nghỉ việc"}
+                  {historyConfirm.detectedType === "rehire" && "Tái tuyển dụng"}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5 mb-5">
+              <label className="block text-xs font-semibold text-gray-500">Nội dung ghi chú trong lịch sử</label>
+              <input
+                type="text"
+                value={historyConfirm.customNote}
+                onChange={e => setHistoryConfirm(prev => prev ? { ...prev, customNote: e.target.value } : null)}
+                placeholder="Nhập ghi chú thêm..."
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 bg-white text-gray-800"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => handleConfirmHistory(true)}
+                className="w-full py-2.5 bg-[#C62828] hover:bg-[#B71C1C] text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-[#C62828]/10"
+              >
+                Đồng ý & ghi nhận lịch sử
               </button>
-            </div>
-
-            <div className="overflow-y-auto flex-1 p-5">
-              <div className="space-y-5">
-                <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Loại thay đổi</p>
-                  {historyConfirm.detectedType === "transfer" || historyConfirm.detectedType === "promotion" ? (
-                    <div className="flex gap-6">
-                      <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-gray-700">
-                        <input
-                          type="radio"
-                          name="detectedType"
-                          value="transfer"
-                          checked={historyConfirm.detectedType === "transfer"}
-                          onChange={() => setHistoryConfirm(prev => prev ? { ...prev, detectedType: "transfer" } : null)}
-                          className="text-[#C62828] focus:ring-[#C62828]"
-                        />
-                        Thuyên chuyển
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-gray-700">
-                        <input
-                          type="radio"
-                          name="detectedType"
-                          value="promotion"
-                          checked={historyConfirm.detectedType === "promotion"}
-                          onChange={() => setHistoryConfirm(prev => prev ? { ...prev, detectedType: "promotion" } : null)}
-                          className="text-[#C62828] focus:ring-[#C62828]"
-                        />
-                        Thăng chức
-                      </label>
-                    </div>
-                  ) : (
-                    <p className="text-lg text-gray-800 font-extrabold">
-                      {historyConfirm.detectedType === "resign" && "Nghỉ việc"}
-                      {historyConfirm.detectedType === "rehire" && "Tái tuyển dụng"}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-semibold text-gray-500">Nội dung ghi chú trong lịch sử</label>
-                  <input
-                    type="text"
-                    value={historyConfirm.customNote}
-                    onChange={e => setHistoryConfirm(prev => prev ? { ...prev, customNote: e.target.value } : null)}
-                    placeholder="Nhập ghi chú thêm..."
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#C62828]/40 bg-white text-gray-800"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-200 bg-white rounded-b-2xl flex items-center justify-between flex-shrink-0">
+              <button
+                onClick={() => handleConfirmHistory(false)}
+                className="w-full py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-xs font-bold transition-all"
+              >
+                Chỉ lưu thông tin (không ghi lịch sử)
+              </button>
               <button
                 onClick={() => setHistoryConfirm(null)}
-                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition-colors"
+                className="w-full py-2.5 hover:bg-gray-100 text-gray-400 rounded-xl text-xs font-bold transition-all mt-1"
               >
                 Quay lại chỉnh sửa
               </button>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleConfirmHistory(false)}
-                  className="px-5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-xl text-sm font-bold transition-colors"
-                >
-                  Chỉ lưu thông tin
-                </button>
-                <button
-                  onClick={() => handleConfirmHistory(true)}
-                  className="px-6 py-2.5 bg-gradient-to-r from-[#C62828] to-[#E64A19] hover:opacity-90 text-white rounded-xl text-sm font-bold transition-all shadow-sm shadow-[#C62828]/20 flex items-center justify-center gap-1.5"
-                >
-                  Đồng ý & ghi nhận lịch sử
-                </button>
-              </div>
             </div>
           </div>
         </div>,
@@ -2205,7 +1974,7 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                       Nhân viên: <span className="font-semibold">{previewReq.employeeId}</span> · Có <span className="font-semibold text-orange-600">{diffRows.length}</span> thay đổi
                     </p>
                   </div>
-                  <button disabled={saving} onClick={() => { setPreviewReq(null); setPreviewMode("diff"); setPreviewFormTab("personal") }} className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50">
+                  <button onClick={() => { setPreviewReq(null); setPreviewMode("diff"); setPreviewFormTab("personal") }} className="text-gray-400 hover:text-gray-600 transition-colors">
                     <X size={20} />
                   </button>
                 </div>
@@ -2332,7 +2101,6 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
 
                 <div className="p-4 border-t border-gray-100 bg-white flex justify-end gap-3">
                   <button
-                    disabled={saving}
                     onClick={() => {
                       setInputModal({
                         open: true,
@@ -2343,16 +2111,14 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
                         }
                       })
                     }}
-                    className="px-6 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-6 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 font-bold rounded-xl text-sm transition-colors"
                   >
                     Yêu cầu sửa lại
                   </button>
                   <button
-                    disabled={saving}
                     onClick={() => handleApproveUpdate(previewReq.id)}
-                    className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl text-sm hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold rounded-xl text-sm hover:opacity-90 transition-opacity shadow-sm"
                   >
-                    {saving ? <Loader2 size={14} className="animate-spin" /> : null}
                     Duyệt & Lưu hồ sơ
                   </button>
                 </div>

@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from "react"
-import { Fingerprint, CheckCircle, Clock, AlertCircle, Calendar, Loader2, RefreshCw, Wifi, XCircle, ChevronRight, ChevronLeft, BarChart3, CornerDownRight, CornerUpLeft } from "lucide-react"
+import { createPortal } from "react-dom"
+import { Fingerprint, CheckCircle, Clock, AlertCircle, Calendar, Loader2, RefreshCw, Wifi } from "lucide-react"
 import { useEmployeeAttendance, todayISO } from "../../hooks/useEmployeeAttendance"
 import { fmtIsoDate, weekdayFromIso, formatAttendanceTimes, ATT_STATUS_LABEL, ATT_STATUS_STYLE } from "../cham-cong/attendanceDisplay"
 import { EMPLOYEE_KIND, INTERN_SESSION, internSessionRange } from "../cham-cong/attendanceModel"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
-  "on-time": { label: "Đúng giờ", color: "text-[#10B981]", bg: "bg-[#F0FDF4] border border-[#BBF7D0]" },
-  late: { label: "Đi trễ", color: "text-[#F59E0B]", bg: "bg-[#FFFCEB] border border-[#FDE68A]" },
-  early: { label: "Về sớm", color: "text-[#F59E0B]", bg: "bg-[#FFFCEB] border border-[#FDE68A]" },
-  late_early: { label: "Vào trễ, ra sớm", color: "text-[#F59E0B]", bg: "bg-[#FFFCEB] border border-[#FDE68A]" },
-  absent: { label: "Vắng mặt", color: "text-[#EF4444]", bg: "bg-[#FEF2F2] border border-[#FECACA]" },
-  leave: { label: "Nghỉ phép", color: "text-[#10B981]", bg: "bg-[#F0FDF4] border border-[#BBF7D0]" },
+  "on-time": { label: "Đúng giờ", color: "text-green-700", bg: "bg-green-100" },
+  late: { label: "Đi trễ", color: "text-orange-700", bg: "bg-orange-100" },
+  early: { label: "Về sớm", color: "text-amber-700", bg: "bg-amber-100" },
+  late_early: { label: "Vào trễ, ra sớm", color: "text-orange-800", bg: "bg-orange-100" },
+  absent: { label: "Vắng mặt", color: "text-red-700", bg: "bg-red-100" },
+  leave: { label: "Nghỉ phép", color: "text-purple-700", bg: "bg-purple-100" },
 }
 
 const PORTAL_BRAND = "#E8231A"
@@ -89,20 +90,16 @@ function WifiStatusBannerLight({ ipStatus, checking }: { ipStatus: { valid: bool
   if (!ipStatus) return null
   if (ipStatus.valid) {
     return (
-      <div className="flex items-center justify-center gap-2 mb-1">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 text-[#10B981] text-xs font-bold border border-green-100 shadow-sm">
-          <Wifi size={13} className="shrink-0" />
-          <span>Đúng WiFi công ty</span>
-        </div>
+      <div className="flex items-center gap-2 p-3 rounded-xl bg-green-50 border border-green-200 text-green-800 text-sm font-medium">
+        <Wifi size={15} className="shrink-0" />
+        <span>Đúng WiFi công ty</span>
       </div>
     )
   }
   return (
-    <div className="flex items-center justify-center gap-2 mb-1">
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-50 text-[#EF4444] text-xs font-bold border border-red-100 shadow-sm">
-        <Wifi size={13} className="shrink-0" />
-        <span>Vui lòng kết nối wifi công ty để chấm công</span>
-      </div>
+    <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+      <Wifi size={15} className="shrink-0 mt-0.5" />
+      <span>Vui lòng kết nối wifi công ty để chấm công.</span>
     </div>
   )
 }
@@ -116,17 +113,13 @@ function PortalAttendanceView() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const isSuperAdmin = React.useMemo(() => {
     try {
-      const raw = localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user")
+      const raw = localStorage.getItem("dudi_user")
       const u = raw ? JSON.parse(raw) : null
       return u?.roleId === "role-super-admin" || ["0000000000", "1111111111", "2222222222"].includes(u?.employeeId)
     } catch {
       return false
     }
   }, [])
-  const displayStatusText = isSuperAdmin ? "Quản trị viên hệ thống" : statusText
-  const displaySubtitle = isSuperAdmin
-    ? "TÀI KHOẢN QUẢN TRỊ · KHÔNG CẦN CHẤM CÔNG"
-    : (isIntern ? `${EMPLOYEE_KIND.intern.label} · theo buổi` : `${EMPLOYEE_KIND.staff.label} · theo ngày`)
 
   useEffect(() => {
     const tick = () => {
@@ -173,16 +166,16 @@ function PortalAttendanceView() {
         <WifiStatusBanner ipStatus={ipStatus} checking={loading && !ipStatus} />
       )}
       <p style={{ fontSize: 13, fontWeight: 750, color: "#7f5f63", letterSpacing: "0.04em" }}>
-        {displaySubtitle}
+        {isIntern ? `${EMPLOYEE_KIND.intern.label} · theo buổi` : `${EMPLOYEE_KIND.staff.label} · theo ngày`} · {isSuperAdmin ? "Miễn chấm công" : statusText}
       </p>
-
+ 
       <div style={{ display: "flex", alignItems: "baseline", gap: "0.04em", fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, lineHeight: 1 }}>
         <span style={{ fontSize: 56, color: PORTAL_BRAND, textShadow: `0 8px 22px ${PORTAL_GR}` }}>{hms.h}</span>
         <span style={{ fontSize: 48, color: PORTAL_BRAND, opacity: 0.3, animation: "colon-blink 1s step-end infinite" }}>:</span>
         <span style={{ fontSize: 56, color: PORTAL_BRAND, textShadow: `0 8px 22px ${PORTAL_GR}` }}>{hms.m}</span>
         <span style={{ fontSize: 18, color: "#8b6b70", marginLeft: 6, alignSelf: "flex-start", marginTop: 6 }}>{hms.s}</span>
       </div>
-
+ 
       <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {!working && !punchLabel.done && !isSuperAdmin && (
           <>
@@ -221,7 +214,7 @@ function PortalAttendanceView() {
       )}
 
       <p style={{ fontSize: 13, color: "#7f5f63" }}>
-        {isSuperAdmin ? "Tài khoản này không cần thao tác chấm công" : punchLabel.done ? "Đã hoàn thành chấm công hôm nay" : working ? "Bấm khi tan ca" : "Bấm khi bắt đầu làm"}
+        {punchLabel.done ? "Đã hoàn thành chấm công hôm nay" : working ? "Bấm khi tan ca" : "Bấm khi bắt đầu làm"}
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, width: "100%" }}>
@@ -322,273 +315,156 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
     reload,
   } = useEmployeeAttendance()
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [clock, setClock] = useState({ date: "", h: "00", m: "00", s: "00" })
+
   const isSuperAdmin = React.useMemo(() => {
     try {
-      const raw = localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user")
+      const raw = localStorage.getItem("dudi_user")
       const u = raw ? JSON.parse(raw) : null
-      return u?.roleId === "role-super-admin" || ["0000000000", "1111111111", "2222222222"].includes(u?.employeeId || u?.id)
+      return u?.roleId === "role-super-admin" || ["0000000000", "1111111111", "2222222222"].includes(u?.employeeId)
     } catch {
       return false
     }
   }, [])
-
-  useEffect(() => {
-    const tick = () => {
-      const d = new Date()
-      setClock({
-        date: String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + d.getFullYear(),
-        h: String(d.getHours()).padStart(2, "0"),
-        m: String(d.getMinutes()).padStart(2, "0"),
-        s: String(d.getSeconds()).padStart(2, "0")
-      })
-    }
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [])
-
-  let profileUser: any = {}
-  try {
-    profileUser = JSON.parse(localStorage.getItem("dudi_user") || sessionStorage.getItem("dudi_user") || "{}")
-  } catch { }
 
   const handlePunchWithConfirm = () => setConfirmOpen(true)
 
   const working = !punchLabel.done && statusText === "Đang làm việc"
   const monthLabel = new Date().toLocaleDateString("vi-VN", { month: "long", year: "numeric" })
   const times = todayRecord ? formatAttendanceTimes(todayRecord) : null
-  const displayStatusText = isSuperAdmin ? "Quản trị viên hệ thống" : statusText
-  const displaySubtitle = isSuperAdmin
-    ? "TÀI KHOẢN QUẢN TRỊ · KHÔNG CẦN CHẤM CÔNG"
-    : (isIntern ? `${EMPLOYEE_KIND.intern.label} · chấm theo buổi` : `${EMPLOYEE_KIND.staff.label} · chấm theo ngày`)
 
   return (
-    <div className="space-y-6 w-full max-w-6xl mx-auto md:px-4 pb-8">
-      {error && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-red-50 border border-red-200 text-red-700 shadow-sm">
+    <div className="space-y-5 max-w-3xl mx-auto">
+      {error && createPortal(
+        <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-red-950/95 border border-red-500/30 text-red-200 shadow-2xl backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-5">
           <div className="w-1.5 h-6 rounded-full bg-red-500 flex-shrink-0" />
-          <span className="text-sm font-semibold flex-1">{error}</span>
+          <span className="text-xs font-semibold tracking-wide">{error}</span>
           <button
             onClick={reload}
-            className="px-3 py-1.5 bg-white border border-red-200 rounded-lg text-xs font-bold text-red-600 hover:bg-red-100 transition-colors whitespace-nowrap"
+            className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-xs font-bold text-red-400 transition-colors whitespace-nowrap"
           >
             Thử lại
           </button>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {isSuperAdmin ? (
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 text-[#6f565a] text-xs font-bold border border-[#efd7da] shadow-sm">
-            <span>Tài khoản Quản trị hệ thống không cần chấm công</span>
-          </div>
-        </div>
-      ) : (
-        <WifiStatusBannerLight ipStatus={ipStatus} checking={loading && !ipStatus} />
-      )}
+      <WifiStatusBannerLight ipStatus={ipStatus} checking={loading && !ipStatus} />
 
-      <div className={`rounded-[2rem] p-8 flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-xl transition-all duration-500 border ${punchLabel.done
-        ? "bg-[#F9FAFB]/90 dark:bg-white/[0.02] border-gray-100 dark:border-white/5 shadow-[0_8px_30px_rgba(0,0,0,0.06)]"
-        : working
-          ? "bg-[#F9FAFB]/90 dark:bg-white/[0.03] border-gray-100 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:shadow-[0_0_30px_rgba(16,185,129,0.05)] dark:hover:shadow-[0_0_40px_rgba(16,185,129,0.12)]"
-          : "bg-white/90 dark:bg-white/[0.03] border-gray-100 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:shadow-[0_0_30px_rgba(239,68,68,0.05)] dark:hover:shadow-[0_0_40px_rgba(239,68,68,0.12)]"
-        }`}>
-        <div className="flex-1 min-w-0 w-full">
-          <div className="mb-6">
-            <h3 className={`text-3xl font-black mb-1 tracking-tight ${punchLabel.done ? "text-[#111827] dark:text-gray-100 dark:drop-shadow-sm opacity-90" : "text-[#111827] dark:text-white dark:drop-shadow-[0_0_12px_rgba(255,255,255,0.4)]"}`}>
-              {loading ? "Đang tải..." : displayStatusText}
-            </h3>
-            <p className="text-[#6B7280] dark:text-gray-300 text-sm font-medium uppercase tracking-wider">
-              {displaySubtitle}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-y-4 gap-x-6 text-sm p-2">
-            <div>
-              <span className="text-[#EF4444] dark:text-[#EF4444] dark:drop-shadow-[0_0_8px_rgba(239,68,68,0.6)] block text-[11px] uppercase tracking-wider font-bold mb-1">Mã NV</span>
-              <span className="font-black text-base text-[#111827] dark:text-white dark:drop-shadow-sm">{profileUser.employeeId || profileUser.id || "--"}</span>
-            </div>
-            <div className="col-span-2 md:col-span-1">
-              <span className="text-[#EF4444] dark:text-[#EF4444] dark:drop-shadow-[0_0_8px_rgba(239,68,68,0.6)] block text-[11px] uppercase tracking-wider font-bold mb-1">Họ và tên</span>
-              <span className="font-black text-base truncate block text-[#111827] dark:text-white dark:drop-shadow-sm">{profileUser.name || "--"}</span>
-            </div>
-            <div>
-              <span className="text-[#EF4444] dark:text-[#EF4444] dark:drop-shadow-[0_0_8px_rgba(239,68,68,0.6)] block text-[11px] uppercase tracking-wider font-bold mb-1">Chức vụ</span>
-              <span className="font-black text-base text-[#111827] dark:text-white dark:drop-shadow-sm">{profileUser.position || "--"}</span>
-            </div>
-            <div className="col-span-2 md:col-span-1">
-              <span className="text-[#EF4444] dark:text-[#EF4444] dark:drop-shadow-[0_0_8px_rgba(239,68,68,0.6)] block text-[11px] uppercase tracking-wider font-bold mb-1">Phòng ban</span>
-              <span className="font-black text-base text-[#111827] dark:text-white dark:drop-shadow-sm">{profileUser.department || "--"}</span>
-            </div>
-          </div>
-
-          <div className={`mt-6 flex items-center gap-3 text-sm rounded-2xl py-3 px-6 shadow-sm border w-fit ${punchLabel.done
-            ? "text-gray-500 bg-gray-50/80 dark:bg-white/10 border-gray-200 dark:border-white/10 dark:text-gray-300"
-            : working
-              ? "text-[#10B981] bg-green-50/80 dark:bg-green-500/10 border-[#10B981]/30"
-              : "text-[#EF4444] bg-red-50/80 dark:bg-red-500/10 border-[#EF4444]/30"
-            }`}>
-            <div className="flex items-center gap-2">
-              <Calendar size={18} strokeWidth={2.5} />
-              <span className={`font-bold ${punchLabel.done ? "dark:text-white" : ""}`}>Ngày: {clock.date}</span>
-            </div>
-            <span className="mx-2 opacity-30">|</span>
-            <div className="flex items-center gap-2">
-              <Clock size={18} strokeWidth={2.5} />
-              <span className={`font-black font-mono tracking-wider ml-0.5 text-[15px] ${!punchLabel.done
-                ? (working ? "dark:text-emerald-400 dark:drop-shadow-[0_0_10px_rgba(52,211,153,0.8)]" : "dark:text-rose-400 dark:drop-shadow-[0_0_10px_rgba(251,113,133,0.8)]")
-                : "dark:text-white"
-                }`}>
-                Giờ: {clock.h}:{clock.m}:{clock.s}
-              </span>
-            </div>
-          </div>
-
+      <div className="bg-gradient-to-br from-[#160606] to-[#2a0808] rounded-2xl p-6 text-white flex items-center justify-between shadow-lg">
+        <div className="flex-1 min-w-0">
+          <p className="text-white/50 text-sm mb-1">
+            {isIntern ? `${EMPLOYEE_KIND.intern.label} · chấm theo buổi` : `${EMPLOYEE_KIND.staff.label} · chấm theo ngày`}
+          </p>
+          <h3 className="text-xl font-bold">{loading ? "Đang tải..." : statusText}</h3>
           {todayRecord && (
-            <div className="text-[#6B7280] dark:text-white text-sm mt-5 font-mono space-y-1 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-white/20 p-3 rounded-xl w-fit drop-shadow-sm">
+            <div className="text-white/60 text-sm mt-2 font-mono space-y-0.5">
               {isIntern ? (
                 <>
-                  <p className="font-bold">{internSessionRange(todayRecord, "am")}</p>
-                  <p className="font-bold">{internSessionRange(todayRecord, "pm")}</p>
+                  <p>{internSessionRange(todayRecord, "am")}</p>
+                  <p>{internSessionRange(todayRecord, "pm")}</p>
                   {todayRecord.autoFilled && (
-                    <p className="text-[#F59E0B] text-xs mt-1">Làm cả ngày — hệ thống tự ghi giờ nghỉ trưa</p>
+                    <p className="text-amber-300/90 text-xs mt-1">Làm cả ngày — hệ thống tự ghi giờ nghỉ trưa</p>
                   )}
                 </>
               ) : (
-                <p className="font-bold tracking-wide">Vào: {todayRecord.checkIn ?? "--"}{todayRecord.checkOut && todayRecord.checkOut !== "--" ? ` · Ra: ${todayRecord.checkOut}` : ""}</p>
+                <p>Vào: {todayRecord.checkIn ?? "--"}{todayRecord.checkOut && todayRecord.checkOut !== "--" ? ` · Ra: ${todayRecord.checkOut}` : ""}</p>
               )}
             </div>
           )}
-        </div>
-
-        <div className="relative group shrink-0 w-[180px] h-[180px] flex items-center justify-center">
-          {!punchLabel.done && !isSuperAdmin && (
-            <div className={`absolute inset-4 rounded-full opacity-20 blur-2xl animate-pulse transition-all duration-1000 ${working ? "bg-[#10B981]" : "bg-[#EF4444]"}`}></div>
+          {!isIntern && times && (
+            <p className="text-white/40 text-xs mt-2">Giờ làm: {todayRecord?.workingHours ?? "--"}</p>
           )}
-          <button
-            onClick={isSuperAdmin ? undefined : handlePunchWithConfirm}
-            disabled={loading || punching || punchLabel.done || isSuperAdmin}
-            className={`relative flex flex-col items-center justify-center gap-4 transition-transform duration-300 outline-none
-              ${punchLabel.done || isSuperAdmin ? "opacity-60 cursor-not-allowed text-gray-400 dark:text-gray-500" :
-                working ? "text-[#10B981] hover:scale-105 active:scale-95 drop-shadow-[0_0_15px_rgba(16,185,129,0.4)]" :
-                  "text-[#EF4444] hover:scale-105 active:scale-95 drop-shadow-[0_0_15px_rgba(239,68,68,0.4)]"} `}
-          >
-            {punching ? <Loader2 size={80} className="animate-spin" /> : (
-              <Fingerprint strokeWidth={1.2} size={110} />
-            )}
-            <span className={`text-[12px] font-bold tracking-[0.15em] text-center uppercase ${punchLabel.done
-              ? "text-gray-500 dark:text-gray-400"
-              : working
-                ? "text-[#10B981] dark:text-emerald-400 dark:drop-shadow-[0_0_12px_rgba(52,211,153,0.9)]"
-                : "text-[#EF4444] dark:text-rose-400 dark:drop-shadow-[0_0_12px_rgba(251,113,133,0.9)]"
-              }`}>
-              {isSuperAdmin ? "MIỄN CHẤM CÔNG" : punchLabel.done ? punchLabel.label : (punchLabel.label === "Check-in" || punchLabel.label === "Check-in Sáng" || punchLabel.label === "Check-in Chiều" ? "CHẠM ĐỂ ĐIỂM DANH" : punchLabel.label)}
-            </span>
-          </button>
         </div>
-      </div >
+        <button
+          onClick={handlePunchWithConfirm}
+          disabled={loading || punching || punchLabel.done || isSuperAdmin || (!!ipStatus && !ipStatus.valid)}
+          className={`w-24 h-24 rounded-full flex flex-col items-center justify-center gap-2 transition-all duration-300 border-2 shrink-0
+            ${punchLabel.done ? "opacity-50 cursor-not-allowed bg-white/5 border-white/20" :
+              working ? "bg-green-600/20 border-green-500/50 hover:scale-105 active:scale-95" :
+              "bg-[#C62828]/20 border-[#C62828]/50 hover:scale-105 active:scale-95"} shadow-xl`}
+        >
+          {punching ? <Loader2 size={28} className="animate-spin text-white" /> : (
+            <Fingerprint size={30} className={working ? "text-green-400" : "text-[#FF8A50]"} />
+          )}
+          <span className="text-[10px] font-bold text-white text-center leading-tight px-1">
+            {punchLabel.label}
+          </span>
+        </button>
+      </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Đúng giờ", value: monthStats.onTime, icon: CheckCircle, color: "text-[#10B981] dark:text-emerald-400", hover: "group-hover:text-[#10B981] dark:group-hover:text-emerald-400", glow: "dark:drop-shadow-[0_0_10px_rgba(52,211,153,0.8)]", boxGlow: "dark:shadow-[0_0_15px_rgba(16,185,129,0.05)] dark:hover:shadow-[0_0_25px_rgba(16,185,129,0.2)]" },
-          { label: "Đi trễ", value: monthStats.late, icon: AlertCircle, color: "text-[#F59E0B] dark:text-amber-400", hover: "group-hover:text-[#F59E0B] dark:group-hover:text-amber-400", glow: "dark:drop-shadow-[0_0_10px_rgba(251,191,36,0.8)]", boxGlow: "dark:shadow-[0_0_15px_rgba(245,158,11,0.05)] dark:hover:shadow-[0_0_25px_rgba(245,158,11,0.2)]" },
-          { label: "Vắng", value: monthStats.absent, icon: Clock, color: "text-[#EF4444] dark:text-rose-400", hover: "group-hover:text-[#EF4444] dark:group-hover:text-rose-400", glow: "dark:drop-shadow-[0_0_10px_rgba(251,113,133,0.8)]", boxGlow: "dark:shadow-[0_0_15px_rgba(239,68,68,0.05)] dark:hover:shadow-[0_0_25px_rgba(239,68,68,0.2)]" },
-          { label: "Nghỉ phép", value: monthStats.leave, icon: Calendar, color: "text-[#10B981] dark:text-emerald-400", hover: "group-hover:text-[#10B981] dark:group-hover:text-emerald-400", glow: "dark:drop-shadow-[0_0_10px_rgba(52,211,153,0.8)]", boxGlow: "dark:shadow-[0_0_15px_rgba(16,185,129,0.05)] dark:hover:shadow-[0_0_25px_rgba(16,185,129,0.2)]" },
+          { label: "Đúng giờ", value: monthStats.onTime, icon: CheckCircle, color: "text-green-600", bg: "bg-green-50" },
+          { label: "Đi trễ / sớm", value: monthStats.late, icon: AlertCircle, color: "text-orange-500", bg: "bg-orange-50" },
+          { label: "Vắng", value: monthStats.absent, icon: Clock, color: "text-red-500", bg: "bg-red-50" },
+          { label: "Nghỉ phép", value: monthStats.leave, icon: Calendar, color: "text-purple-600", bg: "bg-purple-50" },
         ].map(s => (
-          <div key={s.label} className={`group bg-white dark:bg-white/[0.03] rounded-[1rem] p-5 shadow-[0_8px_30px_rgba(0,0,0,0.03)] transition-all duration-300 hover:-translate-y-1 cursor-default border border-gray-50 dark:border-white/10 ${s.boxGlow}`}>
-            <p className={`text-4xl justify-between items-end flex font-black ${s.color} ${s.glow}`}>
-              {loading ? "—" : s.value}
-              <s.icon size={22} className={`opacity-40 transition-opacity ${s.hover} group-hover:opacity-100 mb-1`} />
-            </p>
-            <p className="text-sm font-bold text-[#6B7280] dark:text-gray-300 mt-2 dark:group-hover:text-white transition-colors dark:group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]">{s.label}</p>
+          <div key={s.label} className={`${s.bg} rounded-2xl p-4 border border-black/[0.04]`}>
+            <p className={`text-2xl font-black ${s.color}`}>{loading ? "—" : s.value}</p>
+            <p className="text-xs font-semibold text-gray-600 mt-1">{s.label}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-white/80 dark:bg-white/[0.04] backdrop-blur-xl rounded-[2rem] shadow-sm border border-gray-100 dark:border-white/5 overflow-hidden mt-6">
-        <div className="px-8 py-6 border-b border-gray-100/60 dark:border-white/5 flex items-center justify-between bg-white/40 dark:bg-transparent">
-          <h3 className="font-bold text-[#111827] dark:text-gray-100 text-lg">Lịch sử chấm công</h3>
-          <div className="flex items-center gap-3 text-sm text-[#6B7280] dark:text-gray-400 font-medium bg-white/50 dark:bg-white/10 px-3 py-1.5 rounded-full shadow-sm border border-gray-100 dark:border-white/5">
-            <Calendar size={14} />
-            <span className="capitalize">{monthLabel}</span>
-            <div className="w-[1px] h-4 bg-gray-200 dark:bg-white/20 mx-1" />
-            <button onClick={verifyWifi} className="p-1 hover:text-[#EF4444] dark:hover:text-red-400 transition-colors" title="Kiểm tra WiFi">
-              <Wifi size={14} />
+      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-50 flex items-center justify-between">
+          <h3 className="font-bold text-gray-800">Lịch sử chấm công</h3>
+          <div className="flex items-center gap-2 text-xs text-gray-400 font-medium">
+            <Calendar size={13} />
+            <span>{monthLabel}</span>
+            <button onClick={verifyWifi} className="p-1 hover:text-gray-600" title="Kiểm tra WiFi">
+              <Wifi size={13} />
             </button>
-            <button onClick={reload} className="p-1 hover:text-[#10B981] transition-colors" title="Tải lại">
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            <button onClick={reload} className="p-1 hover:text-gray-600" title="Tải lại">
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
             </button>
           </div>
         </div>
-        <div className="p-6">
-          {/* Removed Mini Bar Chart Tracker */}
-
-          {/* Vertical Timeline Feed */}
-          <div className="relative pl-3 md:pl-6 space-y-6 before:absolute before:inset-0 before:ml-[25px] md:before:ml-[37px] before:-translate-x-px before:h-full before:w-0.5 before:bg-gradient-to-b before:from-gray-200/40 dark:before:from-white/10 before:via-gray-200 dark:before:via-white/20 before:to-transparent">
-            {loading ? (
-              <div className="py-12 text-center text-gray-400">Đang tải...</div>
-            ) : history.length === 0 ? (
-              <div className="py-12 text-center text-gray-400">Chưa có lịch sử trong tháng</div>
-            ) : history.map((r, i) => {
-              const t = formatAttendanceTimes(r)
-              const isAbsent = r.status === "absent"
-              const isLate = r.status === "late" || r.status === "early" || r.status === "late_early"
-              const isOnTime = r.status === "on-time" || r.status === "leave"
-
-              const iconBg = isAbsent ? "bg-red-100 text-red-500 ring-4 ring-white dark:bg-red-900/40 dark:ring-[#0E0508]" : isLate ? "bg-orange-100 text-[#F59E0B] ring-4 ring-white dark:bg-orange-900/40 dark:ring-[#0E0508]" : "bg-green-100 text-[#10B981] ring-4 ring-white dark:bg-green-900/40 dark:ring-[#0E0508]"
-              const cleanTime = (time: string | null | undefined) => time ? time.replace(/\s*\d+s/g, '').trim() : "--"
-
-              return (
-                <div key={r.id} className="relative flex items-start gap-4 md:gap-6 group">
-                  <div className={`mt-0.5 z-10 w-7 h-7 md:w-8 md:h-8 flex items-center justify-center rounded-full shrink-0 shadow-sm ${iconBg}`}>
-                    {isOnTime ? <CheckCircle size={16} /> : isAbsent ? <XCircle size={16} /> : <AlertCircle size={16} />}
-                  </div>
-
-                  <div className="flex-1 bg-white/70 dark:bg-white/[0.04] hover:bg-white dark:hover:bg-white/[0.08] border border-gray-100/80 dark:border-white/5 rounded-2xl p-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:shadow-none transition-all duration-300">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-2">
-                      <div>
-                        <h4 className="font-bold text-gray-800 dark:text-gray-100 text-[15px]">{fmtIsoDate(r.date)} <span className="text-[#9CA3AF] dark:text-gray-500 font-medium ml-2 text-xs">{weekdayFromIso(r.date)}</span></h4>
-                      </div>
-                      <div className="shrink-0">
-                        {isIntern
-                          ? <InternSessionStatusBadges statusAm={r.statusAm} statusPm={r.statusPm} />
-                          : <StatusBadge status={r.status} />}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-[#4B5563] dark:text-gray-400 font-medium bg-gray-50/50 dark:bg-white/5 p-2.5 rounded-xl border border-gray-100/50 dark:border-white/5">
-                      {isIntern ? (
-                        <>
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" /> {cleanTime(t.primary)}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]" /> {cleanTime(t.secondary)}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <CornerDownRight size={15} className="text-[#10B981]" />
-                            <span>Vào: <span className="text-gray-900 dark:text-gray-200 font-bold">{cleanTime(r.checkIn)}</span></span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CornerUpLeft size={15} className="text-[#F59E0B]" />
-                            <span>Ra: <span className="text-gray-900 dark:text-gray-200 font-bold">{cleanTime(r.checkOut)}</span></span>
-                          </div>
-                          <div className="flex items-center gap-2 ml-auto">
-                            <Clock size={15} className="text-gray-400 dark:text-gray-500" />
-                            <span className="font-mono">{cleanTime(r.workingHours)}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50/70 text-gray-400 text-xs">
+                {(isIntern
+                  ? ["Ngày", "Thứ", `${INTERN_SESSION.am.label}`, `${INTERN_SESSION.pm.label}`, "Giờ", "Trạng thái"]
+                  : ["Ngày", "Thứ", "Giờ vào", "Giờ ra", "Số giờ", "Trạng thái"]
+                ).map(h => (
+                  <th key={h} className="px-5 py-3 text-left font-semibold">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                <tr><td colSpan={6} className="py-12 text-center text-gray-400">Đang tải...</td></tr>
+              ) : history.length === 0 ? (
+                <tr><td colSpan={6} className="py-12 text-center text-gray-400">Chưa có lịch sử trong tháng</td></tr>
+              ) : history.map(r => {
+                const t = formatAttendanceTimes(r)
+                return (
+                  <tr key={r.id} className="hover:bg-gray-50/50">
+                    <td className="px-5 py-3.5 font-mono text-xs text-gray-700">{fmtIsoDate(r.date)}</td>
+                    <td className="px-5 py-3.5 text-gray-500 text-xs">{weekdayFromIso(r.date)}</td>
+                    {isIntern ? (
+                      <>
+                        <td className="px-5 py-3.5 font-mono text-xs">{t.primary}</td>
+                        <td className="px-5 py-3.5 font-mono text-xs">{t.secondary}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-5 py-3.5 font-mono text-xs">{r.checkIn}</td>
+                        <td className="px-5 py-3.5 font-mono text-xs">{r.checkOut}</td>
+                      </>
+                    )}
+                    <td className="px-5 py-3.5 font-mono text-xs font-medium">{r.workingHours ?? "--"}</td>
+                    <td className="px-5 py-3.5">
+                      {isIntern
+                        ? <InternSessionStatusBadges statusAm={r.statusAm} statusPm={r.statusPm} />
+                        : <StatusBadge status={r.status} />}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
       <Modal
@@ -615,6 +491,6 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
           Bạn có chắc muốn thực hiện <span className="font-bold text-[#C62828]">{punchLabel.label}</span> không?
         </p>
       </Modal>
-    </div >
+    </div>
   )
 }

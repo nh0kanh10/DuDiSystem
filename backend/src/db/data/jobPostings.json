@@ -1,1 +1,41 @@
-[]
+[
+  {
+    "id": "JP001",
+    "title": "Backend Developer",
+    "orgNodeId": "pos-dev-be",
+    "department": "Phòng Công nghệ",
+    "headcount": 2,
+    "status": "open",
+    "openDate": "10/06/2026",
+    "closeDate": "10/07/2026",
+    "requirements": ["Node.js 2+ năm", "RESTful API", "PostgreSQL hoặc MongoDB", "Git"],
+    "description": "Phát triển và bảo trì hệ thống backend của các sản phẩm phần mềm ERP nội bộ.",
+    "createdBy": "NV005"
+  },
+  {
+    "id": "JP002",
+    "title": "Chuyên viên Tuyển dụng",
+    "orgNodeId": "pos-rec-spec",
+    "department": "Phòng Nhân sự - Hành chính",
+    "headcount": 1,
+    "status": "open",
+    "openDate": "15/06/2026",
+    "closeDate": "15/07/2026",
+    "requirements": ["Kinh nghiệm tuyển dụng IT 1+ năm", "Kỹ năng phỏng vấn", "Quen dùng LinkedIn Recruiter"],
+    "description": "Phụ trách toàn bộ quy trình tuyển dụng từ đăng tin đến onboard cho các vị trí IT.",
+    "createdBy": "NV005"
+  },
+  {
+    "id": "JP003",
+    "title": "Thực tập sinh Phát triển phần mềm",
+    "orgNodeId": "pos-dev-intern",
+    "department": "Phòng Công nghệ",
+    "headcount": 3,
+    "status": "open",
+    "openDate": "01/06/2026",
+    "closeDate": "30/06/2026",
+    "requirements": ["Sinh viên năm 3-4 CNTT", "JavaScript hoặc Python cơ bản", "Ham học hỏi"],
+    "description": "Thực tập tại Bộ phận Phát triển phần mềm, hỗ trợ team build tính năng mới và viết test.",
+    "createdBy": "NV005"
+  }
+]

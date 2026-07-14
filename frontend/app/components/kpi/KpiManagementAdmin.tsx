@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   TrendingUp, Award, Calendar, Users, FileText, Settings, BarChart3,
-  UserCheck, ChevronLeft, ChevronRight, ChevronDown, Download, Search, Plus, Filter, RefreshCw, X, ArrowUpRight, ArrowDownRight, RefreshCcw, Trophy, Medal
+  UserCheck, ChevronLeft, ChevronRight, ChevronDown, Download, Search, Plus, Filter, RefreshCw, X, ArrowUpRight, ArrowDownRight, RefreshCcw
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -2228,16 +2228,16 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
 
           {/* Leaderboard Box */}
           <div className="bg-white rounded-3xl p-6 border border-black/5 shadow-xs space-y-4">
-            <h4 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-              <Trophy size={18} className="text-[#C62828] fill-[#C62828]/10" /> Bảng xếp hạng KPI
+            <h4 className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
+              <span>🏆</span> Bảng xếp hạng KPI
             </h4>
             <div className="space-y-4">
               {statsEmployeeSummaries.slice(0, 3).map((row, idx) => {
                 const colors = [
-                  { bg: "bg-yellow-50", text: "text-amber-500", bar: "bg-amber-400", medal: <Medal size={16} className="text-amber-500 fill-amber-500/20" /> },
-                  { bg: "bg-gray-50", text: "text-slate-500", bar: "bg-slate-400", medal: <Medal size={16} className="text-slate-500 fill-slate-500/20" /> },
-                  { bg: "bg-amber-50/50", text: "text-amber-700", bar: "bg-amber-600", medal: <Medal size={16} className="text-amber-700 fill-amber-700/20" /> }
-                ][idx] || { bg: "bg-gray-50", text: "text-gray-400", bar: "bg-gray-300", medal: <Award size={16} className="text-gray-400" /> };
+                  { bg: "bg-yellow-50", text: "text-amber-500", bar: "bg-amber-400", medal: "🥇" },
+                  { bg: "bg-gray-50", text: "text-slate-500", bar: "bg-slate-400", medal: "🥈" },
+                  { bg: "bg-amber-50/50", text: "text-amber-700", bar: "bg-amber-600", medal: "🥉" }
+                ][idx] || { bg: "bg-gray-50", text: "text-gray-400", bar: "bg-gray-300", medal: "🎖️" };
 
                 const maxPoints = statsEmployeeSummaries[0]?.points || 1;
                 const pct = Math.max(Math.min((row.points / maxPoints) * 100, 100), 5);
@@ -2246,7 +2246,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
                   <div key={row.employeeId} className={`p-4 rounded-2xl border border-gray-100 ${colors.bg} space-y-3 relative overflow-hidden`}>
                     <div className="flex justify-between items-center relative z-10">
                       <div className="flex items-center gap-3">
-                        <span className="flex items-center justify-center w-8 h-8 rounded-full bg-white shadow-xs border border-gray-100/50">{colors.medal}</span>
+                        <span className="text-xl">{colors.medal}</span>
                         <div>
                           <h5 className="font-extrabold text-gray-800 text-xs">{row.name}</h5>
                           <p className="text-[10px] text-gray-400 font-bold mt-0.5">{row.position}</p>

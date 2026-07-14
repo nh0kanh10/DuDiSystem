@@ -1,8 +1,99 @@
 [
   {
+    "id": "ra-001",
+    "userId": "U001",
+    "scopeType": "self",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-002",
+    "userId": "U002",
+    "scopeType": "branch",
+    "scopeId": "branch-hn",
+    "isPrimary": true
+  },
+  {
+    "id": "ra-003",
+    "userId": "U003",
+    "scopeType": "self",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-004",
+    "userId": "U004",
+    "scopeType": "self",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-005",
+    "userId": "U005",
+    "scopeType": "company",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-006",
+    "userId": "U006",
+    "scopeType": "self",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-007",
+    "userId": "U007",
+    "scopeType": "self",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-008",
+    "userId": "U008",
+    "scopeType": "self",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-009",
+    "userId": "U009",
+    "scopeType": "branch",
+    "scopeId": "branch-hcm",
+    "isPrimary": true
+  },
+  {
     "id": "ra-010",
     "userId": "U010",
     "scopeType": "company",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-011",
+    "userId": "U011",
+    "scopeType": "self",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-012",
+    "userId": "U012",
+    "scopeType": "branch",
+    "scopeId": "branch-hn",
+    "isPrimary": true
+  },
+  {
+    "id": "ra-013",
+    "userId": "U013",
+    "scopeType": "self",
+    "scopeId": null,
+    "isPrimary": true
+  },
+  {
+    "id": "ra-1782759981741",
+    "userId": "U-1782759981739",
+    "scopeType": "self",
     "scopeId": null,
     "isPrimary": true
   },

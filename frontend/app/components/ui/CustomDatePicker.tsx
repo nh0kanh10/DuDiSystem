@@ -130,6 +130,7 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
 
   function handleDateInputBlur() {
     if (localDateInput === "") { onChange(""); return }
+    // format: "DD/MM/YYYY HH:mm" or just date part
     const datePart = localDateInput.split(" ")[0]
     const timePart = localDateInput.split(" ")[1] || `${hour}:${minute}`
     if (isValidVNDate(datePart)) {
@@ -174,7 +175,7 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
           <CalendarIcon size={15} className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer hover:text-gray-600 transition-colors" />
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 z-[10010] bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden" align="start">
+      <PopoverContent className="w-auto p-0 z-[999] bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden" align="start">
         <DayPicker
           mode="single"
           selected={parsed.date || undefined}
@@ -311,7 +312,7 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
           <CalendarIcon size={15} className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer hover:text-gray-600 transition-colors" />
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 z-[10010] bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden" align="start">
+      <PopoverContent className="w-auto p-0 z-[999] bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden" align="start">
         <DayPicker
           mode="single"
           selected={dateValue}
@@ -347,3 +348,4 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
     </Popover>
   )
 }
+

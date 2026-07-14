@@ -169,11 +169,6 @@ export function emitTaskChanged(action, task) {
   io.to(roomAdmins()).emit("task:changed", payload)
 }
 
-export function emitCrmChanged(action, data) {
-  if (!io) return
-  io.emit("crm:changed", { action, ...data })
-}
-
 function broadcastPresence(employeeId, branchId, online, lastSeenAt) {
   if (!io) return
   const payload = { employeeId, online, lastSeenAt }

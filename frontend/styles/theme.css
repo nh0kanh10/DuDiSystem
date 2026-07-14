@@ -215,3 +215,22 @@
     width: 100%;
   }
 }
+
+/* Responsive mobile: Hide chat floating button when any popup/modal is open */
+@media (max-width: 768px) {
+  body:has([class*="bg-black/50"]) .chat-widget-fab,
+  body:has([class*="bg-black/55"]) .chat-widget-fab,
+  body:has([class*="bg-black/40"]) .chat-widget-fab,
+  body:has([class*="backdrop-blur"]) .chat-widget-fab,
+  body:has(.fixed.inset-0.z-50) .chat-widget-fab,
+  body:has(.fixed.inset-0.z-\[50\]) .chat-widget-fab,
+  body:has(.fixed.inset-0.z-\[200\]) .chat-widget-fab {
+    display: none !important;
+  }
+}
+
+/* Hide Microsoft Edge / Internet Explorer native password reveal eye button */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+}

@@ -37,7 +37,7 @@ import { isStaffTypeRole } from "../../utils/staffModules"
 
 const ADMIN_MODULE_IDS = new Set([
   "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don",
-  "tai-khoan", "phan-quyen", "ip", "kpi", "du-an", "tien-ich", "crm", "lead"
+  "tai-khoan", "phan-quyen", "ip", "thong-ke", "du-an", "tien-ich",
 ])
 
 function stripAdminModules(modules: string[]): string[] {
@@ -84,7 +84,7 @@ const MODULE_TREE = [
     id: "group-reports",
     label: "Báo cáo & Tiện ích",
     children: [
-      { id: "kpi", label: "Quản lý KPI" },
+      { id: "thong-ke", label: "Báo cáo thống kê" },
       { id: "tien-ich", label: "Tiện ích hệ thống" }
     ]
   },
@@ -137,8 +137,7 @@ const STAFF_MODULE_TREE = [
     id: "staff-crm",
     label: "Quản lý khách hàng (nhân viên)",
     children: [
-      { id: "user-crm", label: "Quản lý khách hàng" },
-      { id: "user-kpi", label: "KPI nhân viên" }
+      { id: "user-crm", label: "Quản lý khách hàng" }
     ]
   }
 ]
@@ -198,9 +197,6 @@ export default function AccountManagement({
   const [modalPermTab, setModalPermTab] = useState<"management" | "staff">("management")
 
   const [showRoleModal, setShowRoleModal] = useState(false)
-  const [lockModalOpen, setLockModalOpen] = useState(false)
-  const [lockTargetId, setLockTargetId] = useState<string | null>(null)
-  const [lockReasonText, setLockReasonText] = useState("")
   const [roleForm, setRoleForm] = useState<{
     name: string;
     scopeType: "company" | "branch" | "self";
@@ -655,44 +651,13 @@ export default function AccountManagement({
     setShowModal(true)
   }
 
-  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent, force = false) => {
+  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
     e?.preventDefault()
     const loginId = form.employeeId || form.email
     if (!loginId.trim()) {
       showToast("Mã đăng nhập là bắt buộc", "error")
       return
     }
-
-    if (form.employeeId && !force) {
-      const existingAcc = accounts.find(
-        a => a.employeeId === form.employeeId && a.id !== editingAcc?.id
-      )
-      if (existingAcc) {
-        const emp = employees.find(e => e.id === form.employeeId)
-        const empName = emp ? emp.name : form.employeeId
-        setConfirmConfig({
-          isOpen: true,
-          title: "Xác nhận chuyển đổi nhân sự",
-          message: `Nhân viên "${empName}" đã có tài khoản "${existingAcc.employeeId || existingAcc.email}". Bạn có chắc chắn muốn thay đổi không?`,
-          confirmText: "Xác nhận",
-          cancelText: "Hủy",
-          type: "warning",
-          onConfirm: async () => {
-            setConfirmConfig(null)
-            try {
-              await api.users.update(existingAcc.id, {
-                employeeId: null
-              })
-              void handleSubmit(undefined, true)
-            } catch (err: any) {
-              showToast(err.message || "Lỗi khi gỡ liên kết tài khoản cũ", "error")
-            }
-          }
-        })
-        return
-      }
-    }
-
     try {
       const finalCustomPerms = customPermissionsEnabled
         ? (customPermissions.includes("user-settings") ? customPermissions : [...customPermissions, "user-settings"])
@@ -725,43 +690,24 @@ export default function AccountManagement({
   const handleToggleStatus = async (id: string) => {
     const acc = accounts.find(a => a.id === id)
     if (!acc) return
-    if (acc.status === "active") {
-      setLockTargetId(id)
-      setLockReasonText("")
-      setLockModalOpen(true)
-    } else {
-      setConfirmConfig({
-        isOpen: true,
-        title: "Kích hoạt tài khoản",
-        message: "Bạn có chắc chắn muốn kích hoạt lại tài khoản này không?",
-        confirmText: "Kích hoạt",
-        cancelText: "Hủy",
-        type: "info",
-        onConfirm: async () => {
-          try {
-            await api.users.toggleStatus(id)
-            showToast("Kích hoạt tài khoản thành công")
-            await loadData(selectedRole, selectedCustomUser)
-          } catch (err: any) {
-            showToast(err.message || "Lỗi xử lý", "error")
-          }
+    const actionText = acc.status === "active" ? "khóa" : "kích hoạt"
+    setConfirmConfig({
+      isOpen: true,
+      title: `${acc.status === "active" ? "Khóa" : "Kích hoạt"} tài khoản`,
+      message: `Bạn có chắc chắn muốn ${actionText} tài khoản này không?`,
+      confirmText: acc.status === "active" ? "Khóa tài khoản" : "Kích hoạt",
+      cancelText: "Hủy",
+      type: acc.status === "active" ? "danger" : "info",
+      onConfirm: async () => {
+        try {
+          await api.users.toggleStatus(id)
+          showToast("Thay đổi trạng thái tài khoản thành công")
+          await loadData(selectedRole, selectedCustomUser)
+        } catch (err: any) {
+          showToast(err.message || "Lỗi xử lý", "error")
         }
-      })
-    }
-  }
-
-  const handleConfirmLock = async () => {
-    if (!lockTargetId) return
-    try {
-      await api.users.toggleStatus(lockTargetId, { reason: lockReasonText.trim() })
-      showToast("Khóa tài khoản thành công")
-      setLockModalOpen(false)
-      setLockTargetId(null)
-      setLockReasonText("")
-      await loadData(selectedRole, selectedCustomUser)
-    } catch (err: any) {
-      showToast(err.message || "Lỗi xử lý", "error")
-    }
+      }
+    })
   }
 
   const handleResetPassword = async (acc: UserRecord) => {
@@ -1034,7 +980,7 @@ export default function AccountManagement({
                   <thead>
                     <tr className="bg-gray-50/80 text-gray-400 text-xs border-b border-gray-100 uppercase tracking-wider font-bold">
                       <th className="px-5 py-3.5 text-left font-bold w-16">STT</th>
-                      {["Mã NV", "Tên nhân viên", "Phòng ban", "Trạng thái nhân sự", "Trạng thái tài khoản", "Tài khoản", "Vai trò (Role)", "Hành động"].map(h => (
+                      {["Mã NV", "Tên nhân viên", "Phòng ban", "Trạng thái", "Tài khoản", "Vai trò (Role)", "Hành động"].map(h => (
                         <th key={h} className="px-5 py-3.5 text-left font-bold">{h}</th>
                       ))}
                     </tr>
@@ -1042,6 +988,7 @@ export default function AccountManagement({
                   <tbody className="divide-y divide-gray-50">
                     {filteredEmployees.map((emp, index) => {
                       const acc = accounts.find(a => a.employeeId === emp.id)
+                      const isResigned = emp.status === "inactive"
                       const roleObj = acc ? rolesList.find(r => r.id === acc.roleId) : null
                       return (
                         <tr key={emp.id} className="hover:bg-gray-50/40 transition-colors">
@@ -1049,8 +996,8 @@ export default function AccountManagement({
                           <td className="px-5 py-4 font-mono font-bold text-gray-700">{emp.id}</td>
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
-                              {emp.avatar
-                                ? <img src={emp.avatar} alt={emp.name} className="w-9 h-9 rounded-xl object-cover shadow-sm" />
+                              {emp.photos?.[0]
+                                ? <img src={emp.photos[0]} alt={emp.name} className="w-9 h-9 rounded-xl object-cover shadow-sm" />
                                 : <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-black shadow-sm">{initials(emp.name)}</div>
                               }
                               <span className="font-bold text-gray-800">{emp.name}</span>
@@ -1058,33 +1005,9 @@ export default function AccountManagement({
                           </td>
                           <td className="px-5 py-4 text-gray-500 font-bold">{emp.department || "—"}</td>
                           <td className="px-5 py-4">
-                            {emp.status === "active" ? (
-                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100">
-                                Đang làm
-                              </span>
-                            ) : emp.status === "suspended" ? (
-                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100">
-                                Tạm nghỉ
-                              </span>
-                            ) : (
-                              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-600 border border-red-100">
-                                Nghỉ việc
-                              </span>
-                            )}
-                          </td>
-                          {/* 2. Trạng thái tài khoản */}
-                          <td className="px-5 py-4">
-                            {acc ? (
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${acc.status === "active" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-amber-50 text-amber-700 border border-amber-100"}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${acc.status === "active" ? "bg-emerald-500" : "bg-amber-500"}`} />
-                                {acc.status === "active" ? "Hoạt động" : "Đã khóa"}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-400 border border-gray-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-                                Chưa tạo
-                              </span>
-                            )}
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${isResigned ? "bg-red-50 text-red-600 border border-red-100" : "bg-green-50 text-green-700 border border-green-100"}`}>
+                              {isResigned ? "Nghỉ việc" : "Đang làm việc"}
+                            </span>
                           </td>
                           <td className="px-5 py-4 text-xs font-mono font-bold text-gray-600">
                             {acc ? acc.email : <span className="text-gray-300 italic font-medium">Chưa tạo tài khoản</span>}
@@ -1418,20 +1341,13 @@ export default function AccountManagement({
               <div className="flex-1 space-y-4">
                 <div>
                   <label className="text-xs font-black text-gray-500 mb-1.5 block">Gán nhân viên</label>
-                  <CustomCombobox
-                    value={form.employeeId || ""}
-                    onChange={handleEmployeeChange}
-                    disabled={!!editingAcc}
-                    options={[
-                      { value: "", label: "-- Chưa gán / Để trống --", desc: "Không gán nhân viên" },
-                      ...employees
-                        .filter(e => e.status === "active")
-                        .map(e => ({ value: e.id, label: e.name, desc: `${e.id} · ${e.department}` }))
-                    ]}
-                    placeholder="Tìm tên hoặc mã nhân viên..."
-                    className="w-full"
-                    heightClass="h-[42px]"
-                  />
+                  <select value={form.employeeId} onChange={e => handleEmployeeChange(e.target.value)} disabled={!!editingAcc}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-600 bg-gray-50/50">
+                    <option value="">-- Chưa gán / Để trống --</option>
+                    {employees
+                      .filter(e => !assignedEmployeeIds.includes(e.id) || (editingAcc && editingAcc.employeeId === e.id))
+                      .map(e => <option key={e.id} value={e.id}>{e.id} — {e.name}</option>)}
+                  </select>
                 </div>
                 <div>
                   <label className="text-xs font-black text-gray-500 mb-1.5 block">Mã đăng nhập</label>
@@ -1447,9 +1363,10 @@ export default function AccountManagement({
                 </div>
                 <div>
                   <label className="text-xs font-black text-gray-500 mb-1.5 block">Phân quyền</label>
-                  <CustomSelect
+                  <select
                     value={form.roleId}
-                    onChange={nextRole => {
+                    onChange={e => {
+                      const nextRole = e.target.value
                       setForm(p => ({ ...p, roleId: nextRole }))
                       const roleObj = rolesList.find(r => r.id === nextRole)
                       if (roleObj) {
@@ -1462,24 +1379,24 @@ export default function AccountManagement({
                         setModalPermTab("management")
                       }
                     }}
-                    options={rolesList.map(r => ({ value: r.id, label: r.name }))}
-                    className="w-full"
-                    heightClass="h-[42px]"
-                  />
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-600 bg-gray-50/50"
+                  >
+                    {rolesList.map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
                 </div>
                 {showBranchSelect && (
                   <div>
                     <label className="text-xs font-black text-gray-500 mb-1.5 block">Chi nhánh quản lý</label>
-                    <CustomSelect
-                      value={form.scopeId}
-                      onChange={val => setForm(p => ({ ...p, scopeId: val }))}
-                      options={[
-                        { value: "", label: "-- Chọn chi nhánh --" },
-                        ...orgNodes.filter((n: any) => n.type === "branch").map((n: any) => ({ value: n.id, label: n.name }))
-                      ]}
-                      className="w-full"
-                      heightClass="h-[42px]"
-                    />
+                    <select value={form.scopeId} onChange={e => setForm(p => ({ ...p, scopeId: e.target.value }))}
+                      required
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-600 bg-gray-50/50">
+                      <option value="">-- Chọn chi nhánh --</option>
+                      {orgNodes.filter((n: any) => n.type === "branch").map((n: any) => (
+                        <option key={n.id} value={n.id}>{n.name}</option>
+                      ))}
+                    </select>
                   </div>
                 )}
 
@@ -1674,16 +1591,14 @@ export default function AccountManagement({
               {roleForm.roleType === "management" && (
                 <div>
                   <label className="text-xs font-black text-gray-500 mb-1.5 block">Phạm vi dữ liệu mặc định</label>
-                  <CustomSelect
+                  <select
                     value={roleForm.scopeType}
-                    onChange={val => setRoleForm(prev => ({ ...prev, scopeType: val as any }))}
-                    options={[
-                      { value: "branch", label: "Một chi nhánh cụ thể (Branch)" },
-                      { value: "company", label: "Tất cả chi nhánh / Toàn công ty (Company)" }
-                    ]}
-                    className="w-full"
-                    heightClass="h-[42px]"
-                  />
+                    onChange={e => setRoleForm(prev => ({ ...prev, scopeType: e.target.value as any }))}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[#C62828]/40 font-semibold text-gray-600 bg-gray-50/50"
+                  >
+                    <option value="branch">Một chi nhánh cụ thể (Branch)</option>
+                    <option value="company">Tất cả chi nhánh / Toàn công ty (Company)</option>
+                  </select>
                 </div>
               )}
 
@@ -1711,50 +1626,6 @@ export default function AccountManagement({
         />
       )}
 
-      {lockModalOpen && createPortal(
-        <div className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center backdrop-blur-xs">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 mx-4 border border-gray-100 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
-              <h3 className="font-black text-[#C62828] text-sm uppercase tracking-wider flex items-center gap-2">
-                <Lock size={16} /> Khóa tài khoản
-              </h3>
-              <button onClick={() => setLockModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl transition-all"><X size={14} /></button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-red-50/50 border border-red-100/50 p-3 rounded-2xl flex gap-3 items-start">
-                <UserX size={18} className="text-[#C62828] shrink-0 mt-0.5" />
-                <p className="text-xs font-semibold text-gray-700 leading-relaxed">
-                  Bạn có chắc chắn muốn khóa tài khoản này không? Người dùng sẽ không thể đăng nhập vào hệ thống sau khi bị khóa.
-                </p>
-              </div>
-
-              <div>
-                <label className="text-xs font-black text-gray-500 mb-1.5 block uppercase tracking-wider">Lý do khóa tài khoản</label>
-                <textarea
-                  placeholder="Nhập lý do khóa tài khoản tại đây (ví dụ: Vi phạm quy chế công ty, Tạm dừng công tác...)"
-                  value={lockReasonText}
-                  onChange={e => setLockReasonText(e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-[#C62828]/20 focus:border-[#C62828]/50 transition-all resize-none"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={() => setLockModalOpen(false)} className="flex-1 py-2.5 border border-gray-200 rounded-2xl text-sm font-bold text-gray-600 hover:bg-gray-50 active:scale-95 transition-all">Huỷ</button>
-                <button
-                  type="button"
-                  onClick={handleConfirmLock}
-                  className="flex-1 py-2.5 bg-[#C62828] text-white rounded-2xl text-sm font-bold hover:bg-[#B71C1C] active:scale-95 transition-all shadow-sm"
-                >
-                  Khóa tài khoản
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-        , document.body)}
-
       {showAddCustomUserModal && createPortal(
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center backdrop-blur-xs">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 mx-4 border border-gray-100 animate-in zoom-in-95 duration-200">
@@ -1767,16 +1638,16 @@ export default function AccountManagement({
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] font-black text-gray-500 mb-1 block">Phòng ban</label>
-                  <CustomSelect
+                  <select
                     value={addCustomUserDeptFilter}
-                    onChange={val => setAddCustomUserDeptFilter(val)}
-                    options={[
-                      { value: "all", label: "Tất cả" },
-                      ...departments.map(d => ({ value: d, label: d }))
-                    ]}
-                    className="w-full"
-                    heightClass="h-[34px]"
-                  />
+                    onChange={e => setAddCustomUserDeptFilter(e.target.value)}
+                    className="w-full px-2 py-1.5 border border-gray-200 rounded-xl text-xs font-semibold text-gray-600 bg-gray-50/50 focus:outline-none focus:border-[#C62828]/40"
+                  >
+                    <option value="all">Tất cả</option>
+                    {departments.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="text-[10px] font-black text-gray-500 mb-1 block">Tìm kiếm</label>

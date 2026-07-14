@@ -59,7 +59,6 @@ export interface Employee {
   homeDistrict?: string
   homeWard?: string
   homeStreet?: string
-  avatar?: string
   photos?: string[]
   attachments?: Attachment[]
   workHistory?: WorkHistoryEntry[]
@@ -121,7 +120,6 @@ export interface EmpExtForm {
   homeDistrict: string
   homeWard: string
   homeStreet: string
-  avatar: string
   photos: string[]
   attachments: Attachment[]
   workHistory: WorkHistoryEntry[]
@@ -551,6 +549,6 @@ export type Page =
   | "dashboard" | "nhan-su" | "cham-cong" | "thong-ke"
   | "duyet-don" | "thong-bao" | "cong-viec" | "du-an" | "lead" 
   | "tai-khoan" | "phan-quyen" | "ip" | "tien-ich" | "co-cau"
-  | "crm" | "kpi" | "kpi-stats" | "kpi-compare" | "staff-portal"
+  | "crm" | "staff-portal" | "kpi" | "kpi-stats" | "kpi-compare"
   | "user-profile" | "user-attendance" | "user-timeoff" | "user-directory"
   | "user-chat" | "user-workflow" | "user-settings" | "user-crm"

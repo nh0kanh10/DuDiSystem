@@ -42,6 +42,7 @@ function InfoField({
 }
 
 export default function UserProfile({ emp, onEdit, onClose }: { emp: Employee; onEdit?: () => void; onClose?: () => void }) {
+    // Use fallbacks for optional fields using || "---" to match the design
     const safeStr = (v: any) => v || "---";
 
     return (
@@ -58,6 +59,7 @@ export default function UserProfile({ emp, onEdit, onClose }: { emp: Employee; o
                 />
 
                 <div className="flex flex-col sm:flex-row">
+                    {/* LEFT PANEL */}
                     <div
                         className="sm:w-72 flex-shrink-0 flex flex-col items-center p-8 relative overflow-hidden"
                         style={{
@@ -103,9 +105,7 @@ export default function UserProfile({ emp, onEdit, onClose }: { emp: Employee; o
                                     backdropFilter: "blur(8px)",
                                 }}
                             >
-                                {emp.avatar ? (
-                                    <img src={emp.avatar} alt={emp.name} className="w-full h-full object-cover" />
-                                ) : emp.name ? (
+                                {emp.name ? (
                                     <span className="text-5xl font-bold text-white opacity-90">{emp.name.split(" ").pop()?.charAt(0)}</span>
                                 ) : (
                                     <User size={52} strokeWidth={1.5} className="text-white opacity-80" />
@@ -185,6 +185,7 @@ export default function UserProfile({ emp, onEdit, onClose }: { emp: Employee; o
                         </div>
                     </div>
 
+                    {/* RIGHT PANEL */}
                     <div className="flex-1 flex flex-col bg-white">
                         <div className="px-8 py-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between border-b border-gray-100">
                             <div>

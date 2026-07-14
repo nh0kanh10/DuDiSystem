@@ -90,14 +90,6 @@ async function start() {
   try {
     await connectDB()
     await loadCache()
-    
-    // Khởi động Garbage Collector chạy ngầm dọn rác Cloudinary/Local định kỳ (24h một lần)
-    import("./storage/garbageCollector.js").then(({ runGarbageCollector }) => {
-      runGarbageCollector().catch(err => console.error("[GC] Error:", err))
-      setInterval(() => {
-        runGarbageCollector().catch(err => console.error("[GC] Error:", err))
-      }, 24 * 60 * 60 * 1000)
-    }).catch(err => console.error("[GC] Import failed:", err))
 
     const httpServer = http.createServer(app)
     initChatSocket(httpServer)

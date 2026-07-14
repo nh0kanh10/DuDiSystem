@@ -1,3 +1,4 @@
+/** Mã NV: YYYYMMDD + 2 số thứ tự trong ngày (01, 02, ...) */
 export function previewEmployeeId(takenIds: string[]): string {
   const taken = new Set(takenIds.filter(Boolean))
   const d = new Date()

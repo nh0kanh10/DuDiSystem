@@ -43,19 +43,12 @@ export type MonthTimeRow = {
   labelClass: string
 }
 
-/** Classify staff vs intern from contract type only — never from employment status (active/inactive). */
-export function isInternContractType(contractType?: string | null) {
-  if (!contractType) return false
-  const t = String(contractType).trim().toLowerCase()
-  return t === "intern" || t === "thực tập" || t.startsWith("thực tập") || t === "thuc tap"
-}
-
 export function isInternStatus(status?: string) {
   return status === "intern"
 }
 
 export function isInternEmployee(emp: Pick<Employee, "contractType">) {
-  return isInternContractType(emp.contractType)
+  return emp.contractType === "intern"
 }
 
 export function isInternRecord(rec: Pick<AttendanceRecord, "employeeStatus">) {
@@ -67,8 +60,7 @@ export function employeeKindMeta(status?: string) {
 }
 
 export function enrichAttendanceRecord(rec: AttendanceRecord, emp: Employee): AttendanceRecord {
-  // Always prefer current contract type over stale attendance.employeeStatus
-  return { ...rec, employeeStatus: isInternEmployee(emp) ? "intern" : "staff" }
+  return { ...rec, employeeStatus: rec.employeeStatus ?? (emp.contractType === "intern" ? "intern" : "staff") }
 }
 
 export function monthRowsForEmployee(emp: Employee): MonthTimeRow[] {
