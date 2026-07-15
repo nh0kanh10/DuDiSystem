@@ -154,6 +154,13 @@ export const api = {
     changePassword: (oldPassword: string, newPassword: string) =>
       req<any>("POST", "/auth/change-password", { oldPassword, newPassword }),
   },
+  kpi: {
+    getTargets: (params: any) => req<any>("GET", `/kpi/targets?${new URLSearchParams(params as any).toString()}`),
+    saveTarget: (data: any) => req<any>("POST", "/kpi/targets", data),
+    deleteTarget: (id: string) => req<any>("DELETE", `/kpi/targets/${id}`),
+    getEntries: (params: any) => req<any>("GET", `/kpi/entries?${new URLSearchParams(params as any).toString()}`),
+    saveEntry: (data: any) => req<any>("POST", "/kpi/entries", data),
+  },
   storage: {
     upload: async (file: File, overrideName?: string): Promise<{ key: string; url: string; name: string }> => {
       const form = new FormData()

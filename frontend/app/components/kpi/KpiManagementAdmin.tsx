@@ -340,9 +340,9 @@ const CustomDatePicker = ({ label, value, onChange, disabled = false }: CustomDa
 };
 
 import { useToast } from "../../hooks/useToast";
+import { api } from "../../../lib/api";
 import {
-  getStoredKpiEntries, getStoredKpiTargets, saveStoredKpiTargets,
-  calculateKpiPoints, getTarget, KpiEntry, KpiTarget, KpiMetrics, KPI_METRIC_LABELS
+  calculateKpiPoints, getTarget, KpiEntry, KpiTarget, KpiMetrics, KPI_METRIC_LABELS, KPI_POINTS_WEIGHT
 } from "./kpiMockData";
 
 interface KpiManagementAdminProps {
@@ -484,13 +484,29 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     return new Set(filteredEmployees.map(e => e.id));
   }, [filteredEmployees]);
 
-  // Load KPI entries and targets from local storage
-  const [entries, setEntries] = useState<KpiEntry[]>(() => getStoredKpiEntries());
-  const [targets, setTargets] = useState<KpiTarget[]>(() => getStoredKpiTargets());
+  // Load KPI entries and targets from backend API
+  const [entries, setEntries] = useState<KpiEntry[]>([]);
+  const [targets, setTargets] = useState<KpiTarget[]>([]);
 
-  const handleRefresh = () => {
-    setEntries(getStoredKpiEntries());
-    setTargets(getStoredKpiTargets());
+  const loadData = async () => {
+    try {
+      const [tRes, eRes] = await Promise.all([
+        api.kpi.getTargets({}),
+        api.kpi.getEntries({})
+      ]);
+      setTargets(tRes.data || []);
+      setEntries(eRes.data || []);
+    } catch (err) {
+      showToast("Lỗi khi tải dữ liệu KPI", "error");
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleRefresh = async () => {
+    await loadData();
     showToast("Đã tải lại dữ liệu KPI!", "success");
   };
 
@@ -1014,26 +1030,20 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     return Array.from(dailyMap.values());
   }, [currentMonthEntries, selectedMonth]);
 
-  // Save targets
-  const handleSaveTarget = (e: React.FormEvent) => {
+  const handleSaveTarget = async (e: React.FormEvent) => {
     e.preventDefault();
-    const currentTargets = getStoredKpiTargets();
-    
-    const newTarget: KpiTarget = {
-      id: targetEmployeeId === "all" ? `t-default-${targetForm.month}` : `t-${targetEmployeeId}-${targetForm.month}`,
-      employeeId: targetEmployeeId,
-      month: targetForm.month,
-      metrics: targetForm.metrics
-    };
-
-    // Remove duplicates
-    const nextTargets = currentTargets.filter(t => !(t.employeeId === targetEmployeeId && t.month === targetForm.month));
-    nextTargets.push(newTarget);
-    
-    saveStoredKpiTargets(nextTargets);
-    setTargets(nextTargets);
-    setIsTargetModalOpen(false);
-    showToast("Đã lưu chỉ tiêu KPI mới thành công!", "success");
+    try {
+      await api.kpi.saveTarget({
+        employeeId: targetEmployeeId,
+        month: targetForm.month,
+        metrics: targetForm.metrics
+      });
+      await loadData();
+      setIsTargetModalOpen(false);
+      showToast("Đã lưu chỉ tiêu KPI mới thành công!", "success");
+    } catch (err) {
+      showToast("Lỗi khi lưu chỉ tiêu KPI", "error");
+    }
   };
 
   const openAddTargetModal = () => {
@@ -1058,16 +1068,18 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     setIsTargetModalOpen(true);
   };
 
-  const handleDeleteTarget = (targetId: string) => {
+  const handleDeleteTarget = async (targetId: string) => {
     if (window.confirm("Bạn có chắc chắn muốn xóa chỉ tiêu KPI này?")) {
-      const nextTargets = targets.filter(t => t.id !== targetId);
-      saveStoredKpiTargets(nextTargets);
-      setTargets(nextTargets);
-      showToast("Đã xóa chỉ tiêu KPI thành công!", "success");
+      try {
+        await api.kpi.deleteTarget(targetId);
+        await loadData();
+        showToast("Đã xóa chỉ tiêu KPI thành công!", "success");
+      } catch (err) {
+        showToast("Lỗi khi xóa chỉ tiêu KPI", "error");
+      }
     }
   };
 
-  // Real CSV Export
   const handleExportCSV = () => {
     if (reportGroupedData.length === 0) {
       showToast("Không có dữ liệu để xuất!", "error");

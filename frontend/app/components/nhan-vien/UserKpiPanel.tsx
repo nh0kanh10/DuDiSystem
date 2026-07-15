@@ -9,9 +9,9 @@ import {
 import { Employee } from "../../types";
 import { NestedOverlay } from "../ui/NestedOverlay";
 import { useToast } from "../../hooks/useToast";
+import { api } from "../../../lib/api";
 import {
-  getStoredKpiEntries, getStoredKpiTargets, saveStoredKpiEntries,
-  calculateKpiPoints, getTarget, KpiEntry, KpiMetrics, KPI_METRIC_LABELS, KPI_POINTS_WEIGHT
+  calculateKpiPoints, KpiEntry, KpiMetrics, KPI_METRIC_LABELS, KPI_POINTS_WEIGHT, KpiTarget
 } from "../kpi/kpiMockData";
 
 const RenderCircleDot = (props: any) => {
@@ -40,7 +40,7 @@ const getVietnameseMonthName = (monthStr: string) => {
   return `${monthMap[month] || `Tháng ${month}`} ${year}`;
 };
 
-const MONTH_LABELS_USER = ["Thg1","Thg2","Thg3","Thg4","Thg5","Thg6","Thg7","Thg8","Thg9","Thg10","Thg11","Thg12"];
+const MONTH_LABELS_USER = ["Thg1", "Thg2", "Thg3", "Thg4", "Thg5", "Thg6", "Thg7", "Thg8", "Thg9", "Thg10", "Thg11", "Thg12"];
 
 const UserCustomMonthPicker = ({ value, onChange }: { value: string; onChange: (val: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -154,13 +154,26 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
   const [activeSubTab, setActiveSubTab] = useState<"overview" | "history">("overview");
   const [historyPage, setHistoryPage] = useState(1);
 
-  // Load KPI data from local storage
-  const [entries, setEntries] = useState<KpiEntry[]>(() => getStoredKpiEntries(employee?.id));
+  // Load KPI data from backend
+  const [entries, setEntries] = useState<KpiEntry[]>([]);
+  const [targets, setTargets] = useState<KpiTarget[]>([]);
+
+  const loadData = async () => {
+    if (!employee?.id) return;
+    try {
+      const [eRes, tRes] = await Promise.all([
+        api.kpi.getEntries({ employeeId: employee.id }),
+        api.kpi.getTargets({ employeeId: employee.id })
+      ]);
+      setEntries(eRes.data || []);
+      setTargets(tRes.data || []);
+    } catch (error) {
+      showToast("Lỗi tải dữ liệu KPI", "error");
+    }
+  };
 
   React.useEffect(() => {
-    if (employee?.id) {
-      setEntries(getStoredKpiEntries(employee.id));
-    }
+    loadData();
   }, [employee?.id]);
 
   // Interactive Modal states
@@ -195,7 +208,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
         }
         return currentList.slice(0, count);
       };
-      
+
       return {
         clientReply: syncCategory("clientReply"),
         khachChuDongIB: syncCategory("khachChuDongIB"),
@@ -216,8 +229,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     };
   }, [isInputModalOpen, selectedEntryForDetail]);
 
-  const handleRefresh = () => {
-    setEntries(getStoredKpiEntries());
+  const handleRefresh = async () => {
+    await loadData();
     showToast("Đã cập nhật dữ liệu KPI cá nhân!", "success");
   };
 
@@ -289,7 +302,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     let nhuCau = "";
     let taiSao = "";
     const text = notesText || "";
-    
+
     if (text.includes("Nhu cầu khách") || text.includes("Tại sao mất khách")) {
       const matchNhuCau = text.match(/Nhu cầu khách:?\s*([\s\S]*?)(?=\nTại sao mất khách|$)/i);
       const matchTaiSao = text.match(/Tại sao mất khách:?\s*([\s\S]*)/i);
@@ -374,11 +387,20 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
   // Get employee targets for selected month
   const monthTargets = useMemo(() => {
-    return getTarget(employee.id, selectedMonth);
-  }, [employee.id, selectedMonth]);
-
+    const found = targets.find(t => t.month === selectedMonth && (t.employeeId === employee.id || t.employeeId === "all"));
+    if (found) return found;
+    return {
+      id: "default",
+      employeeId: "all",
+      month: selectedMonth,
+      metrics: {
+        zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0,
+        khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0
+      }
+    };
+  }, [employee.id, selectedMonth, targets]);
   const getDailyTarget = (metricKey: keyof KpiMetrics) => {
-    const monthlyTarget = monthTargets[metricKey] || 0;
+    const monthlyTarget = monthTargets.metrics[metricKey] || 0;
     return Math.ceil(monthlyTarget / 23);
   };
 
@@ -499,41 +521,27 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
   }, [entries, employee.id, selectedMonth]);
 
   // Save new entry
-  const handleSaveEntry = (e: React.FormEvent) => {
+  const handleSaveEntry = async (e: React.FormEvent) => {
     e.preventDefault();
-    const currentEntries = getStoredKpiEntries();
-
-    // Check if entry for this date already exists
-    const existingIndex = currentEntries.findIndex(x => x.employeeId === employee.id && x.date === formDate);
-
-    const newEntry: KpiEntry = {
-      id: `entry-${employee.id}-${formDate}`,
-      employeeId: employee.id,
-      date: formDate,
-      metrics: formMetrics,
-      notes: JSON.stringify(customerDetails)
-    };
-
-    let nextEntries = [...currentEntries];
-    if (existingIndex > -1) {
-      // Overwrite existing log
-      nextEntries[existingIndex] = newEntry;
-      showToast(`Đã cập nhật báo cáo KPI ngày ${formDate}`, "success");
-    } else {
-      // Insert new log
-      nextEntries.push(newEntry);
-      showToast(`Đã lưu báo cáo KPI ngày ${formDate} thành công!`, "success");
+    try {
+      await api.kpi.saveEntry({
+        employeeId: employee.id,
+        date: formDate,
+        metrics: formMetrics,
+        notes: JSON.stringify(customerDetails)
+      });
+      await loadData();
+      showToast(`Đã lưu báo cáo KPI ngày ${formDate}`, "success");
+      setIsInputModalOpen(false);
+    } catch (error) {
+      showToast("Lỗi khi lưu báo cáo", "error");
     }
-
-    saveStoredKpiEntries(nextEntries);
-    setEntries(nextEntries);
-    setIsInputModalOpen(false);
   };
 
   const openInputModal = () => {
     const todayStr = new Date().toISOString().split("T")[0];
     const todayEntry = entries.find(x => x.employeeId === employee.id && x.date === todayStr);
- 
+
     setFormDate(todayStr);
     if (todayEntry) {
       setFormMetrics(todayEntry.metrics);
@@ -572,21 +580,19 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
         <div className="flex gap-1 rounded-xl p-1 bg-[#fff0f1] dark:bg-white/5 border border-[#efd7da] dark:border-white/10">
           <button
             onClick={() => setActiveSubTab("overview")}
-            className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeSubTab === "overview"
+            className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeSubTab === "overview"
                 ? "bg-white dark:bg-white/10 text-[#E8231A] dark:text-[#FFE8EC] shadow-sm"
                 : "text-[#8b6b70] dark:text-white/40 hover:text-[#C62828] dark:hover:text-white"
-            }`}
+              }`}
           >
             Tổng quan
           </button>
           <button
             onClick={() => setActiveSubTab("history")}
-            className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeSubTab === "history"
+            className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeSubTab === "history"
                 ? "bg-white dark:bg-white/10 text-[#E8231A] dark:text-[#FFE8EC] shadow-sm"
                 : "text-[#8b6b70] dark:text-white/40 hover:text-[#C62828] dark:hover:text-white"
-            }`}
+              }`}
           >
             Lịch sử KPI
           </button>
@@ -724,20 +730,19 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
             <div className="space-y-4">
               {Object.entries(KPI_METRIC_LABELS)
-                .filter(([key]) => key !== "khachChuDongIB") // Exclude khachChuDongIB from progress lines
+                .filter(([key]) => key !== "khachChuDongIB")
                 .map(([key, label]) => {
                   const currentVal = currentMonthTotals[key as keyof KpiMetrics];
-                  const targetVal = monthTargets[key as keyof KpiMetrics];
+                  const targetVal = monthTargets.metrics[key as keyof KpiMetrics];
                   const pct = targetVal > 0 ? Math.min(Math.round((currentVal / targetVal) * 100), 100) : 100;
                   const isMet = currentVal >= targetVal;
                   const isRevenue = key === "revenue";
 
-                  // Bar color styling based on percentage completion
-                  let barColor = "bg-[#DC2626]"; // Red (<30%)
+                  let barColor = "bg-[#DC2626]";
                   if (pct >= 80) {
-                    barColor = "bg-[#16A34A]"; // Green (>=80%)
+                    barColor = "bg-[#16A34A]";
                   } else if (pct >= 30) {
-                    barColor = "bg-[#EA580C]"; // Orange (30-79%)
+                    barColor = "bg-[#EA580C]";
                   }
 
                   return (
@@ -905,22 +910,20 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <button
                     onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className={`w-8 h-8 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 flex items-center justify-center transition-colors ${
-                      currentPage === 1
+                    className={`w-8 h-8 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 flex items-center justify-center transition-colors ${currentPage === 1
                         ? "opacity-50 cursor-not-allowed text-gray-300"
                         : "hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-[#FFE8EC] cursor-pointer text-gray-600 dark:text-gray-350"
-                    }`}
+                      }`}
                   >
                     <ChevronLeft size={16} />
                   </button>
                   <button
                     onClick={() => setHistoryPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className={`w-8 h-8 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 flex items-center justify-center transition-colors ${
-                      currentPage === totalPages
+                    className={`w-8 h-8 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 flex items-center justify-center transition-colors ${currentPage === totalPages
                         ? "opacity-50 cursor-not-allowed text-gray-300"
                         : "hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-[#FFE8EC] cursor-pointer text-gray-600 dark:text-gray-350"
-                    }`}
+                      }`}
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -1146,7 +1149,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                 {(customerDetails.clientReply.length > 0 || customerDetails.khachChuDongIB.length > 0 || customerDetails.followUp.length > 0) && (
                   <div className="pt-4 border-t border-gray-100 space-y-4">
                     <h5 className="font-extrabold text-gray-800 text-xs">Chi tiết danh sách khách hàng tương tác</h5>
-                    
+
                     {/* Render clientReply details */}
                     {customerDetails.clientReply.length > 0 && (
                       <div className="space-y-2">
@@ -1387,12 +1390,12 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
       {selectedEntryForDetail && (
         <NestedOverlay onClose={() => setSelectedEntryForDetail(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[85vh]" style={{ animation: "sessionModalIn 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
-            
+
             {/* Title */}
             <div className="pt-6 px-6 mb-4">
               <h3 className="text-sm font-extrabold text-gray-800">Chi tiết KPI — {formatKpiDate(selectedEntryForDetail.date)}</h3>
             </div>
- 
+
             {/* Content list */}
             <div className="flex-1 overflow-y-auto space-y-4 scrollbar-thin w-full">
               <div className="divide-y divide-gray-100 text-xs px-6">
@@ -1437,13 +1440,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <span className="font-bold text-gray-950 text-right">{formatRevenue(selectedEntryForDetail.metrics.revenue)}</span>
                 </div>
               </div>
- 
+
               {/* Notes parsed */}
               <div className="px-6 pb-2">
                 {renderEntryNotes(selectedEntryForDetail.notes)}
               </div>
             </div>
- 
+
             {/* Footer */}
             <div className="p-6 pt-4 border-t border-gray-100 flex justify-end">
               <button
