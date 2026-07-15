@@ -142,6 +142,7 @@ interface UserKpiPanelProps {
 export function UserKpiPanel({ employee }: UserKpiPanelProps) {
   const { showToast } = useToast();
   const handleMetricChange = (key: keyof KpiMetrics, rawValue: string) => {
+    rawValue = rawValue.replace(/^0+(?=\d)/, "");
     let val = parseInt(rawValue) || 0;
     if (val < 0) val = 0;
     const customerKeys: (keyof KpiMetrics)[] = ["clientReply", "khachChuDongIB", "followUp"];
@@ -165,8 +166,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
         api.kpi.getEntries({ employeeId: employee.id }),
         api.kpi.getTargets({ employeeId: employee.id })
       ]);
-      setEntries(eRes.data || []);
-      setTargets(tRes.data || []);
+      setEntries(eRes || []);
+      setTargets(tRes || []);
     } catch (error) {
       showToast("Lỗi tải dữ liệu KPI", "error");
     }
@@ -217,7 +218,6 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     });
   }, [formMetrics.clientReply, formMetrics.khachChuDongIB, formMetrics.followUp]);
 
-  // Lock background scroll when modals are open
   React.useEffect(() => {
     if (isInputModalOpen || selectedEntryForDetail) {
       document.body.style.overflow = "hidden";
@@ -234,7 +234,6 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     showToast("Đã cập nhật dữ liệu KPI cá nhân!", "success");
   };
 
-  // If employee is null, render loading state
   if (!employee) {
     return (
       <div className="flex items-center justify-center p-12 text-gray-400 text-xs">
@@ -244,7 +243,6 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     );
   }
 
-  // Vietnamese month name translation helper
   const getVietnameseMonthName = (monthStr: string) => {
     if (!monthStr) return "-----------------";
     const parts = monthStr.split("-");
@@ -990,7 +988,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <div>
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Inbox Zalo</label>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric"
                       min={0}
                       value={formMetrics.zalo}
                       onChange={(e) => handleMetricChange("zalo", e.target.value)}
@@ -1010,7 +1008,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <div>
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Inbox Facebook</label>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric"
                       min={0}
                       value={formMetrics.fb}
                       onChange={(e) => handleMetricChange("fb", e.target.value)}
@@ -1030,7 +1028,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <div>
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Comment</label>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric"
                       min={0}
                       value={formMetrics.comment}
                       onChange={(e) => handleMetricChange("comment", e.target.value)}
@@ -1050,7 +1048,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <div>
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Bài đăng</label>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric"
                       min={0}
                       value={formMetrics.post}
                       onChange={(e) => handleMetricChange("post", e.target.value)}
@@ -1076,7 +1074,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <div>
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Khách rep</label>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric"
                       min={0}
                       max={50}
                       value={formMetrics.clientReply}
@@ -1100,7 +1098,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <div>
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Khách chủ động IB</label>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric"
                       min={0}
                       max={50}
                       value={formMetrics.khachChuDongIB}
@@ -1124,7 +1122,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <div className="md:col-span-2">
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Follow-up</label>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric"
                       min={0}
                       max={50}
                       value={formMetrics.followUp}
@@ -1308,7 +1306,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <div>
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Báo giá gửi</label>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric"
                       min={0}
                       value={formMetrics.quote}
                       onChange={(e) => handleMetricChange("quote", e.target.value)}
@@ -1328,7 +1326,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <div>
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Chốt Deal</label>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric"
                       min={0}
                       value={formMetrics.deal}
                       onChange={(e) => handleMetricChange("deal", e.target.value)}
@@ -1348,9 +1346,9 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                   <div>
                     <label className="block text-gray-700 font-bold mb-1.5 text-xs">Doanh số</label>
                     <input
-                      type="number"
+                      type="text" inputMode="numeric"
                       value={formMetrics.revenue}
-                      onChange={(e) => setFormMetrics(prev => ({ ...prev, revenue: parseInt(e.target.value) || 0 }))}
+                      onChange={(e) => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ""); setFormMetrics(prev => ({ ...prev, revenue: parseInt(e.target.value) || 0 })) }}
                       className={`w-full py-2.5 px-4 border ${formMetrics.revenue >= getDailyTarget("revenue") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
                       required
                     />

@@ -1,5 +1,5 @@
 import * as kpiService from "../services/kpi.service.js"
-import { sendResponse, sendError } from "../utils/response.js"
+import { ok, serverError } from "../utils/response.js"
 
 export function getTargets(req, res) {
   try {
@@ -9,27 +9,27 @@ export function getTargets(req, res) {
     if (employeeId) query.employeeId = employeeId
     
     const targets = kpiService.getTargets(query)
-    sendResponse(res, targets)
+    ok(res, targets)
   } catch (error) {
-    sendError(res, error)
+    serverError(res, error)
   }
 }
 
 export function saveTarget(req, res) {
   try {
     const target = kpiService.saveTarget(req.body)
-    sendResponse(res, target, "Đã lưu mục tiêu KPI")
+    ok(res, target)
   } catch (error) {
-    sendError(res, error)
+    serverError(res, error)
   }
 }
 
 export function deleteTarget(req, res) {
   try {
     kpiService.deleteTarget(req.params.id)
-    sendResponse(res, null, "Đã xoá mục tiêu KPI")
+    ok(res, null)
   } catch (error) {
-    sendError(res, error)
+    serverError(res, error)
   }
 }
 
@@ -44,17 +44,17 @@ export function getEntries(req, res) {
     if (employeeId) query.employeeId = employeeId
     
     const entries = kpiService.getEntries(query)
-    sendResponse(res, entries)
+    ok(res, entries)
   } catch (error) {
-    sendError(res, error)
+    serverError(res, error)
   }
 }
 
 export function saveEntry(req, res) {
   try {
     const entry = kpiService.saveEntry(req.body)
-    sendResponse(res, entry, "Đã cập nhật số liệu KPI")
+    ok(res, entry)
   } catch (error) {
-    sendError(res, error)
+    serverError(res, error)
   }
 }

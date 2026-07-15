@@ -9,6 +9,7 @@ import {
   BarChart, Bar, Legend, Cell, PieChart, Pie, LineChart, Line
 } from "recharts";
 import { Employee } from "../../types";
+import ConfirmModal from "../ui/ConfirmModal";
 
 const KpiBarTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
@@ -487,6 +488,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   // Load KPI entries and targets from backend API
   const [entries, setEntries] = useState<KpiEntry[]>([]);
   const [targets, setTargets] = useState<KpiTarget[]>([]);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -494,8 +496,8 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
         api.kpi.getTargets({}),
         api.kpi.getEntries({})
       ]);
-      setTargets(tRes.data || []);
-      setEntries(eRes.data || []);
+      setTargets(tRes || []);
+      setEntries(eRes || []);
     } catch (err) {
       showToast("Lỗi khi tải dữ liệu KPI", "error");
     }
@@ -510,7 +512,6 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     showToast("Đã tải lại dữ liệu KPI!", "success");
   };
 
-  // Filter entries for the selected month and branch
   const currentMonthEntries = useMemo(() => {
     return entries.filter(entry => 
       entry.date.startsWith(selectedMonth) && 
@@ -518,16 +519,13 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     );
   }, [entries, selectedMonth, filteredEmployeeIds]);
 
-  // Compute aggregated stats for each employee for the selected month
   const employeeSummaries = useMemo(() => {
     const map = new Map<string, KpiMetrics & { points: number; daysCount: number }>();
     
-    // Initialize default metrics for all branch employees
     filteredEmployees.forEach(e => {
       map.set(e.id, { zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0, points: 0, daysCount: 0 });
     });
 
-    // Accumulate actual metrics from logs
     currentMonthEntries.forEach(entry => {
       const current = map.get(entry.employeeId);
       if (current) {
@@ -545,7 +543,6 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
       }
     });
 
-    // Compute points and package results
     return Array.from(map.entries()).map(([employeeId, data]) => {
       const emp = employees.find(e => e.id === employeeId);
       const points = calculateKpiPoints(data);
@@ -558,10 +555,9 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
         points,
         daysCount: data.daysCount
       };
-    }).sort((a, b) => b.points - a.points); // Sort by points desc
+    }).sort((a, b) => b.points - a.points); 
   }, [currentMonthEntries, filteredEmployees, employees]);
 
-  // Top 3 Leaderboard rankers
   const topPerformers = useMemo(() => {
     return employeeSummaries.slice(0, 3);
   }, [employeeSummaries]);
@@ -1068,16 +1064,8 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     setIsTargetModalOpen(true);
   };
 
-  const handleDeleteTarget = async (targetId: string) => {
-    if (window.confirm("Bạn có chắc chắn muốn xóa chỉ tiêu KPI này?")) {
-      try {
-        await api.kpi.deleteTarget(targetId);
-        await loadData();
-        showToast("Đã xóa chỉ tiêu KPI thành công!", "success");
-      } catch (err) {
-        showToast("Lỗi khi xóa chỉ tiêu KPI", "error");
-      }
-    }
+  const handleDeleteTarget = (targetId: string) => {
+    setDeleteTargetId(targetId);
   };
 
   const handleExportCSV = () => {
@@ -2630,6 +2618,26 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
       )}
 
 
+
+      <ConfirmModal
+        isOpen={deleteTargetId !== null}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={async () => {
+          if (!deleteTargetId) return;
+          try {
+            await api.kpi.deleteTarget(deleteTargetId);
+            await loadData();
+            showToast("Đã xóa chỉ tiêu KPI thành công!", "success");
+          } catch (error) {
+            showToast("Lỗi khi xóa chỉ tiêu", "error");
+          }
+        }}
+        title="Xóa chỉ tiêu KPI"
+        message="Bạn có chắc chắn muốn xóa chỉ tiêu KPI này? Hành động này không thể hoàn tác."
+        type="danger"
+        confirmText="Xóa"
+        cancelText="Hủy"
+      />
 
       {/* Employee Logs Detail Modal */}
       {selectedEmployeeForDetail && createPortal(

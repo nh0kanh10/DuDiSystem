@@ -1,14 +1,15 @@
 import express from "express"
 import * as kpiController from "../controllers/kpi.controller.js"
-import { protect, authorize } from "../middlewares/auth.js"
+import { authenticate } from "../middlewares/auth.js"
+import { requireAdmin } from "../middlewares/authorize.js"
 
 const router = express.Router()
 
-router.use(protect)
+router.use(authenticate)
 
 router.get("/targets", kpiController.getTargets)
-router.post("/targets", authorize("admin", "manager"), kpiController.saveTarget)
-router.delete("/targets/:id", authorize("admin", "manager"), kpiController.deleteTarget)
+router.post("/targets", requireAdmin, kpiController.saveTarget)
+router.delete("/targets/:id", requireAdmin, kpiController.deleteTarget)
 
 router.get("/entries", kpiController.getEntries)
 router.post("/entries", kpiController.saveEntry) 
