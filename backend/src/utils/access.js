@@ -9,12 +9,13 @@ const MANAGER_ROLES = new Set(["role-admin", "role-super-admin", "role-manager"]
 const STAFF_MODULE_SET = new Set([
   "user-profile", "user-attendance", "user-timeoff", "user-directory",
   "user-chat", "user-workflow", "user-settings", "user-crm", "user-kpi", "crm-employee-data",
-  "cong-viec", "thong-bao",
+  "user-tasks", "user-notifications",
 ])
 
 const ADMIN_MODULE_SET = new Set([
-  "nhan-su", "co-cau", "cham-cong", "duyet-don",
+  "dashboard", "nhan-su", "co-cau", "cham-cong", "duyet-don",
   "tai-khoan", "phan-quyen", "ip", "thong-ke", "kpi", "du-an", "tien-ich", "crm",
+  "cong-viec", "thong-bao", "lead",
 ])
 
 export function isAdminUser(user) {

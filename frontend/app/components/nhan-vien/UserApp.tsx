@@ -1701,7 +1701,6 @@ export default function UserPortalApp({
   });
   const canUseKpi = hasStaffModule(modules, "user-kpi");
 
-  // Đồng bộ class dark lên document.documentElement
   useEffect(() => {
     if (dark) {
       document.documentElement.classList.add("dark");
@@ -1709,7 +1708,6 @@ export default function UserPortalApp({
       document.documentElement.classList.remove("dark");
     }
     return () => {
-      // Dọn dẹp class dark khi component bị unmount
       document.documentElement.classList.remove("dark");
     };
   }, [dark]);
@@ -1720,7 +1718,6 @@ export default function UserPortalApp({
     localStorage.setItem("dudi_theme_mode", newDark ? "dark" : "light");
   };
 
-  // Load admin request count
   useEffect(() => {
     if (!employee?.id) return;
     api.profileUpdates.list({ employeeId: employee.id })
@@ -1773,7 +1770,6 @@ export default function UserPortalApp({
     };
   }, [employee?.id, activePage]);
 
-  // Load employee data — đọc cả localStorage và sessionStorage (đăng nhập không "ghi nhớ")
   useEffect(() => {
     const loadEmployee = async () => {
       let userObj: any = readStoredAuthUser();

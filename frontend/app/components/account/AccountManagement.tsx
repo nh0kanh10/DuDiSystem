@@ -129,8 +129,8 @@ const STAFF_MODULE_TREE = [
     id: "staff-tools",
     label: "Tiện ích nhân viên",
     children: [
-      { id: "thong-bao", label: "Thông báo hệ thống" },
-      { id: "cong-viec", label: "Công việc cá nhân" }
+      { id: "user-notifications", label: "Thông báo hệ thống" },
+      { id: "user-tasks", label: "Công việc cá nhân" }
     ]
   },
   {

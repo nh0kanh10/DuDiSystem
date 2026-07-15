@@ -9,8 +9,8 @@ export const STAFF_PORTAL_MODULES = [
   "user-crm",
   "user-kpi",
   "crm-employee-data",
-  "cong-viec",
-  "thong-bao",
+  "user-tasks",
+  "user-notifications",
 ] as const
 
 const STAFF_MODULE_SET = new Set<string>(STAFF_PORTAL_MODULES)
@@ -31,7 +31,6 @@ export function isStaffTypeRole(role: {
   return role.roleType === "staff"
 }
 
-/** Staff portal modules must exist in role.modules — custom user perms cannot grant beyond role. */
 export function capStaffPermissions(permissions: string[], roleModules: string[]): string[] {
   const roleSet = new Set(roleModules)
   return permissions.filter(p => {
@@ -82,8 +81,8 @@ export const STAFF_BLOCK_MODULES: Record<string, string> = {
   checkin: "user-attendance",
   leave: "user-timeoff",
   directory: "user-directory",
-  tasks: "cong-viec",
-  notifications: "thong-bao",
+  tasks: "user-tasks",
+  notifications: "user-notifications",
   settings: "user-settings",
   crm: "user-crm",
   kpi: "user-kpi",

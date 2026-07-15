@@ -197,9 +197,6 @@ function AppContent() {
       const currentRole = rolesList.find(r => r.id === role)
       if (currentRole?.modules?.length) list = [...currentRole.modules]
     }
-    if (list.length > 0 && !list.includes("kpi")) {
-      list.push("kpi")
-    }
     return list
   }, [effectivePermissions, rolesList, role])
 
@@ -510,9 +507,7 @@ function AppContent() {
 
   if (!isLoggedIn) return (
     <>
-      {sessionAlertMsg && (
-        <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
-      )}
+
       <LoginPage
         onLogin={(id, pass, remember) => handleLogin(id, pass, remember)}
         loginError={loginError}
@@ -524,9 +519,7 @@ function AppContent() {
   if (isStaffRole) {
     return (
       <>
-        {sessionAlertMsg && (
-          <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
-        )}
+
         <UserPortalApp onLogout={handleLogout} modules={activeRolePermissions} onOpenLead={(id) => navigate(`/lead/${id}`)} />
       </>
     )
@@ -669,9 +662,7 @@ function AppContent() {
       <Route path="/form/:leadId" element={<PublicRequirementForm />} />
       <Route path="*" element={
         <>
-          {sessionAlertMsg && (
-            <SessionAlertModal message={sessionAlertMsg} onClose={() => setSessionAlertMsg(null)} />
-          )}
+
           <div className="flex h-screen bg-[#F5F1EF] overflow-hidden" onClick={() => { }}>
             {isMobileAdmin && mobileSidebarOpen && (
               <div
