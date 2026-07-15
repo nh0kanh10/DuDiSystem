@@ -1939,6 +1939,7 @@ export default function UserPortalApp({
               attendanceCheckInTime={attendanceHome.checkInTime}
               modules={modules}
               compact={false}
+              unreadCount={totalUnread}
             />
           </ErrorBoundary>
         </>

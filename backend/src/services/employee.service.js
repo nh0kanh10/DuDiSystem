@@ -1,6 +1,7 @@
 import * as repo from "../repositories/employee.repository.js"
 import * as userRepo from "../repositories/user.repository.js"
 import * as orgNodeRepo from "../repositories/orgNode.repository.js"
+import * as roleRepo from "../repositories/role.repository.js"
 import { createUser } from "./user.service.js"
 import { syncEmployeeOrgFields } from "../utils/orgUtils.js"
 import { generateEmployeeId, collectTakenEmployeeIds } from "../utils/employeeId.js"
@@ -16,6 +17,27 @@ function applyOrgSync(patch) {
   const node = nodes.find(n => n.id === patch.orgNodeId)
   if (!node) throw new Error("Đơn vị tổ chức không tồn tại")
   return syncEmployeeOrgFields(patch, patch.orgNodeId, nodes)
+}
+
+function resolveAutoRole(orgNodeId) {
+  if (!orgNodeId) return null
+  const orgNodes = orgNodeRepo.getAll()
+  const roles = roleRepo.getAll()
+  let currNode = orgNodes.find(n => n.id === orgNodeId)
+  if (!currNode) return null
+
+  if (currNode.type === "department") {
+    const r = roles.find(r => r.linkedOrgNodeId === currNode.id)
+    return r ? r.id : null
+  }
+
+  while (currNode) {
+    if (currNode.type === "department") break
+    const r = roles.find(r => r.linkedOrgNodeId === currNode.id)
+    if (r) return r.id
+    currNode = orgNodes.find(n => n.id === currNode.parentId)
+  }
+  return null
 }
 
 export function listEmployees(filter = {}) {
@@ -133,9 +155,14 @@ export async function createEmployee(data) {
   const employee = repo.create(fields)
 
   try {
+    let targetRoleId = "role-user"
+    if (employee.orgNodeId) {
+      const resolved = resolveAutoRole(employee.orgNodeId)
+      if (resolved) targetRoleId = resolved
+    }
     await createUser({
       loginId: employee.id,
-      roleId: "role-user",
+      roleId: targetRoleId,
       employeeId: employee.id,
       status: "active",
     })
@@ -232,6 +259,20 @@ export function updateEmployee(id, patch) {
   }
 
   const updatedEmp = repo.update(id, safe)
+
+  if (patch.orgNodeId !== undefined && patch.orgNodeId !== oldEmp.orgNodeId) {
+    const user = userRepo.getByEmployeeId(id)
+    if (user && (!user.permissions || user.permissions.length === 0)) {
+      let targetRoleId = "role-user"
+      if (patch.orgNodeId) {
+        const resolved = resolveAutoRole(patch.orgNodeId)
+        if (resolved) targetRoleId = resolved
+      }
+      if (user.roleId !== targetRoleId) {
+        userRepo.update(user.id, { roleId: targetRoleId })
+      }
+    }
+  }
 
   if (patch.status !== undefined) {
     const user = userRepo.getByEmployeeId(id)

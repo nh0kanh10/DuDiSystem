@@ -17,7 +17,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { CustomSelect } from "./ui/CustomSelect";
+import { CustomSelect } from "../ui/CustomSelect";
 import { useToast } from "@/app/hooks/useToast";
 
 type AllowedIP = {

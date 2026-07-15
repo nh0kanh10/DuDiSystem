@@ -1280,6 +1280,8 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, s
   const [form, setForm] = useState<EmpExtForm>(() => editEmp ? { ...blank(), ...editEmp } : blank())
   const sf = useCallback((k: keyof EmpExtForm, v: any) => setForm(p => ({ ...p, [k]: v })), [])
 
+  const [showDeptConfirm, setShowDeptConfirm] = useState(false)
+
   const [internshipMonths, setInternshipMonths] = useState<number | null>(null)
 
   useEffect(() => {
@@ -1336,6 +1338,16 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, s
       return
     }
 
+    const department = (form.department || "").trim()
+    if (!department) {
+      setShowDeptConfirm(true)
+      return
+    }
+
+    proceedValidateAndSave()
+  }
+
+  const proceedValidateAndSave = () => {
     const name = (form.name || "").trim()
     if (!name) {
       showToast("Họ tên không được để trống", "error")
@@ -1484,6 +1496,22 @@ export function EmployeeModal({ editEmp, employees, orgNodes, onClose, onSave, s
           </div>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={showDeptConfirm}
+        onClose={() => {
+          setShowDeptConfirm(false)
+          setTab("work")
+        }}
+        onConfirm={() => {
+          setShowDeptConfirm(false)
+          proceedValidateAndSave()
+        }}
+        title="Xác nhận lưu"
+        message="Bạn chưa chọn phòng ban/bộ phận cho nhân sự này. Bạn có chắc chắn muốn tiếp tục lưu không?"
+        type="warning"
+        confirmText="Tiếp tục lưu"
+        cancelText="Để tôi chọn lại"
+      />
     </div>,
     document.body
   )
@@ -1630,8 +1658,9 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
       const phoneStr = e.phone.toLowerCase()
       const matchQ = !q || nameStr.includes(q) || idStr.includes(q) || emailStr.includes(q) || phoneStr.includes(q)
       const matchS = filterStatus === "all"
-        || e.status === filterStatus
+        || (["active", "inactive", "suspended"].includes(filterStatus) && e.status === filterStatus)
         || (filterStatus === "intern" && e.contractType === "intern")
+        || (filterStatus === "staff" && e.contractType === "staff")
       const matchD = filterDept === "all" || e.department === filterDept
       const matchB = selectedBranch === "all" || (e as any).branchId === selectedBranch
       return matchQ && matchS && matchD && matchB
@@ -1864,10 +1893,12 @@ export function EmployeeManagement({ employees, setEmployees, orgNodes = [], sel
               value={filterStatus}
               onChange={setFilterStatus}
               options={[
-                { value: "all", label: "Tất cả trạng thái" },
-                { value: "active", label: "Đang làm" },
-                { value: "intern", label: "Thực tập" },
-                { value: "inactive", label: "Nghỉ việc" },
+                { value: "all", label: "Tất cả" },
+                { value: "staff", label: "Nhân viên chính thức" },
+                { value: "intern", label: "Thực tập sinh" },
+                { value: "active", label: "Trạng thái: Đang làm" },
+                { value: "suspended", label: "Trạng thái: Tạm nghỉ" },
+                { value: "inactive", label: "Trạng thái: Nghỉ việc" },
               ]}
             />
           </div>

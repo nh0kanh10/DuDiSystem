@@ -65,6 +65,7 @@ export default function OrgStructure({
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
   const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [filterEmployee, setFilterEmployee] = useState<string>("all")
   
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editNode, setEditNode] = useState<OrgNode | null>(null)
@@ -125,6 +126,16 @@ export default function OrgStructure({
       const descendants = getDescendants(n.id, nodes)
       const descendantIds = [n.id, ...descendants.map(d => d.id)]
       const actualCount = employees.filter(e => {
+        let matchesEmpFilter = true
+        const isIntern = typeof e.contractType === 'string' && (e.contractType === 'intern' || e.contractType.toLowerCase().startsWith('thực tập') || e.contractType === 'thuc tap')
+        if (filterEmployee === "staff") matchesEmpFilter = !isIntern
+        else if (filterEmployee === "intern") matchesEmpFilter = isIntern
+        else if (filterEmployee === "active") matchesEmpFilter = e.status === "active"
+        else if (filterEmployee === "inactive") matchesEmpFilter = e.status === "inactive"
+        else if (filterEmployee === "suspended") matchesEmpFilter = e.status === "suspended"
+        
+        if (!matchesEmpFilter) return false
+
         const empNodeIds = [
           e.orgNodeId,
           ...assignments.filter(as => as.employeeId === e.id && as.status === "active").map(as => as.nodeId)
@@ -136,7 +147,7 @@ export default function OrgStructure({
         memberCount: actualCount
       }
     })
-  }, [nodesInActiveBranch, filterStatus, employees, assignments])
+  }, [nodesInActiveBranch, filterStatus, filterEmployee, employees, assignments])
 
   const getDirectEmployees = (nodeId: string): Employee[] => {
     return employees.filter(e => {
@@ -193,6 +204,16 @@ export default function OrgStructure({
     const activeNodeIds = nodesInActiveBranch.map(n => n.id)
     
     const filteredEmployees = employees.filter(e => {
+      let matchesEmpFilter = true
+      const isIntern = typeof e.contractType === 'string' && (e.contractType === 'intern' || e.contractType.toLowerCase().startsWith('thực tập') || e.contractType === 'thuc tap')
+      if (filterEmployee === "staff") matchesEmpFilter = !isIntern
+      else if (filterEmployee === "intern") matchesEmpFilter = isIntern
+      else if (filterEmployee === "active") matchesEmpFilter = e.status === "active"
+      else if (filterEmployee === "inactive") matchesEmpFilter = e.status === "inactive"
+      else if (filterEmployee === "suspended") matchesEmpFilter = e.status === "suspended"
+      
+      if (!matchesEmpFilter) return false
+
       const empNodeIds = [
         e.orgNodeId,
         ...assignments.filter(as => as.employeeId === e.id && as.status === "active").map(as => as.nodeId)
@@ -206,7 +227,7 @@ export default function OrgStructure({
       departments: activeNodes.filter(n => n.type === "department").length,
       positions: activeNodes.filter(n => n.type === "sub-department" || n.type === "position").length
     }
-  }, [nodesInActiveBranch, employees, assignments])
+  }, [nodesInActiveBranch, filterEmployee, employees, assignments])
 
   const selectedNode = useMemo(() => {
     if (!selectedNodeId) return null
@@ -605,35 +626,95 @@ export default function OrgStructure({
     XLSX.writeFile(wb, "co-cau-to-chuc.xlsx")
   }
 
-  const filteredNodes = useMemo<RowItem[]>(() => {
-    const matchedItems: RowItem[] = []
+  const filteredTreeList = useMemo<RowItem[]>(() => {
+    const matchedNodeIds = new Set<string>()
+    const matchedEmpIds = new Set<string>()
+    const ancestorsToKeep = new Set<string>()
+    
     const sq = removeVietnameseTones(searchQuery.toLowerCase())
+    
     nodesToRender.forEach(n => {
       const nameStr = removeVietnameseTones(n.name.toLowerCase())
       const codeStr = (n.code ?? "").toLowerCase()
       const matchesSearch = nameStr.includes(sq) || codeStr.includes(sq)
       const matchesType = filterType === "all" || n.type === filterType
-      if (matchesSearch && matchesType) {
-        matchedItems.push({ type: "node", data: n })
+      const matchesStatus = filterStatus === "all" || n.status === filterStatus
+      if (matchesSearch && matchesType && matchesStatus) {
+        matchedNodeIds.add(n.id)
       }
     })
     
-    if (filterType === "all") {
-      employees.forEach(emp => {
-        const empName = removeVietnameseTones(emp.name.toLowerCase())
-        const empId = emp.id.toLowerCase()
-        const matchesSearch = empName.includes(sq) || empId.includes(sq)
-        if (matchesSearch) {
-          const activeAs = assignments.find(as => as.employeeId === emp.id && as.status === "active")
-          const nodeId = emp.orgNodeId || activeAs?.nodeId
-          if (nodeId && nodesToRender.some(n => n.id === nodeId)) {
-            matchedItems.push({ type: "employee", data: emp, parentId: nodeId })
+    employees.forEach(emp => {
+      const empName = removeVietnameseTones(emp.name.toLowerCase())
+      const empId = emp.id.toLowerCase()
+      const matchesSearch = empName.includes(sq) || empId.includes(sq)
+      
+      let matchesEmpFilter = true
+      const isIntern = typeof emp.contractType === 'string' && (emp.contractType === 'intern' || emp.contractType.toLowerCase().startsWith('thực tập') || emp.contractType === 'thuc tap')
+      if (filterEmployee === "staff") matchesEmpFilter = !isIntern
+      else if (filterEmployee === "intern") matchesEmpFilter = isIntern
+      else if (filterEmployee === "active") matchesEmpFilter = emp.status === "active"
+      else if (filterEmployee === "inactive") matchesEmpFilter = emp.status === "inactive"
+      else if (filterEmployee === "suspended") matchesEmpFilter = emp.status === "suspended"
+
+      if (matchesSearch && matchesEmpFilter) {
+        matchedEmpIds.add(emp.id)
+      }
+    })
+
+    const isSearching = searchQuery.trim() !== "" || filterType !== "all" || filterStatus !== "all" || filterEmployee !== "all"
+    
+    if (!isSearching) {
+      return flattenTree(nodesToRender)
+    }
+
+    matchedNodeIds.forEach(nodeId => {
+      let curr = nodesToRender.find(n => n.id === nodeId)
+      while (curr && curr.parentId) {
+        ancestorsToKeep.add(curr.parentId)
+        curr = nodesToRender.find(n => n.id === curr?.parentId)
+      }
+    })
+
+    matchedEmpIds.forEach(empId => {
+      const emp = employees.find(e => e.id === empId)
+      if (emp) {
+        const activeAs = assignments.find(as => as.employeeId === emp.id && as.status === "active")
+        const nodeId = emp.orgNodeId || activeAs?.nodeId
+        if (nodeId) {
+          ancestorsToKeep.add(nodeId)
+          let curr = nodesToRender.find(n => n.id === nodeId)
+          while (curr && curr.parentId) {
+            ancestorsToKeep.add(curr.parentId)
+            curr = nodesToRender.find(n => n.id === curr?.parentId)
           }
+        }
+      }
+    })
+
+    const visibleItems: RowItem[] = []
+    
+    const buildFilteredTree = (parentId?: string) => {
+      const roots = nodesToRender.filter(n => parentId ? n.parentId === parentId : !n.parentId)
+      roots.forEach(root => {
+        if (matchedNodeIds.has(root.id) || ancestorsToKeep.has(root.id)) {
+          visibleItems.push({ type: "node", data: root })
+          
+          buildFilteredTree(root.id)
+          
+          const directEmps = getDirectEmployees(root.id)
+          directEmps.forEach(emp => {
+            if (matchedEmpIds.has(emp.id)) {
+               visibleItems.push({ type: "employee", data: emp, parentId: root.id })
+            }
+          })
         }
       })
     }
-    return matchedItems
-  }, [nodesToRender, searchQuery, filterType, employees, assignments])
+    
+    buildFilteredTree()
+    return visibleItems
+  }, [nodesToRender, searchQuery, filterType, filterStatus, filterEmployee, employees, assignments])
 
   const getManagerName = (managerId?: string) => {
     if (!managerId) return "—"
@@ -768,7 +849,7 @@ export default function OrgStructure({
                     { value: "position", label: "Vị trí" },
                     { value: "team", label: "Nhóm" }
                   ]}
-                  className="w-44"
+                  className="w-[160px]"
                 />
 
                 <CustomSelect
@@ -779,8 +860,39 @@ export default function OrgStructure({
                     { value: "active", label: "Đang hoạt động" },
                     { value: "inactive", label: "Tạm ngưng hoạt động" }
                   ]}
-                  className="w-44"
+                  className="w-[160px]"
                 />
+
+                <CustomSelect
+                  value={filterEmployee}
+                  onChange={setFilterEmployee}
+                  options={[
+                    { value: "all", label: "Tất cả nhân sự" },
+                    { value: "staff", label: "Chính thức" },
+                    { value: "intern", label: "Thực tập" },
+                    { value: "active", label: "Đang làm" },
+                    { value: "suspended", label: "Tạm nghỉ" },
+                    { value: "inactive", label: "Nghỉ việc" }
+                  ]}
+                  className="w-[150px]"
+                />
+                
+                {viewMode === "list" && (
+                  <div className="flex gap-1 ml-2">
+                    <button
+                      onClick={() => setExpandedListIds(orgNodes.map(n => n.id))}
+                      className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm"
+                    >
+                      Mở tất cả
+                    </button>
+                    <button
+                      onClick={() => setExpandedListIds([])}
+                      className="px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm"
+                    >
+                      Đóng tất cả
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -797,10 +909,7 @@ export default function OrgStructure({
               isSuperAdmin={isSuperAdmin}
             />
           ) : (() => {
-            const isSearching = searchQuery.trim() !== "" || filterType !== "all" || filterStatus !== "all"
-            const listNodes = isSearching
-              ? filteredNodes
-              : flattenTree(nodesToRender).filter(item => {
+            const listNodes = filteredTreeList.filter(item => {
                   return isAncestorsExpanded(item, nodesToRender, expandedListIds)
                 })
 
@@ -840,15 +949,15 @@ export default function OrgStructure({
                       const isNode = item.type === "node"
                       if (isNode) {
                         const node = item.data
-                        const level = isSearching ? 0 : getNodeLevel(node, orgNodes)
+                        const level = getNodeLevel(node, orgNodes)
                         const hasChildren = orgNodes.some(n => n.parentId === node.id) || getDirectEmployees(node.id).length > 0
                         const isExpanded = expandedListIds.includes(node.id)
 
                         return (
                           <tr key={`node-${node.id}`} className="hover:bg-gray-50/50 transition-colors">
                             <td className="px-6 py-3.5 font-bold text-gray-800">
-                              <div className="flex items-center gap-1.5" style={{ paddingLeft: `${isSearching ? 0 : level * 20}px` }}>
-                                {!isSearching && hasChildren ? (
+                              <div className="flex items-center gap-1.5" style={{ paddingLeft: `${level * 20}px` }}>
+                                {hasChildren ? (
                                   <button
                                     type="button"
                                     onClick={() => toggleExpandList(node.id)}
@@ -856,11 +965,11 @@ export default function OrgStructure({
                                   >
                                     {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                   </button>
-                                ) : !isSearching ? (
+                                ) : (
                                   <div className="w-6 h-6 flex items-center justify-center">
                                     <Circle size={4} className="text-gray-300 fill-gray-300" />
                                   </div>
-                                ) : null}
+                                )}
                                 <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColors[node.type]}`} />
                                 <span
                                   className="cursor-pointer hover:text-[#C62828] transition-colors truncate"
@@ -922,12 +1031,12 @@ export default function OrgStructure({
                       } else {
                         const emp = item.data
                         const parentNode = nodesToRender.find(n => n.id === item.parentId)
-                        const level = isSearching ? 0 : (parentNode ? getNodeLevel(parentNode, nodesToRender) + 1 : 1)
+                        const level = parentNode ? getNodeLevel(parentNode, nodesToRender) + 1 : 1
 
                         return (
                           <tr key={`emp-${item.parentId}-${emp.id}`} className="bg-gray-50/20 hover:bg-gray-50/50 transition-colors">
                             <td className="px-6 py-3.5 font-medium text-gray-600">
-                              <div className="flex items-center gap-1.5" style={{ paddingLeft: `${isSearching ? 0 : level * 20}px` }}>
+                              <div className="flex items-center gap-1.5" style={{ paddingLeft: `${level * 20}px` }}>
                                 <div className="w-6 h-6 flex items-center justify-center">
                                   <Circle size={4} className="text-gray-300 fill-gray-300" />
                                 </div>

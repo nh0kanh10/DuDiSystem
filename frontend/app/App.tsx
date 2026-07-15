@@ -13,7 +13,7 @@ import { canOpenStaffPortal, isStaffTypeRole, hasPageAccess } from "./utils/staf
 import ApprovalManagement from "@/app/components/duyet-don/ApprovalManagement"
 import OrgStructure from "./components/co-cau/OrgStructure"
 import UserProfile from "./components/nhan-vien/UserProfile"
-import IPManagement from "./components/IPManagement"
+import IPManagement from "./components/cham-cong/IPManagement"
 import AccountManagement from "./components/account/AccountManagement"
 import StatisticsPage from "./components/thong-ke/StatisticsPage"
 
@@ -48,7 +48,7 @@ import { api, writeStoredAuthUser } from "@/lib/api"
 import { connectChatSocket, releaseChatSocket, resetChatSocket, chatHeartbeat, getChatSocketStatus } from "@/lib/chatSocket"
 import { useNotificationBadge } from "./hooks/useNotifications"
 import { touchSession, resetSessionTouchClock } from "@/lib/session"
-import { ToastProvider } from "./hooks/useToast"
+import { ToastProvider, useToast } from "./hooks/useToast"
 
 function getISOWeek(d: Date): number {
   const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
@@ -118,7 +118,7 @@ function AppContent() {
     return ""
   })
   const [sessionTimeout, setSessionTimeout] = useState<number>(30)
-  const [sessionAlertMsg, setSessionAlertMsg] = useState<string | null>(null)
+  const { showToast } = useToast()
   const [loginLoading, setLoginLoading] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
@@ -237,7 +237,7 @@ function AppContent() {
   useEffect(() => {
     const handleUnauthorized = () => {
       handleLogout()
-      setSessionAlertMsg("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+      showToast("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", "error")
     }
     window.addEventListener("dudi_unauthorized", handleUnauthorized)
     return () => {
@@ -260,9 +260,7 @@ function AppContent() {
         const idleDuration = Date.now() - lastActivityRef.current
         if (idleDuration >= SESSION_MS) {
           handleLogout()
-          setSessionAlertMsg(
-            `Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`
-          )
+          showToast(`Phiên làm việc đã kết thúc do bạn không hoạt động trong ${sessionTimeout} phút. Vui lòng đăng nhập lại.`, "error")
         } else {
           scheduleIdleCheck()
         }
@@ -1162,22 +1160,22 @@ function UserAwareSidebar({
         {hasAccess("thong-bao") && <NavItem page="thong-bao" icon={Bell} label="Quản lý thông báo" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("du-an") && <NavItem page="du-an" icon={Layers} label="Quản lý dự án" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("cong-viec") && <NavItem page="cong-viec" icon={CheckSquare} label="Quản lý công việc" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("lead") && <NavItem page="lead" icon={User} label="Cơ hội" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
-        {hasAccess("kpi") && (
+        {(hasAccess("lead") || hasAccess("kpi") || hasAccess("crm")) && (
           <GroupNav
-            gKey="kpi"
+            gKey="quan-ly-sale"
             icon={TrendingUp}
-            label="Quản lý KPI"
-            pages={["kpi", "kpi-stats", "kpi-compare"]}
+            label="Quản lý Sale"
+            pages={["lead", "kpi", "kpi-stats", "kpi-compare", "crm"].filter(hasAccess) as Page[]}
             active={active} onNavigate={onNavigate} collapsed={collapsed}
             expanded={expanded} onToggle={toggle} onFlyoutOpen={closeOverlays}
           >
-            <SubItem page="kpi" label="Tổng quan" active={active} onNavigate={onNavigate} />
-            <SubItem page="kpi-stats" label="Thống kê KPI" active={active} onNavigate={onNavigate} />
-            <SubItem page="kpi-compare" label="So sánh" active={active} onNavigate={onNavigate} />
+            {hasAccess("lead") && <SubItem page="lead" label="Cơ hội" active={active} onNavigate={onNavigate} />}
+            {hasAccess("kpi") && <SubItem page="kpi" label="Tổng quan KPI" active={active} onNavigate={onNavigate} />}
+            {hasAccess("kpi") && <SubItem page="kpi-stats" label="Thống kê KPI" active={active} onNavigate={onNavigate} />}
+            {hasAccess("kpi") && <SubItem page="kpi-compare" label="So sánh KPI" active={active} onNavigate={onNavigate} />}
+            {hasAccess("crm") && <SubItem page="crm" label="Quản lý Lead" active={active} onNavigate={onNavigate} />}
           </GroupNav>
         )}
-        {hasAccess("crm") && <NavItem page="crm" icon={MessageCircle} label="Quản lý Lead" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
         {hasAccess("tien-ich") && <NavItem page="tien-ich" icon={Wrench} label="Tiện ích" active={active} onNavigate={onNavigate} collapsed={collapsed} />}
       </nav>
 
@@ -1242,51 +1240,5 @@ function UserAwareSidebar({
         )}
       </div>
     </aside>
-  )
-}
-
-function SessionAlertModal({ message, onClose }: { message: string; onClose: () => void }) {
-  return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}
-    >
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-[340px] overflow-hidden"
-        style={{ animation: "sessionModalIn 0.22s cubic-bezier(.34,1.56,.64,1) both" }}
-      >
-        <div className="h-1.5 w-full bg-gradient-to-r from-[#C62828] to-[#E64A19]" />
-        <div className="flex flex-col items-center gap-3 px-7 pt-7 pb-5">
-          <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="#C62828" strokeWidth="2" />
-              <path d="M12 7v5" stroke="#C62828" strokeWidth="2" strokeLinecap="round" />
-              <circle cx="12" cy="16.5" r="1" fill="#C62828" />
-            </svg>
-          </div>
-          <p className="text-sm text-gray-700 font-medium text-center leading-relaxed">
-            {message}
-          </p>
-        </div>
-
-        <div className="px-7 pb-6 flex justify-center">
-          <button
-            id="session-alert-ok"
-            onClick={onClose}
-            autoFocus
-            className="px-8 py-2.5 rounded-xl bg-gradient-to-r from-[#C62828] to-[#E64A19] text-white text-sm font-bold shadow-md hover:opacity-90 active:scale-[0.97] transition-all focus:outline-none focus:ring-2 focus:ring-[#C62828]/40"
-          >
-            OK
-          </button>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes sessionModalIn {
-          from { opacity: 0; transform: scale(0.88) translateY(12px); }
-          to   { opacity: 1; transform: scale(1)   translateY(0); }
-        }
-      `}</style>
-    </div>
   )
 }

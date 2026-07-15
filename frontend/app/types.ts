@@ -9,6 +9,7 @@ export interface RoleDefinition {
   modules: string[]
   scopeType?: "company" | "branch" | "self"
   roleType?: "management" | "staff" | "admin" | "manager"
+  linkedOrgNodeId?: string
 }
 
 export type WorkHistoryType = "join" | "resign" | "rehire" | "transfer" | "promotion"

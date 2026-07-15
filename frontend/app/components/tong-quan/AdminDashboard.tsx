@@ -216,7 +216,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (p: Page) => void }
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <StatCard title="Tổng nhân sự" value={stats?.totalEmployees || 0} sub={`Đang làm: ${stats?.activeEmployees || 0} · Nghỉ việc: ${stats?.resignedEmployees || 0}`} iconBg="bg-blue-50/50" iconColor="text-blue-600" icon={Users} />
+        <StatCard title="Tổng nhân sự" value={stats?.activeEmployees || 0} sub="Đang làm việc" iconBg="bg-blue-50/50" iconColor="text-blue-600" icon={Users} />
         <StatCard 
           title="Đúng giờ / Trễ" 
           value={(() => {

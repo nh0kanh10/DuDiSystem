@@ -31,6 +31,7 @@ interface RoleDefinition {
   scopeType: "company" | "branch" | "self"
   roleType?: "management" | "staff" | "admin" | "manager"
   modules: string[]
+  linkedOrgNodeId?: string
 }
 
 import { isStaffTypeRole } from "../../utils/staffModules"
@@ -84,16 +85,16 @@ const MODULE_TREE = [
     id: "group-reports",
     label: "Báo cáo & Tiện ích",
     children: [
-      { id: "kpi", label: "Quản lý KPI" },
       { id: "tien-ich", label: "Tiện ích hệ thống" }
     ]
   },
   {
-    id: "group-crm",
-    label: "Quản lý khách hàng",
+    id: "group-sale",
+    label: "Quản lý Sale",
     children: [
-      { id: "crm", label: "Quản lý khách hàng" },
-      { id: "lead", label: "Quản lý Lead" },
+      { id: "lead", label: "Cơ hội" },
+      { id: "kpi", label: "Quản lý KPI" },
+      { id: "crm", label: "Quản lý Lead" }
     ]
   }
 ]
@@ -125,7 +126,6 @@ const STAFF_MODULE_TREE = [
     ]
   },
   {
-    // Thêm nhóm Tiện ích nhân viên — ánh xạ tới bubble notifications & tasks trong UserPortalApp
     id: "staff-tools",
     label: "Tiện ích nhân viên",
     children: [
@@ -174,9 +174,11 @@ export default function AccountManagement({
 
   const [selectedRole, setSelectedRole] = useState<RoleDefinition | null>(null)
   const [rolePermissions, setRolePermissions] = useState<string[]>([])
+  const [roleLinkedNodeId, setRoleLinkedNodeId] = useState<string>("")
+  const [editRoleLinkedNodeType, setEditRoleLinkedNodeType] = useState<"department" | "sub-department">("department")
   const [expandedGroups, setExpandedGroups] = useState<string[]>([
     "group-general", "group-hr", "group-work", "group-reports",
-    "staff-general", "staff-work", "staff-social", "staff-tools"  // staff-tools: Tiện ích nhân viên (thong-bao, cong-viec)
+    "staff-general", "staff-work", "staff-social", "staff-tools"
   ])
 
   const [showModal, setShowModal] = useState(false)
@@ -204,11 +206,15 @@ export default function AccountManagement({
   const [roleForm, setRoleForm] = useState<{
     name: string;
     scopeType: "company" | "branch" | "self";
-    roleType: "management" | "staff"
+    roleType: "management" | "staff";
+    linkedOrgNodeId: string;
+    linkedNodeType: "department" | "sub-department";
   }>({
     name: "",
     scopeType: "branch",
-    roleType: "management"
+    roleType: "management",
+    linkedOrgNodeId: "",
+    linkedNodeType: "department"
   })
 
   const { showToast } = useToast()
@@ -262,6 +268,11 @@ export default function AccountManagement({
         setSelectedRole(target)
         setSelectedCustomUser(null)
         setRolePermissions(target.modules || [])
+        const linkedType = target.linkedOrgNodeId 
+          ? (orgNodes.find(n => n.id === target.linkedOrgNodeId)?.type === "sub-department" ? "sub-department" : "department") 
+          : "department"
+        setRoleLinkedNodeId(target.linkedOrgNodeId || "")
+        setEditRoleLinkedNodeType(linkedType)
         setPermTab(isStaffTypeRole(target) ? "staff" : "management")
       }
     } catch (err: any) {
@@ -283,6 +294,11 @@ export default function AccountManagement({
     setSelectedRole(roleItem)
     setSelectedCustomUser(null)
     setRolePermissions(roleItem.modules || [])
+    const linkedType = roleItem.linkedOrgNodeId 
+      ? (orgNodes.find(n => n.id === roleItem.linkedOrgNodeId)?.type === "sub-department" ? "sub-department" : "department") 
+      : "department"
+    setRoleLinkedNodeId(roleItem.linkedOrgNodeId || "")
+    setEditRoleLinkedNodeType(linkedType)
     setPermTab(isStaffTypeRole(roleItem) ? "staff" : "management")
   }
 
@@ -403,7 +419,8 @@ export default function AccountManagement({
       if (selectedRole) {
         await api.roles.update(selectedRole.id, {
           name: selectedRole.name,
-          modules: finalPermissions
+          modules: finalPermissions,
+          linkedOrgNodeId: roleLinkedNodeId || undefined
         })
         showToast("Cập nhật quyền hạn vai trò thành công")
         await loadData(selectedRole, null)
@@ -485,11 +502,12 @@ export default function AccountManagement({
         name: roleForm.name.trim(),
         scopeType: roleForm.scopeType,
         roleType: roleForm.roleType,
-        modules: initialModules
+        modules: initialModules,
+        linkedOrgNodeId: roleForm.linkedOrgNodeId || undefined
       })
-      showToast("Tạo vai trò mới thành công")
+      showToast("Tạo vai trò thành công", "success")
       setShowRoleModal(false)
-      setRoleForm({ name: "", scopeType: "branch", roleType: "management" })
+      setRoleForm({ name: "", scopeType: "branch", roleType: "management", linkedOrgNodeId: "", linkedNodeType: "department" })
       loadData()
       setSelectedRole(created)
       setRolePermissions(created.modules)
@@ -550,6 +568,32 @@ export default function AccountManagement({
     return Array.from(new Set(employees.map(e => e.department).filter(Boolean))) as string[]
   }, [employees])
 
+  const isNodeInBranch = (nodeId: string, branchId: string) => {
+    let curr = orgNodes.find(n => n.id === nodeId)
+    while (curr) {
+      if (curr.id === branchId) return true
+      if (curr.type === "branch") return curr.id === branchId
+      curr = orgNodes.find(n => n.id === curr?.parentId)
+    }
+    return false
+  }
+
+  const activeDepartments = useMemo(() => {
+    return orgNodes
+      .filter((n: any) => n.type === "department" && (!n.status || n.status === "active"))
+      .filter((n: any) => branchFilter === "all" || isNodeInBranch(n.id, branchFilter))
+  }, [orgNodes, branchFilter])
+
+  const activeSubDepartments = useMemo(() => {
+    return orgNodes
+      .filter((n: any) => n.type === "sub-department" && (!n.status || n.status === "active"))
+      .filter((n: any) => branchFilter === "all" || isNodeInBranch(n.id, branchFilter))
+  }, [orgNodes, branchFilter])
+
+  const activeDepartmentNames = useMemo(() => {
+    return activeDepartments.map((n: any) => n.name)
+  }, [activeDepartments])
+
   const branches = useMemo(() => {
     return orgNodes.filter(n => n.type === "branch")
   }, [orgNodes])
@@ -578,9 +622,38 @@ export default function AccountManagement({
 
   const handleEmployeeChange = (empId: string) => {
     const emp = employees.find(e => e.id === empId)
-    const targetRole = emp
-      ? (emp.position?.toLowerCase().includes("trưởng") || emp.position?.toLowerCase().includes("quản lý") ? "role-manager" : "role-user")
-      : form.roleId
+    let targetRole = form.roleId
+    if (emp) {
+      if (emp.orgNodeId) {
+        let currNode = orgNodes.find((n: any) => n.id === emp.orgNodeId)
+        let resolvedRoleId: string | null = null
+
+        if (currNode) {
+          if (currNode.type === "department") {
+            const r = rolesList.find(r => r.linkedOrgNodeId === currNode.id)
+            if (r) resolvedRoleId = r.id
+          } else {
+            while (currNode) {
+              if (currNode.type === "department") break
+              const r = rolesList.find(r => r.linkedOrgNodeId === currNode.id)
+              if (r) {
+                resolvedRoleId = r.id
+                break
+              }
+              currNode = orgNodes.find((n: any) => n.id === currNode.parentId)
+            }
+          }
+        }
+
+        if (resolvedRoleId) {
+          targetRole = resolvedRoleId
+        } else {
+          targetRole = (emp.position?.toLowerCase().includes("trưởng") || emp.position?.toLowerCase().includes("quản lý") ? "role-manager" : "role-user")
+        }
+      } else {
+        targetRole = (emp.position?.toLowerCase().includes("trưởng") || emp.position?.toLowerCase().includes("quản lý") ? "role-manager" : "role-user")
+      }
+    }
     setForm(p => ({
       ...p,
       employeeId: empId,
@@ -903,7 +976,7 @@ export default function AccountManagement({
           ) : (
             <button
               onClick={() => {
-                setRoleForm({ name: "", scopeType: "branch", roleType: "management" })
+                setRoleForm({ name: "", scopeType: "branch", roleType: "management", linkedOrgNodeId: "", linkedNodeType: "department" })
                 setShowRoleModal(true)
               }}
               className="flex items-center gap-2 px-4 py-2.5 bg-white text-[#C62828] hover:bg-gray-100 rounded-xl text-xs font-bold transition-colors shadow-sm cursor-pointer"
@@ -1187,6 +1260,11 @@ export default function AccountManagement({
                       <p className="text-[10px] text-gray-400 font-mono tracking-wide">{r.id}</p>
                     </div>
                     <div className="flex items-center gap-1">
+                      {r.linkedOrgNodeId && (
+                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded-md" title={`Liên kết đơn vị: ${orgNodes.find(n => n.id === r.linkedOrgNodeId)?.name || r.linkedOrgNodeId}`}>
+                          {orgNodes.find(n => n.id === r.linkedOrgNodeId)?.name || r.linkedOrgNodeId}
+                        </span>
+                      )}
                       {r.isSystem ? (
                         <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-gray-100 text-gray-500 rounded-md">
                           Mặc định
@@ -1266,7 +1344,7 @@ export default function AccountManagement({
             {selectedRole || selectedCustomUser ? (
               <div className="space-y-6">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3 flex-wrap gap-2">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="font-black text-gray-800 text-base">
                       {selectedRole ? (
                         <>Cấu hình quyền hạn vai trò: <span className="text-[#C62828] font-black">{selectedRole.name}</span></>
@@ -1274,11 +1352,48 @@ export default function AccountManagement({
                         <>Quyền riêng tài khoản: <span className="text-[#C62828] font-black">{selectedCustomUser?.name}</span></>
                       )}
                     </h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Bật/Tắt module để cho phép/ngăn chặn quyền truy cập tương ứng</p>
+                    <p className="text-xs text-gray-400 mt-0.5 mb-3">Bật/Tắt module để cho phép/ngăn chặn quyền truy cập tương ứng</p>
+                    
+                    {selectedRole && !selectedRole.isSystem && (
+                      <div className="flex flex-col gap-2 bg-gray-50/50 p-3 rounded-xl border border-gray-100 w-fit">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-black text-gray-500 uppercase tracking-wider pl-1">Liên kết Đơn vị:</span>
+                          <div className="flex items-center bg-gray-200/60 p-0.5 rounded-lg border border-gray-200">
+                            <button
+                              onClick={() => { setEditRoleLinkedNodeType("department"); setRoleLinkedNodeId(""); }}
+                              className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${editRoleLinkedNodeType === "department" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                            >
+                              Phòng ban
+                            </button>
+                            <button
+                              onClick={() => { setEditRoleLinkedNodeType("sub-department"); setRoleLinkedNodeId(""); }}
+                              className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${editRoleLinkedNodeType === "sub-department" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                            >
+                              Bộ phận
+                            </button>
+                          </div>
+                        </div>
+                        <div className="w-[320px]">
+                          <CustomCombobox
+                            value={roleLinkedNodeId}
+                            onChange={setRoleLinkedNodeId}
+                            placeholder={`Chọn ${editRoleLinkedNodeType === "department" ? "phòng ban" : "bộ phận"} để liên kết...`}
+                            heightClass="h-[36px]"
+                            options={[
+                              { value: "", label: "-- Không liên kết --" },
+                              ...(editRoleLinkedNodeType === "department" 
+                                ? activeDepartments.map(d => ({ value: d.id, label: d.name }))
+                                : activeSubDepartments.map(d => ({ value: d.id, label: d.name }))
+                              )
+                            ]}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={handleSavePermissions}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 self-start mt-1"
                   >
                     <Save size={14} /> Lưu cấu hình
                   </button>
@@ -1686,6 +1801,41 @@ export default function AccountManagement({
                   />
                 </div>
               )}
+
+              <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-xs font-black text-gray-700">Tự động gán cho Đơn vị (Tùy chọn)</label>
+                  <div className="flex items-center bg-gray-200/60 p-0.5 rounded-lg border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setRoleForm(prev => ({ ...prev, linkedNodeType: "department", linkedOrgNodeId: "" }))}
+                      className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${roleForm.linkedNodeType === "department" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                    >
+                      Phòng ban
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRoleForm(prev => ({ ...prev, linkedNodeType: "sub-department", linkedOrgNodeId: "" }))}
+                      className={`px-3 py-1.5 rounded-md text-[10px] font-bold transition-all ${roleForm.linkedNodeType === "sub-department" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+                    >
+                      Bộ phận
+                    </button>
+                  </div>
+                </div>
+                <CustomCombobox
+                  value={roleForm.linkedOrgNodeId}
+                  onChange={val => setRoleForm(prev => ({ ...prev, linkedOrgNodeId: val }))}
+                  placeholder={`Chọn ${roleForm.linkedNodeType === "department" ? "phòng ban" : "bộ phận"} để liên kết...`}
+                  heightClass="h-[42px]"
+                  options={[
+                    { value: "", label: "-- Không liên kết --" },
+                    ...(roleForm.linkedNodeType === "department" 
+                      ? activeDepartments.map(d => ({ value: d.id, label: d.name }))
+                      : activeSubDepartments.map(d => ({ value: d.id, label: d.name }))
+                    )
+                  ]}
+                />
+              </div>
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowRoleModal(false)} className="flex-1 py-2.5 border border-gray-200 rounded-2xl text-sm font-bold text-gray-600 hover:bg-gray-50 active:scale-95 transition-all">Huỷ</button>

@@ -214,6 +214,7 @@ interface Block {
   color: string;
   lightBg: string;
   darkBg: string;
+  badge?: number;
 }
 
 const LEFT_BLOCKS: Block[] = [
@@ -313,7 +314,7 @@ function BlockCard({
   return (
     <button
       onClick={onClick}
-      className={`group flex items-center gap-3.5 rounded-2xl transition-all duration-200
+      className={`relative group flex items-center gap-3.5 rounded-2xl transition-all duration-200
         hover:scale-[1.025] hover:-translate-y-0.5 active:scale-[0.98]
         ${flip ? "flex-row-reverse" : ""}
         ${compact ? "px-3.5 py-3" : "px-5"}
@@ -338,6 +339,11 @@ function BlockCard({
       <div className={`font-semibold leading-tight ${compact ? "text-[15px]" : "text-[17px]"} ${dark ? "text-[#F0DCE2]" : "text-[#1A0810]"}`}>
         {block.label}
       </div>
+      {block.badge ? (
+        <div className="absolute -top-2 -right-2 bg-gradient-to-tr from-[#E8231A] to-[#ff4d4d] text-white text-[10px] font-extrabold h-5 min-w-[20px] px-1.5 rounded-full border-2 border-white dark:border-[#3A1810] shadow-md z-10 flex items-center justify-center pointer-events-none">
+          {block.badge > 99 ? "99+" : block.badge}
+        </div>
+      ) : null}
     </button>
   );
 }
@@ -354,6 +360,7 @@ export default function GreetingMessageApp({
   checkingIP = false,
   attendanceCheckedIn = false,
   attendanceCheckInTime = null,
+  unreadCount = 0,
 }: any) {
 
   const [now, setNow] = useState(new Date());
@@ -456,7 +463,7 @@ export default function GreetingMessageApp({
           <div className="flex flex-col pl-2 pr-2 gap-3 justify-center items-end">
             {LEFT_BLOCKS.map((block, i) => (
               <div key={block.label} className="flex justify-start" style={{ width: WIDTHS[i] }}>
-                <BlockCard block={block} dark={dark} side="left" onClick={() => block.id && onNavigate(block.id)} />
+                <BlockCard block={block.id === "notifications" && unreadCount > 0 ? { ...block, badge: unreadCount } : block} dark={dark} side="left" onClick={() => block.id && onNavigate(block.id)} />
               </div>
             ))}
           </div>
@@ -553,7 +560,7 @@ export default function GreetingMessageApp({
               {LEFT_BLOCKS.map((block) => (
                 <BlockCard
                   key={block.label}
-                  block={block}
+                  block={block.id === "notifications" && unreadCount > 0 ? { ...block, badge: unreadCount } : block}
                   dark={dark}
                   side="left"
                   compact
