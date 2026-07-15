@@ -489,6 +489,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   const [entries, setEntries] = useState<KpiEntry[]>([]);
   const [targets, setTargets] = useState<KpiTarget[]>([]);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -699,10 +700,9 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     return totals;
   }, [employeeSummaries]);
 
-  // Target values for the branch/month
   const selectedMonthTarget = useMemo(() => {
     // Return average or default targets for selected month
-    return getTarget("all", selectedMonth);
+    return getTarget("all", selectedMonth, targets);
   }, [selectedMonth, targets]);
 
   // Average KPI completion percentage
@@ -712,7 +712,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     let counts = 0;
     
     employeeSummaries.forEach(emp => {
-      const target = getTarget(emp.employeeId, selectedMonth);
+      const target = getTarget(emp.employeeId, selectedMonth, targets);
       // Let's compute average rate across key fields (e.g. Revenue, Deal, Zalo)
       const revRate = target.revenue > 0 ? (emp.metrics.revenue / target.revenue) * 100 : 100;
       const dealRate = target.deal > 0 ? (emp.metrics.deal / target.deal) * 100 : 100;
@@ -1030,6 +1030,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     e.preventDefault();
     try {
       await api.kpi.saveTarget({
+        id: editingTargetId,
         employeeId: targetEmployeeId,
         month: targetForm.month,
         metrics: targetForm.metrics
@@ -1038,13 +1039,14 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
       setIsTargetModalOpen(false);
       showToast("Đã lưu chỉ tiêu KPI mới thành công!", "success");
     } catch (err) {
-      showToast("Lỗi khi lưu chỉ tiêu KPI", "error");
+      showToast(err instanceof Error ? err.message : "Lỗi khi lưu chỉ tiêu KPI", "error");
     }
   };
 
   const openAddTargetModal = () => {
     setTargetEmployeeId("all");
     setTargetFormType("all");
+    setEditingTargetId(null);
     setTargetForm({
       employeeId: "all",
       month: selectedMonth,
@@ -1056,6 +1058,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   const handleEditTarget = (target: KpiTarget) => {
     setTargetEmployeeId(target.employeeId);
     setTargetFormType(target.employeeId === "all" ? "all" : "employee");
+    setEditingTargetId(target.id);
     setTargetForm({
       employeeId: target.employeeId,
       month: target.month,

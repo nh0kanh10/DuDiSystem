@@ -1,5 +1,6 @@
 import * as kpiTargetRepo from "../repositories/kpiTarget.repository.js"
 import * as kpiEntryRepo from "../repositories/kpiEntry.repository.js"
+import { getModel } from "../db/models.js"
 
 const KPI_POINTS_WEIGHT = {
   zalo: 1,
@@ -18,26 +19,40 @@ export function getTargets(query = {}) {
   return kpiTargetRepo.getAll(query)
 }
 
-export function saveTarget(data) {
-  const { employeeId, month, metrics } = data
+export async function saveTarget(data) {
+  const { id, employeeId, month, metrics } = data
   if (!employeeId || !month) throw new Error("Thiếu employeeId hoặc month")
   
-  const existing = kpiTargetRepo.getAll({ employeeId, month })[0]
-  if (existing) {
-    return kpiTargetRepo.update(existing.id, { metrics })
-  }
-  
-  const newTarget = {
-    id: "kpi-tgt-" + Math.random().toString(36).substring(2, 9) + "-" + Date.now(),
-    employeeId,
-    month,
-    metrics: metrics || {
-      zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, 
-      khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0
+  if (id) {
+    const existing = kpiTargetRepo.getById(id)
+    if (!existing) throw new Error("Không tìm thấy chỉ tiêu cần cập nhật")
+    
+    const duplicate = kpiTargetRepo.getAll({ employeeId, month }).find(d => d.id !== id)
+    if (duplicate) {
+      throw new Error(`Chỉ tiêu KPI cho nhân viên này trong tháng ${month} đã tồn tại ở một bản ghi khác.`)
     }
+    
+    await getModel("kpiTargets").updateOne({ id }, { $set: { metrics } })
+    return kpiTargetRepo.update(id, { metrics })
+  } else {
+    const existing = kpiTargetRepo.getAll({ employeeId, month })[0]
+    if (existing) {
+      throw new Error(`Chỉ tiêu KPI cho nhân viên này trong tháng ${month} đã tồn tại. Vui lòng chỉnh sửa chỉ tiêu cũ thay vì tạo mới.`)
+    }
+    
+    const newTarget = {
+      id: "kpi-tgt-" + Math.random().toString(36).substring(2, 9) + "-" + Date.now(),
+      employeeId,
+      month,
+      metrics: metrics || {
+        zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, 
+        khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0
+      }
+    }
+    
+    await getModel("kpiTargets").create(JSON.parse(JSON.stringify(newTarget)))
+    return kpiTargetRepo.create(newTarget)
   }
-  kpiTargetRepo.create(newTarget)
-  return newTarget
 }
 
 export function deleteTarget(id) {
@@ -48,27 +63,41 @@ export function getEntries(query = {}) {
   return kpiEntryRepo.getAll(query)
 }
 
-export function saveEntry(data) {
-  const { employeeId, date, metrics, notes } = data
+export async function saveEntry(data) {
+  const { id, employeeId, date, metrics, notes } = data
   if (!employeeId || !date) throw new Error("Thiếu employeeId hoặc date")
   
-  const existing = kpiEntryRepo.getAll({ employeeId, date })[0]
-  if (existing) {
-    return kpiEntryRepo.update(existing.id, { metrics, notes })
+  if (id) {
+    const existing = kpiEntryRepo.getById(id)
+    if (!existing) throw new Error("Không tìm thấy báo cáo KPI cần cập nhật")
+    
+    const duplicate = kpiEntryRepo.getAll({ employeeId, date }).find(d => d.id !== id)
+    if (duplicate) {
+      throw new Error(`Báo cáo KPI cho ngày ${date} đã tồn tại ở một bản ghi khác.`)
+    }
+    
+    await getModel("kpiEntries").updateOne({ id }, { $set: { metrics, notes } })
+    return kpiEntryRepo.update(id, { metrics, notes })
+  } else {
+    const existing = kpiEntryRepo.getAll({ employeeId, date })[0]
+    if (existing) {
+      throw new Error(`Báo cáo KPI cho ngày ${date} đã tồn tại. Vui lòng chỉnh sửa báo cáo cũ thay vì tạo mới.`)
+    }
+    
+    const newEntry = {
+      id: "kpi-ent-" + Math.random().toString(36).substring(2, 9) + "-" + Date.now(),
+      employeeId,
+      date,
+      metrics: metrics || {
+        zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, 
+        khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0
+      },
+      notes: notes || ""
+    }
+    
+    await getModel("kpiEntries").create(JSON.parse(JSON.stringify(newEntry)))
+    return kpiEntryRepo.create(newEntry)
   }
-  
-  const newEntry = {
-    id: "kpi-ent-" + Math.random().toString(36).substring(2, 9) + "-" + Date.now(),
-    employeeId,
-    date,
-    metrics: metrics || {
-      zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, 
-      khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0
-    },
-    notes: notes || ""
-  }
-  kpiEntryRepo.create(newEntry)
-  return newEntry
 }
 
 export function calculatePoints(metrics) {

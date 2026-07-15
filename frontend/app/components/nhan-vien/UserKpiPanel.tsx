@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   CalendarDays, BarChart3, Plus, FileText, ChevronLeft, ChevronRight, Eye, RefreshCw, X, Check, ClipboardList, HelpCircle,
-  Calendar, DollarSign, Target, ArrowUpRight, ArrowDownRight
+  Calendar, DollarSign, Target, ArrowUpRight, ArrowDownRight, Edit2
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -180,6 +180,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
   // Interactive Modal states
   const [isInputModalOpen, setIsInputModalOpen] = useState(false);
   const [selectedEntryForDetail, setSelectedEntryForDetail] = useState<KpiEntry | null>(null);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
   // New entry form state
   const [formDate, setFormDate] = useState(() => new Date().toISOString().split("T")[0]);
@@ -523,6 +524,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     e.preventDefault();
     try {
       await api.kpi.saveEntry({
+        id: editingEntryId,
         employeeId: employee.id,
         date: formDate,
         metrics: formMetrics,
@@ -532,7 +534,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
       showToast(`Đã lưu báo cáo KPI ngày ${formDate}`, "success");
       setIsInputModalOpen(false);
     } catch (error) {
-      showToast("Lỗi khi lưu báo cáo", "error");
+      showToast(error instanceof Error ? error.message : "Lỗi khi lưu báo cáo", "error");
     }
   };
 
@@ -541,6 +543,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     const todayEntry = entries.find(x => x.employeeId === employee.id && x.date === todayStr);
 
     setFormDate(todayStr);
+    setEditingEntryId(null);
     if (todayEntry) {
       setFormMetrics(todayEntry.metrics);
       setFormNotes(todayEntry.notes);
@@ -557,6 +560,23 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     } else {
       setFormMetrics({ zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0 });
       setFormNotes("");
+      setCustomerDetails({ clientReply: [], khachChuDongIB: [], followUp: [] });
+    }
+    setIsInputModalOpen(true);
+  };
+
+  const handleEditEntry = (entry: KpiEntry) => {
+    setFormDate(entry.date);
+    setFormMetrics(entry.metrics);
+    setEditingEntryId(entry.id);
+    try {
+      const parsed = JSON.parse(entry.notes);
+      if (parsed && (parsed.clientReply || parsed.khachChuDongIB || parsed.followUp)) {
+        setCustomerDetails(parsed);
+      } else {
+        setCustomerDetails({ clientReply: [], khachChuDongIB: [], followUp: [] });
+      }
+    } catch {
       setCustomerDetails({ clientReply: [], khachChuDongIB: [], followUp: [] });
     }
     setIsInputModalOpen(true);
@@ -882,13 +902,22 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                             {formatRevenue(log.metrics.revenue)}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap text-center">
-                            <button
-                              onClick={() => setSelectedEntryForDetail(log)}
-                              className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer inline-flex items-center justify-center"
-                              title="Chi tiết"
-                            >
-                              <Eye size={16} />
-                            </button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => setSelectedEntryForDetail(log)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer inline-flex items-center justify-center"
+                                title="Chi tiết"
+                              >
+                                <Eye size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleEditEntry(log)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors p-1 rounded-full hover:bg-gray-100 dark:hover:bg-white/10 cursor-pointer inline-flex items-center justify-center"
+                                title="Sửa báo cáo"
+                              >
+                                <Edit2 size={15} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );

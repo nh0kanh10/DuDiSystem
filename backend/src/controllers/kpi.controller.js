@@ -1,5 +1,5 @@
 import * as kpiService from "../services/kpi.service.js"
-import { ok, serverError } from "../utils/response.js"
+import { ok, fail, serverError } from "../utils/response.js"
 
 export function getTargets(req, res) {
   try {
@@ -15,12 +15,12 @@ export function getTargets(req, res) {
   }
 }
 
-export function saveTarget(req, res) {
+export async function saveTarget(req, res) {
   try {
-    const target = kpiService.saveTarget(req.body)
+    const target = await kpiService.saveTarget(req.body)
     ok(res, target)
   } catch (error) {
-    serverError(res, error)
+    fail(res, error.message, 400)
   }
 }
 
@@ -50,11 +50,11 @@ export function getEntries(req, res) {
   }
 }
 
-export function saveEntry(req, res) {
+export async function saveEntry(req, res) {
   try {
-    const entry = kpiService.saveEntry(req.body)
+    const entry = await kpiService.saveEntry(req.body)
     ok(res, entry)
   } catch (error) {
-    serverError(res, error)
+    fail(res, error.message, 400)
   }
 }
