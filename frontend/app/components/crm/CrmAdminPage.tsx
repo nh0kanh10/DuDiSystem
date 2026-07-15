@@ -72,13 +72,15 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
   const [form, setForm] = useState({ ...emptyForm })
   const [formErrors, setFormErrors] = useState<any>({})
   const [selectedEmpId, setSelectedEmpId] = useState("")
-  const [autoAssignLoading, setAutoAssignLoading] = useState(false)
   const [autoAssignOpen, setAutoAssignOpen] = useState(false)
   const [autoAssignTab, setAutoAssignTab] = useState<"department" | "specific">("department")
   const [autoAssignDept, setAutoAssignDept] = useState("")
+  const [autoAssignSubDept, setAutoAssignSubDept] = useState("")
+  const [autoAssignSelectedEmpIds, setAutoAssignSelectedEmpIds] = useState<string[]>([])
   const [autoAssignSpecificEmp, setAutoAssignSpecificEmp] = useState("")
   const [autoAssignQuantity, setAutoAssignQuantity] = useState("")
-  const [autoAssignSelectedEmpIds, setAutoAssignSelectedEmpIds] = useState<string[]>([])
+  const [autoAssignLoading, setAutoAssignLoading] = useState(false)
+  const [orgNodes, setOrgNodes] = useState<any[]>([])
   const [reassignWarnOpen, setReassignWarnOpen] = useState(false)
   const [reassignWarnMsg, setReassignWarnMsg] = useState("")
   const [reassignAction, setReassignAction] = useState<{ onConfirm: () => void } | null>(null)
@@ -97,6 +99,14 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
   const { showToast: notify } = useToast()
   const [convertModalRecord, setConvertModalRecord] = useState<any>(null)
   const [convertLeadName, setConvertLeadName] = useState("")
+
+  const fetchOrgNodes = async () => {
+    try { setOrgNodes((await api.orgNodes.list()) as any[]) } catch { }
+  }
+
+  useEffect(() => {
+    fetchOrgNodes()
+  }, [])
 
   const handleConvertToLead = (record: { id: string; convertedLeadId?: string; businessName?: string }) => {
     setConvertModalRecord(record)
@@ -187,6 +197,7 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
   useEffect(() => {
     if (!autoAssignOpen) {
       setAutoAssignDept("")
+      setAutoAssignSubDept("")
       setAutoAssignSelectedEmpIds([])
       setAutoAssignSpecificEmp("")
       setAutoAssignQuantity("")
@@ -400,28 +411,63 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
     ),
     [employees, selectedBranch]
   )
+  const empOptions = activeEmployees.map((e: any) => ({ value: e.id, label: e.name }))
+
+  const deptOptions = useMemo(() => {
+    return orgNodes
+      .filter(n => n.type === "department" && (selectedBranch === "all" || n.parentId === selectedBranch))
+      .map(n => ({ value: n.id, label: n.name }))
+  }, [orgNodes, selectedBranch])
+
+  const subDeptOptions = useMemo(() => {
+    if (!autoAssignDept) return []
+    return orgNodes.filter(n => n.type === "sub-department" && n.parentId === autoAssignDept).map(n => ({ value: n.id, label: n.name }))
+  }, [orgNodes, autoAssignDept])
+
+  const getDescendantIds = (nodes: any[], parentId: string): string[] => {
+    const children = nodes.filter(n => n.parentId === parentId).map(n => n.id)
+    let all = [...children]
+    for (const childId of children) {
+      all = all.concat(getDescendantIds(nodes, childId))
+    }
+    return all
+  }
 
   const deptEmployees = useMemo(() => {
     if (!autoAssignDept) return []
-    return activeEmployees.filter((e: any) => e.department === autoAssignDept)
-  }, [activeEmployees, autoAssignDept])
+    const targetNodeId = autoAssignSubDept || autoAssignDept
+    const validOrgNodeIds = [targetNodeId, ...getDescendantIds(orgNodes, targetNodeId)]
+
+    return activeEmployees.filter((e: any) => {
+      if (e.orgNodeId && validOrgNodeIds.includes(e.orgNodeId)) return true
+      if (!autoAssignSubDept) {
+        const deptNode = orgNodes.find(n => n.id === autoAssignDept)
+        if (deptNode && e.department === deptNode.name) return true
+      }
+      return false
+    })
+  }, [activeEmployees, autoAssignDept, autoAssignSubDept, orgNodes])
 
   useEffect(() => {
     setAutoAssignSelectedEmpIds(deptEmployees.map((e: any) => e.id))
   }, [deptEmployees])
 
-  const allEmployeesInBranch = employees.filter(
-    (e: any) => selectedBranch === "all" || e.branchId === selectedBranch
-  )
-
-  const empOptions = activeEmployees.map((e: any) => ({ value: e.id, label: e.name }))
-  const deptOptions = Array.from(new Set(activeEmployees.map((e: any) => e.department).filter(Boolean))).map(d => ({ value: d as string, label: d as string }))
   const inlineEmpOptions = [{ value: "", label: "Bỏ giao (để trống)" }, ...empOptions]
-  const assignedFilterOptions = [
-    { value: "", label: "Tất cả nhân viên" },
-    { value: "unassigned", label: "Chưa giao" },
-    ...allEmployeesInBranch.map((e: any) => ({ value: e.id, label: e.name }))
-  ]
+  const assignedFilterOptions = useMemo(() => {
+    const base = [
+      { value: "", label: "Tất cả nhân viên" },
+      { value: "unassigned", label: "Chưa giao" }
+    ]
+    if (!stats || !stats.activeAssignees) {
+      return [...base, ...empOptions]
+    }
+    const withData = stats.activeAssignees.map((id: string) => {
+      const emp = employees.find((e: any) => e.id === id)
+      return { value: id, label: emp ? emp.name : id }
+    })
+    withData.sort((a: any, b: any) => a.label.localeCompare(b.label))
+    return [...base, ...withData]
+  }, [stats, employees, empOptions])
   const statusFilterOptions = [
     { value: "", label: "Tất cả trạng thái" },
     ...STATUSES_VN_DISPLAY.map(s => ({ value: s, label: s }))
@@ -1216,12 +1262,28 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Chọn phòng ban</label>
                 <CustomCombobox
                   value={autoAssignDept}
-                  onChange={setAutoAssignDept}
+                  onChange={(val) => {
+                    setAutoAssignDept(val)
+                    setAutoAssignSubDept("")
+                  }}
                   options={deptOptions}
                   placeholder="Chọn một phòng ban..."
                   showSearchIcon
                 />
               </div>
+
+              {autoAssignDept && subDeptOptions.length > 0 && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1 mt-3">Chọn bộ phận (Tuỳ chọn)</label>
+                  <CustomCombobox
+                    value={autoAssignSubDept}
+                    onChange={setAutoAssignSubDept}
+                    options={subDeptOptions}
+                    placeholder="Tất cả bộ phận..."
+                    showSearchIcon
+                  />
+                </div>
+              )}
 
               {autoAssignDept && (
                 <div className="space-y-3 pt-2">

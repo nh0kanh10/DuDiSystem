@@ -1,5 +1,6 @@
 import * as repo from "../repositories/task.repository.js"
 import * as empRepo from "../repositories/employee.repository.js"
+import * as notificationSvc from "./notification.service.js"
 import { emitTaskChanged } from "../socket/chat.socket.js"
 
 function todayVn() {
@@ -70,6 +71,16 @@ export function createTask(data) {
   })
   publishTask("created", task)
   if (task.parentId) syncParentStatus(task.parentId)
+
+  if (task.assigneeId) {
+    notificationSvc.createNotification({
+      type: "Công việc mới",
+      title: "Giao việc mới",
+      message: `Bạn được giao công việc mới: ${task.title}`,
+      recipientId: task.assigneeId
+    })
+  }
+
   return withEmployee(task)
 }
 
@@ -91,6 +102,16 @@ export function updateTask(id, patch) {
   publishTask("updated", task)
   const parentId = task.parentId || before?.parentId
   if (parentId) syncParentStatus(parentId)
+
+  if (task.assigneeId && before?.assigneeId !== task.assigneeId) {
+    notificationSvc.createNotification({
+      type: "Công việc mới",
+      title: "Giao việc mới",
+      message: `Bạn được phân công công việc: ${task.title}`,
+      recipientId: task.assigneeId
+    })
+  }
+
   return withEmployee(task)
 }
 
