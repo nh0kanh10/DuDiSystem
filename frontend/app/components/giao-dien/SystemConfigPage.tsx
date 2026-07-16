@@ -374,12 +374,12 @@ function LoyaltyBoardTab() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white border-b border-gray-100">
-                <th className="py-5 px-8 text-xs font-black text-gray-400 uppercase tracking-wider w-20 text-center">#</th>
-                <th className="py-5 px-5 text-xs font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Mã nhân viên</th>
-                <th className="py-5 px-5 text-xs font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Tên nhân viên</th>
-                <th className="py-5 px-5 text-xs font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Ngày bắt đầu</th>
-                <th className="py-5 px-5 text-xs font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Thời gian làm việc</th>
-                <th className="py-5 px-8 text-xs font-black text-gray-400 uppercase tracking-wider text-right whitespace-nowrap">Trạng thái</th>
+                <th className="py-4 px-5 text-[11px] font-black text-gray-400 uppercase tracking-wider w-12 text-center">#</th>
+                <th className="py-4 px-4 text-[11px] font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Mã nhân viên</th>
+                <th className="py-4 px-4 text-[11px] font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Tên nhân viên</th>
+                <th className="py-4 px-4 text-[11px] font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Ngày bắt đầu</th>
+                <th className="py-4 px-4 text-[11px] font-black text-gray-400 uppercase tracking-wider whitespace-nowrap">Thời gian làm việc</th>
+                <th className="py-4 px-5 text-[11px] font-black text-gray-400 uppercase tracking-wider text-right whitespace-nowrap">Trạng thái</th>
               </tr>
             </thead>
             <tbody>
@@ -393,7 +393,7 @@ function LoyaltyBoardTab() {
               )}
               {!loading && processedData.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-20 text-center text-gray-400 font-medium text-lg">Không tìm thấy nhân viên nào phù hợp</td>
+                  <td colSpan={6} className="py-20 text-center text-gray-400 font-medium text-sm">Không tìm thấy nhân viên nào phù hợp</td>
                 </tr>
               )}
               {!loading && processedData.map((emp, index) => {
@@ -408,39 +408,39 @@ function LoyaltyBoardTab() {
 
                 return (
                   <tr key={emp.id} className="border-b border-gray-50/50 hover:bg-red-50/20 transition-colors group">
-                    <td className="py-4 px-8 whitespace-nowrap">
-                      <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center text-xs font-black mx-auto ${rankColor}`}>
+                    <td className="py-3 px-5 whitespace-nowrap">
+                      <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-[10px] font-black mx-auto ${rankColor}`}>
                         {rank}
                       </div>
                     </td>
-                    <td className="py-4 px-5 whitespace-nowrap">
-                      <span className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm font-mono font-bold">
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-md text-xs font-mono font-bold">
                         {emp.id.replace('emp-', '')}
                       </span>
                     </td>
-                    <td className="py-4 px-5 whitespace-nowrap">
-                      <div className="font-bold text-base text-gray-800">{emp.name}</div>
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <div className="font-bold text-sm text-gray-800">{emp.name}</div>
                     </td>
-                    <td className="py-4 px-5 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-600">
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <div className="text-xs font-medium text-gray-600">
                         {emp._joinDateObj.toLocaleDateString("en-GB")}
                       </div>
                       {!emp.isWorking && emp.resignDate && (
-                        <div className="text-xs text-red-400 mt-1 font-semibold">Nghỉ việc: {new Date(emp.resignDate).toLocaleDateString("en-GB")}</div>
+                        <div className="text-[10px] text-red-400 mt-1 font-semibold">Nghỉ việc: {new Date(emp.resignDate).toLocaleDateString("en-GB")}</div>
                       )}
                     </td>
-                    <td className="py-4 px-5 whitespace-nowrap">
-                      <div className="font-bold text-emerald-600 text-sm">{emp.formattedDuration}</div>
-                      <div className="text-xs text-gray-400 mt-1 font-medium">{emp.isWorking ? "Tính đến hiện tại: " : "Đã làm: "} {emp.totalDays} ngày</div>
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <div className="font-bold text-emerald-600 text-xs">{emp.formattedDuration}</div>
+                      <div className="text-[10px] text-gray-400 mt-0.5 font-medium">{emp.isWorking ? "Tính đến hiện tại: " : "Đã làm: "} {emp.totalDays} ngày</div>
                     </td>
-                    <td className="py-4 px-8 text-right whitespace-nowrap">
+                    <td className="py-3 px-5 text-right whitespace-nowrap">
                       {emp.isWorking ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold border border-emerald-100 whitespace-nowrap">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span> Đang làm việc
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[11px] font-bold border border-emerald-100 whitespace-nowrap">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span> Đang làm việc
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 rounded-full text-xs font-bold border border-red-100 whitespace-nowrap">
-                          <span className="w-3 h-3 rounded-full bg-red-500 flex items-center justify-center text-[10px] text-white font-black leading-none pb-0.5 shrink-0">×</span> Nghỉ việc
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 text-red-600 rounded-full text-[11px] font-bold border border-red-100 whitespace-nowrap">
+                          <span className="w-2 h-2 rounded-full bg-red-500 flex items-center justify-center text-[8px] text-white font-black leading-none pb-[1px] shrink-0">×</span> Nghỉ việc
                         </span>
                       )}
                     </td>
