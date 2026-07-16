@@ -213,18 +213,27 @@ function LoyaltyBoardTab() {
   const now = new Date()
   const processedData = useMemo(() => {
     let result = employees.map(emp => {
-      const joinDate = new Date(emp.joinDate || Date.now())
+      let joinDate = new Date(emp.joinDate)
+      if (isNaN(joinDate.getTime())) {
+        joinDate = new Date() // Fallback if missing or invalid
+      }
+
       let endDate = now
       let isWorking = true
 
       if (emp.status === "inactive" || emp.status === "suspended") {
         isWorking = false
         if (emp.resignDate) {
-          endDate = new Date(emp.resignDate)
+          const resign = new Date(emp.resignDate)
+          if (!isNaN(resign.getTime())) {
+            endDate = resign
+          }
         }
       }
 
-      const diffTime = Math.max(0, endDate.getTime() - joinDate.getTime())
+      let diffTime = endDate.getTime() - joinDate.getTime()
+      if (isNaN(diffTime) || diffTime < 0) diffTime = 0
+
       const totalDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
 
       return {
