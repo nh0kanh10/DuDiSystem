@@ -1046,24 +1046,38 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   const handleSaveTarget = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (!api || !api.kpi) {
-        // fallback placeholder if api is not injected or defined
-        throw new Error("API not initialized");
-      }
-      await api.kpi.saveTarget({
-        id: editingTargetId || undefined,
-        employeeId: targetEmployeeId,
-        month: targetForm.month,
-        metrics: targetForm.metrics
-      });
-      // Fallback load if loadData is undefined
-      if (typeof loadData === 'function') {
-        await loadData();
+      const api: any = (window as any).api || (globalThis as any).api;
+      if (api && api.kpi) {
+        await api.kpi.saveTarget({
+          id: editingTargetId || undefined,
+          employeeId: targetEmployeeId,
+          month: targetForm.month,
+          metrics: targetForm.metrics
+        });
+        handleRefresh();
+        setIsTargetModalOpen(false);
+        showToast("Đã lưu chỉ tiêu KPI mới thành công!", "success");
       } else {
-        // ...
+        const currentTargets = getStoredKpiTargets();
+        const newTarget: KpiTarget = {
+          id: targetEmployeeId === "all" ? `t-default-${targetForm.month}` : `t-${targetEmployeeId}-${targetForm.month}`,
+          employeeId: targetEmployeeId,
+          month: targetForm.month,
+          metrics: targetForm.metrics
+        };
+        const nextTargets = currentTargets.filter(t => !(t.employeeId === targetEmployeeId && t.month === targetForm.month));
+        if (editingTargetId) {
+          const eTarget = nextTargets.find(t => t.id === editingTargetId);
+          if (eTarget) Object.assign(eTarget, newTarget);
+          else nextTargets.push(newTarget);
+        } else {
+          nextTargets.push(newTarget);
+        }
+        saveStoredKpiTargets(nextTargets);
+        setTargets(nextTargets);
+        setIsTargetModalOpen(false);
+        showToast("Đã lưu chỉ tiêu KPI mới thành công!", "success");
       }
-      setIsTargetModalOpen(false);
-      showToast("Đã lưu chỉ tiêu KPI mới thành công!", "success");
     } catch (err: any) {
       showToast(err instanceof Error ? err.message : "Lỗi khi lưu chỉ tiêu KPI", "error");
     }

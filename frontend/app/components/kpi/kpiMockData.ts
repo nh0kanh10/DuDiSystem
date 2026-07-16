@@ -13,15 +13,15 @@ export interface KpiMetrics {
 
 export interface KpiTarget {
   id: string;
-  employeeId: string; 
-  month: string; 
+  employeeId: string;
+  month: string;
   metrics: KpiMetrics;
 }
 
 export interface KpiEntry {
   id: string;
   employeeId: string;
-  date: string;  
+  date: string;
   metrics: KpiMetrics;
   notes: string;
 }
@@ -36,7 +36,7 @@ export const KPI_POINTS_WEIGHT: Record<keyof KpiMetrics, number> = {
   followUp: 5,
   quote: 15,
   deal: 50,
-  revenue: 0.00001, 
+  revenue: 0.00001,
 };
 
 export const KPI_METRIC_LABELS: Record<keyof KpiMetrics, string> = {
@@ -76,6 +76,34 @@ export function clearKpiMockData() {
   localStorage.removeItem("dudi_kpi_targets");
 }
 
+export function getStoredKpiEntries(employeeId?: string): KpiEntry[] {
+  try {
+    const data = localStorage.getItem("dudi_kpi_entries_v4");
+    if (!data) return [];
+    let entries: KpiEntry[] = JSON.parse(data);
+    if (employeeId) {
+      entries = entries.filter((e) => e.employeeId === employeeId);
+    }
+    return entries;
+  } catch (error) {
+    return [];
+  }
+}
 
+export function saveStoredKpiEntries(entries: KpiEntry[]) {
+  localStorage.setItem("dudi_kpi_entries_v4", JSON.stringify(entries));
+}
 
+export function getStoredKpiTargets(): KpiTarget[] {
+  try {
+    const data = localStorage.getItem("dudi_kpi_targets");
+    if (!data) return [];
+    return JSON.parse(data);
+  } catch (error) {
+    return [];
+  }
+}
 
+export function saveStoredKpiTargets(targets: KpiTarget[]) {
+  localStorage.setItem("dudi_kpi_targets", JSON.stringify(targets));
+}

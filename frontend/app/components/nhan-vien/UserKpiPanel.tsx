@@ -375,7 +375,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
   // Get employee targets for selected month
   const monthTargets = useMemo(() => {
-    return getTarget(employee.id, selectedMonth);
+    const targets = getStoredKpiTargets();
+    return getTarget(employee.id, selectedMonth, targets);
   }, [employee.id, selectedMonth]);
 
   const getDailyTarget = (metricKey: keyof KpiMetrics) => {
@@ -517,7 +518,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
       } else {
         // Fallback to local storage if API isn't injected yet
         const currentEntries = getStoredKpiEntries();
-        const existingIndex = currentEntries.findIndex(x => x.employeeId === employee.id && x.date === formDate);
+        const existingIndex = currentEntries.findIndex((x: KpiEntry) => x.employeeId === employee.id && x.date === formDate);
         const newEntry: KpiEntry = {
           id: `entry-${employee.id}-${formDate}`,
           employeeId: employee.id,
