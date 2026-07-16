@@ -124,9 +124,9 @@ export function CustomSelect({
   const hasWidth = className.split(" ").some(c => c.startsWith("w-") || c.startsWith("flex-1"))
 
   const menuContent = (
-    <div ref={menuRef} className={`bg-white border border-gray-200 rounded-xl shadow-lg z-50 flex flex-col max-h-60 overflow-hidden min-w-full ${menuClassName}`}>
+    <div ref={menuRef} className={`bg-white dark:bg-white/[0.08] dark:backdrop-blur-[24px] dark:border-white/10 border border-gray-200 rounded-xl shadow-lg dark:shadow-[0_16px_40px_rgba(0,0,0,0.6)] z-50 flex flex-col max-h-60 overflow-hidden min-w-full ${menuClassName}`}>
       {searchable && (
-        <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center relative">
+        <div className="p-2 border-b border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5 flex items-center relative">
           <Search size={12} className="absolute left-4 text-gray-400" />
           <input
             ref={searchInputRef}
@@ -134,12 +134,12 @@ export function CustomSelect({
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Nhập từ khóa tìm kiếm..."
-            className="w-full pl-7 pr-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:border-[#C62828]/40 bg-white text-gray-700 font-medium"
+            className="w-full pl-7 pr-2.5 py-1.5 border border-gray-200 dark:border-white/10 rounded-lg text-xs focus:outline-none focus:border-[#C62828]/40 bg-white dark:bg-white/5 text-gray-700 dark:text-gray-200 font-medium"
             onClick={e => e.stopPropagation()}
           />
         </div>
       )}
-      <div className="overflow-y-auto py-1 divide-y divide-gray-50 flex-1" style={{ scrollbarWidth: "thin" }}>
+      <div className="overflow-y-auto py-1 divide-y divide-gray-50 dark:divide-white/5 flex-1" style={{ scrollbarWidth: "thin" }}>
         {filteredOptions.length > 0 ? (
           filteredOptions.map(opt => (
             <button
@@ -149,13 +149,13 @@ export function CustomSelect({
                 onChange(opt.value)
                 setIsOpen(false)
               }}
-              className={`w-full px-4 py-2.5 text-left text-xs font-bold transition-colors block truncate ${value === opt.value ? "bg-[#C62828]/5 text-[#C62828]" : "text-gray-700 hover:bg-gray-50"}`}
+              className={`w-full px-4 py-2.5 text-left text-xs font-bold transition-colors block truncate ${value === opt.value ? "bg-[#C62828]/5 text-[#C62828] dark:bg-[#C62828]/10" : "text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10"}`}
             >
               {opt.label}
             </button>
           ))
         ) : (
-          <div className="px-4 py-3 text-xs text-gray-400 text-center font-medium">Không tìm thấy kết quả</div>
+          <div className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 text-center font-medium">Không tìm thấy kết quả</div>
         )}
       </div>
     </div>
@@ -180,7 +180,7 @@ export function CustomSelect({
             return nextOpen
           })
         }}
-        className={`w-full flex items-center justify-between px-3 py-2 border border-gray-200 rounded-xl text-xs text-gray-700 bg-white font-bold ${heightClass} focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50/50 transition-colors disabled:bg-gray-50 disabled:text-gray-400 text-left`}
+        className={`w-full flex items-center justify-between px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-700 dark:text-gray-200 bg-white dark:bg-white/5 font-bold ${heightClass} focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50/50 dark:hover:bg-white/10 transition-colors disabled:bg-gray-50 dark:disabled:bg-white/5 disabled:text-gray-400 text-left`}
       >
         <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
         <ChevronDown size={14} className="text-gray-400 pointer-events-none flex-shrink-0 ml-1" />

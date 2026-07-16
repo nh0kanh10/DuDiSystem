@@ -477,7 +477,6 @@ export function getAdminDashboard({ branchId, period = "all" } = {}) {
     unassignedData: all.length - assigned,
     statusCounts: dashboardStatusCounts,
     employeeProgress,
-    activeAssignees: Array.from(new Set(all.filter(r => r.assignedTo).map(r => r.assignedTo))),
   }
 }
 

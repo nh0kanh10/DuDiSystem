@@ -6,12 +6,12 @@ import { EMPLOYEE_KIND, INTERN_SESSION, internSessionRange } from "../cham-cong/
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
-  "on-time": { label: "Đúng giờ", color: "text-[#10B981]", bg: "bg-[#F0FDF4] border border-[#BBF7D0]" },
-  late: { label: "Đi trễ", color: "text-[#F59E0B]", bg: "bg-[#FFFCEB] border border-[#FDE68A]" },
-  early: { label: "Về sớm", color: "text-[#F59E0B]", bg: "bg-[#FFFCEB] border border-[#FDE68A]" },
-  late_early: { label: "Vào trễ, ra sớm", color: "text-[#F59E0B]", bg: "bg-[#FFFCEB] border border-[#FDE68A]" },
-  absent: { label: "Vắng mặt", color: "text-[#EF4444]", bg: "bg-[#FEF2F2] border border-[#FECACA]" },
-  leave: { label: "Nghỉ phép", color: "text-[#10B981]", bg: "bg-[#F0FDF4] border border-[#BBF7D0]" },
+  "on-time": { label: "Đúng giờ", color: "text-[#10B981] dark:text-emerald-400", bg: "bg-[#F0FDF4] dark:bg-emerald-500/10 border border-[#BBF7D0] dark:border-emerald-500/20" },
+  late: { label: "Đi trễ", color: "text-[#F59E0B] dark:text-amber-400", bg: "bg-[#FFFCEB] dark:bg-amber-500/10 border border-[#FDE68A] dark:border-amber-500/20" },
+  early: { label: "Về sớm", color: "text-[#F59E0B] dark:text-amber-400", bg: "bg-[#FFFCEB] dark:bg-amber-500/10 border border-[#FDE68A] dark:border-amber-500/20" },
+  late_early: { label: "Vào trễ, ra sớm", color: "text-[#F59E0B] dark:text-amber-400", bg: "bg-[#FFFCEB] dark:bg-orange-500/10 border border-[#FDE68A] dark:border-orange-500/20" },
+  absent: { label: "Vắng mặt", color: "text-[#EF4444] dark:text-rose-400", bg: "bg-[#FEF2F2] dark:bg-rose-500/10 border border-[#FECACA] dark:border-rose-500/20" },
+  leave: { label: "Nghỉ phép", color: "text-[#10B981] dark:text-emerald-400", bg: "bg-[#F0FDF4] dark:bg-emerald-500/10 border border-[#BBF7D0] dark:border-emerald-500/20" },
 }
 
 const PORTAL_BRAND = "#E8231A"
@@ -34,7 +34,7 @@ function InternSessionStatusBadges({ statusAm, statusPm }: { statusAm?: string; 
         const s = ATT_STATUS_STYLE[status ?? "absent"] ?? ATT_STATUS_STYLE.absent
         return (
           <span key={label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap ${s.bg} ${s.text}`}>
-            <span className="text-gray-500 font-black">{label}:</span>
+            <span className="text-gray-500 dark:text-current font-black opacity-60">{label}:</span>
             {s.label}
           </span>
         )
@@ -210,8 +210,8 @@ function PortalAttendanceView() {
         <div style={{ fontSize: 12, color: "#6f565a", textAlign: "center", fontFamily: "monospace", lineHeight: 1.6 }}>
           {isIntern ? (
             <>
-              <div>{internSessionRange(todayRecord, "am")}</div>
-              <div>{internSessionRange(todayRecord, "pm")}</div>
+              <div style={{ whiteSpace: "nowrap" }}>{internSessionRange(todayRecord, "am")}</div>
+              <div style={{ whiteSpace: "nowrap" }}>{internSessionRange(todayRecord, "pm")}</div>
               {todayRecord.autoFilled && <div style={{ color: "#fbbf24", marginTop: 4 }}>Làm cả ngày — tự ghi giờ trưa</div>}
             </>
           ) : (
@@ -423,7 +423,7 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
             </div>
           </div>
 
-          <div className={`mt-6 flex items-center gap-3 text-sm rounded-2xl py-3 px-6 shadow-sm border w-fit ${punchLabel.done
+          <div className={`mt-6 flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-3 text-sm rounded-2xl py-3 px-5 sm:px-6 shadow-sm border w-fit ${punchLabel.done
             ? "text-gray-500 bg-gray-50/80 dark:bg-white/10 border-gray-200 dark:border-white/10 dark:text-gray-300"
             : working
               ? "text-[#10B981] bg-green-50/80 dark:bg-green-500/10 border-[#10B981]/30"
@@ -431,12 +431,12 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
             }`}>
             <div className="flex items-center gap-2">
               <Calendar size={18} strokeWidth={2.5} />
-              <span className={`font-bold ${punchLabel.done ? "dark:text-white" : ""}`}>Ngày: {clock.date}</span>
+              <span className={`font-bold whitespace-nowrap ${punchLabel.done ? "dark:text-white" : ""}`}>Ngày: {clock.date}</span>
             </div>
-            <span className="mx-2 opacity-30">|</span>
+            <span className="hidden sm:inline-block mx-2 opacity-30">|</span>
             <div className="flex items-center gap-2">
               <Clock size={18} strokeWidth={2.5} />
-              <span className={`font-black font-mono tracking-wider ml-0.5 text-[15px] ${!punchLabel.done
+              <span className={`font-black font-mono whitespace-nowrap tracking-wider ml-0.5 text-[15px] ${!punchLabel.done
                 ? (working ? "dark:text-emerald-400 dark:drop-shadow-[0_0_10px_rgba(52,211,153,0.8)]" : "dark:text-rose-400 dark:drop-shadow-[0_0_10px_rgba(251,113,133,0.8)]")
                 : "dark:text-white"
                 }`}>
@@ -446,11 +446,11 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
           </div>
 
           {todayRecord && (
-            <div className="text-[#6B7280] dark:text-white text-sm mt-5 font-mono space-y-1 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-white/20 p-3 rounded-xl w-fit drop-shadow-sm">
+            <div className="text-[#6B7280] dark:text-white text-sm mt-4 sm:mt-5 font-mono space-y-1 bg-gray-50 dark:bg-white/10 border border-gray-200 dark:border-white/20 p-3 rounded-xl w-fit drop-shadow-sm">
               {isIntern ? (
                 <>
-                  <p className="font-bold">{internSessionRange(todayRecord, "am")}</p>
-                  <p className="font-bold">{internSessionRange(todayRecord, "pm")}</p>
+                  <p className="font-bold whitespace-nowrap">{internSessionRange(todayRecord, "am")}</p>
+                  <p className="font-bold whitespace-nowrap">{internSessionRange(todayRecord, "pm")}</p>
                   {todayRecord.autoFilled && (
                     <p className="text-[#F59E0B] text-xs mt-1">Làm cả ngày — hệ thống tự ghi giờ nghỉ trưa</p>
                   )}
@@ -507,16 +507,16 @@ export default function UserAttendance({ variant = "default" }: { variant?: "def
       </div>
 
       <div className="bg-white/80 dark:bg-white/[0.04] backdrop-blur-xl rounded-[2rem] shadow-sm border border-gray-100 dark:border-white/5 overflow-hidden mt-6">
-        <div className="px-8 py-6 border-b border-gray-100/60 dark:border-white/5 flex items-center justify-between bg-white/40 dark:bg-transparent">
-          <h3 className="font-bold text-[#111827] dark:text-gray-100 text-lg">Lịch sử chấm công</h3>
-          <div className="flex items-center gap-3 text-sm text-[#6B7280] dark:text-gray-400 font-medium bg-white/50 dark:bg-white/10 px-3 py-1.5 rounded-full shadow-sm border border-gray-100 dark:border-white/5">
-            <Calendar size={14} />
-            <span className="capitalize">{monthLabel}</span>
-            <div className="w-[1px] h-4 bg-gray-200 dark:bg-white/20 mx-1" />
-            <button onClick={verifyWifi} className="p-1 hover:text-[#EF4444] dark:hover:text-red-400 transition-colors" title="Kiểm tra WiFi">
+        <div className="px-5 sm:px-8 py-5 sm:py-6 border-b border-gray-100/60 dark:border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0 bg-white/40 dark:bg-transparent">
+          <h3 className="font-bold whitespace-nowrap text-[#111827] dark:text-gray-100 text-lg">Lịch sử chấm công</h3>
+          <div className="flex items-center gap-3 text-sm text-[#6B7280] dark:text-gray-400 font-medium bg-white/50 dark:bg-white/10 px-3 py-1.5 rounded-full shadow-sm border border-gray-100 dark:border-white/5 w-fit">
+            <Calendar size={14} className="shrink-0" />
+            <span className="capitalize whitespace-nowrap">{monthLabel}</span>
+            <div className="w-[1px] h-4 bg-gray-200 dark:bg-white/20 mx-1 shrink-0" />
+            <button onClick={verifyWifi} className="p-1 hover:text-[#EF4444] dark:hover:text-red-400 transition-colors shrink-0" title="Kiểm tra WiFi">
               <Wifi size={14} />
             </button>
-            <button onClick={reload} className="p-1 hover:text-[#10B981] transition-colors" title="Tải lại">
+            <button onClick={reload} className="p-1 hover:text-[#10B981] transition-colors shrink-0" title="Tải lại">
               <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
             </button>
           </div>

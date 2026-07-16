@@ -18,10 +18,10 @@ interface ModalProps {
 }
 
 const WIDTH = {
-  sm:  "max-w-sm",
-  md:  "max-w-md",
-  lg:  "max-w-lg",
-  xl:  "max-w-4xl",
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-lg",
+  xl: "max-w-4xl",
   "3xl": "max-w-3xl",
   "5xl": "max-w-5xl",
   "6xl": "max-w-6xl",
@@ -37,7 +37,7 @@ export function Modal({ open, onClose, title, icon: Icon, width = "xl", children
     >
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
       <div
-        className={`relative bg-white rounded-3xl shadow-2xl w-full ${WIDTH[width]} flex flex-col max-h-[90vh]`}
+        className={`relative bg-white dark:bg-white/[0.07] dark:backdrop-blur-[36px] dark:border dark:border-white/10 dark:shadow-[0_32px_80px_rgba(0,0,0,0.7)] rounded-3xl shadow-2xl w-full ${WIDTH[width]} flex flex-col max-h-[90vh]`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -65,7 +65,7 @@ export function Modal({ open, onClose, title, icon: Icon, width = "xl", children
 
         {/* Footer */}
         {footer && !noFooter && (
-          <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0">
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 dark:border-white/10 flex-shrink-0">
             {footer}
           </div>
         )}
@@ -80,7 +80,7 @@ export function ModalCancelButton({ onClick, label = "Hủy" }: { onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      className="px-5 py-2.5 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-100 transition-colors"
+      className="px-5 py-2.5 rounded-xl text-sm font-bold text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
     >
       {label}
     </button>

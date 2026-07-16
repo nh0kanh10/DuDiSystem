@@ -9,11 +9,11 @@ import {
 import { Employee } from "../../types";
 import { NestedOverlay } from "../ui/NestedOverlay";
 import { useToast } from "../../hooks/useToast";
-import { api } from "../../../lib/api";
+import { CustomDatePicker } from "../ui/CustomDatePicker";
 import {
-  calculateKpiPoints, KpiEntry, KpiMetrics, KPI_METRIC_LABELS, KPI_POINTS_WEIGHT, KpiTarget
+  getStoredKpiEntries, getStoredKpiTargets, saveStoredKpiEntries,
+  calculateKpiPoints, getTarget, KpiEntry, KpiMetrics, KPI_METRIC_LABELS, KPI_POINTS_WEIGHT
 } from "../kpi/kpiMockData";
-
 const RenderCircleDot = (props: any) => {
   const { cx, cy, stroke } = props;
   if (!cx || !cy) return null;
@@ -142,7 +142,6 @@ interface UserKpiPanelProps {
 export function UserKpiPanel({ employee }: UserKpiPanelProps) {
   const { showToast } = useToast();
   const handleMetricChange = (key: keyof KpiMetrics, rawValue: string) => {
-    rawValue = rawValue.replace(/^0+(?=\d)/, "");
     let val = parseInt(rawValue) || 0;
     if (val < 0) val = 0;
     const customerKeys: (keyof KpiMetrics)[] = ["clientReply", "khachChuDongIB", "followUp"];
@@ -155,26 +154,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
   const [activeSubTab, setActiveSubTab] = useState<"overview" | "history">("overview");
   const [historyPage, setHistoryPage] = useState(1);
 
-  // Load KPI data from backend
-  const [entries, setEntries] = useState<KpiEntry[]>([]);
-  const [targets, setTargets] = useState<KpiTarget[]>([]);
-
-  const loadData = async () => {
-    if (!employee?.id) return;
-    try {
-      const [eRes, tRes] = await Promise.all([
-        api.kpi.getEntries({ employeeId: employee.id }),
-        api.kpi.getTargets({ employeeId: employee.id })
-      ]);
-      setEntries(eRes || []);
-      setTargets(tRes || []);
-    } catch (error) {
-      showToast("Lỗi tải dữ liệu KPI", "error");
-    }
-  };
+  // Load KPI data from local storage
+  const [entries, setEntries] = useState<KpiEntry[]>(() => getStoredKpiEntries(employee?.id));
 
   React.useEffect(() => {
-    loadData();
+    if (employee?.id) {
+      setEntries(getStoredKpiEntries(employee.id));
+    }
   }, [employee?.id]);
 
   // Interactive Modal states
@@ -218,6 +204,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     });
   }, [formMetrics.clientReply, formMetrics.khachChuDongIB, formMetrics.followUp]);
 
+  // Lock background scroll when modals are open
   React.useEffect(() => {
     if (isInputModalOpen || selectedEntryForDetail) {
       document.body.style.overflow = "hidden";
@@ -229,11 +216,12 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     };
   }, [isInputModalOpen, selectedEntryForDetail]);
 
-  const handleRefresh = async () => {
-    await loadData();
+  const handleRefresh = () => {
+    setEntries(getStoredKpiEntries());
     showToast("Đã cập nhật dữ liệu KPI cá nhân!", "success");
   };
 
+  // If employee is null, render loading state
   if (!employee) {
     return (
       <div className="flex items-center justify-center p-12 text-gray-400 text-xs">
@@ -243,6 +231,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
     );
   }
 
+  // Vietnamese month name translation helper
   const getVietnameseMonthName = (monthStr: string) => {
     if (!monthStr) return "-----------------";
     const parts = monthStr.split("-");
@@ -385,20 +374,11 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
   // Get employee targets for selected month
   const monthTargets = useMemo(() => {
-    const found = targets.find(t => t.month === selectedMonth && (t.employeeId === employee.id || t.employeeId === "all"));
-    if (found) return found;
-    return {
-      id: "default",
-      employeeId: "all",
-      month: selectedMonth,
-      metrics: {
-        zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0,
-        khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0
-      }
-    };
-  }, [employee.id, selectedMonth, targets]);
+    return getTarget(employee.id, selectedMonth);
+  }, [employee.id, selectedMonth]);
+
   const getDailyTarget = (metricKey: keyof KpiMetrics) => {
-    const monthlyTarget = monthTargets.metrics[metricKey] || 0;
+    const monthlyTarget = monthTargets[metricKey] || 0;
     return Math.ceil(monthlyTarget / 23);
   };
 
@@ -519,21 +499,35 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
   }, [entries, employee.id, selectedMonth]);
 
   // Save new entry
-  const handleSaveEntry = async (e: React.FormEvent) => {
+  const handleSaveEntry = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await api.kpi.saveEntry({
-        employeeId: employee.id,
-        date: formDate,
-        metrics: formMetrics,
-        notes: JSON.stringify(customerDetails)
-      });
-      await loadData();
-      showToast(`Đã lưu báo cáo KPI ngày ${formDate}`, "success");
-      setIsInputModalOpen(false);
-    } catch (error) {
-      showToast("Lỗi khi lưu báo cáo", "error");
+    const currentEntries = getStoredKpiEntries();
+
+    // Check if entry for this date already exists
+    const existingIndex = currentEntries.findIndex(x => x.employeeId === employee.id && x.date === formDate);
+
+    const newEntry: KpiEntry = {
+      id: `entry-${employee.id}-${formDate}`,
+      employeeId: employee.id,
+      date: formDate,
+      metrics: formMetrics,
+      notes: JSON.stringify(customerDetails)
+    };
+
+    let nextEntries = [...currentEntries];
+    if (existingIndex > -1) {
+      // Overwrite existing log
+      nextEntries[existingIndex] = newEntry;
+      showToast(`Đã cập nhật báo cáo KPI ngày ${formDate}`, "success");
+    } else {
+      // Insert new log
+      nextEntries.push(newEntry);
+      showToast(`Đã lưu báo cáo KPI ngày ${formDate} thành công!`, "success");
     }
+
+    saveStoredKpiEntries(nextEntries);
+    setEntries(nextEntries);
+    setIsInputModalOpen(false);
   };
 
   const openInputModal = () => {
@@ -579,8 +573,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
           <button
             onClick={() => setActiveSubTab("overview")}
             className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeSubTab === "overview"
-                ? "bg-white dark:bg-white/10 text-[#E8231A] dark:text-[#FFE8EC] shadow-sm"
-                : "text-[#8b6b70] dark:text-white/40 hover:text-[#C62828] dark:hover:text-white"
+              ? "bg-white dark:bg-white/10 text-[#E8231A] dark:text-[#FFE8EC] shadow-sm"
+              : "text-[#8b6b70] dark:text-white/40 hover:text-[#C62828] dark:hover:text-white"
               }`}
           >
             Tổng quan
@@ -588,8 +582,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
           <button
             onClick={() => setActiveSubTab("history")}
             className={`py-1.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeSubTab === "history"
-                ? "bg-white dark:bg-white/10 text-[#E8231A] dark:text-[#FFE8EC] shadow-sm"
-                : "text-[#8b6b70] dark:text-white/40 hover:text-[#C62828] dark:hover:text-white"
+              ? "bg-white dark:bg-white/10 text-[#E8231A] dark:text-[#FFE8EC] shadow-sm"
+              : "text-[#8b6b70] dark:text-white/40 hover:text-[#C62828] dark:hover:text-white"
               }`}
           >
             Lịch sử KPI
@@ -728,19 +722,23 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
             <div className="space-y-4">
               {Object.entries(KPI_METRIC_LABELS)
-                .filter(([key]) => key !== "khachChuDongIB")
+                .filter(([key]) => key !== "khachChuDongIB") // Exclude khachChuDongIB from progress lines
                 .map(([key, label]) => {
                   const currentVal = currentMonthTotals[key as keyof KpiMetrics];
-                  const targetVal = monthTargets.metrics[key as keyof KpiMetrics];
-                  const pct = targetVal > 0 ? Math.min(Math.round((currentVal / targetVal) * 100), 100) : 100;
-                  const isMet = currentVal >= targetVal;
+                  const targetVal = monthTargets[key as keyof KpiMetrics];
+                  const pct = targetVal > 0 ? Math.min(Math.round((currentVal / targetVal) * 100), 100) : (currentVal > 0 ? 100 : 0);
+                  const isMet = currentVal > 0 && currentVal >= targetVal;
+                  const isNoTarget = targetVal === 0 && currentVal === 0;
                   const isRevenue = key === "revenue";
 
-                  let barColor = "bg-[#DC2626]";
-                  if (pct >= 80) {
-                    barColor = "bg-[#16A34A]";
+                  // Bar color styling based on percentage completion
+                  let barColor = "bg-[#DC2626]"; // Red (<30%)
+                  if (isNoTarget) {
+                    barColor = "bg-transparent";
+                  } else if (pct >= 80) {
+                    barColor = "bg-[#16A34A]"; // Green (>=80%)
                   } else if (pct >= 30) {
-                    barColor = "bg-[#EA580C]";
+                    barColor = "bg-[#EA580C]"; // Orange (30-79%)
                   }
 
                   return (
@@ -754,14 +752,16 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                               : `${currentVal} / ${targetVal} (${pct}%)`
                             }
                           </span>
-                          <span className={`px-2 py-0.5 rounded-md text-[8px] font-bold ${isMet ? "bg-green-50 text-green-600 border border-green-200" : "bg-red-50 text-[#C62828] border border-red-200"
+                          <span className={`px-2 py-0.5 rounded-md text-[8px] font-bold ${isNoTarget
+                            ? "bg-gray-100 text-gray-400 border border-transparent dark:bg-white/5 dark:text-gray-400"
+                            : (isMet ? "bg-green-50 text-green-600 border border-green-200" : "bg-red-50 text-[#C62828] border border-red-200")
                             }`}>
-                            {isMet ? "Đạt KPI" : "Chưa đủ KPI"}
+                            {isNoTarget ? "Không yêu cầu" : (isMet ? "Đạt KPI" : "Chưa đủ KPI")}
                           </span>
                         </div>
                       </div>
                       <div className="w-full bg-gray-100 dark:bg-white/10 h-2.5 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );
@@ -909,8 +909,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                     className={`w-8 h-8 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 flex items-center justify-center transition-colors ${currentPage === 1
-                        ? "opacity-50 cursor-not-allowed text-gray-300"
-                        : "hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-[#FFE8EC] cursor-pointer text-gray-600 dark:text-gray-350"
+                      ? "opacity-50 cursor-not-allowed text-gray-300"
+                      : "hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-[#FFE8EC] cursor-pointer text-gray-600 dark:text-gray-350"
                       }`}
                   >
                     <ChevronLeft size={16} />
@@ -919,8 +919,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                     onClick={() => setHistoryPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
                     className={`w-8 h-8 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 flex items-center justify-center transition-colors ${currentPage === totalPages
-                        ? "opacity-50 cursor-not-allowed text-gray-300"
-                        : "hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-[#FFE8EC] cursor-pointer text-gray-600 dark:text-gray-350"
+                      ? "opacity-50 cursor-not-allowed text-gray-300"
+                      : "hover:bg-gray-50 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-[#FFE8EC] cursor-pointer text-gray-600 dark:text-gray-350"
                       }`}
                   >
                     <ChevronRight size={16} />
@@ -935,27 +935,30 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
       {/* Entry Daily Form Modal */}
       {isInputModalOpen && (
         <NestedOverlay>
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col" style={{ animation: "sessionModalIn 0.2s ease", maxHeight: "90vh" }} onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white dark:bg-white/[0.07] dark:backdrop-blur-[36px] dark:border dark:border-white/10 dark:shadow-[0_32px_80px_rgba(0,0,0,0.7),inset_0_0_0_1px_rgba(255,255,255,0.03)] rounded-3xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col" style={{ animation: "sessionModalIn 0.2s ease", maxHeight: "90vh" }} onClick={(e) => e.stopPropagation()}>
             <div className="h-1.5 bg-gradient-to-r from-[#E8231A] to-[#FF8800]" />
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-sm font-extrabold text-gray-800">Nhập số liệu báo cáo KPI</h3>
+            <div className="p-6 border-b border-gray-100 dark:border-white/10 flex justify-between items-center">
+              <h3 className="text-sm font-extrabold text-gray-800 dark:text-[#FFE8EC]">Nhập số liệu báo cáo KPI</h3>
               <button type="button" onClick={() => setIsInputModalOpen(false)} className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer">
                 <X size={16} />
               </button>
             </div>
 
             <form onSubmit={handleSaveEntry} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 text-xs max-h-[75vh]" style={{ scrollbarWidth: "thin" }}>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-gray-50 dark:bg-white/[0.06] p-4 rounded-2xl border border-gray-100 dark:border-white/10">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Ngày báo cáo nhật trình</label>
+                  <label className="block font-bold text-gray-700 dark:text-gray-200 mb-1">Ngày báo cáo nhật trình</label>
                   <p className="text-[10px] text-gray-400">Chọn ngày để cập nhật hoặc thêm nhật ký mới</p>
                 </div>
-                <input
-                  type="date"
-                  value={formDate}
-                  onChange={(e) => {
-                    setFormDate(e.target.value);
-                    const match = entries.find(x => x.employeeId === employee.id && x.date === e.target.value);
+                <CustomDatePicker
+                  value={formDate ? `${formDate.split('-')[2]}/${formDate.split('-')[1]}/${formDate.split('-')[0]}` : ""}
+                  onChange={(val) => {
+                    if (!val) return;
+                    const parts = val.split("/");
+                    if (parts.length !== 3) return;
+                    const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                    setFormDate(isoDate);
+                    const match = entries.find(x => x.employeeId === employee.id && x.date === isoDate);
                     if (match) {
                       setFormMetrics(match.metrics);
                       setFormNotes(match.notes);
@@ -975,24 +978,23 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                       setCustomerDetails({ clientReply: [], khachChuDongIB: [], followUp: [] });
                     }
                   }}
-                  className="w-full sm:w-auto py-2 px-4 border border-gray-200 rounded-xl focus:outline-none font-bold text-gray-700 bg-white"
-                  required
+                  className="w-full sm:w-[150px] py-1.5 px-3 border border-gray-200 dark:border-white/10 rounded-xl focus:outline-none font-bold text-gray-700 dark:text-[#FFE8EC] bg-white dark:bg-white/5"
                 />
               </div>
 
               {/* Section 1: Tương tác */}
-              <div className="bg-white p-4 sm:p-5 border border-gray-150 rounded-2xl shadow-xs space-y-4">
-                <h4 className="font-extrabold text-gray-800 text-sm border-b border-gray-100 pb-2">Tương tác</h4>
+              <div className="bg-white dark:bg-white/[0.03] p-4 sm:p-5 border border-gray-200 dark:border-white/10 rounded-2xl shadow-xs space-y-4">
+                <h4 className="font-extrabold text-gray-800 dark:text-[#FFE8EC] text-sm border-b border-gray-100 dark:border-white/10 pb-2">Tương tác</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Zalo */}
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">Inbox Zalo</label>
+                    <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1.5 text-xs">Inbox Zalo</label>
                     <input
-                      type="text" inputMode="numeric"
+                      type="number"
                       min={0}
                       value={formMetrics.zalo}
                       onChange={(e) => handleMetricChange("zalo", e.target.value)}
-                      className={`w-full py-2.5 px-4 border ${formMetrics.zalo >= getDailyTarget("zalo") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
+                      className={`w-full py-2.5 px-4 border ${formMetrics.zalo >= getDailyTarget("zalo") ? "border-gray-200 dark:border-white/10 focus:border-green-500 dark:focus:border-green-400" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all bg-white dark:bg-white/5 dark:text-[#FFE8EC]`}
                       required
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
@@ -1006,13 +1008,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
                   {/* Facebook */}
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">Inbox Facebook</label>
+                    <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1.5 text-xs">Inbox Facebook</label>
                     <input
-                      type="text" inputMode="numeric"
+                      type="number"
                       min={0}
                       value={formMetrics.fb}
                       onChange={(e) => handleMetricChange("fb", e.target.value)}
-                      className={`w-full py-2.5 px-4 border ${formMetrics.fb >= getDailyTarget("fb") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
+                      className={`w-full py-2.5 px-4 border ${formMetrics.fb >= getDailyTarget("fb") ? "border-gray-200 dark:border-white/10 focus:border-green-500 dark:focus:border-green-400" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all bg-white dark:bg-white/5 dark:text-[#FFE8EC]`}
                       required
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
@@ -1026,13 +1028,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
                   {/* Comment */}
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">Comment</label>
+                    <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1.5 text-xs">Comment</label>
                     <input
-                      type="text" inputMode="numeric"
+                      type="number"
                       min={0}
                       value={formMetrics.comment}
                       onChange={(e) => handleMetricChange("comment", e.target.value)}
-                      className={`w-full py-2.5 px-4 border ${formMetrics.comment >= getDailyTarget("comment") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
+                      className={`w-full py-2.5 px-4 border ${formMetrics.comment >= getDailyTarget("comment") ? "border-gray-200 dark:border-white/10 focus:border-green-500 dark:focus:border-green-400" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all bg-white dark:bg-white/5 dark:text-[#FFE8EC]`}
                       required
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
@@ -1046,13 +1048,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
                   {/* Bài đăng */}
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">Bài đăng</label>
+                    <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1.5 text-xs">Bài đăng</label>
                     <input
-                      type="text" inputMode="numeric"
+                      type="number"
                       min={0}
                       value={formMetrics.post}
                       onChange={(e) => handleMetricChange("post", e.target.value)}
-                      className={`w-full py-2.5 px-4 border ${formMetrics.post >= getDailyTarget("post") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
+                      className={`w-full py-2.5 px-4 border ${formMetrics.post >= getDailyTarget("post") ? "border-gray-200 dark:border-white/10 focus:border-green-500 dark:focus:border-green-400" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all bg-white dark:bg-white/5 dark:text-[#FFE8EC]`}
                       required
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
@@ -1067,19 +1069,19 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
               </div>
 
               {/* Section 2: Khách hàng */}
-              <div className="bg-white p-5 border border-gray-150 rounded-2xl shadow-xs space-y-4">
-                <h4 className="font-extrabold text-gray-800 text-sm border-b border-gray-100 pb-2">Khách hàng</h4>
+              <div className="bg-white dark:bg-white/[0.06] p-5 border border-gray-200 dark:border-white/10 rounded-2xl shadow-xs space-y-4">
+                <h4 className="font-extrabold text-gray-800 dark:text-[#FFE8EC] text-sm border-b border-gray-100 dark:border-white/10 pb-2">Khách hàng</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Khách rep */}
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">Khách rep</label>
+                    <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1.5 text-xs">Khách rep</label>
                     <input
-                      type="text" inputMode="numeric"
+                      type="number"
                       min={0}
                       max={50}
                       value={formMetrics.clientReply}
                       onChange={(e) => handleMetricChange("clientReply", e.target.value)}
-                      className={`w-full py-2.5 px-4 border ${formMetrics.clientReply >= getDailyTarget("clientReply") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
+                      className={`w-full py-2.5 px-4 border ${formMetrics.clientReply >= getDailyTarget("clientReply") ? "border-gray-200 dark:border-white/10 focus:border-green-500 dark:focus:border-green-400" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all bg-white dark:bg-white/5 dark:text-[#FFE8EC]`}
                       required
                     />
                     <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
@@ -1096,14 +1098,14 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
                   {/* Khách chủ động IB */}
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">Khách chủ động IB</label>
+                    <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1.5 text-xs">Khách chủ động IB</label>
                     <input
-                      type="text" inputMode="numeric"
+                      type="number"
                       min={0}
                       max={50}
                       value={formMetrics.khachChuDongIB}
                       onChange={(e) => handleMetricChange("khachChuDongIB", e.target.value)}
-                      className={`w-full py-2.5 px-4 border ${formMetrics.khachChuDongIB >= getDailyTarget("khachChuDongIB") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
+                      className={`w-full py-2.5 px-4 border ${formMetrics.khachChuDongIB >= getDailyTarget("khachChuDongIB") ? "border-gray-200 dark:border-white/10 focus:border-green-500 dark:focus:border-green-400" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all bg-white dark:bg-white/5 dark:text-[#FFE8EC]`}
                       required
                     />
                     <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
@@ -1120,14 +1122,14 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
                   {/* Follow-up */}
                   <div className="md:col-span-2">
-                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">Follow-up</label>
+                    <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1.5 text-xs">Follow-up</label>
                     <input
-                      type="text" inputMode="numeric"
+                      type="number"
                       min={0}
                       max={50}
                       value={formMetrics.followUp}
                       onChange={(e) => handleMetricChange("followUp", e.target.value)}
-                      className={`w-full py-2.5 px-4 border ${formMetrics.followUp >= getDailyTarget("followUp") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
+                      className={`w-full py-2.5 px-4 border ${formMetrics.followUp >= getDailyTarget("followUp") ? "border-gray-200 dark:border-white/10 focus:border-green-500 dark:focus:border-green-400" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all bg-white dark:bg-white/5 dark:text-[#FFE8EC]`}
                       required
                     />
                     <div className="mt-1 flex items-center justify-between text-[10px] font-bold">
@@ -1145,8 +1147,8 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
                 {/* Details Section */}
                 {(customerDetails.clientReply.length > 0 || customerDetails.khachChuDongIB.length > 0 || customerDetails.followUp.length > 0) && (
-                  <div className="pt-4 border-t border-gray-100 space-y-4">
-                    <h5 className="font-extrabold text-gray-800 text-xs">Chi tiết danh sách khách hàng tương tác</h5>
+                  <div className="pt-4 border-t border-gray-100 dark:border-white/10 space-y-4">
+                    <h5 className="font-extrabold text-gray-800 dark:text-[#FFE8EC] text-xs">Chi tiết danh sách khách hàng tương tác</h5>
 
                     {/* Render clientReply details */}
                     {customerDetails.clientReply.length > 0 && (
@@ -1154,7 +1156,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                         <p className="font-bold text-[#C62828] text-[11px] border-l-2 border-[#C62828] pl-2">Khách rep ({customerDetails.clientReply.length})</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {customerDetails.clientReply.map((item, index) => (
-                            <div key={index} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+                            <div key={index} className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-2">
                               <div>
                                 <label className="block text-[10px] text-gray-400 font-bold mb-1">Tên khách hàng {index + 1}</label>
                                 <input
@@ -1203,7 +1205,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                         <p className="font-bold text-[#C62828] text-[11px] border-l-2 border-[#C62828] pl-2">Khách chủ động IB ({customerDetails.khachChuDongIB.length})</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {customerDetails.khachChuDongIB.map((item, index) => (
-                            <div key={index} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+                            <div key={index} className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-2">
                               <div>
                                 <label className="block text-[10px] text-gray-400 font-bold mb-1">Tên khách hàng {index + 1}</label>
                                 <input
@@ -1252,7 +1254,7 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
                         <p className="font-bold text-[#C62828] text-[11px] border-l-2 border-[#C62828] pl-2">Follow-up ({customerDetails.followUp.length})</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {customerDetails.followUp.map((item, index) => (
-                            <div key={index} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+                            <div key={index} className="p-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-100 dark:border-white/10 space-y-2">
                               <div>
                                 <label className="block text-[10px] text-gray-400 font-bold mb-1">Tên khách hàng {index + 1}</label>
                                 <input
@@ -1299,18 +1301,18 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
               </div>
 
               {/* Section 3: Báo giá & Deal */}
-              <div className="bg-white p-4 sm:p-5 border border-gray-150 rounded-2xl shadow-xs space-y-4">
-                <h4 className="font-extrabold text-gray-800 text-sm border-b border-gray-100 pb-2">Báo giá & Deal</h4>
+              <div className="bg-white dark:bg-white/[0.06] p-4 sm:p-5 border border-gray-200 dark:border-white/10 rounded-2xl shadow-xs space-y-4">
+                <h4 className="font-extrabold text-gray-800 dark:text-[#FFE8EC] text-sm border-b border-gray-100 dark:border-white/10 pb-2">Báo giá &amp; Deal</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Báo giá gửi */}
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">Báo giá gửi</label>
+                    <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1.5 text-xs">Báo giá gửi</label>
                     <input
-                      type="text" inputMode="numeric"
+                      type="number"
                       min={0}
                       value={formMetrics.quote}
                       onChange={(e) => handleMetricChange("quote", e.target.value)}
-                      className={`w-full py-2.5 px-4 border ${formMetrics.quote >= getDailyTarget("quote") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
+                      className={`w-full py-2.5 px-4 border ${formMetrics.quote >= getDailyTarget("quote") ? "border-gray-200 dark:border-white/10 focus:border-green-500 dark:focus:border-green-400" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all bg-white dark:bg-white/5 dark:text-[#FFE8EC]`}
                       required
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
@@ -1324,13 +1326,13 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
                   {/* Chốt Deal */}
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">Chốt Deal</label>
+                    <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1.5 text-xs">Chốt Deal</label>
                     <input
-                      type="text" inputMode="numeric"
+                      type="number"
                       min={0}
                       value={formMetrics.deal}
                       onChange={(e) => handleMetricChange("deal", e.target.value)}
-                      className={`w-full py-2.5 px-4 border ${formMetrics.deal >= getDailyTarget("deal") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
+                      className={`w-full py-2.5 px-4 border ${formMetrics.deal >= getDailyTarget("deal") ? "border-gray-200 dark:border-white/10 focus:border-green-500 dark:focus:border-green-400" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all bg-white dark:bg-white/5 dark:text-[#FFE8EC]`}
                       required
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
@@ -1344,12 +1346,12 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
 
                   {/* Doanh số */}
                   <div>
-                    <label className="block text-gray-700 font-bold mb-1.5 text-xs">Doanh số</label>
+                    <label className="block text-gray-700 dark:text-gray-300 font-bold mb-1.5 text-xs">Doanh số</label>
                     <input
-                      type="text" inputMode="numeric"
+                      type="number"
                       value={formMetrics.revenue}
-                      onChange={(e) => { e.target.value = e.target.value.replace(/^0+(?=\d)/, ""); setFormMetrics(prev => ({ ...prev, revenue: parseInt(e.target.value) || 0 })) }}
-                      className={`w-full py-2.5 px-4 border ${formMetrics.revenue >= getDailyTarget("revenue") ? "border-gray-200 focus:border-green-500" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all`}
+                      onChange={(e) => setFormMetrics(prev => ({ ...prev, revenue: parseInt(e.target.value) || 0 }))}
+                      className={`w-full py-2.5 px-4 border ${formMetrics.revenue >= getDailyTarget("revenue") ? "border-gray-200 dark:border-white/10 focus:border-green-500 dark:focus:border-green-400" : "border-red-500 focus:border-red-600"} rounded-xl focus:outline-none text-xs font-semibold transition-all bg-white dark:bg-white/5 dark:text-[#FFE8EC]`}
                       required
                     />
                     <div className="mt-1 flex items-center gap-1 text-[10px] font-bold">
@@ -1364,11 +1366,11 @@ export function UserKpiPanel({ employee }: UserKpiPanelProps) {
               </div>
 
 
-              <div className="flex justify-end gap-2.5 pt-4 border-t border-gray-100">
+              <div className="flex justify-end gap-2.5 pt-4 border-t border-gray-100 dark:border-white/10">
                 <button
                   type="button"
                   onClick={() => setIsInputModalOpen(false)}
-                  className="py-1.5 px-4 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer font-bold text-[11px] transition-colors"
+                  className="py-1.5 px-4 rounded-xl border border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/10 cursor-pointer font-bold text-[11px] transition-colors"
                 >
                   Hủy bỏ
                 </button>

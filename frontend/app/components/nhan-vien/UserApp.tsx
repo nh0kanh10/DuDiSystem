@@ -278,186 +278,186 @@ function ModalWrapper({ children, onClose, title, subtitle }: { children: React.
       </div>
     </div>
   );
-    }
+}
 
-    // Panel cho Tasks, Checkin và CRM (full-page)
-    function Panel({
-      activePage,
-      onClose,
-      employee,
-      canUseKpi = false,
-      onOpenLead,
-    }: {
-      activePage: BubbleId;
-      onClose: () => void;
-      employee: Employee | null;
-      canUseKpi?: boolean;
-      onOpenLead?: (leadId: string) => void;
-    }) {
-      const isDark = document.documentElement.classList.contains("dark") || localStorage.getItem("dudi_theme_mode") === "dark";
+// Panel cho Tasks, Checkin và CRM (full-page)
+function Panel({
+  activePage,
+  onClose,
+  employee,
+  canUseKpi = false,
+  onOpenLead,
+}: {
+  activePage: BubbleId;
+  onClose: () => void;
+  employee: Employee | null;
+  canUseKpi?: boolean;
+  onOpenLead?: (leadId: string) => void;
+}) {
+  const isDark = document.documentElement.classList.contains("dark") || localStorage.getItem("dudi_theme_mode") === "dark";
 
-      return (
+  return (
     <div
       className={`fixed inset-0 ${overlayLayer("staffPanel")} overflow-y-auto flex flex-col`}
       style={{
         background: isDark
-              ? "radial-gradient(ellipse 80% 60% at 50% 50%, #1A0810 0%, #0E0508 100%)"
+          ? "radial-gradient(ellipse 80% 60% at 50% 50%, #1A0810 0%, #0E0508 100%)"
           : "radial-gradient(ellipse 70% 55% at 50% 45%, #FFE4D8 0%, #FFF0E8 50%, #FFF8F4 100%)",
       }}
     >
-          {/* Background layer absolute */}
-          <Background dark={isDark} />
+      {/* Background layer absolute */}
+      <Background dark={isDark} />
 
-          {/* Content wrapper on top of background */}
-          <div style={{ padding: "16px 24px", position: "relative", zIndex: 1, minHeight: "100%" }}>
-            <button
-              onClick={onClose}
-              className="flex items-center justify-center w-11 h-11 rounded-2xl bg-white/70 backdrop-blur-md border border-gray-200/50 text-gray-500 hover:text-[#E8231A] hover:border-red-200/50 hover:bg-red-50/70 hover:shadow-[0_8px_20px_rgba(232,35,26,0.15)] hover:-translate-y-0.5 transition-all outline-none"
-              title="Quay lại"
-            >
-              <ArrowLeft size={22} strokeWidth={2.5} />
-            </button>
+      {/* Content wrapper on top of background */}
+      <div style={{ padding: "16px 24px", position: "relative", zIndex: 1, minHeight: "100%" }}>
+        <button
+          onClick={onClose}
+          className="flex items-center justify-center w-11 h-11 rounded-2xl bg-white/70 backdrop-blur-md border border-gray-200/50 text-gray-500 hover:text-[#E8231A] hover:border-red-200/50 hover:bg-red-50/70 hover:shadow-[0_8px_20px_rgba(232,35,26,0.15)] hover:-translate-y-0.5 transition-all outline-none"
+          title="Quay lại"
+        >
+          <ArrowLeft size={22} strokeWidth={2.5} />
+        </button>
 
-            <div style={{ marginTop: 24 }}>
-              {activePage === "checkin" && <UserAttendance variant="default" />}
-              {activePage === "tasks" && <UserTasks variant="portal" />}
-              {activePage === "crm" && employee && (
-                <CrmStaffContent employee={employee} canUseKpi={canUseKpi} onOpenLead={onOpenLead} />
-              )}
-            </div>
-          </div>
+        <div style={{ marginTop: 24 }}>
+          {activePage === "checkin" && <UserAttendance variant="default" />}
+          {activePage === "tasks" && <UserTasks variant="portal" />}
+          {activePage === "crm" && employee && (
+            <CrmStaffContent employee={employee} canUseKpi={canUseKpi} onOpenLead={onOpenLead} />
+          )}
         </div>
-      );
-    }
+      </div>
+    </div>
+  );
+}
 
-    // Directory with real API data
-    function DirectoryContent() {
-      const [search, setSearch] = useState("");
-      const { employees, loading, error, reload } = useEmployeeDirectory();
-      const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
-      const [copied, setCopied] = useState(false);
+// Directory with real API data
+function DirectoryContent() {
+  const [search, setSearch] = useState("");
+  const { employees, loading, error, reload } = useEmployeeDirectory();
+  const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
+  const [copied, setCopied] = useState(false);
 
-      const handleCopy = (emp: any) => {
-        const text = `Họ tên: ${emp.name}\nPhòng ban: ${emp.department}\nVị trí: ${emp.position}\nSĐT: ${emp.phone || "—"}\nEmail: ${emp.email || "—"}`;
-        navigator.clipboard.writeText(text).catch(() => { });
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      };
+  const handleCopy = (emp: any) => {
+    const text = `Họ tên: ${emp.name}\nPhòng ban: ${emp.department}\nVị trí: ${emp.position}\nSĐT: ${emp.phone || "—"}\nEmail: ${emp.email || "—"}`;
+    navigator.clipboard.writeText(text).catch(() => { });
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-      const list = employees.filter((e) => {
-        const q = removeVietnameseTones(search.trim().toLowerCase());
-        if (!q) return true;
-        const nameStr = removeVietnameseTones(e.name.toLowerCase());
-        const deptStr = removeVietnameseTones(e.department.toLowerCase());
-        const posStr = removeVietnameseTones(e.position.toLowerCase());
-        const emailStr = (e.email || "").toLowerCase();
-        return (
-          nameStr.includes(q) ||
-          deptStr.includes(q) ||
-          posStr.includes(q) ||
-          emailStr.includes(q)
-        );
-      });
+  const list = employees.filter((e) => {
+    const q = removeVietnameseTones(search.trim().toLowerCase());
+    if (!q) return true;
+    const nameStr = removeVietnameseTones(e.name.toLowerCase());
+    const deptStr = removeVietnameseTones(e.department.toLowerCase());
+    const posStr = removeVietnameseTones(e.position.toLowerCase());
+    const emailStr = (e.email || "").toLowerCase();
+    return (
+      nameStr.includes(q) ||
+      deptStr.includes(q) ||
+      posStr.includes(q) ||
+      emailStr.includes(q)
+    );
+  });
 
-      return (
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-2.5 items-center">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm tên nhân viên, phòng ban..."
-                className="w-full bg-white dark:bg-white/[0.04] border border-[#efd7da] dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-4 py-3 outline-none focus:border-[#D4472A] text-sm font-medium transition-colors"
-              />
-            </div>
-            <button
-              onClick={reload}
-              className="bg-white dark:bg-white/[0.04] border border-[#e8231a]/20 dark:border-white/10 text-[#7a1d22] dark:text-red-400 font-extrabold rounded-xl px-4 py-3 text-[13px] hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
-            >
-              Tải lại
-            </button>
-          </div>
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex gap-2.5 items-center">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm tên nhân viên, phòng ban..."
+            className="w-full bg-white dark:bg-white/[0.04] border border-[#efd7da] dark:border-white/10 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 rounded-xl px-4 py-3 outline-none focus:border-[#D4472A] text-sm font-medium transition-colors"
+          />
+        </div>
+        <button
+          onClick={reload}
+          className="bg-white dark:bg-white/[0.04] border border-[#e8231a]/20 dark:border-white/10 text-[#7a1d22] dark:text-red-400 font-extrabold rounded-xl px-4 py-3 text-[13px] hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+        >
+          Tải lại
+        </button>
+      </div>
 
-          {error && <p className="text-[13px] text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-[13px] text-red-600 dark:text-red-400">{error}</p>}
 
-          {loading && (
-            <div className="flex items-center justify-center p-6 text-[#7f5f63] dark:text-gray-400 text-[13px] font-medium">
-              Đang tải...
-            </div>
-          )}
+      {loading && (
+        <div className="flex items-center justify-center p-6 text-[#7f5f63] dark:text-gray-400 text-[13px] font-medium">
+          Đang tải...
+        </div>
+      )}
 
-          {!loading && list.length === 0 && (
-            <p className="text-[13px] text-[#7f5f63] dark:text-gray-400 text-center p-6 font-medium">
-              Không tìm thấy nhân viên
-            </p>
-          )}
+      {!loading && list.length === 0 && (
+        <p className="text-[13px] text-[#7f5f63] dark:text-gray-400 text-center p-6 font-medium">
+          Không tìm thấy nhân viên
+        </p>
+      )}
 
-          <div className="flex flex-col gap-2.5">
-            {list.map((emp) => {
-              const isInactive = emp.status === "inactive"
-              const isSuspended = emp.status === "suspended"
-              const dimmed = isInactive || isSuspended
-              return (
-              <div
-                key={emp.id}
-                onClick={() => setSelectedEmp(emp)}
-                className={`flex items-center gap-3.5 p-3.5 bg-white dark:bg-white/[0.04] border border-[#efd7da] dark:border-white/10 rounded-2xl shadow-[0_12px_30px_rgba(95,15,22,0.06)] dark:shadow-none cursor-pointer hover:border-[#D4472A]/50 transition-all ${dimmed ? "opacity-60" : ""}`}
-              >
+      <div className="flex flex-col gap-2.5">
+        {list.map((emp) => {
+          const isInactive = emp.status === "inactive"
+          const isSuspended = emp.status === "suspended"
+          const dimmed = isInactive || isSuspended
+          return (
             <div
-              className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-black text-white shrink-0 shadow-[0_0_12px_rgba(212,71,42,0.4)]"
-              style={{ background: dimmed ? "linear-gradient(135deg, #9ca3af, #6b7280)" : `linear-gradient(135deg, ${BRAND}, ${GOLD})` }}
+              key={emp.id}
+              onClick={() => setSelectedEmp(emp)}
+              className={`flex items-center gap-3.5 p-3.5 bg-white dark:bg-white/[0.04] border border-[#efd7da] dark:border-white/10 rounded-2xl shadow-[0_12px_30px_rgba(95,15,22,0.06)] dark:shadow-none cursor-pointer hover:border-[#D4472A]/50 transition-all ${dimmed ? "opacity-60" : ""}`}
             >
-              {empInitials(emp.name)}
-            </div>
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center text-[13px] font-black text-white shrink-0 shadow-[0_0_12px_rgba(212,71,42,0.4)]"
+                style={{ background: dimmed ? "linear-gradient(135deg, #9ca3af, #6b7280)" : `linear-gradient(135deg, ${BRAND}, ${GOLD})` }}
+              >
+                {empInitials(emp.name)}
+              </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <p className="text-[15px] font-extrabold text-[#241416] dark:text-gray-100 truncate">
-                    {emp.name}
-                  </p>
-                  {isInactive && (
-                    <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-300">
-                      Đã nghỉ
-                    </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="text-[15px] font-extrabold text-[#241416] dark:text-gray-100 truncate">
+                      {emp.name}
+                    </p>
+                    {isInactive && (
+                      <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                        Đã nghỉ
+                      </span>
+                    )}
+                    {isSuspended && (
+                      <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                        Tạm nghỉ
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-[#fff1f2] dark:bg-red-500/10 text-[#7a1d22] dark:text-red-400 shrink-0">
+                    {emp.department}
+                  </span>
+                </div>
+                <p className="text-[13px] text-[#7f5f63] dark:text-gray-400 mt-0.5 font-medium">{emp.position}</p>
+
+                <div className="flex gap-4 mt-2 flex-wrap">
+                  {emp.phone && (
+                    <a
+                      href={`tel:${emp.phone}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1.5 text-[11px] font-bold text-[#D4472A] no-underline hover:opacity-80"
+                    >
+                      Tel {emp.phone}
+                    </a>
                   )}
-                  {isSuspended && (
-                    <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
-                      Tạm nghỉ
-                    </span>
+                  {emp.email && (
+                    <a
+                      href={`mailto:${emp.email}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1.5 text-[11px] font-bold text-[#6f565a] dark:text-gray-400 no-underline hover:opacity-80"
+                    >
+                      Email {emp.email}
+                    </a>
                   )}
                 </div>
-                <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-[#fff1f2] dark:bg-red-500/10 text-[#7a1d22] dark:text-red-400 shrink-0">
-                  {emp.department}
-                </span>
-              </div>
-              <p className="text-[13px] text-[#7f5f63] dark:text-gray-400 mt-0.5 font-medium">{emp.position}</p>
-
-              <div className="flex gap-4 mt-2 flex-wrap">
-                {emp.phone && (
-                  <a
-                    href={`tel:${emp.phone}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1.5 text-[11px] font-bold text-[#D4472A] no-underline hover:opacity-80"
-                  >
-                    Tel {emp.phone}
-                  </a>
-                )}
-                {emp.email && (
-                  <a
-                    href={`mailto:${emp.email}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1.5 text-[11px] font-bold text-[#6f565a] dark:text-gray-400 no-underline hover:opacity-80"
-                  >
-                    Email {emp.email}
-                  </a>
-                )}
               </div>
             </div>
-          </div>
-              )
-            })}
+          )
+        })}
       </div>
 
       {/* Detail Modal Overlay */}
@@ -1626,9 +1626,9 @@ function SettingsContent({
 function CrmStaffContent({ employee, canUseKpi, onOpenLead }: { employee: Employee | null; canUseKpi: boolean; onOpenLead?: (leadId: string) => void }) {
   const [activeTab, setActiveTab] = useState<"data" | "kpi">("data");
   return (
-    <div style={{ width: "100%" }}>
+    <div className="w-full max-w-6xl mx-auto md:px-4 pb-8 h-full flex flex-col">
       {canUseKpi && (
-        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid rgba(0,0,0,0.08)", marginBottom: 12 }}>
+        <div className="flex gap-1 mb-4 border-b border-gray-200 dark:border-white/10 shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab("data")}
@@ -1718,6 +1718,7 @@ export default function UserPortalApp({
     localStorage.setItem("dudi_theme_mode", newDark ? "dark" : "light");
   };
 
+  // Load admin request count
   useEffect(() => {
     if (!employee?.id) return;
     api.profileUpdates.list({ employeeId: employee.id })
@@ -1862,7 +1863,7 @@ export default function UserPortalApp({
 
 
   return (
-    <div 
+    <div
       className={dark ? "dark" : ""}
       style={{ width: "100%", height: embed ? "100%" : "100vh", overflow: "hidden", position: embed ? "absolute" : "relative", inset: embed ? 0 : undefined }}
     >

@@ -29,6 +29,4 @@ export const COLLECTIONS = [
   "projectVaultItems",
   "leads",
   "customers",
-  "kpiTargets",
-  "kpiEntries",
 ]

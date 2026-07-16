@@ -9,7 +9,6 @@ import {
   BarChart, Bar, Legend, Cell, PieChart, Pie, LineChart, Line
 } from "recharts";
 import { Employee } from "../../types";
-import ConfirmModal from "../ui/ConfirmModal";
 
 const KpiBarTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
@@ -341,9 +340,9 @@ const CustomDatePicker = ({ label, value, onChange, disabled = false }: CustomDa
 };
 
 import { useToast } from "../../hooks/useToast";
-import { api } from "../../../lib/api";
 import {
-  calculateKpiPoints, getTarget, KpiEntry, KpiTarget, KpiMetrics, KPI_METRIC_LABELS, KPI_POINTS_WEIGHT
+  getStoredKpiEntries, getStoredKpiTargets, saveStoredKpiTargets,
+  calculateKpiPoints, getTarget, KpiEntry, KpiTarget, KpiMetrics, KPI_METRIC_LABELS
 } from "./kpiMockData";
 
 interface KpiManagementAdminProps {
@@ -485,33 +484,17 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     return new Set(filteredEmployees.map(e => e.id));
   }, [filteredEmployees]);
 
-  // Load KPI entries and targets from backend API
-  const [entries, setEntries] = useState<KpiEntry[]>([]);
-  const [targets, setTargets] = useState<KpiTarget[]>([]);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  // Load KPI entries and targets from local storage
+  const [entries, setEntries] = useState<KpiEntry[]>(() => getStoredKpiEntries());
+  const [targets, setTargets] = useState<KpiTarget[]>(() => getStoredKpiTargets());
 
-  const loadData = async () => {
-    try {
-      const [tRes, eRes] = await Promise.all([
-        api.kpi.getTargets({}),
-        api.kpi.getEntries({})
-      ]);
-      setTargets(tRes || []);
-      setEntries(eRes || []);
-    } catch (err) {
-      showToast("Lỗi khi tải dữ liệu KPI", "error");
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const handleRefresh = async () => {
-    await loadData();
+  const handleRefresh = () => {
+    setEntries(getStoredKpiEntries());
+    setTargets(getStoredKpiTargets());
     showToast("Đã tải lại dữ liệu KPI!", "success");
   };
 
+  // Filter entries for the selected month and branch
   const currentMonthEntries = useMemo(() => {
     return entries.filter(entry => 
       entry.date.startsWith(selectedMonth) && 
@@ -519,13 +502,16 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     );
   }, [entries, selectedMonth, filteredEmployeeIds]);
 
+  // Compute aggregated stats for each employee for the selected month
   const employeeSummaries = useMemo(() => {
     const map = new Map<string, KpiMetrics & { points: number; daysCount: number }>();
     
+    // Initialize default metrics for all branch employees
     filteredEmployees.forEach(e => {
       map.set(e.id, { zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0, points: 0, daysCount: 0 });
     });
 
+    // Accumulate actual metrics from logs
     currentMonthEntries.forEach(entry => {
       const current = map.get(entry.employeeId);
       if (current) {
@@ -543,6 +529,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
       }
     });
 
+    // Compute points and package results
     return Array.from(map.entries()).map(([employeeId, data]) => {
       const emp = employees.find(e => e.id === employeeId);
       const points = calculateKpiPoints(data);
@@ -555,9 +542,10 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
         points,
         daysCount: data.daysCount
       };
-    }).sort((a, b) => b.points - a.points); 
+    }).sort((a, b) => b.points - a.points); // Sort by points desc
   }, [currentMonthEntries, filteredEmployees, employees]);
 
+  // Top 3 Leaderboard rankers
   const topPerformers = useMemo(() => {
     return employeeSummaries.slice(0, 3);
   }, [employeeSummaries]);
@@ -1026,20 +1014,26 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     return Array.from(dailyMap.values());
   }, [currentMonthEntries, selectedMonth]);
 
-  const handleSaveTarget = async (e: React.FormEvent) => {
+  // Save targets
+  const handleSaveTarget = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await api.kpi.saveTarget({
-        employeeId: targetEmployeeId,
-        month: targetForm.month,
-        metrics: targetForm.metrics
-      });
-      await loadData();
-      setIsTargetModalOpen(false);
-      showToast("Đã lưu chỉ tiêu KPI mới thành công!", "success");
-    } catch (err) {
-      showToast("Lỗi khi lưu chỉ tiêu KPI", "error");
-    }
+    const currentTargets = getStoredKpiTargets();
+    
+    const newTarget: KpiTarget = {
+      id: targetEmployeeId === "all" ? `t-default-${targetForm.month}` : `t-${targetEmployeeId}-${targetForm.month}`,
+      employeeId: targetEmployeeId,
+      month: targetForm.month,
+      metrics: targetForm.metrics
+    };
+
+    // Remove duplicates
+    const nextTargets = currentTargets.filter(t => !(t.employeeId === targetEmployeeId && t.month === targetForm.month));
+    nextTargets.push(newTarget);
+    
+    saveStoredKpiTargets(nextTargets);
+    setTargets(nextTargets);
+    setIsTargetModalOpen(false);
+    showToast("Đã lưu chỉ tiêu KPI mới thành công!", "success");
   };
 
   const openAddTargetModal = () => {
@@ -1065,9 +1059,15 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   };
 
   const handleDeleteTarget = (targetId: string) => {
-    setDeleteTargetId(targetId);
+    if (window.confirm("Bạn có chắc chắn muốn xóa chỉ tiêu KPI này?")) {
+      const nextTargets = targets.filter(t => t.id !== targetId);
+      saveStoredKpiTargets(nextTargets);
+      setTargets(nextTargets);
+      showToast("Đã xóa chỉ tiêu KPI thành công!", "success");
+    }
   };
 
+  // Real CSV Export
   const handleExportCSV = () => {
     if (reportGroupedData.length === 0) {
       showToast("Không có dữ liệu để xuất!", "error");
@@ -2618,26 +2618,6 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
       )}
 
 
-
-      <ConfirmModal
-        isOpen={deleteTargetId !== null}
-        onClose={() => setDeleteTargetId(null)}
-        onConfirm={async () => {
-          if (!deleteTargetId) return;
-          try {
-            await api.kpi.deleteTarget(deleteTargetId);
-            await loadData();
-            showToast("Đã xóa chỉ tiêu KPI thành công!", "success");
-          } catch (error) {
-            showToast("Lỗi khi xóa chỉ tiêu", "error");
-          }
-        }}
-        title="Xóa chỉ tiêu KPI"
-        message="Bạn có chắc chắn muốn xóa chỉ tiêu KPI này? Hành động này không thể hoàn tác."
-        type="danger"
-        confirmText="Xóa"
-        cancelText="Hủy"
-      />
 
       {/* Employee Logs Detail Modal */}
       {selectedEmployeeForDetail && createPortal(

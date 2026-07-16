@@ -247,7 +247,7 @@ export function createLeaveForm(emp: Pick<Employee, "contractType">): LeaveFormS
 }
 
 export function validateLeaveForm(form: LeaveFormState, isAdmin: boolean = false): string | null {
-  const isBackdatingAllowed = isAdmin;
+  const isBackdatingAllowed = form.leaveType === "sick" || isAdmin
 
   if (!form.reason.trim()) return "Vui lòng nhập lý do"
 
@@ -256,11 +256,13 @@ export function validateLeaveForm(form: LeaveFormState, isAdmin: boolean = false
     return "Vui lòng tải lên tệp đính kèm (Giấy khám bệnh/chứng từ)"
   }
 
+  // Quota checking for special limit
   const requestedDays = countLeaveDaysForm(form)
   if (subTypeInfo?.maxDays && requestedDays > subTypeInfo.maxDays) {
     return `Loại nghỉ này chỉ được tối đa ${subTypeInfo.maxDays} ngày (${subTypeInfo.maxDays * 2} buổi)`
   }
 
+  // Phép năm quota mock check
   if (form.leaveType === "annual" && requestedDays > 12) {
     return "Số ngày nghỉ vượt quá số phép năm còn lại (12 ngày)"
   }
@@ -268,20 +270,20 @@ export function validateLeaveForm(form: LeaveFormState, isAdmin: boolean = false
   switch (form.scope) {
     case "full_day":
       if (!form.startDate) return "Vui lòng chọn ngày nghỉ"
-      if (!isBackdatingAllowed && isDateInPast(form.startDate)) return "Không được phép chọn ngày trong quá khứ"
+      if (!isBackdatingAllowed && isDateInPast(form.startDate)) return "Chỉ nghỉ ốm mới được chọn ngày trong quá khứ"
       break
     case "date_range":
       if (!form.startDate || !form.endDate) return "Vui lòng chọn đủ ngày bắt đầu và kết thúc"
       if (parseVnDate(form.endDate) < parseVnDate(form.startDate)) return "Ngày kết thúc phải sau ngày bắt đầu"
-      if (!isBackdatingAllowed && isDateInPast(form.startDate)) return "Không được phép chọn ngày trong quá khứ"
+      if (!isBackdatingAllowed && isDateInPast(form.startDate)) return "Chỉ nghỉ ốm mới được chọn ngày trong quá khứ"
       break
     case "half_session":
       if (!form.startDate) return "Vui lòng chọn ngày nghỉ"
-      if (!isBackdatingAllowed && isDateInPast(form.startDate)) return "Không được phép chọn ngày trong quá khứ"
+      if (!isBackdatingAllowed && isDateInPast(form.startDate)) return "Chỉ nghỉ ốm mới được chọn ngày trong quá khứ"
       break
     case "multi_session":
       if (form.sessions.length === 0) return "Vui lòng chọn ít nhất một buổi nghỉ"
-      if (!isBackdatingAllowed && form.sessions.some(s => isDateInPast(s.date))) return "Không được phép chọn buổi trong quá khứ"
+      if (!isBackdatingAllowed && form.sessions.some(s => isDateInPast(s.date))) return "Chỉ nghỉ ốm mới được chọn buổi trong quá khứ"
       break
   }
   return null

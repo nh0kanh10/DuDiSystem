@@ -1181,7 +1181,7 @@ function UserAwareSidebar({
                 ${showUserDrop ? "bg-white/10" : "hover:bg-white/8"}
                 ${collapsed ? "justify-center" : ""}`}
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#C62828] to-[#E64A19] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ring-2 ring-white/10">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#C62828] via-[#D43C20] to-[#E64A19] flex items-center justify-center text-white text-sm font-black flex-shrink-0 ring-2 ring-white/15 shadow-[0_4px_12px_rgba(198,40,40,0.45)]">
                 {initials(currentUser.name)}
               </div>
               {!collapsed && (

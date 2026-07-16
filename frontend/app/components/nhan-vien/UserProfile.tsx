@@ -13,6 +13,10 @@ import {
     Printer,
     Pencil,
     X,
+    Image as ImageIcon,
+    Paperclip,
+    ExternalLink,
+    Download
 } from "lucide-react"
 import { Employee } from "../../types"
 
@@ -350,6 +354,58 @@ export default function UserProfile({ emp, onEdit, onClose }: { emp: Employee; o
                                         ))}
                                     </div>
                                 )}
+                            </div>
+
+                            <div className="mt-4 pb-2">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-[10px] font-bold tracking-[0.18em] uppercase" style={{ color: "#dc2626" }}>
+                                        Tài liệu & Hình ảnh
+                                    </span>
+                                    <div className="flex-1 h-px bg-red-100" />
+                                </div>
+                                <div className="flex flex-col gap-4">
+                                    {(emp.photos && emp.photos.length > 0) ? (
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                            {emp.photos.map((url, i) => (
+                                                <div key={i} className="relative group rounded-xl overflow-hidden border border-gray-200 aspect-square bg-gray-50">
+                                                    <img src={url} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                                                    <a href={url} target="_blank" rel="noopener noreferrer" className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <ExternalLink className="text-white" size={20} />
+                                                    </a>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="w-full py-8 text-center border-2 border-dashed border-gray-100 rounded-2xl bg-gray-50 flex items-center justify-center flex-col gap-2">
+                                            <ImageIcon size={20} className="text-gray-300" />
+                                            <p className="text-[13px] text-gray-400 font-medium">Chưa có hình ảnh nào</p>
+                                        </div>
+                                    )}
+
+                                    {(emp.attachments && emp.attachments.length > 0) ? (
+                                        <div className="flex flex-col gap-2">
+                                            {emp.attachments.map((a, i) => (
+                                                <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-gray-50 transition-colors">
+                                                    <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500 shrink-0">
+                                                        <Paperclip size={14} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-bold text-gray-800 truncate">{a.name}</p>
+                                                        <p className="text-[11px] text-gray-400">{a.type === 'file' ? 'Tệp đính kèm' : 'Liên kết URL'}</p>
+                                                    </div>
+                                                    <a href={a.url} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors shrink-0 tooltip-trigger" title="Mở">
+                                                        {a.type === 'link' ? <ExternalLink size={16} /> : <Download size={16} />}
+                                                    </a>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="w-full py-8 text-center border-2 border-dashed border-gray-100 rounded-2xl bg-gray-50 flex items-center justify-center flex-col gap-2">
+                                            <FileText size={20} className="text-gray-300" />
+                                            <p className="text-[13px] text-gray-400 font-medium">Chưa có tài liệu đính kèm nào</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 

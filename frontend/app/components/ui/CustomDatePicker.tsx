@@ -25,7 +25,7 @@ function formatVNDate(d: Date | undefined): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`
 }
 
-const MONTHS = ["Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6","Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"]
+const MONTHS = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"]
 
 function CustomCaption({ month, onMonthChange }: { month: Date; onMonthChange: (m: Date) => void }) {
   const years = Array.from({ length: new Date().getFullYear() - 1990 + 31 }, (_, i) => 1990 + i)
@@ -36,19 +36,19 @@ function CustomCaption({ month, onMonthChange }: { month: Date; onMonthChange: (
         <select
           value={getMonth(month)}
           onChange={e => onMonthChange(setMonth(month, Number(e.target.value)))}
-          className="flex-1 text-xs font-black text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#C62828]/40 cursor-pointer hover:bg-gray-100 transition-colors"
+          className="flex-1 text-xs font-black text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#C62828]/40 dark:focus:border-[#C62828]/70 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
         >
           {MONTHS.map((m, i) => (
-            <option key={i} value={i}>{m}</option>
+            <option key={i} value={i} className="dark:bg-[#1D1D23] dark:text-gray-200">{m}</option>
           ))}
         </select>
         <select
           value={getYear(month)}
           onChange={e => onMonthChange(setYear(month, Number(e.target.value)))}
-          className="w-20 text-xs font-black text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#C62828]/40 cursor-pointer hover:bg-gray-100 transition-colors"
+          className="w-20 text-xs font-black text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#C62828]/40 dark:focus:border-[#C62828]/70 cursor-pointer hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
         >
           {years.map(y => (
-            <option key={y} value={y}>{y}</option>
+            <option key={y} value={y} className="dark:bg-[#1D1D23] dark:text-gray-200">{y}</option>
           ))}
         </select>
       </div>
@@ -56,14 +56,14 @@ function CustomCaption({ month, onMonthChange }: { month: Date; onMonthChange: (
         <button
           type="button"
           onClick={() => onMonthChange(addMonths(month, -1))}
-          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700"
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
         >
           <ChevronLeft size={14} />
         </button>
         <button
           type="button"
           onClick={() => onMonthChange(addMonths(month, 1))}
-          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700"
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
         >
           <ChevronRight size={14} />
         </button>
@@ -77,7 +77,7 @@ function parseVNDateTime(s: string): { date: Date | null; hour: string; minute: 
   const [datePart, timePart] = s.split(" ")
   const date = parseVNDate(datePart)
   const [h, m] = (timePart || "08:00").split(":")
-  return { date, hour: h?.padStart(2,"0") || "08", minute: m?.padStart(2,"0") || "00" }
+  return { date, hour: h?.padStart(2, "0") || "08", minute: m?.padStart(2, "0") || "00" }
 }
 
 export function CustomDateTimePicker({ value, onChange, className, disabled, placeholder = "Chọn ngày giờ..." }: {
@@ -99,8 +99,8 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
     if (parsed.date) setMonth(parsed.date)
   }, [value])
 
-  const hours   = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"))
-  const minutes = ["00","05","10","15","20","25","30","35","40","45","50","55"]
+  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"))
+  const minutes = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"]
 
   function emit(date: Date | undefined, h: string, m: string) {
     if (!date) return
@@ -155,13 +155,10 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
     }
   }, [isOpen])
 
-  const widthClass = className?.split(" ").find(c => c.startsWith("w-")) || "w-full"
-  const inputClass = className?.split(" ").filter(c => !c.startsWith("w-")).join(" ") || ""
-
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <div ref={containerRef} className={`relative ${widthClass}`}>
+        <div ref={containerRef} className={`relative ${className || "w-full"}`}>
           <input
             type="text"
             disabled={disabled}
@@ -169,12 +166,13 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
             value={localDateInput}
             onChange={e => setLocalDateInput(e.target.value)}
             onBlur={handleDateInputBlur}
-            className={`${inputClass} w-full pr-10 cursor-text`}
+            className="w-full h-full bg-transparent outline-none pr-10 cursor-text"
+            style={{ padding: "inherit", margin: 0, font: "inherit", color: "inherit", borderRadius: "inherit", background: "transparent", border: "none" }}
           />
           <CalendarIcon size={15} className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer hover:text-gray-600 transition-colors" />
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 z-[10010] bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden" align="start">
+      <PopoverContent className="w-auto p-0 z-[10010] bg-white dark:bg-white/[0.08] dark:backdrop-blur-[24px] border border-gray-100 dark:border-white/10 rounded-2xl shadow-2xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.6)] overflow-hidden" align="start">
         <DayPicker
           mode="single"
           selected={parsed.date || undefined}
@@ -195,33 +193,33 @@ export function CustomDateTimePicker({ value, onChange, className, disabled, pla
             month_caption: "",
             month_grid: "w-full border-collapse",
             weekdays: "flex mb-1",
-            weekday: "w-9 text-center text-[11px] font-bold text-gray-400",
+            weekday: "w-9 text-center text-[11px] font-bold text-gray-400 dark:text-gray-500",
             week: "flex",
             day: "relative p-0 text-center",
-            day_button: "w-9 h-9 text-xs font-semibold rounded-xl hover:bg-gray-100 transition-colors text-gray-700 flex items-center justify-center mx-auto cursor-pointer",
+            day_button: "w-9 h-9 text-xs font-semibold rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-300 flex items-center justify-center mx-auto cursor-pointer",
             selected: "!bg-[#C62828] !text-white hover:!bg-[#B71C1C] font-black rounded-xl",
-            today: "bg-[#C62828]/8 text-[#C62828] font-black rounded-xl",
-            outside: "text-gray-300",
-            disabled: "text-gray-200 cursor-not-allowed",
+            today: "bg-[#C62828]/8 dark:bg-[#C62828]/20 text-[#C62828] dark:text-[#ff6b6b] font-black rounded-xl",
+            outside: "text-gray-300 dark:text-gray-600",
+            disabled: "text-gray-200 dark:text-gray-700 cursor-not-allowed",
             hidden: "invisible",
           }}
         />
-        <div className="px-4 pb-4 border-t border-gray-100 pt-3">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-wide mb-2">Giờ</p>
+        <div className="px-4 pb-4 border-t border-gray-100 dark:border-white/10 pt-3">
+          <p className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">Giờ</p>
           <div className="flex items-center gap-2">
             <select value={hour} onChange={e => handleHour(e.target.value)}
-              className="flex-1 text-sm font-bold text-gray-800 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 cursor-pointer">
-              {hours.map(h => <option key={h} value={h}>{h}</option>)}
+              className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 dark:focus:border-[#C62828]/70 cursor-pointer">
+              {hours.map(h => <option key={h} value={h} className="dark:bg-[#1D1D23]">{h}</option>)}
             </select>
-            <span className="text-gray-400 font-black">:</span>
+            <span className="text-gray-400 dark:text-gray-500 font-black">:</span>
             <select value={minute} onChange={e => handleMinute(e.target.value)}
-              className="flex-1 text-sm font-bold text-gray-800 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 cursor-pointer">
-              {minutes.map(m => <option key={m} value={m}>{m}</option>)}
+              className="flex-1 text-sm font-bold text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:border-[#C62828]/40 dark:focus:border-[#C62828]/70 cursor-pointer">
+              {minutes.map(m => <option key={m} value={m} className="dark:bg-[#1D1D23]">{m}</option>)}
             </select>
           </div>
           <div className="flex gap-2 mt-3">
             <button type="button" onClick={handleClear}
-              className="flex-1 py-1.5 text-xs font-bold text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+              className="flex-1 py-1.5 text-xs font-bold text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors">
               Xóa
             </button>
             <button type="button" onClick={() => setIsOpen(false)}
@@ -292,13 +290,10 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
     }
   }, [isOpen])
 
-  const widthClass = className?.split(" ").find(c => c.startsWith("w-")) || "w-full"
-  const inputClass = className?.split(" ").filter(c => !c.startsWith("w-")).join(" ") || ""
-
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <div ref={containerRef} className={`relative ${widthClass}`}>
+        <div ref={containerRef} className={`relative ${className || "w-full"}`}>
           <input
             type="text"
             disabled={disabled}
@@ -306,12 +301,13 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
             value={localValue}
             onChange={e => setLocalValue(e.target.value)}
             onBlur={handleBlur}
-            className={`${inputClass} w-full pr-10 cursor-text`}
+            className="w-full h-full bg-transparent outline-none pr-10 cursor-text"
+            style={{ padding: "inherit", margin: 0, font: "inherit", color: "inherit", borderRadius: "inherit", background: "transparent", border: "none" }}
           />
           <CalendarIcon size={15} className="text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer hover:text-gray-600 transition-colors" />
         </div>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0 z-[10010] bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden" align="start">
+      <PopoverContent className="w-auto p-0 z-[10010] bg-white dark:bg-white/[0.08] dark:backdrop-blur-[24px] border border-gray-100 dark:border-white/10 rounded-2xl shadow-2xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.6)] overflow-hidden" align="start">
         <DayPicker
           mode="single"
           selected={dateValue}
@@ -332,14 +328,14 @@ export function CustomDatePicker({ value, onChange, className, disabled, placeho
             month_caption: "",
             month_grid: "w-full border-collapse",
             weekdays: "flex mb-1",
-            weekday: "w-9 text-center text-[11px] font-bold text-gray-400",
+            weekday: "w-9 text-center text-[11px] font-bold text-gray-400 dark:text-gray-500",
             week: "flex",
             day: "relative p-0 text-center",
-            day_button: "w-9 h-9 text-xs font-semibold rounded-xl hover:bg-gray-100 transition-colors text-gray-700 flex items-center justify-center mx-auto cursor-pointer",
+            day_button: "w-9 h-9 text-xs font-semibold rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-colors text-gray-700 dark:text-gray-300 flex items-center justify-center mx-auto cursor-pointer",
             selected: "!bg-[#C62828] !text-white hover:!bg-[#B71C1C] font-black rounded-xl",
-            today: "bg-[#C62828]/8 text-[#C62828] font-black rounded-xl",
-            outside: "text-gray-300",
-            disabled: "text-gray-200 cursor-not-allowed",
+            today: "bg-[#C62828]/8 dark:bg-[#C62828]/20 text-[#C62828] dark:text-[#ff6b6b] font-black rounded-xl",
+            outside: "text-gray-300 dark:text-gray-600",
+            disabled: "text-gray-200 dark:text-gray-700 cursor-not-allowed",
             hidden: "invisible",
           }}
         />

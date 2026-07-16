@@ -268,8 +268,8 @@ export default function AccountManagement({
         setSelectedRole(target)
         setSelectedCustomUser(null)
         setRolePermissions(target.modules || [])
-        const linkedType = target.linkedOrgNodeId 
-          ? (orgNodes.find(n => n.id === target.linkedOrgNodeId)?.type === "sub-department" ? "sub-department" : "department") 
+        const linkedType = target.linkedOrgNodeId
+          ? (orgNodes.find(n => n.id === target.linkedOrgNodeId)?.type === "sub-department" ? "sub-department" : "department")
           : "department"
         setRoleLinkedNodeId(target.linkedOrgNodeId || "")
         setEditRoleLinkedNodeType(linkedType)
@@ -294,8 +294,8 @@ export default function AccountManagement({
     setSelectedRole(roleItem)
     setSelectedCustomUser(null)
     setRolePermissions(roleItem.modules || [])
-    const linkedType = roleItem.linkedOrgNodeId 
-      ? (orgNodes.find(n => n.id === roleItem.linkedOrgNodeId)?.type === "sub-department" ? "sub-department" : "department") 
+    const linkedType = roleItem.linkedOrgNodeId
+      ? (orgNodes.find(n => n.id === roleItem.linkedOrgNodeId)?.type === "sub-department" ? "sub-department" : "department")
       : "department"
     setRoleLinkedNodeId(roleItem.linkedOrgNodeId || "")
     setEditRoleLinkedNodeType(linkedType)
@@ -1106,9 +1106,9 @@ export default function AccountManagement({
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50/80 text-gray-400 text-xs border-b border-gray-100 uppercase tracking-wider font-bold">
-                      <th className="px-5 py-3.5 text-left font-bold w-16">STT</th>
+                      <th className="px-5 py-3.5 text-left font-bold w-16 whitespace-nowrap">STT</th>
                       {["Mã NV", "Tên nhân viên", "Phòng ban", "Trạng thái nhân sự", "Trạng thái tài khoản", "Tài khoản", "Vai trò (Role)", "Hành động"].map(h => (
-                        <th key={h} className="px-5 py-3.5 text-left font-bold">{h}</th>
+                        <th key={h} className="px-5 py-3.5 text-left font-bold whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1118,9 +1118,9 @@ export default function AccountManagement({
                       const roleObj = acc ? rolesList.find(r => r.id === acc.roleId) : null
                       return (
                         <tr key={emp.id} className="hover:bg-gray-50/40 transition-colors">
-                          <td className="px-5 py-4 font-semibold text-gray-400">{index + 1}</td>
-                          <td className="px-5 py-4 font-mono font-bold text-gray-700">{emp.id}</td>
-                          <td className="px-5 py-4">
+                          <td className="px-5 py-4 font-semibold text-gray-400 whitespace-nowrap">{index + 1}</td>
+                          <td className="px-5 py-4 font-mono font-bold text-gray-700 whitespace-nowrap">{emp.id}</td>
+                          <td className="px-5 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-3">
                               {emp.avatar
                                 ? <img src={emp.avatar} alt={emp.name} className="w-9 h-9 rounded-xl object-cover shadow-sm" />
@@ -1129,8 +1129,8 @@ export default function AccountManagement({
                               <span className="font-bold text-gray-800">{emp.name}</span>
                             </div>
                           </td>
-                          <td className="px-5 py-4 text-gray-500 font-bold">{emp.department || "—"}</td>
-                          <td className="px-5 py-4">
+                          <td className="px-5 py-4 text-gray-500 font-bold whitespace-nowrap">{emp.department || "—"}</td>
+                          <td className="px-5 py-4 whitespace-nowrap">
                             {emp.status === "active" ? (
                               <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-green-50 text-green-700 border border-green-100">
                                 Đang làm
@@ -1146,7 +1146,7 @@ export default function AccountManagement({
                             )}
                           </td>
                           {/* 2. Trạng thái tài khoản */}
-                          <td className="px-5 py-4">
+                          <td className="px-5 py-4 whitespace-nowrap">
                             {acc ? (
                               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${acc.status === "active" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-amber-50 text-amber-700 border border-amber-100"}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${acc.status === "active" ? "bg-emerald-500" : "bg-amber-500"}`} />
@@ -1159,10 +1159,10 @@ export default function AccountManagement({
                               </span>
                             )}
                           </td>
-                          <td className="px-5 py-4 text-xs font-mono font-bold text-gray-600">
+                          <td className="px-5 py-4 text-xs font-mono font-bold text-gray-600 whitespace-nowrap">
                             {acc ? acc.email : <span className="text-gray-300 italic font-medium">Chưa tạo tài khoản</span>}
                           </td>
-                          <td className="px-5 py-4">
+                          <td className="px-5 py-4 whitespace-nowrap">
                             {acc ? (
                               <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold 
                                 ${acc.roleId === "role-admin"
@@ -1180,7 +1180,7 @@ export default function AccountManagement({
                               </span>
                             ) : "—"}
                           </td>
-                          <td className="px-5 py-4">
+                          <td className="px-5 py-4 whitespace-nowrap">
                             {acc ? (
                               ["0000000000", "1111111111", "2222222222"].includes(acc.email) ? (
                                 <span className="text-xs text-gray-400 font-semibold italic">Không thể thao tác</span>
@@ -1353,7 +1353,7 @@ export default function AccountManagement({
                       )}
                     </h3>
                     <p className="text-xs text-gray-400 mt-0.5 mb-3">Bật/Tắt module để cho phép/ngăn chặn quyền truy cập tương ứng</p>
-                    
+
                     {selectedRole && !selectedRole.isSystem && (
                       <div className="flex flex-col gap-2 bg-gray-50/50 p-3 rounded-xl border border-gray-100 w-fit">
                         <div className="flex items-center gap-3">
@@ -1381,7 +1381,7 @@ export default function AccountManagement({
                             heightClass="h-[36px]"
                             options={[
                               { value: "", label: "-- Không liên kết --" },
-                              ...(editRoleLinkedNodeType === "department" 
+                              ...(editRoleLinkedNodeType === "department"
                                 ? activeDepartments.map(d => ({ value: d.id, label: d.name }))
                                 : activeSubDepartments.map(d => ({ value: d.id, label: d.name }))
                               )
@@ -1406,8 +1406,8 @@ export default function AccountManagement({
                       type="button"
                       onClick={() => setPermTab("management")}
                       className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${permTab === "management"
-                          ? "bg-[#C62828] text-white shadow-xs"
-                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        ? "bg-[#C62828] text-white shadow-xs"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                         }`}
                     >
                       Quyền Quản lý / Admin
@@ -1417,8 +1417,8 @@ export default function AccountManagement({
                     type="button"
                     onClick={() => setPermTab("staff")}
                     className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${permTab === "staff"
-                        ? "bg-[#C62828] text-white shadow-xs"
-                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                      ? "bg-[#C62828] text-white shadow-xs"
+                      : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                       }`}
                   >
                     Quyền Nhân viên / Staff
@@ -1651,8 +1651,8 @@ export default function AccountManagement({
                         type="button"
                         onClick={() => setModalPermTab("management")}
                         className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all text-center cursor-pointer ${modalPermTab === "management"
-                            ? "bg-[#C62828] text-white shadow-xs"
-                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                          ? "bg-[#C62828] text-white shadow-xs"
+                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                           }`}
                       >
                         Quản lý
@@ -1662,8 +1662,8 @@ export default function AccountManagement({
                       type="button"
                       onClick={() => setModalPermTab("staff")}
                       className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all text-center cursor-pointer ${modalPermTab === "staff"
-                          ? "bg-[#C62828] text-white shadow-xs"
-                          : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                        ? "bg-[#C62828] text-white shadow-xs"
+                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
                         }`}
                     >
                       Staff
@@ -1765,8 +1765,8 @@ export default function AccountManagement({
                       setRoleForm(prev => ({ ...prev, roleType: "management", scopeType: prev.scopeType === "self" ? "branch" : prev.scopeType }))
                     }}
                     className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${roleForm.roleType === "management"
-                        ? "bg-[#C62828] text-white border-[#C62828] shadow-xs"
-                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                      ? "bg-[#C62828] text-white border-[#C62828] shadow-xs"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                       }`}
                   >
                     Quản lý / Admin
@@ -1777,8 +1777,8 @@ export default function AccountManagement({
                       setRoleForm(prev => ({ ...prev, roleType: "staff", scopeType: "self" }))
                     }}
                     className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${roleForm.roleType === "staff"
-                        ? "bg-[#C62828] text-white border-[#C62828] shadow-xs"
-                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                      ? "bg-[#C62828] text-white border-[#C62828] shadow-xs"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                       }`}
                   >
                     Nhân viên / Staff
@@ -1829,7 +1829,7 @@ export default function AccountManagement({
                   heightClass="h-[42px]"
                   options={[
                     { value: "", label: "-- Không liên kết --" },
-                    ...(roleForm.linkedNodeType === "department" 
+                    ...(roleForm.linkedNodeType === "department"
                       ? activeDepartments.map(d => ({ value: d.id, label: d.name }))
                       : activeSubDepartments.map(d => ({ value: d.id, label: d.name }))
                     )
