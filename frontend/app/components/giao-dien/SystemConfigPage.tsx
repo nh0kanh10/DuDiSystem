@@ -45,18 +45,18 @@ export function SystemConfigPage() {
           <button
             onClick={() => setActiveTab("admin")}
             className={`px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shrink-0 ${activeTab === "admin"
-                ? "bg-white text-[#C62828] shadow-sm border border-gray-200/50"
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+              ? "bg-white text-[#C62828] shadow-sm border border-gray-200/50"
+              : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
               }`}
           >
             <Lock size={16} /> Quản lý Admin
           </button>
-          
+
           <button
             onClick={() => setActiveTab("bxh")}
             className={`px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shrink-0 ${activeTab === "bxh"
-                ? "bg-white text-[#C62828] shadow-sm border border-gray-200/50"
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+              ? "bg-white text-[#C62828] shadow-sm border border-gray-200/50"
+              : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
               }`}
           >
             <Users size={16} /> BXH Gắn bó
@@ -66,7 +66,7 @@ export function SystemConfigPage() {
         {/* Tab Content */}
         <div className="p-8">
           {activeTab === "admin" && <AdminManagementTab />}
-          
+
           {activeTab === "bxh" && <LoyaltyBoardTab />}
         </div>
       </div>
@@ -244,6 +244,20 @@ function LoyaltyBoardTab() {
       return a.totalDays - b.totalDays
     })
 
+    // Assign ranking with ties
+    result.forEach((item, index) => {
+      if (index === 0) {
+        item._calculatedRank = 1;
+      } else {
+        const prevItem = result[index - 1];
+        if (item.totalDays === prevItem.totalDays) {
+          item._calculatedRank = prevItem._calculatedRank; // Tied rank
+        } else {
+          item._calculatedRank = index + 1; // Standard competition ranking
+        }
+      }
+    })
+
     return result
   }, [employees, filterStatus, filterSort])
 
@@ -374,7 +388,7 @@ function LoyaltyBoardTab() {
                 </tr>
               )}
               {!loading && processedData.map((emp, index) => {
-                let rank = index + 1;
+                let rank = emp._calculatedRank || (index + 1);
 
                 let rankColor = "text-gray-500 border-gray-200"
                 if (filterSort === "desc") {
