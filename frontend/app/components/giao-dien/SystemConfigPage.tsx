@@ -51,15 +51,7 @@ export function SystemConfigPage() {
           >
             <Lock size={16} /> Quản lý Admin
           </button>
-          <button
-            onClick={() => setActiveTab("attendance")}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shrink-0 ${activeTab === "attendance"
-                ? "bg-white text-[#C62828] shadow-sm border border-gray-200/50"
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
-              }`}
-          >
-            <Clock size={16} /> Điều chỉnh chấm công
-          </button>
+          
           <button
             onClick={() => setActiveTab("bxh")}
             className={`px-6 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all shrink-0 ${activeTab === "bxh"
@@ -74,7 +66,7 @@ export function SystemConfigPage() {
         {/* Tab Content */}
         <div className="p-8">
           {activeTab === "admin" && <AdminManagementTab />}
-          {activeTab === "attendance" && <AttendanceAdjustmentTab />}
+          
           {activeTab === "bxh" && <LoyaltyBoardTab />}
         </div>
       </div>
@@ -195,19 +187,6 @@ function AdminManagementTab() {
   )
 }
 
-function AttendanceAdjustmentTab() {
-  return (
-    <div className="text-center flex flex-col items-center justify-center py-20 min-h-[400px] animate-in fade-in duration-300">
-      <div className="w-24 h-24 rounded-full bg-gray-50 flex items-center justify-center mb-6 border border-gray-100">
-        <Clock size={48} className="text-gray-300" />
-      </div>
-      <h2 className="text-2xl font-black text-gray-800 mb-3">Điều chỉnh chấm công</h2>
-      <p className="text-gray-500 text-base max-w-md leading-relaxed">
-        Tính năng này đang trong quá trình phát triển để mang lại trải nghiệm quản trị tốt hơn. Vui lòng quay lại sau.
-      </p>
-    </div>
-  )
-}
 
 function LoyaltyBoardTab() {
   const [employees, setEmployees] = useState<any[]>([])
