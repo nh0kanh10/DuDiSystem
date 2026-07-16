@@ -15,14 +15,25 @@ import {
 
 const STATUSES = ["Chưa xử lý", "Chặn người lạ", "Đã gửi tin nhắn", "Không có Zalo", "Trả lời"]
 
-function statusColor(s: string) {
+function statusBadge(s: string): string {
   switch (s) {
-    case "Chưa xử lý": return "bg-slate-100 text-slate-700 border border-slate-200"
-    case "Chặn người lạ": return "bg-amber-50 text-amber-700 border border-amber-200"
-    case "Đã gửi tin nhắn": return "bg-blue-50 text-blue-700 border border-blue-200"
-    case "Không có Zalo": return "bg-red-50 text-red-700 border border-red-200 font-bold"
-    case "Trả lời": return "bg-emerald-50 text-emerald-700 border border-emerald-200"
-    default: return "bg-slate-100 text-slate-700 border border-slate-200"
+    case "Chưa xử lý":    return "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700/60"
+    case "Chặn người lạ": return "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800/40"
+    case "Đã gửi tin nhắn": return "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/40"
+    case "Không có Zalo":   return "bg-red-50 text-red-500 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/40"
+    case "Trả lời":        return "bg-teal-50 text-teal-600 border-teal-200 dark:bg-teal-900/30 dark:text-teal-400 dark:border-teal-800/40"
+    default:               return "bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:border-slate-700/60"
+  }
+}
+
+function statusOptionColor(s: string): { dot: string; base: string; active: string } {
+  switch (s) {
+    case "Chưa xử lý":    return { dot: "bg-slate-400 dark:bg-slate-500",   base: "bg-slate-50 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300",   active: "bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200" }
+    case "Chặn người lạ": return { dot: "bg-orange-400 dark:bg-orange-500", base: "bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-300", active: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-200" }
+    case "Đã gửi tin nhắn": return { dot: "bg-blue-400 dark:bg-blue-500",   base: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300",     active: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200" }
+    case "Không có Zalo":   return { dot: "bg-red-400 dark:bg-red-500",     base: "bg-red-50 text-red-500 dark:bg-red-900/20 dark:text-red-300",         active: "bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-200" }
+    case "Trả lời":        return { dot: "bg-teal-400 dark:bg-teal-500",   base: "bg-teal-50 text-teal-600 dark:bg-teal-900/20 dark:text-teal-300",     active: "bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-200" }
+    default:               return { dot: "bg-slate-400 dark:bg-slate-500",   base: "bg-slate-50 text-slate-600 dark:bg-slate-800/40 dark:text-slate-300",   active: "bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200" }
   }
 }
 
@@ -370,7 +381,8 @@ export function CrmStaffPage({ employee = null, activeTab = "data", onOpenLead }
                         disabled={updatingId === r.id}
                         onChange={val => handleStatusChange(r.id, val)}
                         options={STATUSES.map(s => ({ value: s, label: s }))}
-                        className={`min-w-[130px] rounded-full overflow-hidden text-[10px] font-bold ${statusColor(r.status)}`}
+                        optionColorFn={statusOptionColor}
+                        className={`min-w-[145px] rounded-xl border font-bold text-[10px] ${statusBadge(r.status ?? "Chưa xử lý")}`}
                         heightClass="h-[28px]"
                         menuClassName="text-left"
                       />

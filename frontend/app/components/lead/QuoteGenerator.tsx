@@ -254,8 +254,10 @@ export function QuoteGenerator({
   const handleUploadDirect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !lead?.id) return
-    if (!file.name.toLowerCase().endsWith(".docx") && !file.name.toLowerCase().endsWith(".doc")) {
-      setError("Chỉ hỗ trợ file Word (.doc, .docx)")
+    const isDoc = file.name.toLowerCase().endsWith(".docx") || file.name.toLowerCase().endsWith(".doc")
+    const isPdf = file.name.toLowerCase().endsWith(".pdf")
+    if (!isDoc && !isPdf) {
+      setError("Chỉ hỗ trợ file Word (.doc, .docx) hoặc PDF (.pdf)")
       return
     }
 
@@ -395,7 +397,7 @@ export function QuoteGenerator({
             <UploadCloud size={40} className="mx-auto text-gray-400 mb-3" />
             <h3 className="text-base font-black text-gray-800">Tải lên file báo giá</h3>
             <p className="text-xs text-gray-500 mt-1">
-              Tải lên file Word (.doc, .docx) báo giá do bạn tự soạn thảo.
+              Tải lên file Word (.doc, .docx) hoặc PDF (.pdf) báo giá do bạn tự soạn thảo.
             </p>
           </div>
           
@@ -418,7 +420,7 @@ export function QuoteGenerator({
             <label className={`flex items-center justify-center gap-2 w-full py-4 ${!saveLabel.trim() || !!editingDocId || uploadingFile ? "bg-gray-300 cursor-not-allowed" : "bg-[#C62828] cursor-pointer hover:bg-[#B71C1C]"} text-white rounded-xl text-base font-bold transition-colors shadow-sm`}>
               {uploadingFile ? <Loader2 size={18} className="animate-spin" /> : <UploadCloud size={18} />}
               Chọn file & Tải lên
-              <input type="file" className="hidden" accept=".doc,.docx" onChange={handleUploadDirect} disabled={uploadingFile || !!editingDocId || !saveLabel.trim()} />
+              <input type="file" className="hidden" accept=".doc,.docx,.pdf" onChange={handleUploadDirect} disabled={uploadingFile || !!editingDocId || !saveLabel.trim()} />
             </label>
             
             {saveMsg && <p className="text-sm text-green-700 font-semibold text-center mt-2">{saveMsg}</p>}

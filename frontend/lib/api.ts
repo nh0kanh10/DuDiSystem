@@ -184,6 +184,7 @@ export const api = {
       return { ...json.data, url }
     },
     downloadUrl: (key: string) => `${BASE}/storage/download?key=${encodeURIComponent(key)}`,
+    downloadBlob: (key: string) => fetchAuthBlob(`/storage/download?key=${encodeURIComponent(key)}`, { method: "GET" }),
     delete: (key: string) => req<any>("POST", "/storage/delete", { key }),
   },
   users: {

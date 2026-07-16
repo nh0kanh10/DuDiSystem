@@ -523,7 +523,18 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   const employeeSummaries = useMemo(() => {
     const map = new Map<string, KpiMetrics & { points: number; daysCount: number }>();
     
-    filteredEmployees.forEach(e => {
+    const employeesWithEntries = new Set(currentMonthEntries.map(entry => entry.employeeId));
+
+    const activeEmployeesInMonth = filteredEmployees.filter(e => {
+      if (employeesWithEntries.has(e.id)) return true;
+      if (e.status === "active") return true;
+      if (e.resignDate) {
+        return e.resignDate.slice(0, 7) >= selectedMonth;
+      }
+      return false;
+    });
+
+    activeEmployeesInMonth.forEach(e => {
       map.set(e.id, { zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0, points: 0, daysCount: 0 });
     });
 
@@ -557,7 +568,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
         daysCount: data.daysCount
       };
     }).sort((a, b) => b.points - a.points); 
-  }, [currentMonthEntries, filteredEmployees, employees]);
+  }, [currentMonthEntries, filteredEmployees, employees, selectedMonth]);
 
   const topPerformers = useMemo(() => {
     return employeeSummaries.slice(0, 3);
@@ -595,7 +606,25 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   const statsEmployeeSummaries = useMemo(() => {
     const map = new Map<string, KpiMetrics & { points: number; daysCount: number }>();
     
-    filteredEmployees.forEach(e => {
+    const employeesWithStatsEntries = new Set(statsEntries.map(entry => entry.employeeId));
+
+    const activeEmployeesInStats = filteredEmployees.filter(e => {
+      if (employeesWithStatsEntries.has(e.id)) return true;
+      if (e.status === "active") return true;
+      if (e.resignDate) {
+        const today = new Date();
+        if (statsTimeRange === "this-year") {
+          const currentYearStr = today.getFullYear().toString();
+          return e.resignDate.slice(0, 4) >= currentYearStr;
+        } else {
+          const currentMonthStr = today.toISOString().slice(0, 7);
+          return e.resignDate.slice(0, 7) >= currentMonthStr;
+        }
+      }
+      return false;
+    });
+
+    activeEmployeesInStats.forEach(e => {
       map.set(e.id, { zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0, points: 0, daysCount: 0 });
     });
 
@@ -636,7 +665,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
       return row.name.toLowerCase().includes(q) || row.department.toLowerCase().includes(q) || row.position.toLowerCase().includes(q);
     })
     .sort((a, b) => b.points - a.points);
-  }, [statsEntries, filteredEmployees, employees, statsSearchQuery]);
+  }, [statsEntries, filteredEmployees, employees, statsSearchQuery, statsTimeRange]);
 
   // Aggregate totals for the stats table
   const statsTableTotals = useMemo(() => {

@@ -270,15 +270,32 @@ function FilesTab({
   const [previewKey, setPreviewKey] = useState(0)
 
   const extractKey = (url: string) => {
+    if (!url) return ""
     try {
       const parsed = new URL(url)
-      return parsed.searchParams.get("key") || ""
-    } catch {
-      if (url.includes("key=")) {
+      const keyParam = parsed.searchParams.get("key")
+      if (keyParam) return keyParam
+    } catch {}
+
+    if (url.includes("key=")) {
+      try {
         return decodeURIComponent(url.split("key=")[1].split("&")[0])
-      }
-      return ""
+      } catch {}
     }
+
+    // Handle direct Cloudinary or local upload URLs by extracting after folders
+    const cloudFolder = "dudi/"
+    if (url.includes(cloudFolder)) {
+      const parts = url.split(cloudFolder)
+      return parts[parts.length - 1]
+    }
+    const uploadsFolder = "uploads/"
+    if (url.includes(uploadsFolder)) {
+      const parts = url.split(uploadsFolder)
+      return parts[parts.length - 1]
+    }
+
+    return ""
   }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -571,6 +588,10 @@ function FilesTab({
             downloadName={previewFile.name}
             refreshKey={previewKey}
             loadBlob={async () => {
+              const key = extractKey(previewFile.url)
+              if (key) {
+                return api.storage.downloadBlob(key)
+              }
               const res = await fetch(previewFile.url)
               if (!res.ok) throw new Error("Không thể tải file xem trước")
               return res.blob()

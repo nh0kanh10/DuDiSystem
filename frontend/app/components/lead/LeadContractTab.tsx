@@ -271,8 +271,10 @@ export function LeadContractTab({
   const handleUploadContractDirect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (!file.name.toLowerCase().endsWith(".docx") && !file.name.toLowerCase().endsWith(".doc")) {
-      setError("Chỉ hỗ trợ file Word (.doc, .docx)")
+    const isDoc = file.name.toLowerCase().endsWith(".docx") || file.name.toLowerCase().endsWith(".doc")
+    const isPdf = file.name.toLowerCase().endsWith(".pdf")
+    if (!isDoc && !isPdf) {
+      setError("Chỉ hỗ trợ file Word (.doc, .docx) hoặc PDF (.pdf)")
       return
     }
     const targetLabel = uploadContractLabel.trim() || file.name.replace(/\.[^/.]+$/, "")
@@ -584,8 +586,8 @@ export function LeadContractTab({
                           <h3 className="text-base font-black text-gray-800">Tải lên file hợp đồng</h3>
                           <p className="text-xs text-gray-500 mt-1">
                             {isQuoteUploaded
-                              ? "Báo giá này được tải lên từ máy. Vui lòng tải lên file Word (.doc, .docx) hợp đồng do bạn tự soạn thảo."
-                              : "Vui lòng tải lên file Word (.doc, .docx) hợp đồng do bạn tự soạn thảo."}
+                              ? "Báo giá này được tải lên từ máy. Vui lòng tải lên file Word (.doc, .docx) hoặc PDF (.pdf) hợp đồng do bạn tự soạn thảo."
+                              : "Vui lòng tải lên file Word (.doc, .docx) hoặc PDF (.pdf) hợp đồng do bạn tự soạn thảo."}
                           </p>
                         </div>
                         
@@ -605,7 +607,7 @@ export function LeadContractTab({
                           <label className={`flex items-center justify-center gap-2 w-full py-4 ${!uploadContractLabel.trim() || uploadingContract ? "bg-gray-300 cursor-not-allowed" : "bg-[#C62828] cursor-pointer hover:bg-[#B71C1C]"} text-white rounded-xl text-base font-bold transition-colors shadow-sm`}>
                             {uploadingContract ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
                             Chọn file & Tải lên
-                            <input type="file" className="hidden" accept=".doc,.docx" onChange={handleUploadContractDirect} disabled={uploadingContract || !uploadContractLabel.trim()} />
+                            <input type="file" className="hidden" accept=".doc,.docx,.pdf" onChange={handleUploadContractDirect} disabled={uploadingContract || !uploadContractLabel.trim()} />
                           </label>
                         </div>
                       </div>
@@ -801,11 +803,11 @@ export function LeadContractTab({
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Chọn File Word (.docx)</label>
+            <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Chọn File Word (.docx) hoặc PDF (.pdf)</label>
             <input
               type="file"
               multiple
-              accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".docx,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
               className="hidden"
               ref={appendixInputRef}
               disabled={creatingAppendix}
@@ -813,7 +815,7 @@ export function LeadContractTab({
                 const files = Array.from(e.target.files ?? [])
                 if (files.length === 0) return
                 setAppendixFiles(files)
-                setAppendixLabels(files.map(f => f.name.replace(/\.docx$/i, "")))
+                setAppendixLabels(files.map(f => f.name.replace(/\.(docx|pdf)$/i, "")))
               }}
             />
             <button
@@ -823,7 +825,7 @@ export function LeadContractTab({
               className="w-full flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-red-200 bg-red-50/20 px-4 py-6 text-xs font-semibold text-[#C62828] hover:border-red-400 hover:bg-red-50/40 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Upload size={22} className="text-[#C62828]" />
-              <span>Nhấp để chọn một hoặc nhiều file Word (.docx)</span>
+              <span>Nhấp để chọn một hoặc nhiều file Word (.docx) hoặc PDF (.pdf)</span>
             </button>
           </div>
 

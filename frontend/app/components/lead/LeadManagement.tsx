@@ -255,11 +255,11 @@ export function LeadManagement({
                 className="bg-white rounded-2xl border border-gray-100 p-5 hover:border-[#C62828]/20 hover:shadow-md transition-all group cursor-pointer text-left"
               >
                 <div className="flex items-start justify-between gap-3 mb-3">
-                  <div>
+                  <div className="min-w-0">
                     <span className="text-[10px] font-black text-gray-400 font-mono">{lead.code}</span>
-                    <h3 className="font-bold text-gray-800 text-sm mt-1">{lead.name}</h3>
+                    <h3 className="font-bold text-gray-800 text-sm mt-1 break-words">{lead.name}</h3>
                   </div>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusConfig.cls}`}>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${statusConfig.cls}`}>
                     <Icon size={10} /> {statusConfig.label}
                   </span>
                 </div>

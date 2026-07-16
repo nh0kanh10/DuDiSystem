@@ -35,7 +35,11 @@ function assertAllowedUpload(type, filename) {
     return
   }
   if (type === "quote" || type === "contract") {
-    if (!WORD_EXT.test(name)) throw new Error("Chỉ chấp nhận file Word (.doc, .docx)")
+    const isDoc = WORD_EXT.test(name)
+    const isPdf = /\.pdf$/i.test(name)
+    if (!isDoc && !isPdf) {
+      throw new Error("Chỉ chấp nhận file Word (.doc, .docx) hoặc PDF (.pdf)")
+    }
     return
   }
   throw new Error("Loại tài liệu không hợp lệ")
@@ -311,12 +315,14 @@ export async function createContractAppendix(leadId, parentDocId, options = {}, 
 
   const fileBuffer = options.fileBuffer
   if (!fileBuffer?.length) {
-    throw new Error("Vui lòng tải lên file Word (.docx)")
+    throw new Error("Vui lòng tải lên file Word (.docx) hoặc PDF (.pdf)")
   }
 
   const originalName = decodeUploadFilename(String(options.originalFilename || "phu-luc.docx").trim())
-  if (!originalName.toLowerCase().endsWith(".docx")) {
-    throw new Error("Chỉ chấp nhận file .docx")
+  const isDoc = originalName.toLowerCase().endsWith(".docx")
+  const isPdf = originalName.toLowerCase().endsWith(".pdf")
+  if (!isDoc && !isPdf) {
+    throw new Error("Chỉ chấp nhận file .docx hoặc .pdf")
   }
 
   const version = repo.nextAppendixVersion(leadId, parentDoc.id)
@@ -324,7 +330,7 @@ export async function createContractAppendix(leadId, parentDocId, options = {}, 
   const createdAt = new Date().toISOString()
   const createdBy = user.employeeId ?? user.id ?? ""
   const baseLabel = String(options.label || options.title || "").trim()
-    || originalName.replace(/\.docx$/i, "")
+    || originalName.replace(/\.(docx|pdf)$/i, "")
     || `Phụ lục #${version}`
 
   const list = repo.listByLead(leadId, "contract").filter(d => d.parentDocumentId)
@@ -333,13 +339,11 @@ export async function createContractAppendix(leadId, parentDocId, options = {}, 
   }
 
   const label = `${baseLabel} — ${parentDoc.label}`
-  const downloadName = originalName.toLowerCase().endsWith(".docx")
-    ? originalName
-    : `${originalName}.docx`
+  const downloadName = originalName
 
   const storageKey = leadDocumentKey(leadId, "contract", id, downloadName)
   await getFileStorage().put(storageKey, fileBuffer, {
-    contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    contentType: isPdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   })
 
   const payload = {

@@ -561,6 +561,9 @@ export default function UserChatWidget({ embed = false }: { embed?: boolean }) {
                         border: msg.failed ? "1px solid #fecaca" : msg.from === "me" ? "none" : "1px solid #efd7da",
                         fontSize: 13.5,
                         lineHeight: 1.4,
+                        wordBreak: "break-word",
+                        overflowWrap: "break-word",
+                        whiteSpace: "pre-wrap",
                       }}
                     >
                       {msg.text}
