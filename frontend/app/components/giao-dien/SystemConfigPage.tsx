@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { Settings, Clock, ShieldAlert, Check, RefreshCw, Users, Layers, X, Edit, Lock, User, Save, Building } from "lucide-react"
 import { createPortal } from "react-dom"
 import { useToast } from "@/app/hooks/useToast"
+import { AdminUtilitiesOverlay } from "./AdminUtilitiesOverlay"
 import { api } from "@/lib/api"
 
 import { CustomTimePicker } from "../ui/CustomTimePicker"
@@ -27,6 +28,7 @@ export function SystemConfigPage() {
   })
 
   const [activeDrawer, setActiveDrawer] = useState<"admin" | "bxh" | null>(null)
+  const [activeOverlayTab, setActiveOverlayTab] = useState<string | null>(null)
   const [adminUsers, setAdminUsers] = useState<any[]>([])
   const [isLoadingAdmins, setIsLoadingAdmins] = useState(false)
   const [editingAdmin, setEditingAdmin] = useState<any | null>(null)
@@ -378,9 +380,9 @@ export function SystemConfigPage() {
 
             <div className="space-y-2.5">
               {[
-                { label: "Quản lý admin", action: () => handleOpenAdminManagement() },
-                { label: "Điều chỉnh chấm công", action: () => {} },
-                { label: "BXH gắn bó", action: () => handleOpenLoyaltyBoard() },
+                { label: "Quản lý admin", action: () => setActiveOverlayTab("admin") },
+                { label: "Điều chỉnh chấm công", action: () => setActiveOverlayTab("attendance") },
+                { label: "BXH gắn bó", action: () => setActiveOverlayTab("bxh") },
               ].map(item => (
                 <div
                   key={item.label}
@@ -395,6 +397,13 @@ export function SystemConfigPage() {
           </div>
         </div>
       </div>
+
+      {activeOverlayTab && (
+        <AdminUtilitiesOverlay 
+          initialTab={activeOverlayTab} 
+          onClose={() => setActiveOverlayTab(null)} 
+        />
+      )}
 
       {/* Right Drawer Overlay */}
       {activeDrawer && createPortal(
