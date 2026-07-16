@@ -515,7 +515,15 @@ function DirectoryContent() {
   );
 }
 
-function NotificationsContent({ employee }: { employee: Employee | null }) {
+function NotificationsContent({
+  employee,
+  notificationsState,
+  onReloadAnnouncementsCount,
+}: {
+  employee: Employee | null;
+  notificationsState: ReturnType<typeof useNotifications>;
+  onReloadAnnouncementsCount?: () => void;
+}) {
   const {
     items,
     loading: loadingInbox,
@@ -525,7 +533,7 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
     markRead,
     deleteItem,
     reload: reloadInbox,
-  } = useNotifications();
+  } = notificationsState;
 
   const [activeSubTab, setActiveSubTab] = useState<
     "inbox" | "admin_req" | "broadcast"
@@ -541,6 +549,13 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailItem, setDetailItem] = useState<any | null>(null);
+  const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("dudi_read_announcements") || "[]")
+    } catch {
+      return []
+    }
+  });
 
   const loadAnnouncements = () => {
     setLoadingAnnouncements(true);
@@ -590,6 +605,15 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
       loadAdminRequests();
     }
   }, [activeSubTab]);
+
+  useEffect(() => {
+    if (activeSubTab === "broadcast" && announcements.length > 0) {
+      const newReadIds = [...new Set([...readAnnouncementIds, ...announcements.map(a => a.id)])];
+      setReadAnnouncementIds(newReadIds);
+      localStorage.setItem("dudi_read_announcements", JSON.stringify(newReadIds));
+      onReloadAnnouncementsCount?.();
+    }
+  }, [activeSubTab, announcements]);
 
   const handleReload = () => {
     if (activeSubTab === "inbox") {
@@ -670,9 +694,9 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
             }`}
         >
           Thông báo hệ thống{" "}
-          {announcements.length > 0 && (
+          {announcements.filter(a => !readAnnouncementIds.includes(a.id)).length > 0 && (
             <span className="ml-1 bg-blue-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">
-              {announcements.length}
+              {announcements.filter(a => !readAnnouncementIds.includes(a.id)).length}
             </span>
           )}
         </button>
@@ -947,6 +971,9 @@ function NotificationsContent({ employee }: { employee: Employee | null }) {
                         <span className="text-[11px] text-gray-400 dark:text-gray-300 font-semibold">
                           {a.createdAt || a.startTime}
                         </span>
+                      )}
+                      {!readAnnouncementIds.includes(a.id) && (
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
                       )}
                     </div>
                     <div className="space-y-1">
@@ -1692,7 +1719,25 @@ export default function UserPortalApp({
     return false;
   });
   const [employee, setEmployee] = useState<Employee | null>(null);
-  const { unread: notifUnread } = useNotifications();
+  const notificationsState = useNotifications();
+  const { unread: notifUnread } = notificationsState;
+  const [unreadAnnouncementsCount, setUnreadAnnouncementsCount] = useState(0);
+
+  useEffect(() => {
+    api.announcements.list()
+      .then((data: any) => {
+        const active = (data || []).filter((item: any) => item.status === "active");
+        try {
+          const readIds = JSON.parse(localStorage.getItem("dudi_read_announcements") || "[]");
+          const unreadCount = active.filter((a: any) => !readIds.includes(a.id)).length;
+          setUnreadAnnouncementsCount(unreadCount);
+        } catch {
+          setUnreadAnnouncementsCount(active.length);
+        }
+      })
+      .catch(() => { });
+  }, [activePage]);
+
   const [adminReqCount, setAdminReqCount] = useState(0);
   const [checkingIP, setCheckingIP] = useState(false);
   const [attendanceHome, setAttendanceHome] = useState<{ checkedIn: boolean; checkInTime: string | null }>({
@@ -1731,7 +1776,7 @@ export default function UserPortalApp({
       .catch(() => { });
   }, [employee?.id, activePage]);
 
-  const totalUnread = notifUnread + adminReqCount;
+  const totalUnread = notifUnread + adminReqCount + unreadAnnouncementsCount;
 
   useEffect(() => {
     if (!employee?.id) return;
@@ -1966,7 +2011,24 @@ export default function UserPortalApp({
 
       {activePage === "notifications" && (
         <ModalWrapper title="Thông báo hệ thống" onClose={() => setActivePage(null)}>
-          <NotificationsContent employee={employee} />
+          <NotificationsContent
+            employee={employee}
+            notificationsState={notificationsState}
+            onReloadAnnouncementsCount={() => {
+              api.announcements.list()
+                .then((data: any) => {
+                  const active = (data || []).filter((item: any) => item.status === "active");
+                  try {
+                    const readIds = JSON.parse(localStorage.getItem("dudi_read_announcements") || "[]");
+                    const unreadCount = active.filter((a: any) => !readIds.includes(a.id)).length;
+                    setUnreadAnnouncementsCount(unreadCount);
+                  } catch {
+                    setUnreadAnnouncementsCount(active.length);
+                  }
+                })
+                .catch(() => { });
+            }}
+          />
         </ModalWrapper>
       )}
 

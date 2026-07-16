@@ -92,11 +92,10 @@ const CustomSelect = ({ label, value, onChange, options }: CustomSelectProps) =>
                     onChange(opt.value);
                     setIsOpen(false);
                   }}
-                  className={`px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
-                    isSelected 
-                      ? "bg-red-50 text-[#C62828]" 
-                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
+                  className={`px-4 py-2 text-xs font-bold transition-all cursor-pointer ${isSelected
+                    ? "bg-red-50 text-[#C62828]"
+                    : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                    }`}
                 >
                   {opt.label}
                 </div>
@@ -114,7 +113,7 @@ interface CustomMonthPickerProps {
   onChange: (val: string) => void;
 }
 
-const MONTH_LABELS = ["Thg1","Thg2","Thg3","Thg4","Thg5","Thg6","Thg7","Thg8","Thg9","Thg10","Thg11","Thg12"];
+const MONTH_LABELS = ["Thg1", "Thg2", "Thg3", "Thg4", "Thg5", "Thg6", "Thg7", "Thg8", "Thg9", "Thg10", "Thg11", "Thg12"];
 
 const CustomMonthPicker = ({ value, onChange }: CustomMonthPickerProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -213,7 +212,7 @@ interface CustomDatePickerProps {
 }
 
 const VIET_DAYS = ["Th 2", "Th 3", "Th 4", "Th 5", "Th 6", "Th 7", "CN"];
-const VIET_MONTHS = ["Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6","Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"];
+const VIET_MONTHS = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
 
 const CustomDatePicker = ({ label, value, onChange, disabled = false }: CustomDatePickerProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -246,7 +245,7 @@ const CustomDatePicker = ({ label, value, onChange, disabled = false }: CustomDa
   };
 
   const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const handlePrevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
@@ -259,7 +258,7 @@ const CustomDatePicker = ({ label, value, onChange, disabled = false }: CustomDa
 
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);
   const firstDay = getFirstDayOfMonth(viewYear, viewMonth);
-  const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({length: daysInMonth}, (_, i) => i + 1)];
+  const cells: (number | null)[] = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
   while (cells.length % 7 !== 0) cells.push(null);
 
   const yearOptions = Array.from({ length: 10 }, (_, i) => today.getFullYear() - 3 + i);
@@ -316,7 +315,7 @@ const CustomDatePicker = ({ label, value, onChange, disabled = false }: CustomDa
           <div className="grid grid-cols-7 gap-y-0.5">
             {cells.map((day, idx) => {
               if (!day) return <div key={`empty-${idx}`} />;
-              const dateStr = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+              const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const isSelected = dateStr === value;
               const isToday = dateStr === todayStr;
               return (
@@ -359,7 +358,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     });
   }, [rawEmployees]);
   const [selectedMonth, setSelectedMonth] = useState("2026-07");
-  
+
   // Dashboard Sub-tabs for "Tổng quan"
   const [overviewSubTab, setOverviewSubTab] = useState<"charts" | "reports" | "targets">("charts");
 
@@ -442,7 +441,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
       setReportEndDate(formatLocalDate(lastDay));
     }
   }, [reportTimeRange]);
-  
+
   // States for target inline form
   const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
   const [targetFormType, setTargetFormType] = useState<"all" | "employee">("all");
@@ -484,9 +483,11 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     return new Set(filteredEmployees.map(e => e.id));
   }, [filteredEmployees]);
 
-  // Load KPI entries and targets from local storage
-  const [entries, setEntries] = useState<KpiEntry[]>(() => getStoredKpiEntries());
-  const [targets, setTargets] = useState<KpiTarget[]>(() => getStoredKpiTargets());
+  // Load KPI entries and targets from backend API
+  const [entries, setEntries] = useState<KpiEntry[]>([]);
+  const [targets, setTargets] = useState<KpiTarget[]>([]);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
 
   const handleRefresh = () => {
     setEntries(getStoredKpiEntries());
@@ -496,8 +497,8 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
 
   // Filter entries for the selected month and branch
   const currentMonthEntries = useMemo(() => {
-    return entries.filter(entry => 
-      entry.date.startsWith(selectedMonth) && 
+    return entries.filter(entry =>
+      entry.date.startsWith(selectedMonth) &&
       filteredEmployeeIds.has(entry.employeeId)
     );
   }, [entries, selectedMonth, filteredEmployeeIds]);
@@ -505,9 +506,19 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   // Compute aggregated stats for each employee for the selected month
   const employeeSummaries = useMemo(() => {
     const map = new Map<string, KpiMetrics & { points: number; daysCount: number }>();
-    
-    // Initialize default metrics for all branch employees
-    filteredEmployees.forEach(e => {
+
+    const employeesWithEntries = new Set(currentMonthEntries.map(entry => entry.employeeId));
+
+    const activeEmployeesInMonth = filteredEmployees.filter(e => {
+      if (employeesWithEntries.has(e.id)) return true;
+      if (e.status === "active") return true;
+      if (e.resignDate) {
+        return e.resignDate.slice(0, 7) >= selectedMonth;
+      }
+      return false;
+    });
+
+    activeEmployeesInMonth.forEach(e => {
       map.set(e.id, { zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0, points: 0, daysCount: 0 });
     });
 
@@ -542,8 +553,8 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
         points,
         daysCount: data.daysCount
       };
-    }).sort((a, b) => b.points - a.points); // Sort by points desc
-  }, [currentMonthEntries, filteredEmployees, employees]);
+    }).sort((a, b) => b.points - a.points);
+  }, [currentMonthEntries, filteredEmployees, employees, selectedMonth]);
 
   // Top 3 Leaderboard rankers
   const topPerformers = useMemo(() => {
@@ -554,7 +565,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   const statsEntries = useMemo(() => {
     return entries.filter(entry => {
       if (!filteredEmployeeIds.has(entry.employeeId)) return false;
-      
+
       const today = new Date();
       if (statsTimeRange === "today") {
         const todayStr = today.toISOString().split("T")[0];
@@ -581,8 +592,26 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   // Aggregate stats by employee for selected stats time range
   const statsEmployeeSummaries = useMemo(() => {
     const map = new Map<string, KpiMetrics & { points: number; daysCount: number }>();
-    
-    filteredEmployees.forEach(e => {
+
+    const employeesWithStatsEntries = new Set(statsEntries.map(entry => entry.employeeId));
+
+    const activeEmployeesInStats = filteredEmployees.filter(e => {
+      if (employeesWithStatsEntries.has(e.id)) return true;
+      if (e.status === "active") return true;
+      if (e.resignDate) {
+        const today = new Date();
+        if (statsTimeRange === "this-year") {
+          const currentYearStr = today.getFullYear().toString();
+          return e.resignDate.slice(0, 4) >= currentYearStr;
+        } else {
+          const currentMonthStr = today.toISOString().slice(0, 7);
+          return e.resignDate.slice(0, 7) >= currentMonthStr;
+        }
+      }
+      return false;
+    });
+
+    activeEmployeesInStats.forEach(e => {
       map.set(e.id, { zalo: 0, fb: 0, comment: 0, post: 0, clientReply: 0, khachChuDongIB: 0, followUp: 0, quote: 0, deal: 0, revenue: 0, points: 0, daysCount: 0 });
     });
 
@@ -617,13 +646,13 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
           daysCount: data.daysCount
         };
       })
-    .filter(row => {
-      if (!statsSearchQuery) return true;
-      const q = statsSearchQuery.toLowerCase();
-      return row.name.toLowerCase().includes(q) || row.department.toLowerCase().includes(q) || row.position.toLowerCase().includes(q);
-    })
-    .sort((a, b) => b.points - a.points);
-  }, [statsEntries, filteredEmployees, employees, statsSearchQuery]);
+      .filter(row => {
+        if (!statsSearchQuery) return true;
+        const q = statsSearchQuery.toLowerCase();
+        return row.name.toLowerCase().includes(q) || row.department.toLowerCase().includes(q) || row.position.toLowerCase().includes(q);
+      })
+      .sort((a, b) => b.points - a.points);
+  }, [statsEntries, filteredEmployees, employees, statsSearchQuery, statsTimeRange]);
 
   // Aggregate totals for the stats table
   const statsTableTotals = useMemo(() => {
@@ -687,10 +716,9 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     return totals;
   }, [employeeSummaries]);
 
-  // Target values for the branch/month
   const selectedMonthTarget = useMemo(() => {
     // Return average or default targets for selected month
-    return getTarget("all", selectedMonth);
+    return getTarget("all", selectedMonth, targets);
   }, [selectedMonth, targets]);
 
   // Average KPI completion percentage
@@ -698,18 +726,18 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     if (employeeSummaries.length === 0) return 0;
     let totalRate = 0;
     let counts = 0;
-    
+
     employeeSummaries.forEach(emp => {
-      const target = getTarget(emp.employeeId, selectedMonth);
+      const target = getTarget(emp.employeeId, selectedMonth, targets);
       // Let's compute average rate across key fields (e.g. Revenue, Deal, Zalo)
       const revRate = target.revenue > 0 ? (emp.metrics.revenue / target.revenue) * 100 : 100;
       const dealRate = target.deal > 0 ? (emp.metrics.deal / target.deal) * 100 : 100;
       const zaloRate = target.zalo > 0 ? (emp.metrics.zalo / target.zalo) * 100 : 100;
-      
+
       totalRate += (Math.min(revRate, 100) + Math.min(dealRate, 100) + Math.min(zaloRate, 100)) / 3;
       counts++;
     });
-    
+
     return Math.round(totalRate / (counts || 1));
   }, [employeeSummaries, selectedMonth]);
 
@@ -769,7 +797,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
         if (reportGroupBy === "week") {
           key = getWeekString(dateStr);
         }
-        
+
         if (reportGroupBy !== "employee") {
           map.set(key, {
             groupKey: key,
@@ -818,7 +846,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
       } else if (reportGroupBy === "week") {
         key = getWeekString(entry.date);
       }
-      
+
       const current = map.get(key) || {
         groupKey: key,
         zalo: 0,
@@ -833,7 +861,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
         khachChuDongIB: 0,
         entriesCount: 0
       };
-      
+
       current.zalo += entry.metrics.zalo;
       current.fb += entry.metrics.fb;
       current.comment += entry.metrics.comment;
@@ -845,7 +873,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
       current.revenue += entry.metrics.revenue;
       current.khachChuDongIB += entry.metrics.khachChuDongIB || 0;
       current.entriesCount += 1;
-      
+
       map.set(key, current);
     });
 
@@ -956,7 +984,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
 
     const total = zaloVal + fbVal + commentVal + postVal + followUpVal + dealVal;
     if (total === 0) return [];
-    
+
     return [
       { name: "IB Zalo", value: zaloVal, pct: Math.round((zaloVal / total) * 100), color: "#6366F1" },
       { name: "Comment", value: commentVal, pct: Math.round((commentVal / total) * 100), color: "#EA580C" },
@@ -970,33 +998,33 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   // Prepare chart daily data
   const chartDailyData = useMemo(() => {
     const dailyMap = new Map<string, { date: string; fullDate: string; revenue: number; zalo: number; fb: number; deal: number }>();
-    
+
     // Seed all dates of selected month up to current day (if current month)
     const year = parseInt(selectedMonth.split("-")[0]);
     const monthIndex = parseInt(selectedMonth.split("-")[1]) - 1;
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-    
+
     const today = new Date();
     const curYear = today.getFullYear();
     const curMonthIndex = today.getMonth();
     const curDay = today.getDate();
-    
+
     let maxDay = daysInMonth;
     if (year === curYear && monthIndex === curMonthIndex) {
       maxDay = curDay;
     } else if (year > curYear || (year === curYear && monthIndex > curMonthIndex)) {
       maxDay = 0; // future month
     }
-    
+
     for (let d = 1; d <= maxDay; d++) {
       const dateStr = `${selectedMonth}-${String(d).padStart(2, "0")}`;
-      dailyMap.set(dateStr, { 
-        date: `${String(monthIndex + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`, 
-        fullDate: dateStr, 
-        revenue: 0, 
-        zalo: 0, 
-        fb: 0, 
-        deal: 0 
+      dailyMap.set(dateStr, {
+        date: `${String(monthIndex + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
+        fullDate: dateStr,
+        revenue: 0,
+        zalo: 0,
+        fb: 0,
+        deal: 0
       });
     }
 
@@ -1015,30 +1043,36 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   }, [currentMonthEntries, selectedMonth]);
 
   // Save targets
-  const handleSaveTarget = (e: React.FormEvent) => {
+  const handleSaveTarget = async (e: React.FormEvent) => {
     e.preventDefault();
-    const currentTargets = getStoredKpiTargets();
-    
-    const newTarget: KpiTarget = {
-      id: targetEmployeeId === "all" ? `t-default-${targetForm.month}` : `t-${targetEmployeeId}-${targetForm.month}`,
-      employeeId: targetEmployeeId,
-      month: targetForm.month,
-      metrics: targetForm.metrics
-    };
-
-    // Remove duplicates
-    const nextTargets = currentTargets.filter(t => !(t.employeeId === targetEmployeeId && t.month === targetForm.month));
-    nextTargets.push(newTarget);
-    
-    saveStoredKpiTargets(nextTargets);
-    setTargets(nextTargets);
-    setIsTargetModalOpen(false);
-    showToast("Đã lưu chỉ tiêu KPI mới thành công!", "success");
+    try {
+      if (!api || !api.kpi) {
+        // fallback placeholder if api is not injected or defined
+        throw new Error("API not initialized");
+      }
+      await api.kpi.saveTarget({
+        id: editingTargetId || undefined,
+        employeeId: targetEmployeeId,
+        month: targetForm.month,
+        metrics: targetForm.metrics
+      });
+      // Fallback load if loadData is undefined
+      if (typeof loadData === 'function') {
+        await loadData();
+      } else {
+        // ...
+      }
+      setIsTargetModalOpen(false);
+      showToast("Đã lưu chỉ tiêu KPI mới thành công!", "success");
+    } catch (err: any) {
+      showToast(err instanceof Error ? err.message : "Lỗi khi lưu chỉ tiêu KPI", "error");
+    }
   };
 
   const openAddTargetModal = () => {
     setTargetEmployeeId("all");
     setTargetFormType("all");
+    setEditingTargetId(null);
     setTargetForm({
       employeeId: "all",
       month: selectedMonth,
@@ -1050,6 +1084,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   const handleEditTarget = (target: KpiTarget) => {
     setTargetEmployeeId(target.employeeId);
     setTargetFormType(target.employeeId === "all" ? "all" : "employee");
+    setEditingTargetId(target.id);
     setTargetForm({
       employeeId: target.employeeId,
       month: target.month,
@@ -1149,16 +1184,16 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
     showToast("Đang chuẩn bị xuất file PDF...", "success");
 
     const scriptUrl = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-    
+
     const runExport = () => {
       const element = document.createElement("div");
       element.style.padding = "20px";
       element.style.fontFamily = "Arial, sans-serif";
       element.style.color = "#333";
-      
+
       let html = `<h2 style="text-align: center; color: #C62828; margin-bottom: 5px;">BÁO CÁO PHÂN TÍCH KPI</h2>`;
       html += `<div style="text-align: center; font-size: 11px; color: #666; margin-bottom: 25px;">Khoảng thời gian: ${reportStartDate} đến ${reportEndDate} | Nhóm theo: ${reportGroupBy === "day" ? "Ngày" : reportGroupBy === "employee" ? "Nhân viên" : "Phòng ban"}</div>`;
-      
+
       const activeDivisor = reportGroupedData.length || 1;
       html += `<div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 25px;">`;
       html += `<div style="border: 1px solid #eee; padding: 12px; border-radius: 8px; text-align: center; background: #fafafa;"><span style="font-size: 9px; text-transform: uppercase; color: #888;">IB Zalo</span><h3 style="margin: 8px 0 0 0; font-size: 14px; font-weight: bold;">${reportTotals.zalo}</h3><small style="font-size: 9px; color: #999;">TB: ${Math.round(reportTotals.zalo / activeDivisor)}</small></div>`;
@@ -1280,8 +1315,8 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
   // Selected Employee log logs (for detail modal)
   const selectedEmployeeLogs = useMemo(() => {
     if (!selectedEmployeeForDetail) return [];
-    return entries.filter(e => 
-      e.employeeId === selectedEmployeeForDetail.id && 
+    return entries.filter(e =>
+      e.employeeId === selectedEmployeeForDetail.id &&
       e.date.startsWith(selectedMonth)
     ).sort((a, b) => b.date.localeCompare(a.date)); // Newest first
   }, [entries, selectedEmployeeForDetail, selectedMonth]);
@@ -1309,8 +1344,8 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
                 {activeTab === "overview"
                   ? "Theo dõi hiệu suất truyền thông, tương tác khách hàng và doanh thu của toàn bộ nhân viên chi nhánh."
                   : activeTab === "stats"
-                  ? "Xem bảng xếp hạng và thống kê điểm tích lũy KPI của nhân sự."
-                  : "So sánh hiệu suất và các chỉ số KPI giữa các nhân sự hoặc phòng ban."}
+                    ? "Xem bảng xếp hạng và thống kê điểm tích lũy KPI của nhân sự."
+                    : "So sánh hiệu suất và các chỉ số KPI giữa các nhân sự hoặc phòng ban."}
               </p>
             </div>
           </div>
@@ -1323,33 +1358,30 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
           <div className="flex gap-1.5 rounded-2xl p-1 bg-white border border-gray-200">
             <button
               onClick={() => setOverviewSubTab("charts")}
-              className={`py-2 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
-                overviewSubTab === "charts"
-                  ? "bg-[#C62828] text-white shadow-sm"
-                  : "text-[#8b6b70] hover:text-[#C62828]"
-              }`}
+              className={`py-2 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${overviewSubTab === "charts"
+                ? "bg-[#C62828] text-white shadow-sm"
+                : "text-[#8b6b70] hover:text-[#C62828]"
+                }`}
             >
               <BarChart3 size={14} />
               Tổng quan
             </button>
             <button
               onClick={() => setOverviewSubTab("reports")}
-              className={`py-2 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
-                overviewSubTab === "reports"
-                  ? "bg-[#C62828] text-white shadow-sm"
-                  : "text-[#8b6b70] hover:text-[#C62828]"
-              }`}
+              className={`py-2 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${overviewSubTab === "reports"
+                ? "bg-[#C62828] text-white shadow-sm"
+                : "text-[#8b6b70] hover:text-[#C62828]"
+                }`}
             >
               <FileText size={14} />
               Báo cáo
             </button>
             <button
               onClick={() => setOverviewSubTab("targets")}
-              className={`py-2 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${
-                overviewSubTab === "targets"
-                  ? "bg-[#C62828] text-white shadow-sm"
-                  : "text-[#8b6b70] hover:text-[#C62828]"
-              }`}
+              className={`py-2 px-4 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center gap-2 ${overviewSubTab === "targets"
+                ? "bg-[#C62828] text-white shadow-sm"
+                : "text-[#8b6b70] hover:text-[#C62828]"
+                }`}
             >
               <Settings size={14} />
               KPI Target
@@ -1465,13 +1497,13 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
                               <AreaChart data={chartDailyData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                                 <defs>
                                   <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#C62828" stopOpacity={0.2}/>
-                                    <stop offset="95%" stopColor="#C62828" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#C62828" stopOpacity={0.2} />
+                                    <stop offset="95%" stopColor="#C62828" stopOpacity={0} />
                                   </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                                 <XAxis dataKey="date" stroke="#9ca3af" axisLine={false} tickLine={false} tickFormatter={(val) => val.split("-")[1]} interval={1} />
-                                <YAxis stroke="#9ca3af" axisLine={false} tickLine={false} tickFormatter={(val) => `${(val/1000000).toFixed(0)}M`} />
+                                <YAxis stroke="#9ca3af" axisLine={false} tickLine={false} tickFormatter={(val) => `${(val / 1000000).toFixed(0)}M`} />
                                 <Tooltip formatter={(value) => [`${(value as number).toLocaleString()} đ`, "Doanh thu"]} />
                                 <Area type="monotone" dataKey="revenue" stroke="#C62828" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
                               </AreaChart>
@@ -1538,12 +1570,11 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
                       topRevenueEmployees.map((emp, index) => (
                         <div key={emp.employeeId} className="flex justify-between items-center border-b border-gray-50 pb-2.5 last:border-0 last:pb-0">
                           <div className="flex items-center gap-3">
-                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-                              index === 0 ? "bg-amber-100 text-amber-700" :
+                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${index === 0 ? "bg-amber-100 text-amber-700" :
                               index === 1 ? "bg-slate-100 text-slate-700" :
-                              index === 2 ? "bg-orange-100 text-orange-700" :
-                              "bg-gray-100 text-gray-600"
-                            }`}>{index + 1}</span>
+                                index === 2 ? "bg-orange-100 text-orange-700" :
+                                  "bg-gray-100 text-gray-600"
+                              }`}>{index + 1}</span>
                             <div>
                               <p className="text-xs font-bold text-gray-800">{emp.name}</p>
                               <p className="text-[9px] text-gray-400">{emp.position} • {emp.department}</p>
@@ -1794,7 +1825,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
               {/* Detailed Grouped Report Table */}
               <div className="bg-white rounded-3xl p-6 border border-black/5 shadow-xs">
                 <h4 className="font-bold text-gray-800 text-sm mb-4">Chi tiết báo cáo phân tích</h4>
-                
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs text-left border-collapse">
                     <thead>
@@ -2562,20 +2593,20 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
               const borderClass = isIncreased
                 ? "border-[#A5D6A7] bg-white"
                 : isDecreased
-                ? "border-[#EF9A9A] bg-white"
-                : "border-gray-100 bg-white";
+                  ? "border-[#EF9A9A] bg-white"
+                  : "border-gray-100 bg-white";
 
               const badgeBgClass = isIncreased
                 ? "bg-[#E8F5E9] text-[#2E7D32]"
                 : isDecreased
-                ? "bg-[#FFEBEE] text-[#C62828]"
-                : "bg-gray-50 text-gray-500";
+                  ? "bg-[#FFEBEE] text-[#C62828]"
+                  : "bg-gray-50 text-gray-500";
 
               const trendIcon = isIncreased ? "▲" : isDecreased ? "▼" : "•";
 
               const displayVal1 = formatCompareMetricValue(key, val1);
               const displayVal2 = formatCompareMetricValue(key, val2);
-              
+
               // Absolute difference formatting: prepend + if positive, raw negative if negative
               let displayDiff = "0";
               if (diff > 0) {
@@ -2634,9 +2665,9 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
                   <p className="text-[10px] text-gray-400 font-bold mt-0.5">{selectedEmployeeForDetail.position} • {selectedEmployeeForDetail.department}</p>
                 </div>
               </div>
-              <button 
+              <button
                 type="button"
-                onClick={() => setSelectedEmployeeForDetail(null)} 
+                onClick={() => setSelectedEmployeeForDetail(null)}
                 className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 <X size={16} />
@@ -2646,7 +2677,7 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
             {/* List entries */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4" style={{ scrollbarWidth: "thin" }}>
               <h4 className="font-bold text-gray-800 text-xs">Danh sách báo cáo hàng ngày (Tháng {selectedMonth})</h4>
-              
+
               {selectedEmployeeLogs.length === 0 ? (
                 <div className="p-8 text-center text-gray-400 text-xs font-semibold">Chưa có nhật ký KPI nào được gửi cho tháng này</div>
               ) : (
@@ -2711,9 +2742,9 @@ export function KpiManagementAdmin({ employees: rawEmployees, activeTab = "overv
             </div>
 
             <div className="p-6 border-t border-gray-100 bg-gray-50/50 flex justify-end">
-              <button 
+              <button
                 type="button"
-                onClick={() => setSelectedEmployeeForDetail(null)} 
+                onClick={() => setSelectedEmployeeForDetail(null)}
                 className="py-2 px-6 rounded-xl bg-gray-800 text-white font-bold text-xs hover:bg-gray-900 transition-all cursor-pointer"
               >
                 Đóng

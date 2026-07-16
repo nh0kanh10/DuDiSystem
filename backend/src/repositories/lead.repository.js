@@ -14,7 +14,7 @@ export function getAll(filter = {}) {
       || l.contactName?.toLowerCase().includes(q),
     )
   }
-  return rows.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+  return rows.sort((a, b) => String(b.code || "").localeCompare(String(a.code || "")))
 }
 
 export function getById(id) {

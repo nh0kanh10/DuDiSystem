@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react"
+import * as XLSX from "xlsx"
 import { api } from "@/lib/api"
 import { Modal, ModalCancelButton, ModalSubmitButton } from "../ui/Modal"
 import ConfirmModal from "../ui/ConfirmModal"
@@ -279,6 +280,52 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
       } catch (err: any) { notify(err.message || "Lỗi giao data số lượng", "error") }
       finally { setAutoAssignLoading(false) }
     }
+  }
+
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "Tên doanh nghiệp",
+      "Số điện thoại",
+      "Địa chỉ",
+      "Khu vực",
+      "Website",
+      "Loại hình",
+      "Google Maps",
+      "Ghi chú",
+      "ID"
+    ]
+    const sampleData = [
+      [
+        "Công ty TNHH Đầu tư và Phát triển DuDi",
+        "0901234567",
+        "123 Đường Nguyễn Huệ, Phường Bến Nghé",
+        "Quận 1, TP. HCM",
+        "https://dudi.vn",
+        "Công nghệ thông tin",
+        "https://maps.app.goo.gl/abc",
+        "Khách hàng tiềm năng liên hệ qua website. Vui lòng XÓA DÒNG VÍ DỤ NÀY trước khi import.",
+        "000000"
+      ]
+    ]
+    const wsData = [headers, ...sampleData]
+    const ws = XLSX.utils.aoa_to_sheet(wsData)
+    
+    ws["!cols"] = [
+      { wch: 35 }, // Tên doanh nghiệp
+      { wch: 15 }, // Số điện thoại
+      { wch: 40 }, // Địa chỉ
+      { wch: 20 }, // Khu vực
+      { wch: 25 }, // Website
+      { wch: 20 }, // Loại hình
+      { wch: 30 }, // Google Maps
+      { wch: 40 }, // Ghi chú
+      { wch: 15 }  // ID
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, "Mẫu Import Lead")
+    XLSX.writeFile(wb, "mau_import_lead.xlsx")
+    notify("Tải file mẫu thành công!")
   }
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -819,9 +866,17 @@ export function CrmAdminPage({ selectedBranch = "all", onOpenLead }: { selectedB
               >
                 <Plus size={14} className="mr-1.5" /> Thêm mới
               </button>
+              <button
+                onClick={handleDownloadTemplate}
+                className="flex items-center px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 rounded-xl text-sm font-bold transition"
+                title="Tải file Excel mẫu để nhập dữ liệu import"
+              >
+                <Download size={14} className="mr-1.5 text-blue-600" />
+                Tải file mẫu
+              </button>
               <label className={"flex items-center px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200 rounded-xl text-sm font-bold transition cursor-pointer " + (importLoading ? "opacity-60 pointer-events-none" : "")}>
                 {importLoading ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <FileSpreadsheet size={14} className="mr-1.5 text-[#C62828]" />}
-                Import CSV
+                Import Excel/CSV
                 <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={handleImport} />
               </label>
               <button

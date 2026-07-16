@@ -19,6 +19,7 @@ interface CustomSelectProps {
   placeholder?: string
   menuClassName?: string
   portal?: boolean
+  optionColorFn?: (value: string) => { dot: string; base: string; active: string }
 }
 
 export function CustomSelect({
@@ -32,6 +33,7 @@ export function CustomSelect({
   placeholder = "Chọn...",
   menuClassName = "",
   portal = true,
+  optionColorFn,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
@@ -82,7 +84,6 @@ export function CustomSelect({
     }
 
     if (searchable) {
-      // Focus search input when dropdown opens
       setTimeout(() => {
         searchInputRef.current?.focus()
       }, 50)
@@ -94,7 +95,6 @@ export function CustomSelect({
       const next = calcMenuRect()
       if (!next) return
       const prev = lastRectRef.current
-      // Tránh setState liên tục khi tọa độ không đổi -> giảm nháy/giật
       if (prev && prev.top === next.top && prev.left === next.left && prev.width === next.width) return
       lastRectRef.current = next
       setMenuRect(next)
@@ -116,6 +116,7 @@ export function CustomSelect({
   }, [isOpen, searchable, portal])
 
   const selectedOption = options.find(opt => opt.value === value)
+  const currentColor = optionColorFn?.(value)
 
   const filteredOptions = options.filter(opt =>
     removeVietnameseTones(opt.label.toLowerCase()).includes(removeVietnameseTones(searchTerm.toLowerCase()))
@@ -141,19 +142,29 @@ export function CustomSelect({
       )}
       <div className="overflow-y-auto py-1 divide-y divide-gray-50 dark:divide-white/5 flex-1" style={{ scrollbarWidth: "thin" }}>
         {filteredOptions.length > 0 ? (
-          filteredOptions.map(opt => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => {
-                onChange(opt.value)
-                setIsOpen(false)
-              }}
-              className={`w-full px-4 py-2.5 text-left text-xs font-bold transition-colors block truncate ${value === opt.value ? "bg-[#C62828]/5 text-[#C62828] dark:bg-[#C62828]/10" : "text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10"}`}
-            >
-              {opt.label}
-            </button>
-          ))
+          filteredOptions.map(opt => {
+            const color = optionColorFn?.(opt.value)
+            const isSelected = value === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value)
+                  setIsOpen(false)
+                }}
+                className={`w-full px-4 py-2.5 text-left text-xs font-bold transition-colors flex items-center gap-2 block truncate ${color
+                    ? isSelected ? color.active : color.base
+                    : isSelected ? "bg-[#C62828]/5 text-[#C62828] dark:bg-[#C62828]/10" : "text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10"
+                  }`}
+              >
+                {color && (
+                  <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${color.dot}`} />
+                )}
+                {opt.label}
+              </button>
+            )
+          })
         ) : (
           <div className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 text-center font-medium">Không tìm thấy kết quả</div>
         )}
@@ -180,7 +191,13 @@ export function CustomSelect({
             return nextOpen
           })
         }}
-        className={`w-full flex items-center justify-between px-3 py-2 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-700 dark:text-gray-200 bg-white dark:bg-white/5 font-bold ${heightClass} focus:outline-none focus:border-[#C62828]/40 hover:bg-gray-50/50 dark:hover:bg-white/10 transition-colors disabled:bg-gray-50 dark:disabled:bg-white/5 disabled:text-gray-400 text-left`}
+        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold ${heightClass} focus:outline-none transition-colors text-left
+          ${currentColor
+            ? `${currentColor.base} border border-transparent`
+            : "border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200 bg-white dark:bg-white/5 focus:border-[#C62828]/40 hover:bg-gray-50/50 dark:hover:bg-white/10"
+          }
+          ${disabled ? "opacity-60 cursor-not-allowed bg-gray-50 dark:bg-white/5 text-gray-400" : ""}
+        `}
       >
         <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
         <ChevronDown size={14} className="text-gray-400 pointer-events-none flex-shrink-0 ml-1" />
