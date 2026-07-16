@@ -357,7 +357,7 @@ function LoyaltyBoardTab() {
             🏆 Bảng xếp hạng thâm niên
           </h3>
           <div className="text-sm text-gray-500 font-bold flex items-center gap-2">
-            <Clock size={16} /> Ngày: {now.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric', year: 'numeric' })}
+            <Clock size={16} /> Ngày: {now.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
           </div>
         </div>
 
